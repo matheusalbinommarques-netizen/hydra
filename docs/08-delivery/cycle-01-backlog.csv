@@ -1,0 +1,12 @@
+﻿ID;Tipo;Título;Prioridade;Esforço;Release;Ciclo;Status
+C1-01;Tarefa;Criar repositório privado;Must;Pequeno;Release 0;Ciclo 1;Ready
+C1-02;Tarefa;Organizar baseline documental;Must;Médio;Release 0;Ciclo 1;Ready
+C1-03;Tarefa;Configurar GitHub Project;Must;Pequeno;Release 0;Ciclo 1;Backlog
+C1-04;História;Especificar fluxo inicial;Must;Médio;Release 0;Ciclo 1;Backlog
+C1-05;História;Especificar motor de orientação v0.1;Must;Médio;Release 0;Ciclo 1;Backlog
+C1-06;História;Criar wireframe estrutural;Must;Grande;Release 0;Ciclo 1;Backlog
+C1-07;Tarefa;Criar templates de issue;Should;Pequeno;Release 0;Ciclo 1;Done
+C1-08;Tarefa;Preparar plano de teste;Should;Pequeno;Release 0;Ciclo 1;Done
+C1-09;História;Criar protótipo navegável inicial;Should;Grande;Release 0;Ciclo 1;Backlog
+C1-10;Tarefa;Criar identidade visual provisória;Could;Médio;Release 0;Ciclo 1;Backlog
+C1-11;Tarefa;Preparar publicação de iniciação;Could;Pequeno;Release 0;Ciclo 1;Backlog
