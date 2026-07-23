@@ -41,11 +41,14 @@
 Decidida em `ADR-001` (`docs/06-architecture/adr/ADR-001-stack-choice.md`):
 
 - SvelteKit + TypeScript;
-- executado em Node.js;
-- SQLite embutido no processo Node;
+- executado em Node.js 24.18.0 LTS — versão fixada em `app/.node-version` e `app/package.json#engines` (C2-01/C2-02);
+- adapter `@sveltejs/adapter-node`, com build standalone confirmado (`npm run build` + `node build` respondendo HTTP 200 — C2-02);
+- driver SQLite: `better-sqlite3` (sem ORM), com `@types/better-sqlite3` para tipagem — resolvido (C2-02; tabela de justificativa em `docs/08-delivery/cycle-02-backlog.md`);
+- biblioteca de validação de formulários/dados: nenhuma — validação própria, sem dependência externa;
+- runner de testes: Vitest (unitário/integração) + Playwright (jornada), já instalados via scaffold (C2-01);
 - self-host em VPS único.
 
-ORM, driver de banco, biblioteca de validação e migrations permanecem em aberto (ver §9).
+Estratégia de migração de schema e infraestrutura da VPS permanecem em aberto (ver §9).
 
 ## 5. Estrutura de módulos
 
@@ -120,8 +123,8 @@ Direção de dependência: `domain/` e `orientation-engine/` nunca importam `per
 
 - SQLite embutido no processo Node (`ADR-001`) — mantém aplicação e arquivo do banco no mesmo servidor;
 - acessado exclusivamente através da porta definida em `server/persistence/` (§5) — nenhum outro módulo fala com o banco diretamente;
-- a porta carrega o estado do projeto e salva atomicamente o estado resultante de uma operação; a estratégia interna ainda não foi decidida;
-- driver/ORM concreto ainda não escolhido (§9);
+- a porta carrega o estado do projeto e salva atomicamente o estado resultante de uma operação; a estratégia interna (schema, tabelas) ainda não foi decidida (§9);
+- driver: `better-sqlite3` (sem ORM) — resolvido (C2-02/C2-03);
 - exportação e importação JSON no Walking Skeleton (já previstas em `TECHNICAL_BRIEF.md` §6 e §14) operam sobre o mesmo estado exposto pela porta, não sobre o banco diretamente.
 
 ## 7. Testes
@@ -133,7 +136,7 @@ Categorias mapeadas para a estrutura de módulos (§5):
 - **jornada** — `routes/` ponta a ponta (criar projeto, responder atividades, pular, revisar resumo, receber próxima ação);
 - **manuais** — clareza visual, navegação, estados, mensagens, acessibilidade básica.
 
-Runner de testes específico ainda não escolhido (§9).
+Runner: Vitest (unitário/integração) + Playwright (jornada) — resolvido (C2-01).
 
 ## 8. Autenticação
 
@@ -141,10 +144,7 @@ Adiada. O Walking Skeleton poderá operar sem contas, desde que isso não compro
 
 ## 9. Decisões pendentes
 
-- ORM ou driver de banco para SQLite;
-- biblioteca de validação de formulários/dados;
-- runner de testes (unitário e de jornada);
 - estratégia de migração de schema;
 - infraestrutura da VPS (provisionamento, backups, TLS, processo de deploy).
 
-Resolvidos nesta versão: framework/linguagem/runtime e banco embutido (`ADR-001`); localização da aplicação no repositório (`app/`); estrutura interna de módulos, incluindo a camada de aplicação e a fronteira server-only (§5).
+Resolvidos nesta versão: framework/linguagem/runtime e banco embutido (`ADR-001`); localização da aplicação no repositório (`app/`); estrutura interna de módulos, incluindo a camada de aplicação e a fronteira server-only (§5); versão do Node fixada em 24.18.0 LTS, registrada em `app/.node-version` e `app/package.json#engines` (C2-01/C2-02); adapter `@sveltejs/adapter-node`, com build standalone confirmado (C2-02); driver SQLite `better-sqlite3` (sem ORM) com `@types/better-sqlite3` (C2-02); biblioteca de validação: nenhuma, validação própria; runner de testes: Vitest + Playwright (C2-01). Justificativas de cada dependência em `docs/08-delivery/cycle-02-backlog.md`.
