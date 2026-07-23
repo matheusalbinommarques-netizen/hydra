@@ -1,6 +1,6 @@
 # Architecture Brief
 
-**Status:** preliminar — escolha de stack pendente
+**Status:** aceita — stack definida em ADR-001; arquitetura interna definida nesta versão
 
 ## 1. Contexto
 
@@ -10,9 +10,8 @@
 - sem integrações externas;
 - sem orçamento;
 - desenvolvimento assistido pelo Claude Code;
-- execução local inicialmente;
-- futura hospedagem gratuita;
-- persistência simples no Walking Skeleton.
+- execução local inicialmente, com self-host em VPS único como hospedagem-alvo (ADR-001);
+- persistência simples no Walking Skeleton, com SQLite embutido no processo Node (ADR-001).
 
 ## 2. Prioridades
 
@@ -34,54 +33,118 @@
 - nada de arquitetura distribuída;
 - regras metodológicas separadas da UI;
 - textos de orientação separados dos componentes;
-- dados preparados para futura IA;
+- dados estruturados e semanticamente identificados, sem componentes ou serviços de IA no Release 0;
 - nenhuma funcionalidade crítica como caixa-preta.
 
 ## 4. Stack
 
-Opções serão comparadas formalmente.
+Decidida em `ADR-001` (`docs/06-architecture/adr/ADR-001-stack-choice.md`):
 
-SvelteKit possui vantagem preliminar porque:
+- SvelteKit + TypeScript;
+- executado em Node.js;
+- SQLite embutido no processo Node;
+- self-host em VPS único.
 
-- já foi utilizado em projeto anterior;
-- reduz o número de tecnologias novas;
-- oferece TypeScript;
-- permite aplicação full stack simples;
-- favorece desenvolvimento em um repositório.
+ORM, driver de banco, biblioteca de validação e migrations permanecem em aberto (ver §9).
 
-A vantagem não representa decisão final.
+## 5. Estrutura de módulos
 
-## 5. Persistência inicial
+Localização do projeto no monorepo: pasta `app/` dedicada — mantém `docs/`, `design/` e `prototype/` limpos na raiz.
 
-Release 0:
+A estrutura interna de `app/src/` reflete a separação de responsabilidades de `TECHNICAL_BRIEF.md` §4 e o conteúdo já registrado em `DOMAIN_MODEL.md`, `STATE_MACHINE.md` e `ORIENTATION_ENGINE.md`:
 
-- protótipo sem persistência real.
+```text
+app/
+  src/
+    lib/
+      domain/               tipos das entidades e do catálogo (Project,
+                             ActivityProgress, Answer, PendingItem,
+                             PhaseDefinition, ActivityDefinition,
+                             FieldDefinition) e as funções puras de transição e
+                             invariantes de `STATE_MACHINE.md` (transições de
+                             status de atividade, regras de edição, gatilho de
+                             invalidação do Resumo). Não acessa persistência
+                             nem o catálogo concreto.
 
-Walking Skeleton:
+      catalog/               dados: instâncias concretas do catálogo
+                             metodológico (as 7 atividades da Descoberta +
+                             "Definir usuário principal", com títulos,
+                             perguntas, exemplos, critérios de conclusão,
+                             textos de pendência). Estático, sem estado de
+                             projeto.
 
-- persistência simples;
-- exportação e importação JSON;
-- banco local ou equivalente a decidir;
-- modelo preparado para migração.
+      orientation-engine/    funções puras de projeção e recomendação de
+                             `ORIENTATION_ENGINE.md`: status de fase/projeto,
+                             Trilha A, Trilha B, "limite do catálogo
+                             alcançado", projeção de hipóteses. Recebe estado
+                             + catálogo como entrada; nunca acessa nem grava
+                             persistência.
 
-## 6. Testes
+      server/
+        persistence/         porta (interface) de um único repositório
+                             orientado ao agregado Project: carrega o estado
+                             do projeto e salva atomicamente o estado
+                             resultante de uma operação. A estratégia interna
+                             (reescrita completa, diffs, transações) ainda não
+                             foi decidida — só o contrato "carregar" /
+                             "salvar atomicamente" está fixado aqui. Fronteira
+                             server-only explícita via convenção `$lib/server`
+                             do SvelteKit.
 
-- unitários para regras;
-- integração para persistência e importação;
-- testes de jornada crítica;
-- interface manual inicialmente.
+        application/          casos de uso (ex.: responder atividade, pular
+                             atividade, confirmar resumo): carrega o estado
+                             via persistence/, aplica as funções puras de
+                             transição de domain/, persiste atomicamente o
+                             estado resultante via persistence/, e só então
+                             solicita ao orientation-engine/ as projeções
+                             (status, Trilha A/B) para montar a resposta. É a
+                             única camada que conhece catalog/, persistence/,
+                             domain/ e orientation-engine/ ao mesmo tempo.
 
-## 7. Autenticação
+    routes/                  interface (SvelteKit): Home, Agora, Mapa,
+                             Resumo, Registros. `+page.server.ts` e `actions`
+                             chamam apenas `server/application/` — nunca
+                             catalog/, persistence/, domain/ ou
+                             orientation-engine/ diretamente.
+```
 
-Adiada. O Walking Skeleton poderá operar sem contas, desde que isso não comprometa a arquitetura escolhida.
+**Fluxo de leitura** (qualquer tela): `routes/` chama o caso de uso de leitura em `server/application/` → este chama `persistence.load(projectId)` (estado) + `catalog` (conteúdo estático) → passa isso ao `orientation-engine` (status calculado, Trilha A/B) → monta o resultado pronto para o componente.
 
-## 8. Decisões pendentes
+**Fluxo de escrita** (responder, pular, confirmar resumo): `routes/` recebe a ação → chama o caso de uso correspondente em `server/application/` → este carrega o estado via `persistence`, aplica a transição pura de `domain/`, persiste atomicamente o estado resultante via `persistence`, e então chama `orientation-engine` para recalcular as projeções (Trilha A/B, status) → devolve o resultado para `routes/`.
 
-- framework;
-- banco;
-- ORM;
-- biblioteca de UI;
-- testes;
-- localização da aplicação na estrutura do repositório;
-- deploy;
-- estratégia de migração.
+O Motor de Orientação (`orientation-engine/`) nunca acessa nem grava persistência — é `server/application/` quem aplica e persiste as transições, e só depois solicita as projeções ao motor.
+
+Direção de dependência: `domain/` e `orientation-engine/` nunca importam `persistence/`, `application/` ou `routes/`. `persistence/` não conhece regras de domínio além do que precisa serializar. `application/` é a única camada que integra tudo. `routes/` só conhece `application/`. É essa direção que permite adiar a escolha de ORM/driver sem reescrever domínio ou motor depois.
+
+## 6. Persistência inicial
+
+- SQLite embutido no processo Node (`ADR-001`) — mantém aplicação e arquivo do banco no mesmo servidor;
+- acessado exclusivamente através da porta definida em `server/persistence/` (§5) — nenhum outro módulo fala com o banco diretamente;
+- a porta carrega o estado do projeto e salva atomicamente o estado resultante de uma operação; a estratégia interna ainda não foi decidida;
+- driver/ORM concreto ainda não escolhido (§9);
+- exportação e importação JSON no Walking Skeleton (já previstas em `TECHNICAL_BRIEF.md` §6 e §14) operam sobre o mesmo estado exposto pela porta, não sobre o banco diretamente.
+
+## 7. Testes
+
+Categorias mapeadas para a estrutura de módulos (§5):
+
+- **unitários** — transições e invariantes de `domain/`, e projeções/recomendação de `orientation-engine/`;
+- **integração** — `server/persistence/` e `server/application/` (casos de uso completos, carregar/salvar/exportar/importar);
+- **jornada** — `routes/` ponta a ponta (criar projeto, responder atividades, pular, revisar resumo, receber próxima ação);
+- **manuais** — clareza visual, navegação, estados, mensagens, acessibilidade básica.
+
+Runner de testes específico ainda não escolhido (§9).
+
+## 8. Autenticação
+
+Adiada. O Walking Skeleton poderá operar sem contas, desde que isso não comprometa a arquitetura descrita em §5.
+
+## 9. Decisões pendentes
+
+- ORM ou driver de banco para SQLite;
+- biblioteca de validação de formulários/dados;
+- runner de testes (unitário e de jornada);
+- estratégia de migração de schema;
+- infraestrutura da VPS (provisionamento, backups, TLS, processo de deploy).
+
+Resolvidos nesta versão: framework/linguagem/runtime e banco embutido (`ADR-001`); localização da aplicação no repositório (`app/`); estrutura interna de módulos, incluindo a camada de aplicação e a fronteira server-only (§5).
