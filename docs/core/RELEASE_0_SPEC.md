@@ -41,6 +41,8 @@ Tela inicial
 → informar origem
 → registrar contexto
 → descrever problema ou oportunidade
+→ identificar público afetado
+→ registrar estado atual
 → definir resultado desejado
 → revisar resumo
 → receber próxima ação
@@ -140,9 +142,7 @@ Ajudar o usuário a compreender a necessidade antes de definir funcionalidades.
 
 #### Campos obrigatórios
 
-- situação;
-- pessoa ou grupo afetado;
-- forma atual de lidar com a situação;
+- situação que precisa mudar;
 - principal dificuldade.
 
 #### Campos opcionais
@@ -171,8 +171,9 @@ Deve conter:
 O usuário descreveu:
 
 - o que acontece;
-- quem é afetado;
 - por que a situação é problemática.
+
+Quem é afetado e como a situação é tratada hoje são aprofundados nas atividades seguintes (Público afetado e Estado atual).
 
 #### Ações
 
@@ -184,7 +185,87 @@ O usuário descreveu:
 
 ---
 
-### 4.4 Atividade guiada — resultado desejado
+### 4.4 Atividade guiada — público afetado
+
+#### Objetivo
+
+Aprofundar quem sente esta situação, com mais detalhe do que o levantamento inicial em Problema ou oportunidade.
+
+#### Pergunta principal
+
+> Quem é afetado por esta situação, em detalhe?
+
+#### Campos obrigatórios
+
+- público afetado em detalhe.
+
+#### Orientação contextual
+
+Deve conter:
+
+- por que essa atividade importa;
+- exemplo de resposta;
+- critério de conclusão.
+
+#### Exemplo
+
+> Agentes de atendimento e clientes que abrem e acompanham solicitações.
+
+#### Critério de conclusão
+
+O público afetado foi descrito com clareza.
+
+#### Ações
+
+- salvar e continuar;
+- voltar;
+- pular;
+- ver exemplo;
+- entender melhor.
+
+---
+
+### 4.5 Atividade guiada — estado atual
+
+#### Objetivo
+
+Aprofundar como a situação é tratada hoje, para dimensionar o esforço da mudança necessária.
+
+#### Pergunta principal
+
+> Como a situação é tratada hoje, em detalhe?
+
+#### Campos obrigatórios
+
+- estado atual em detalhe.
+
+#### Orientação contextual
+
+Deve conter:
+
+- por que essa atividade importa;
+- exemplo de resposta;
+- critério de conclusão.
+
+#### Exemplo
+
+> Cada atendente mantém sua própria planilha, sem padrão entre times.
+
+#### Critério de conclusão
+
+O estado atual foi descrito com detalhe suficiente para orientar a próxima atividade.
+
+#### Ações
+
+- salvar e continuar;
+- voltar;
+- pular;
+- ver exemplo;
+- entender melhor.
+
+---
+
+### 4.6 Atividade guiada — resultado desejado
 
 #### Objetivo
 
@@ -214,7 +295,7 @@ Evitar aceitar apenas uma lista de funcionalidades como resultado.
 
 ---
 
-### 4.5 Resumo da descoberta
+### 4.7 Resumo da descoberta
 
 #### Objetivo
 
@@ -246,7 +327,7 @@ O resumo não deve parecer um documento jurídico. Deve ser escaneável e editá
 
 ---
 
-### 4.6 Próxima ação recomendada
+### 4.8 Próxima ação recomendada
 
 #### Objetivo
 
@@ -281,7 +362,7 @@ Demonstrar o principal diferencial do Hydra.
 
 ---
 
-### 4.7 Workspace principal
+### 4.9 Workspace principal
 
 #### Objetivo
 
