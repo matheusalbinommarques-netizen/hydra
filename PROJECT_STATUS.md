@@ -5,7 +5,17 @@
 
 ## Estado geral
 
-O projeto concluiu sua descoberta conceitual, iniciação e planejamento inicial do produto. A próxima etapa é a execução do Release 0, destinado a validar a experiência guiada antes da implementação do sistema funcional.
+## Estado geral
+
+A descoberta, iniciação, planejamento e definição visual do Release 0
+foram concluídos.
+
+O protótipo de experiência foi aprovado como referência oficial.
+
+O projeto entra agora na fase de definição técnica, iniciando pelo modelo
+conceitual de dados, máquina de estados e regras do motor de orientação.
+
+Nenhum código de produção foi iniciado.
 
 ## Entregas consolidadas
 

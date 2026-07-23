@@ -23,3 +23,28 @@
 - comparação formal de stacks;
 - ADR de escolha da stack;
 - Walking Skeleton funcional.
+
+## [0.2.0] — 22/07/2026
+
+### Adicionado
+
+- protótipo navegável do Release 0;
+- Home com estados vazio, único projeto e múltiplos projetos;
+- atividades guiadas;
+- modal de confirmação ao pular;
+- criação e resolução de pendências;
+- Resumo da descoberta;
+- Workspace com Agora, Mapa e Registros;
+- documentação das decisões visuais finais.
+
+### Alterado
+
+- unificação da jornada macro em seis fases;
+- separação entre fases e atividades;
+- sincronização conceitual dos estados entre as telas;
+- simplificação da navegação e terminologia.
+
+### Aprovado
+
+- identidade visual navy, prata e ciano;
+- experiência do Release 0 como referência para implementação.
