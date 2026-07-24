@@ -1,0 +1,474 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { catalog } from '../../catalog';
+import { createSqliteProjectRepository, type ProjectRepository, type SqliteProjectRepository } from '../persistence';
+import { createProjectUseCases } from './project-use-cases';
+import type { Clock, IdGenerator } from './ports';
+
+function fakeClock(initial: string): Clock & { set(iso: string): void } {
+	let current = initial;
+	return {
+		now: () => current,
+		set: (iso: string) => {
+			current = iso;
+		}
+	};
+}
+
+function fakeIdGenerator(prefix: string): IdGenerator {
+	let counter = 0;
+	return { generate: () => `${prefix}-${++counter}` };
+}
+
+function countingRepository(inner: ProjectRepository): { repository: ProjectRepository; counts: { insert: number; save: number } } {
+	const counts = { insert: 0, save: 0 };
+	return {
+		repository: {
+			insert: async (state) => {
+				counts.insert++;
+				return inner.insert(state);
+			},
+			findById: (projectId) => inner.findById(projectId),
+			save: async (state) => {
+				counts.save++;
+				return inner.save(state);
+			}
+		},
+		counts
+	};
+}
+
+const openRepos: SqliteProjectRepository[] = [];
+const tempFiles: string[] = [];
+
+function memoryRepo(): SqliteProjectRepository {
+	const repo = createSqliteProjectRepository(':memory:');
+	openRepos.push(repo);
+	return repo;
+}
+
+function tempFilePath(): string {
+	const filePath = path.join(os.tmpdir(), `hydra-app-test-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`);
+	tempFiles.push(filePath);
+	return filePath;
+}
+
+afterEach(() => {
+	for (const repo of openRepos.splice(0)) repo.close();
+	for (const filePath of tempFiles.splice(0)) fs.rmSync(filePath, { force: true });
+});
+
+function setup(clockValue = '2026-01-01T00:00:00.000Z') {
+	const repo = memoryRepo();
+	const clock = fakeClock(clockValue);
+	const idGenerator = fakeIdGenerator('id');
+	const useCases = createProjectUseCases({ repository: repo, catalog, clock, idGenerator });
+	return { repo, clock, idGenerator, useCases };
+}
+
+describe('createProjectUseCases — createProject', () => {
+	it('cria, persiste e retorna ProjectView', async () => {
+		const { useCases, repo } = setup();
+		const result = await useCases.createProject();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.projectName).toBeNull();
+		expect(result.value.projectStatus).toBe('rascunho');
+		expect(result.value.nextActivity).toEqual({ kind: 'recommendation', activityDefinitionId: 'origem' });
+
+		const stored = await repo.findById(result.value.projectId);
+		expect(stored).not.toBeNull();
+		expect(stored?.project.id).toBe(result.value.projectId);
+	});
+});
+
+describe('createProjectUseCases — loadProjectView', () => {
+	it('retorna o mesmo projeto após fechar e reabrir o banco', async () => {
+		const filePath = tempFilePath();
+		const repo1 = createSqliteProjectRepository(filePath);
+		const useCases1 = createProjectUseCases({
+			repository: repo1,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+		const created = await useCases1.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		repo1.close();
+
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		const useCases2 = createProjectUseCases({
+			repository: repo2,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+		const loaded = await useCases2.loadProjectView(created.value.projectId);
+		expect(loaded).toEqual({ ok: true, value: created.value });
+	});
+
+	it('retorna project_not_found para um projeto inexistente', async () => {
+		const { useCases } = setup();
+		await expect(useCases.loadProjectView('nao-existe')).resolves.toEqual({
+			ok: false,
+			error: { kind: 'project_not_found' }
+		});
+	});
+});
+
+describe('createProjectUseCases — renameProject', () => {
+	it('persiste uma mudança real de nome', async () => {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const renamed = await useCases.renameProject({ projectId: created.value.projectId, name: 'Portal' });
+		// definir o nome também tira o projeto de "rascunho" (STATE_MACHINE.md §4)
+		expect(renamed).toEqual({
+			ok: true,
+			value: { ...created.value, projectName: 'Portal', projectStatus: 'em_andamento' }
+		});
+
+		const stored = await repo.findById(created.value.projectId);
+		expect(stored?.project.name).toBe('Portal');
+	});
+
+	it('nome idêntico preserva o comportamento do domínio (não persiste de novo)', async () => {
+		const inner = memoryRepo();
+		const { repository, counts } = countingRepository(inner);
+		const useCases = createProjectUseCases({
+			repository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		await useCases.renameProject({ projectId: created.value.projectId, name: 'Portal' });
+		expect(counts.save).toBe(1);
+
+		await useCases.renameProject({ projectId: created.value.projectId, name: 'Portal' });
+		expect(counts.save).toBe(1); // não incrementou — domínio retornou a mesma referência
+	});
+});
+
+describe('createProjectUseCases — answerActivity', () => {
+	it('grava um campo answer', async () => {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.answerActivity({
+			projectId: created.value.projectId,
+			activityDefinitionId: 'origem',
+			values: { origem: 'Um problema' }
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.answers.origem).toBe('Um problema');
+		expect(result.value.activityStatuses.origem).toBe('concluída');
+
+		const stored = await repo.findById(created.value.projectId);
+		expect(stored?.answers.some((a) => a.fieldDefinitionId === 'origem' && a.value === 'Um problema')).toBe(true);
+	});
+
+	it('grava o campo project_property (nome do projeto)', async () => {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.answerActivity({
+			projectId: created.value.projectId,
+			activityDefinitionId: 'contexto',
+			values: { nome_provisorio: 'Portal de Solicitações' }
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.projectName).toBe('Portal de Solicitações');
+		expect(result.value.answers.nome_provisorio).toBeUndefined();
+
+		const stored = await repo.findById(created.value.projectId);
+		expect(stored?.project.name).toBe('Portal de Solicitações');
+		expect(stored?.answers.some((a) => a.fieldDefinitionId === 'nome_provisorio')).toBe(false);
+	});
+
+	it('invalida o Resumo quando necessário', async () => {
+		const { useCases, clock } = setup('2026-01-01T00:00:00.000Z');
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		// completa as demais atividades da Descoberta para que, após a
+		// invalidação, "resumo" seja de fato a única recomendação elegível
+		// antes dela na ordem do catálogo.
+		await useCases.answerActivity({ projectId, activityDefinitionId: 'origem', values: { origem: 'x' } });
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'contexto',
+			values: {
+				nome_provisorio: 'Portal',
+				breve_descricao: 'x',
+				modo_trabalho: 'Individual',
+				nivel_experiencia: 'Iniciante',
+				estagio_atual: 'Ideia inicial'
+			}
+		});
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'problema',
+			values: { situacao: 'x', dificuldade: 'y' }
+		});
+		await useCases.answerActivity({ projectId, activityDefinitionId: 'publico', values: { publico_detail: 'x' } });
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'estado_atual',
+			values: { estado_atual_detail: 'x' }
+		});
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'resultado',
+			values: { mudanca: 'x', beneficiario: 'y', percepcao: 'z' }
+		});
+		const confirmed = await useCases.confirmSummary({ projectId });
+		if (!confirmed.ok) throw new Error('esperado ok');
+		expect(confirmed.value.activityStatuses.resumo).toBe('concluída');
+
+		clock.set('2026-01-02T00:00:00.000Z');
+		const edited = await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'publico',
+			values: { publico_detail: 'y' }
+		});
+		if (!edited.ok) throw new Error('esperado ok');
+		expect(edited.value.activityStatuses.resumo).toBe('em_andamento');
+		expect(edited.value.nextActivity).toEqual({ kind: 'recommendation', activityDefinitionId: 'resumo' });
+	});
+});
+
+describe('createProjectUseCases — skipActivity', () => {
+	it('cria uma pendência', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.skipActivity({ projectId: created.value.projectId, activityDefinitionId: 'origem' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.activityStatuses.origem).toBe('pulada');
+		expect(result.value.openPendingItems).toHaveLength(1);
+		expect(result.value.openPendingItems[0].activityDefinitionId).toBe('origem');
+	});
+
+	it('atividade pulada, posteriormente concluída, resolve a pendência', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.skipActivity({ projectId, activityDefinitionId: 'origem' });
+		const completed = await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'origem',
+			values: { origem: 'Um problema' }
+		});
+		if (!completed.ok) throw new Error('esperado ok');
+		expect(completed.value.activityStatuses.origem).toBe('concluída');
+		expect(completed.value.openPendingItems).toHaveLength(0);
+	});
+
+	it('erro activity_not_skippable ao tentar pular o Resumo', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.skipActivity({ projectId: created.value.projectId, activityDefinitionId: 'resumo' });
+		expect(result).toEqual({ ok: false, error: { kind: 'activity_not_skippable' } });
+	});
+});
+
+describe('createProjectUseCases — confirmSummary', () => {
+	it('atualiza o snapshot', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const before = created.value.activityStatuses.resumo;
+		expect(before).toBe('não_iniciada');
+
+		const result = await useCases.confirmSummary({ projectId: created.value.projectId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.activityStatuses.resumo).toBe('concluída');
+	});
+
+	it('erro transition_not_allowed ao confirmar duas vezes', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		await useCases.confirmSummary({ projectId: created.value.projectId });
+
+		const result = await useCases.confirmSummary({ projectId: created.value.projectId });
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+});
+
+describe('createProjectUseCases — exportProject / importProject', () => {
+	it('exportProject produz um JSON versionado', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.exportProject(created.value.projectId);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const parsed = JSON.parse(result.value);
+		expect(parsed.version).toBe(1);
+		expect(parsed.state.project.id).toBe(created.value.projectId);
+	});
+
+	it('importProject restaura o projeto e o snapshot num repositório novo', async () => {
+		const source = setup();
+		const created = await source.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		await source.useCases.answerActivity({
+			projectId: created.value.projectId,
+			activityDefinitionId: 'origem',
+			values: { origem: 'Um problema' }
+		});
+		const exported = await source.useCases.exportProject(created.value.projectId);
+		if (!exported.ok) throw new Error('esperado ok');
+
+		const target = setup();
+		const imported = await target.useCases.importProject(exported.value);
+		expect(imported.ok).toBe(true);
+		if (!imported.ok) return;
+		expect(imported.value.projectId).toBe(created.value.projectId);
+		expect(imported.value.answers.origem).toBe('Um problema');
+		expect(imported.value.activityStatuses.origem).toBe('concluída');
+
+		const stored = await target.repo.findById(created.value.projectId);
+		expect(stored).not.toBeNull();
+	});
+
+	it('rejeita JSON inválido', async () => {
+		const { useCases } = setup();
+		const result = await useCases.importProject('isto não é JSON {{{');
+		expect(result).toEqual({
+			ok: false,
+			error: { kind: 'invalid_import', reason: { kind: 'invalid_json' } }
+		});
+	});
+
+	it('rejeita violação de invariantes do agregado', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const exported = await useCases.exportProject(created.value.projectId);
+		if (!exported.ok) throw new Error('esperado ok');
+
+		const envelope = JSON.parse(exported.value) as { state: { activityProgress: unknown[] } };
+		envelope.state.activityProgress = envelope.state.activityProgress.slice(1); // remove uma — viola cardinalidade
+
+		const target = setup();
+		const result = await target.useCases.importProject(JSON.stringify(envelope));
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toEqual({
+			kind: 'invalid_import',
+			reason: { kind: 'invariant_violation', details: expect.any(String) }
+		});
+	});
+
+	it('rejeita colisão de ID contra um projeto já existente', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const exported = await useCases.exportProject(created.value.projectId);
+		if (!exported.ok) throw new Error('esperado ok');
+
+		// importa no MESMO repositório, onde o id já existe
+		const result = await useCases.importProject(exported.value);
+		expect(result).toEqual({
+			ok: false,
+			error: { kind: 'import_id_collision', projectId: created.value.projectId }
+		});
+	});
+});
+
+describe('createProjectUseCases — propagação de erros e falhas', () => {
+	it('project_not_found é retornado sem tocar o domínio quando o projeto não existe', async () => {
+		const { useCases } = setup();
+		const result = await useCases.answerActivity({
+			projectId: 'nao-existe',
+			activityDefinitionId: 'origem',
+			values: {}
+		});
+		expect(result).toEqual({ ok: false, error: { kind: 'project_not_found' } });
+	});
+
+	it('falha de persistência nunca retorna sucesso', async () => {
+		const brokenRepository: ProjectRepository = {
+			insert: async () => {
+				throw new Error('falha simulada de persistência');
+			},
+			findById: async () => null,
+			save: async () => {
+				throw new Error('falha simulada de persistência');
+			}
+		};
+		const useCases = createProjectUseCases({
+			repository: brokenRepository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		await expect(useCases.createProject()).rejects.toThrow('falha simulada de persistência');
+	});
+});
+
+describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
+	it('o registro persistido contém só os 4 tipos de domínio', async () => {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		await useCases.answerActivity({
+			projectId: created.value.projectId,
+			activityDefinitionId: 'origem',
+			values: { origem: 'x' }
+		});
+
+		const stored = await repo.findById(created.value.projectId);
+		expect(stored && Object.keys(stored).sort()).toEqual(
+			['project', 'activityProgress', 'answers', 'pendingItems'].sort()
+		);
+	});
+
+	it('ProjectView contém só os 9 campos do contrato, nunca ProjectState bruto', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		expect(Object.keys(created.value).sort()).toEqual(
+			[
+				'projectId',
+				'projectName',
+				'projectStatus',
+				'phaseStatuses',
+				'activityStatuses',
+				'answers',
+				'nextActivity',
+				'openPendingItems',
+				'hypotheses'
+			].sort()
+		);
+		expect(created.value).not.toHaveProperty('project');
+		expect(created.value).not.toHaveProperty('activityProgress');
+		expect(created.value).not.toHaveProperty('pendingItems');
+	});
+});
