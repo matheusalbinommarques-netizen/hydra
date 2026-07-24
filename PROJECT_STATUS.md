@@ -5,8 +5,6 @@
 
 ## Estado geral
 
-## Estado geral
-
 A descoberta, iniciação, planejamento e definição visual do Release 0
 foram concluídos.
 

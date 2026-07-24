@@ -11,14 +11,14 @@ Este arquivo é a visão operacional do trabalho atual. A documentação complet
 - [x] Criar o repositório privado no GitHub.
 - [x] Versionar a baseline v0.1.
 - [x] Criar os documentos canônicos do produto.
-- [ ] Definir as quatro telas centrais do Release 0.
-- [ ] Definir a direção visual inicial.
-- [ ] Gerar imagens de referência das telas.
-- [ ] Registrar as referências em `design/references/`.
-- [ ] Explorar variações no Claude Design.
-- [ ] Selecionar e aprovar a direção visual.
-- [ ] Salvar as telas aprovadas em `design/approved/`.
-- [ ] Atualizar `UX_DESIGN_SPEC.md` com as decisões visuais.
+- [x ] Definir as quatro telas centrais do Release 0.
+- [x ] Definir a direção visual inicial.
+- [x ] Gerar imagens de referência das telas.
+- [x ] Registrar as referências em `design/references/`.
+- [x ] Explorar variações no Claude Design.
+- [x ] Selecionar e aprovar a direção visual.
+- [x ] Salvar as telas aprovadas em `design/approved/`.
+- [x ] Atualizar `UX_DESIGN_SPEC.md` com as decisões visuais.
 - [ ] Revisar `RELEASE_0_SPEC.md` contra o design aprovado.
 - [ ] Criar o modelo conceitual inicial de dados.
 - [ ] Comparar opções de stack.
