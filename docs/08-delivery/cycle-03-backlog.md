@@ -83,6 +83,7 @@ atividade atual (recomendação da Trilha A). Consome somente `ProjectView`
 
 ### C3-02 — Tela Registros mínima
 
+**Status:** ✅ concluído (commit `784dd34` — `feat(records): add project records view`).
 **Tipo:** tarefa · **Esforço:** pequeno
 **Origem:** C2-14 (Ciclo 2, Should → Must no Ciclo 3)
 **Aceite:** lista respostas (`view.answers` + `catalog`, mesmo padrão já
@@ -142,6 +143,42 @@ A implementação de C3-02 deve, nesta ordem:
    derivação de `pendingItemHistory`;
 6. nova rota `routes/projects/[projectId]/records/`; atualizar
    `+layout.svelte` (link "Registros").
+
+**Evidências:**
+- `PendingItemHistoryView` implementado como união discriminada por
+  `status` em `server/application/types.ts` (`resolvedAt` indisponível em
+  `aberta`, obrigatório em `resolvida`), populado em `buildProjectView`
+  direto de `state.pendingItems` — `orientation-engine/` não foi alterado,
+  `openPendingItems` continua exatamente como estava, só para a Trilha B;
+- `docs/06-architecture/contracts.md` §10 atualizado com o tipo novo e o
+  campo `pendingItemHistory` em `ProjectView`;
+- rota `/projects/[projectId]/records` implementada e navegável, somente
+  leitura — confirmado que não há nenhum formulário, botão de edição,
+  input ou controle de resolução na tela;
+- respostas agrupadas por fase e atividade, com rótulos do catálogo (nunca
+  identificadores técnicos), e o campo `project_property` (nome do
+  projeto) corretamente excluído;
+- pendências abertas e resolvidas exibidas em listas separadas, cada uma
+  com label, detail, atividade relacionada, status textual e datas
+  formatadas — resolvida com data de resolução, aberta sem ela;
+- estados vazios independentes para respostas, pendências abertas e
+  pendências resolvidas;
+- validado manualmente contra um banco temporário isolado (nunca
+  `local-data/hydra-dev.sqlite`): projeto sem respostas/pendências,
+  projeto com respostas (incluindo texto longo sem overflow em ~1280px e
+  ~390px), pendência aberta e pendência resolvida — pendências preparadas
+  por fixture SQL direta no banco temporário, sem implementar C3-03;
+  navegação Agora/Mapa/Registros/Resumo validada; nenhum erro de console;
+- `app/src/lib/server/application/project-view.spec.ts` — 7 testes Vitest
+  da derivação de `pendingItemHistory` (vazio, aberta, resolvida,
+  `resolvedAt` só em resolvida, `openPendingItems` continua separado,
+  label/detail do catálogo, `ProjectView` nunca expõe `ProjectState` bruto);
+- `app/src/routes/projects/[projectId]/records/records-view.spec.ts` — 5
+  testes da projeção pura de agrupamento e separação de pendências;
+- `app/e2e/records-view.journey.ts` — teste Playwright dedicado, servidor e
+  banco SQLite isolados, sem modificar `walking-skeleton-journey.journey.ts`
+  nem `map-view.journey.ts`;
+- commit `784dd34` — `feat(records): add project records view`.
 
 ## Could
 

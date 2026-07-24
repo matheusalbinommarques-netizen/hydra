@@ -6,7 +6,10 @@
 
 - Tela Mapa da jornada (`/projects/[projectId]/map`): mostra as seis fases
   do catálogo em ordem, com status de cada fase e atividade, e destaque da
-  atividade recomendada como próximo passo.
+  atividade recomendada como próximo passo;
+- Tela Registros (`/projects/[projectId]/records`): mostra as respostas
+  registradas, agrupadas por fase e atividade, e o histórico de pendências
+  (abertas e resolvidas, com datas), somente leitura.
 
 ## [0.3.0] — 24/07/2026
 

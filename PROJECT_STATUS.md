@@ -19,11 +19,15 @@ revisar e confirmar o Resumo, receber a recomendação de próxima atividade,
 persistir em SQLite, e exportar/importar o projeto em JSON versionado —,
 coberto por um teste de jornada Playwright automatizado.
 
-O Ciclo 3 foi iniciado (`docs/08-delivery/cycle-03-backlog.md`). C3-01 —
-Tela Mapa mínima está concluída (commit `b98c840`), disponível em
-`/projects/[projectId]/map`: mostra as seis fases do catálogo em ordem,
-status de fase e de atividade, e a atividade recomendada pela Trilha A.
-C3-02 (Registros) e C3-03 (Pular etapa) ainda não foram iniciadas.
+O Ciclo 3 foi iniciado (`docs/08-delivery/cycle-03-backlog.md`). Os dois
+itens Must estão concluídos: C3-01 — Tela Mapa mínima (commit `b98c840`),
+disponível em `/projects/[projectId]/map`, mostrando as seis fases do
+catálogo em ordem, status de fase e de atividade, e a atividade recomendada
+pela Trilha A; e C3-02 — Tela Registros mínima (commit `784dd34`),
+disponível em `/projects/[projectId]/records`, mostrando respostas
+agrupadas por fase e atividade e o histórico de pendências (abertas e
+resolvidas), somente leitura. C3-03 (Pular etapa, Could) ainda não foi
+iniciada.
 
 ## Entregas consolidadas
 
@@ -48,7 +52,9 @@ C3-02 (Registros) e C3-03 (Pular etapa) ainda não foram iniciadas.
   casos de uso (`server/application/`), rotas mínimas (Home, Agora, Resumo,
   Exportar/Importar) e teste de jornada ponta a ponta (Playwright);
 - Tela Mapa mínima do Ciclo 3 (C3-01), com testes Vitest e Playwright
-  dedicados.
+  dedicados;
+- Tela Registros mínima do Ciclo 3 (C3-02), com histórico de pendências
+  (`pendingItemHistory`) e testes Vitest e Playwright dedicados.
 
 ## Decisões de maior impacto
 
@@ -84,12 +90,14 @@ C3-02 (Registros) e C3-03 (Pular etapa) ainda não foram iniciadas.
 **Progresso do Ciclo 3** (`docs/08-delivery/cycle-03-backlog.md`):
 
 - C3-01 — Tela Mapa mínima (Must): concluída (commit `b98c840`);
-- C3-02 — Tela Registros mínima (Must): não iniciada;
+- C3-02 — Tela Registros mínima (Must): concluída (commit `784dd34`);
 - C3-03 — "Pular etapa" na interface (Could): não iniciada.
 
-Gate do Ciclo 3 ainda não avaliado — depende de C3-02 (Must).
+Os dois itens Must do Ciclo 3 estão concluídos. Gate do Ciclo 3 ainda não
+avaliado — falta decidir se C3-03 (Could) entra neste ciclo antes da
+avaliação final.
 
 ## Próxima decisão relevante
 
-Prosseguir com C3-02 — Tela Registros mínima, item Must restante do
-Ciclo 3. C3-03 (Could) permanece em aberto, sujeita à capacidade do ciclo.
+Decidir entre executar C3-03 — "Pular etapa" na interface (Could) — ou
+encerrar o Ciclo 3 sem ela, já que os dois itens Must estão concluídos.
