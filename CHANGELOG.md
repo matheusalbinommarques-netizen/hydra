@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Adicionado
+
+- Tela Mapa da jornada (`/projects/[projectId]/map`): mostra as seis fases
+  do catálogo em ordem, com status de cada fase e atividade, e destaque da
+  atividade recomendada como próximo passo.
+
 ## [0.3.0] — 24/07/2026
 
 ### Adicionado

@@ -19,6 +19,12 @@ revisar e confirmar o Resumo, receber a recomendação de próxima atividade,
 persistir em SQLite, e exportar/importar o projeto em JSON versionado —,
 coberto por um teste de jornada Playwright automatizado.
 
+O Ciclo 3 foi iniciado (`docs/08-delivery/cycle-03-backlog.md`). C3-01 —
+Tela Mapa mínima está concluída (commit `b98c840`), disponível em
+`/projects/[projectId]/map`: mostra as seis fases do catálogo em ordem,
+status de fase e de atividade, e a atividade recomendada pela Trilha A.
+C3-02 (Registros) e C3-03 (Pular etapa) ainda não foram iniciadas.
+
 ## Entregas consolidadas
 
 - Opportunity & Project Brief;
@@ -40,7 +46,9 @@ coberto por um teste de jornada Playwright automatizado.
   domínio (`domain/`), catálogo completo (`catalog/`), motor de orientação
   (`orientation-engine/`), persistência SQLite (`server/persistence/`),
   casos de uso (`server/application/`), rotas mínimas (Home, Agora, Resumo,
-  Exportar/Importar) e teste de jornada ponta a ponta (Playwright).
+  Exportar/Importar) e teste de jornada ponta a ponta (Playwright);
+- Tela Mapa mínima do Ciclo 3 (C3-01), com testes Vitest e Playwright
+  dedicados.
 
 ## Decisões de maior impacto
 
@@ -73,14 +81,15 @@ coberto por um teste de jornada Playwright automatizado.
    manualmente: salvar um projeto, reiniciar o servidor, confirmar que os
    dados carregam do arquivo SQLite).
 
+**Progresso do Ciclo 3** (`docs/08-delivery/cycle-03-backlog.md`):
+
+- C3-01 — Tela Mapa mínima (Must): concluída (commit `b98c840`);
+- C3-02 — Tela Registros mínima (Must): não iniciada;
+- C3-03 — "Pular etapa" na interface (Could): não iniciada.
+
+Gate do Ciclo 3 ainda não avaliado — depende de C3-02 (Must).
+
 ## Próxima decisão relevante
 
-Com o Walking Skeleton entregue, os itens Should do Ciclo 2 seguem
-pendentes de priorização:
-
-- C2-13 — Tela Mapa mínima;
-- C2-14 — Tela Registros mínima;
-- C2-15 (Could) — "Pular etapa" na interface.
-
-Decisão em aberto: priorizar esses itens Should/Could dentro do próprio
-Ciclo 2, ou encerrar o ciclo e planejar o Ciclo 3.
+Prosseguir com C3-02 — Tela Registros mínima, item Must restante do
+Ciclo 3. C3-03 (Could) permanece em aberto, sujeita à capacidade do ciclo.

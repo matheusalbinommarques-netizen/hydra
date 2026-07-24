@@ -39,6 +39,7 @@ e os casos de uso/DTOs já existentes em `server/application/`.
 
 ### C3-01 — Tela Mapa mínima
 
+**Status:** ✅ concluído (commit `b98c840` — `feat(map): add project journey map`).
 **Tipo:** tarefa · **Esforço:** pequeno
 **Origem:** C2-13 (Ciclo 2, Should → Must no Ciclo 3)
 **Aceite:** lista as 8 atividades do catálogo com status (`não_iniciada`,
@@ -57,6 +58,28 @@ atividade atual (recomendação da Trilha A). Consome somente `ProjectView`
   do produto) e `unavailable` (Estruturação, Planejamento, Execução,
   Validação) — sem tratar `partial`/`unavailable` como "concluída";
 - atualizar a navegação em `+layout.svelte` (link "Mapa").
+
+**Evidências:**
+- rota `/projects/[projectId]/map` implementada e navegável;
+- as seis fases do catálogo exibidas em ordem (Descoberta, Definição do
+  produto, Estruturação do projeto, Planejamento da entrega, Execução e
+  acompanhamento, Validação e encerramento), confirmado manualmente contra
+  um projeto real existente no banco local;
+- status de fase e de atividade refletidos corretamente, incluindo `partial`
+  e `unavailable` nunca tratados como concluídos;
+- atividade recomendada pela Trilha A destacada visualmente, e ausente em
+  `catalog_limit_reached`;
+- navegação Agora → Mapa → Resumo → Mapa validada manualmente e por teste
+  Playwright;
+- comportamento validado tanto no início do projeto quanto em
+  `catalog_limit_reached`;
+- `app/src/routes/projects/[projectId]/map/map-view.spec.ts` — testes
+  Vitest da projeção pura (fase `complete`/`partial`/`unavailable`,
+  atividade recomendada, os 4 status de atividade);
+- `app/e2e/map-view.journey.ts` — teste Playwright dedicado, com servidor e
+  banco SQLite isolados (sem usar `local-data/hydra-dev.sqlite`), sem
+  modificar `walking-skeleton-journey.journey.ts`;
+- commit `b98c840` — `feat(map): add project journey map`.
 
 ### C3-02 — Tela Registros mínima
 
