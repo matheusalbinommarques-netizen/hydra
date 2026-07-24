@@ -13,6 +13,7 @@
 		</div>
 		<nav>
 			<a href="/projects/{projectId}/now">Agora</a>
+			<a href="/projects/{projectId}/map">Mapa</a>
 			<a href="/projects/{projectId}/summary">Resumo</a>
 			<a href="/projects/{projectId}/export">Exportar</a>
 		</nav>
