@@ -1,0 +1,366 @@
+// Serialização JSON versionada — ver docs/06-architecture/contracts.md §6.
+// Entrada tratada como não confiável (TECHNICAL_BRIEF.md §11): nunca lança
+// exceção, sempre retorna Result; nenhum cast é usado para presumir validade.
+
+import type { ActivityDefinition, Catalog } from './catalog-types';
+import type { ActivityProgress, ActivityStatus, Answer, PendingItem, Project, ProjectState } from './state-types';
+import type { Result } from './result';
+
+export interface ExportedProjectState {
+	version: 1;
+	state: ProjectState;
+}
+
+export type ProjectStateParseError =
+	| { kind: 'invalid_json' }
+	| { kind: 'unsupported_version'; found: number }
+	| { kind: 'invalid_shape'; details: string }
+	| { kind: 'invalid_reference'; details: string }
+	| { kind: 'invariant_violation'; details: string };
+
+export function serializeProjectState(state: ProjectState): string {
+	const envelope: ExportedProjectState = { version: 1, state };
+	return JSON.stringify(envelope);
+}
+
+// --- narrowing seguro de unknown ------------------------------------------
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+	return typeof value === 'string';
+}
+
+function isIsoDateString(value: unknown): value is string {
+	return typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
+}
+
+const ACTIVITY_STATUSES: readonly string[] = ['não_iniciada', 'em_andamento', 'concluída', 'pulada'];
+function isActivityStatus(value: unknown): value is ActivityStatus {
+	return typeof value === 'string' && ACTIVITY_STATUSES.includes(value);
+}
+
+const PENDING_ITEM_STATUSES: readonly string[] = ['aberta', 'resolvida'];
+function isPendingItemStatus(value: unknown): value is 'aberta' | 'resolvida' {
+	return typeof value === 'string' && PENDING_ITEM_STATUSES.includes(value);
+}
+
+function shapeError(details: string): Result<never, ProjectStateParseError> {
+	return { ok: false, error: { kind: 'invalid_shape', details } };
+}
+
+function referenceError(details: string): Result<never, ProjectStateParseError> {
+	return { ok: false, error: { kind: 'invalid_reference', details } };
+}
+
+function invariantError(details: string): Result<never, ProjectStateParseError> {
+	return { ok: false, error: { kind: 'invariant_violation', details } };
+}
+
+// --- fase 3: parsing bruto de cada entidade -------------------------------
+
+function parseProject(value: unknown): Result<Project, ProjectStateParseError> {
+	if (!isRecord(value)) return shapeError('project deve ser um objeto');
+	if (!isString(value.id)) return shapeError('project.id deve ser uma string');
+	if (value.name !== null && !isString(value.name)) {
+		return shapeError('project.name deve ser string ou null');
+	}
+	if (!isIsoDateString(value.createdAt)) {
+		return shapeError('project.createdAt deve ser uma data ISO 8601 válida');
+	}
+	return { ok: true, value: { id: value.id, name: value.name, createdAt: value.createdAt } };
+}
+
+function parseActivityProgressList(value: unknown): Result<ActivityProgress[], ProjectStateParseError> {
+	if (!Array.isArray(value)) return shapeError('activityProgress deve ser um array');
+	const result: ActivityProgress[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada ActivityProgress deve ser um objeto');
+		if (!isString(item.projectId)) return shapeError('ActivityProgress.projectId deve ser uma string');
+		if (!isString(item.activityDefinitionId)) {
+			return shapeError('ActivityProgress.activityDefinitionId deve ser uma string');
+		}
+		if (!isActivityStatus(item.status)) {
+			return shapeError('ActivityProgress.status deve ser um dos literais aprovados');
+		}
+		result.push({ projectId: item.projectId, activityDefinitionId: item.activityDefinitionId, status: item.status });
+	}
+	return { ok: true, value: result };
+}
+
+function parseAnswerList(value: unknown): Result<Answer[], ProjectStateParseError> {
+	if (!Array.isArray(value)) return shapeError('answers deve ser um array');
+	const result: Answer[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Answer deve ser um objeto');
+		if (!isString(item.projectId)) return shapeError('Answer.projectId deve ser uma string');
+		if (!isString(item.activityDefinitionId)) return shapeError('Answer.activityDefinitionId deve ser uma string');
+		if (!isString(item.fieldDefinitionId)) return shapeError('Answer.fieldDefinitionId deve ser uma string');
+		if (!isString(item.value)) return shapeError('Answer.value deve ser uma string');
+		if (!isIsoDateString(item.createdAt)) return shapeError('Answer.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('Answer.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			projectId: item.projectId,
+			activityDefinitionId: item.activityDefinitionId,
+			fieldDefinitionId: item.fieldDefinitionId,
+			value: item.value,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+interface RawPendingItem {
+	id: string;
+	projectId: string;
+	activityDefinitionId: string;
+	createdAt: string;
+	status: 'aberta' | 'resolvida';
+	resolvedAt: string | undefined;
+}
+
+function parsePendingItemList(value: unknown): Result<RawPendingItem[], ProjectStateParseError> {
+	if (!Array.isArray(value)) return shapeError('pendingItems deve ser um array');
+	const result: RawPendingItem[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada PendingItem deve ser um objeto');
+		if (!isString(item.id)) return shapeError('PendingItem.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('PendingItem.projectId deve ser uma string');
+		if (!isString(item.activityDefinitionId)) {
+			return shapeError('PendingItem.activityDefinitionId deve ser uma string');
+		}
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('PendingItem.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (!isPendingItemStatus(item.status)) {
+			return shapeError('PendingItem.status deve ser "aberta" ou "resolvida"');
+		}
+		let resolvedAt: string | undefined;
+		if (item.resolvedAt === undefined) {
+			resolvedAt = undefined;
+		} else if (isIsoDateString(item.resolvedAt)) {
+			resolvedAt = item.resolvedAt;
+		} else {
+			return shapeError('PendingItem.resolvedAt, quando presente, deve ser uma data ISO 8601 válida');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			activityDefinitionId: item.activityDefinitionId,
+			createdAt: item.createdAt,
+			status: item.status,
+			resolvedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+// --- fase 4: referências contra o catálogo --------------------------------
+
+function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
+	for (const phase of catalog.phases) {
+		const found = phase.activities.find((activity) => activity.id === activityId);
+		if (found) return found;
+	}
+	return undefined;
+}
+
+// --- fase 5 + montagem final ------------------------------------------------
+
+function assembleProjectState(
+	catalog: Catalog,
+	project: Project,
+	activityProgress: ActivityProgress[],
+	answers: Answer[],
+	rawPendingItems: RawPendingItem[]
+): Result<ProjectState, ProjectStateParseError> {
+	// referências: ActivityProgress
+	for (const progress of activityProgress) {
+		if (progress.projectId !== project.id) {
+			return invariantError(
+				`ActivityProgress "${progress.activityDefinitionId}" usa projectId diferente do Project`
+			);
+		}
+		if (!findActivityDefinition(catalog, progress.activityDefinitionId)) {
+			return referenceError(
+				`ActivityProgress referencia activityDefinitionId "${progress.activityDefinitionId}", que não existe no catálogo`
+			);
+		}
+	}
+
+	// invariante: exatamente um ActivityProgress por atividade do catálogo
+	const catalogActivityIds = catalog.phases.flatMap((phase) => phase.activities.map((activity) => activity.id));
+	const progressByActivity = new Map<string, number>();
+	for (const progress of activityProgress) {
+		progressByActivity.set(
+			progress.activityDefinitionId,
+			(progressByActivity.get(progress.activityDefinitionId) ?? 0) + 1
+		);
+	}
+	for (const activityId of catalogActivityIds) {
+		const count = progressByActivity.get(activityId) ?? 0;
+		if (count === 0) return invariantError(`Falta ActivityProgress para a atividade "${activityId}"`);
+		if (count > 1) return invariantError(`ActivityProgress duplicado para a atividade "${activityId}"`);
+	}
+	if (progressByActivity.size !== catalogActivityIds.length) {
+		return invariantError('Existe ActivityProgress para atividade fora do catálogo');
+	}
+
+	// invariante: nenhuma atividade explicit_confirmation com status pulada
+	for (const progress of activityProgress) {
+		const activity = findActivityDefinition(catalog, progress.activityDefinitionId);
+		if (activity?.completionMode === 'explicit_confirmation' && progress.status === 'pulada') {
+			return invariantError(
+				`Atividade "${activity.id}" é explicit_confirmation mas tem ActivityProgress.status "pulada"`
+			);
+		}
+	}
+
+	// referências + invariantes: Answer
+	const seenAnswerKeys = new Set<string>();
+	for (const answer of answers) {
+		if (answer.projectId !== project.id) {
+			return invariantError(`Answer do campo "${answer.fieldDefinitionId}" usa projectId diferente do Project`);
+		}
+		const activity = findActivityDefinition(catalog, answer.activityDefinitionId);
+		if (!activity) {
+			return referenceError(
+				`Answer referencia activityDefinitionId "${answer.activityDefinitionId}", que não existe no catálogo`
+			);
+		}
+		if (activity.completionMode !== 'required_fields') {
+			return referenceError(
+				`Answer referencia fieldDefinitionId "${answer.fieldDefinitionId}" numa atividade sem campos ("${activity.id}")`
+			);
+		}
+		const field = activity.fields.find((f) => f.id === answer.fieldDefinitionId);
+		if (!field) {
+			return referenceError(
+				`Answer referencia fieldDefinitionId "${answer.fieldDefinitionId}", que não pertence à atividade "${activity.id}"`
+			);
+		}
+		if (field.dataTarget !== 'answer') {
+			return invariantError(
+				`Answer referencia o campo "${field.id}", que tem dataTarget "project_property" e não pode ter Answer`
+			);
+		}
+		const key = `${answer.activityDefinitionId}::${answer.fieldDefinitionId}`;
+		if (seenAnswerKeys.has(key)) {
+			return invariantError(`Answer duplicada para o campo "${answer.fieldDefinitionId}"`);
+		}
+		seenAnswerKeys.add(key);
+	}
+
+	// referências + invariantes: PendingItem
+	const seenPendingItemIds = new Set<string>();
+	const seenPendingItemActivities = new Set<string>();
+	const pendingItems: PendingItem[] = [];
+	for (const raw of rawPendingItems) {
+		if (raw.projectId !== project.id) {
+			return invariantError(`PendingItem "${raw.id}" usa projectId diferente do Project`);
+		}
+		const activity = findActivityDefinition(catalog, raw.activityDefinitionId);
+		if (!activity) {
+			return referenceError(
+				`PendingItem referencia activityDefinitionId "${raw.activityDefinitionId}", que não existe no catálogo`
+			);
+		}
+		if (!activity.allowsSkip) {
+			return invariantError(`PendingItem referencia atividade "${activity.id}", que não permite pular`);
+		}
+		if (seenPendingItemIds.has(raw.id)) {
+			return invariantError(`PendingItem.id duplicado: "${raw.id}"`);
+		}
+		seenPendingItemIds.add(raw.id);
+		if (seenPendingItemActivities.has(raw.activityDefinitionId)) {
+			return invariantError(`Mais de um PendingItem para a atividade "${raw.activityDefinitionId}"`);
+		}
+		seenPendingItemActivities.add(raw.activityDefinitionId);
+
+		if (raw.status === 'aberta') {
+			if (raw.resolvedAt !== undefined) {
+				return invariantError(`PendingItem "${raw.id}" está aberta mas possui resolvedAt`);
+			}
+			pendingItems.push({
+				id: raw.id,
+				projectId: raw.projectId,
+				activityDefinitionId: raw.activityDefinitionId,
+				createdAt: raw.createdAt,
+				status: 'aberta'
+			});
+		} else {
+			if (raw.resolvedAt === undefined) {
+				return invariantError(`PendingItem "${raw.id}" está resolvida mas não possui resolvedAt`);
+			}
+			pendingItems.push({
+				id: raw.id,
+				projectId: raw.projectId,
+				activityDefinitionId: raw.activityDefinitionId,
+				createdAt: raw.createdAt,
+				status: 'resolvida',
+				resolvedAt: raw.resolvedAt
+			});
+		}
+	}
+
+	return {
+		ok: true,
+		value: { project, activityProgress, answers, pendingItems }
+	};
+}
+
+export function deserializeProjectState(
+	json: string,
+	catalog: Catalog
+): Result<ProjectState, ProjectStateParseError> {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(json);
+	} catch {
+		return { ok: false, error: { kind: 'invalid_json' } };
+	}
+
+	if (!isRecord(parsed)) {
+		return shapeError('o JSON raiz precisa ser um objeto') as Result<ProjectState, ProjectStateParseError>;
+	}
+	if (typeof parsed.version !== 'number') {
+		return shapeError('campo "version" ausente ou não numérico') as Result<
+			ProjectState,
+			ProjectStateParseError
+		>;
+	}
+	if (parsed.version !== 1) {
+		return { ok: false, error: { kind: 'unsupported_version', found: parsed.version } };
+	}
+	if (!isRecord(parsed.state)) {
+		return shapeError('campo "state" ausente ou não é um objeto') as Result<
+			ProjectState,
+			ProjectStateParseError
+		>;
+	}
+
+	const state = parsed.state;
+
+	const projectResult = parseProject(state.project);
+	if (!projectResult.ok) return projectResult;
+
+	const activityProgressResult = parseActivityProgressList(state.activityProgress);
+	if (!activityProgressResult.ok) return activityProgressResult;
+
+	const answersResult = parseAnswerList(state.answers);
+	if (!answersResult.ok) return answersResult;
+
+	const pendingItemsResult = parsePendingItemList(state.pendingItems);
+	if (!pendingItemsResult.ok) return pendingItemsResult;
+
+	return assembleProjectState(
+		catalog,
+		projectResult.value,
+		activityProgressResult.value,
+		answersResult.value,
+		pendingItemsResult.value
+	);
+}

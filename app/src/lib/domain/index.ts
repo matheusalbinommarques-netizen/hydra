@@ -5,3 +5,4 @@ export type * from './state-types';
 export type * from './result';
 export * from './factory';
 export * from './transitions';
+export * from './serialization';
