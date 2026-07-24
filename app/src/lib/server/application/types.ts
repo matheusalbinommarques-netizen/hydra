@@ -9,6 +9,31 @@ import type {
 	ProjectStatus
 } from '$lib/orientation-engine';
 
+// Histórico completo de pendências (Registros, C3-02) — deriva diretamente
+// de state.pendingItems nesta camada (mesmo padrão já usado para popular
+// `answers`), nunca de orientation-engine/: computeOpenPendingItems existe
+// só para a Trilha B e continua filtrando apenas `aberta`. Discriminada por
+// `status`, no mesmo estilo do PendingItem de domain/.
+export type PendingItemHistoryView =
+	| {
+			id: string;
+			activityDefinitionId: string;
+			label: string;
+			detail: string;
+			status: 'aberta';
+			createdAt: string;
+			resolvedAt?: never;
+		}
+	| {
+			id: string;
+			activityDefinitionId: string;
+			label: string;
+			detail: string;
+			status: 'resolvida';
+			createdAt: string;
+			resolvedAt: string;
+		};
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -18,6 +43,7 @@ export interface ProjectView {
 	answers: Record<string, string>;
 	nextActivity: NextActivityResult;
 	openPendingItems: PendingItemView[];
+	pendingItemHistory: PendingItemHistoryView[];
 	hypotheses: HypothesisView[];
 }
 

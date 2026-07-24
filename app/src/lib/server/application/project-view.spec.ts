@@ -1,0 +1,177 @@
+import { describe, expect, it } from 'vitest';
+import { catalog } from '../../catalog';
+import type { ProjectState } from '../../domain';
+import { buildProjectView } from './project-view';
+
+function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
+	return {
+		project: { id: 'p1', name: null, createdAt: '2026-01-01T00:00:00.000Z' },
+		activityProgress: [],
+		answers: [],
+		pendingItems: [],
+		...overrides
+	};
+}
+
+describe('buildProjectView — pendingItemHistory', () => {
+	it('fica vazio quando não há pendências', () => {
+		const view = buildProjectView(catalog, baseState());
+		expect(view.pendingItemHistory).toEqual([]);
+	});
+
+	it('projeta uma pendência aberta corretamente, sem resolvedAt', () => {
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-1',
+					projectId: 'p1',
+					activityDefinitionId: 'origem',
+					status: 'aberta',
+					createdAt: '2026-01-02T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.pendingItemHistory).toHaveLength(1);
+		expect(view.pendingItemHistory[0]).toEqual({
+			id: 'pend-1',
+			activityDefinitionId: 'origem',
+			label: 'Origem do projeto não foi definida',
+			detail: 'Ajuda o Hydra a calibrar o tom e a profundidade das próximas perguntas.',
+			status: 'aberta',
+			createdAt: '2026-01-02T00:00:00.000Z'
+		});
+		expect(view.pendingItemHistory[0]).not.toHaveProperty('resolvedAt');
+	});
+
+	it('projeta uma pendência resolvida corretamente, com resolvedAt', () => {
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-2',
+					projectId: 'p1',
+					activityDefinitionId: 'origem',
+					status: 'resolvida',
+					createdAt: '2026-01-02T00:00:00.000Z',
+					resolvedAt: '2026-01-03T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.pendingItemHistory).toHaveLength(1);
+		expect(view.pendingItemHistory[0]).toEqual({
+			id: 'pend-2',
+			activityDefinitionId: 'origem',
+			label: 'Origem do projeto não foi definida',
+			detail: 'Ajuda o Hydra a calibrar o tom e a profundidade das próximas perguntas.',
+			status: 'resolvida',
+			createdAt: '2026-01-02T00:00:00.000Z',
+			resolvedAt: '2026-01-03T00:00:00.000Z'
+		});
+	});
+
+	it('resolvedAt só aparece para pendências resolvidas, nunca para abertas', () => {
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-aberta',
+					projectId: 'p1',
+					activityDefinitionId: 'origem',
+					status: 'aberta',
+					createdAt: '2026-01-02T00:00:00.000Z'
+				},
+				{
+					id: 'pend-resolvida',
+					projectId: 'p1',
+					activityDefinitionId: 'publico',
+					status: 'resolvida',
+					createdAt: '2026-01-02T00:00:00.000Z',
+					resolvedAt: '2026-01-03T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		const aberta = view.pendingItemHistory.find((item) => item.id === 'pend-aberta')!;
+		const resolvida = view.pendingItemHistory.find((item) => item.id === 'pend-resolvida')!;
+		expect(aberta.status).toBe('aberta');
+		expect('resolvedAt' in aberta).toBe(false);
+		expect(resolvida.status).toBe('resolvida');
+		expect(resolvida.resolvedAt).toBe('2026-01-03T00:00:00.000Z');
+	});
+
+	it('openPendingItems (Trilha B) continua funcionando separadamente de pendingItemHistory', () => {
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-aberta',
+					projectId: 'p1',
+					activityDefinitionId: 'origem',
+					status: 'aberta',
+					createdAt: '2026-01-02T00:00:00.000Z'
+				},
+				{
+					id: 'pend-resolvida',
+					projectId: 'p1',
+					activityDefinitionId: 'publico',
+					status: 'resolvida',
+					createdAt: '2026-01-01T00:00:00.000Z',
+					resolvedAt: '2026-01-02T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.openPendingItems).toHaveLength(1);
+		expect(view.openPendingItems[0].activityDefinitionId).toBe('origem');
+		expect(view.pendingItemHistory).toHaveLength(2);
+	});
+
+	it('label e detail vêm de ActivityDefinition.pendingItemLabel/pendingItemDetail do catálogo', () => {
+		const publico = catalog.phases
+			.flatMap((phase) => phase.activities)
+			.find((activity) => activity.id === 'publico');
+		if (!publico || publico.completionMode !== 'required_fields') {
+			throw new Error('fixture inválida: atividade "publico" precisa ser required_fields');
+		}
+
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-1',
+					projectId: 'p1',
+					activityDefinitionId: 'publico',
+					status: 'aberta',
+					createdAt: '2026-01-02T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.pendingItemHistory[0].label).toBe(publico.pendingItemLabel);
+		expect(view.pendingItemHistory[0].detail).toBe(publico.pendingItemDetail);
+	});
+
+	it('ProjectView nunca expõe ProjectState bruto', () => {
+		const view = buildProjectView(catalog, baseState());
+		expect(view).not.toHaveProperty('pendingItems');
+		expect(view).not.toHaveProperty('activityProgress');
+		expect(view).not.toHaveProperty('project');
+		expect(Object.keys(view).sort()).toEqual(
+			[
+				'projectId',
+				'projectName',
+				'projectStatus',
+				'phaseStatuses',
+				'activityStatuses',
+				'answers',
+				'nextActivity',
+				'openPendingItems',
+				'pendingItemHistory',
+				'hypotheses'
+			].sort()
+		);
+	});
+});

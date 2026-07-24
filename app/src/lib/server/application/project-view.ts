@@ -1,9 +1,47 @@
 // Montagem do DTO ProjectView a partir de ProjectState + Catalog — uso
 // interno; nunca expõe ProjectState bruto (ver contracts.md §10).
 
-import type { ActivityStatus, Catalog, ProjectState } from '$lib/domain';
+import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
 import { computeSnapshot } from '$lib/orientation-engine';
-import type { ProjectView } from './types';
+import type { PendingItemHistoryView, ProjectView } from './types';
+
+function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
+	for (const phase of catalog.phases) {
+		const found = phase.activities.find((activity) => activity.id === activityDefinitionId);
+		if (found) return found;
+	}
+	return undefined;
+}
+
+function buildPendingItemHistory(catalog: Catalog, state: ProjectState): PendingItemHistoryView[] {
+	const history: PendingItemHistoryView[] = [];
+	for (const item of state.pendingItems) {
+		const activity = findActivityDefinition(catalog, item.activityDefinitionId);
+		if (!activity || activity.completionMode !== 'required_fields') continue;
+
+		if (item.status === 'aberta') {
+			history.push({
+				id: item.id,
+				activityDefinitionId: item.activityDefinitionId,
+				label: activity.pendingItemLabel,
+				detail: activity.pendingItemDetail,
+				status: 'aberta',
+				createdAt: item.createdAt
+			});
+		} else {
+			history.push({
+				id: item.id,
+				activityDefinitionId: item.activityDefinitionId,
+				label: activity.pendingItemLabel,
+				detail: activity.pendingItemDetail,
+				status: 'resolvida',
+				createdAt: item.createdAt,
+				resolvedAt: item.resolvedAt
+			});
+		}
+	}
+	return history;
+}
 
 export function buildProjectView(catalog: Catalog, state: ProjectState): ProjectView {
 	const snapshot = computeSnapshot(catalog, state);
@@ -27,6 +65,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		answers,
 		nextActivity: snapshot.nextActivity,
 		openPendingItems: snapshot.openPendingItems,
+		pendingItemHistory: buildPendingItemHistory(catalog, state),
 		hypotheses: snapshot.hypotheses
 	};
 }

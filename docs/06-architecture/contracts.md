@@ -420,7 +420,35 @@ export interface ProjectRepository {
 `routes/` nunca recebe `ProjectState` bruto — só o DTO `ProjectView`, e pode
 importar `catalog/` diretamente para renderização (§7).
 
+Histórico completo de pendências (Registros, C3-02) — discriminado por
+`status`, no mesmo estilo do `PendingItem` de `domain/` (§2). Construído em
+`buildProjectView` (`server/application/project-view.ts`) diretamente a
+partir de `state.pendingItems`, **não** de `orientation-engine/`:
+`computeOpenPendingItems` continua existindo exatamente como está, só para a
+Trilha B (`openPendingItems`), e nunca é alterado nem reaproveitado para o
+histórico completo.
+
 ```typescript
+export type PendingItemHistoryView =
+  | {
+      id: string;
+      activityDefinitionId: string;
+      label: string;   // de ActivityDefinition.pendingItemLabel
+      detail: string;  // de ActivityDefinition.pendingItemDetail
+      status: 'aberta';
+      createdAt: string;
+      resolvedAt?: never;
+    }
+  | {
+      id: string;
+      activityDefinitionId: string;
+      label: string;
+      detail: string;
+      status: 'resolvida';
+      createdAt: string;
+      resolvedAt: string;
+    };
+
 export interface ProjectView {
   projectId: string;
   projectName: string | null;
@@ -429,7 +457,8 @@ export interface ProjectView {
   activityStatuses: Record<string, ActivityStatus>; // por activityDefinitionId
   answers: Record<string, string>; // fieldDefinitionId -> valor
   nextActivity: NextActivityResult;
-  openPendingItems: PendingItemView[];
+  openPendingItems: PendingItemView[];       // Trilha B — inalterado
+  pendingItemHistory: PendingItemHistoryView[]; // abertas + resolvidas (Registros)
   hypotheses: HypothesisView[];
 }
 

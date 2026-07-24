@@ -262,6 +262,13 @@ describe('createProjectUseCases — skipActivity', () => {
 		expect(result.value.activityStatuses.origem).toBe('pulada');
 		expect(result.value.openPendingItems).toHaveLength(1);
 		expect(result.value.openPendingItems[0].activityDefinitionId).toBe('origem');
+
+		expect(result.value.pendingItemHistory).toHaveLength(1);
+		expect(result.value.pendingItemHistory[0]).toMatchObject({
+			activityDefinitionId: 'origem',
+			status: 'aberta'
+		});
+		expect(result.value.pendingItemHistory[0]).not.toHaveProperty('resolvedAt');
 	});
 
 	it('atividade pulada, posteriormente concluída, resolve a pendência', async () => {
@@ -279,6 +286,13 @@ describe('createProjectUseCases — skipActivity', () => {
 		if (!completed.ok) throw new Error('esperado ok');
 		expect(completed.value.activityStatuses.origem).toBe('concluída');
 		expect(completed.value.openPendingItems).toHaveLength(0);
+
+		expect(completed.value.pendingItemHistory).toHaveLength(1);
+		expect(completed.value.pendingItemHistory[0]).toMatchObject({
+			activityDefinitionId: 'origem',
+			status: 'resolvida'
+		});
+		expect(completed.value.pendingItemHistory[0].resolvedAt).toEqual(expect.any(String));
 	});
 
 	it('erro activity_not_skippable ao tentar pular o Resumo', async () => {
@@ -449,7 +463,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 9 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 10 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -464,6 +478,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'answers',
 				'nextActivity',
 				'openPendingItems',
+				'pendingItemHistory',
 				'hypotheses'
 			].sort()
 		);
