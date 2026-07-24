@@ -43,7 +43,7 @@ interface ActivityDefinitionBase {
 	completionCriteria: string;
 }
 
-type RequiredFieldsActivity = ActivityDefinitionBase & {
+export type RequiredFieldsActivity = ActivityDefinitionBase & {
 	completionMode: 'required_fields';
 	allowsSkip: boolean;
 	fields: FieldDefinition[];
