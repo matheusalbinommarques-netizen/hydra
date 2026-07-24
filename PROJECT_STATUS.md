@@ -1,6 +1,7 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 22/07/2026  
+**Data de referência:** 24/07/2026
+
 **Versão da baseline:** 0.1
 
 ## Estado geral
@@ -10,10 +11,13 @@ foram concluídos.
 
 O protótipo de experiência foi aprovado como referência oficial.
 
-O projeto entra agora na fase de definição técnica, iniciando pelo modelo
-conceitual de dados, máquina de estados e regras do motor de orientação.
-
-Nenhum código de produção foi iniciado.
+O Ciclo 2 (Walking Skeleton) foi concluído: todos os itens Must
+(C2-01 a C2-12, ver `docs/08-delivery/cycle-02-backlog.md`) foram entregues.
+O Hydra agora roda de ponta a ponta no navegador — criar projeto, responder
+as oito atividades do catálogo (Descoberta + Definir usuário principal),
+revisar e confirmar o Resumo, receber a recomendação de próxima atividade,
+persistir em SQLite, e exportar/importar o projeto em JSON versionado —,
+coberto por um teste de jornada Playwright automatizado.
 
 ## Entregas consolidadas
 
@@ -31,7 +35,12 @@ Nenhum código de produção foi iniciado.
 - especificação preliminar do Release 0;
 - registro inicial de riscos;
 - registro de decisões;
-- backlog do Ciclo 1.
+- backlog do Ciclo 1;
+- backlog do Ciclo 2 (Walking Skeleton), com todos os itens Must entregues:
+  domínio (`domain/`), catálogo completo (`catalog/`), motor de orientação
+  (`orientation-engine/`), persistência SQLite (`server/persistence/`),
+  casos de uso (`server/application/`), rotas mínimas (Home, Agora, Resumo,
+  Exportar/Importar) e teste de jornada ponta a ponta (Playwright).
 
 ## Decisões de maior impacto
 
@@ -51,25 +60,27 @@ Nenhum código de produção foi iniciado.
 
 ## Gate atual
 
-**Gate:** aprovar e testar a experiência do Release 0.
+**Gate anterior (Release 0 — protótipo):** aprovado.
 
-### Critério para avançar
+**Gate do Ciclo 2 — Walking Skeleton:** atendido. Critérios de
+`docs/08-delivery/cycle-02-backlog.md` ("Gate de conclusão do Ciclo 2"):
 
-Uma pessoa deve conseguir explicar, sem treinamento:
-
-1. onde está;
-2. o que precisa fazer;
-3. por que precisa fazer;
-4. o que acontecerá depois;
-5. como pular uma etapa e qual pendência será gerada.
+1. `tsc --noEmit` limpo — atendido (0 erros, 0 avisos);
+2. suíte Vitest (unitária + integração) passando — atendido (137/137);
+3. teste de jornada Playwright (C2-12) passando — atendido;
+4. build de produção (`adapter-node`) sem erro — atendido;
+5. persistência sobrevive a reinício do processo — atendido (validado
+   manualmente: salvar um projeto, reiniciar o servidor, confirmar que os
+   dados carregam do arquivo SQLite).
 
 ## Próxima decisão relevante
 
-Após o protótipo:
+Com o Walking Skeleton entregue, os itens Should do Ciclo 2 seguem
+pendentes de priorização:
 
-- prosseguir;
-- ajustar a experiência;
-- reposicionar o fluxo;
-- interromper a abordagem atual.
+- C2-13 — Tela Mapa mínima;
+- C2-14 — Tela Registros mínima;
+- C2-15 (Could) — "Pular etapa" na interface.
 
-Somente depois será aprovada a stack e criada a arquitetura interna da aplicação.
+Decisão em aberto: priorizar esses itens Should/Could dentro do próprio
+Ciclo 2, ou encerrar o ciclo e planejar o Ciclo 3.

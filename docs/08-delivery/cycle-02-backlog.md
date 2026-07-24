@@ -28,8 +28,12 @@ desenvolvimento e a futura VPS de destino.
 
 ## Must
 
+Todos os itens Must abaixo (C2-01 a C2-12) foram entregues — ver "Resultado
+do Gate de conclusão do Ciclo 2" ao final deste documento.
+
 ### C2-01 — Criar o projeto da aplicação
 
+**Status:** ✅ concluído.
 **Tipo:** tarefa · **Esforço:** pequeno
 **Aceite:** `app/` criado via scaffolding oficial do SvelteKit, escolhendo
 TypeScript, Vitest e Playwright nas perguntas do próprio assistente de
@@ -38,6 +42,7 @@ scaffold.
 
 ### C2-02 — Configurar `adapter-node` e instalar `better-sqlite3`
 
+**Status:** ✅ concluído.
 **Tipo:** tarefa · **Esforço:** pequeno
 **Aceite:** troca para `@sveltejs/adapter-node`; `better-sqlite3` (+ tipos)
 instalado; um build de produção gera um servidor Node standalone, e
@@ -46,6 +51,7 @@ reinstala Vitest/Playwright — isso já veio do scaffold em C2-01.
 
 ### C2-03 — Registrar as dependências novas e a versão do Node
 
+**Status:** ✅ concluído.
 **Tipo:** tarefa · **Esforço:** pequeno
 **Aceite:** tabela de justificativa deste documento refletida em
 `architecture-brief.md` §9 (marcando ORM/driver como resolvido), e a versão
@@ -54,12 +60,14 @@ LTS do Node fixada registrada onde o projeto guardar essa informação (ex.:
 
 ### C2-04 — Tipos de `domain/`
 
+**Status:** ✅ concluído.
 **Tipo:** tarefa · **Esforço:** pequeno
 **Aceite:** tipos de `contracts.md` §1–§3 (catálogo, estado, `Result`)
 transcritos para `app/src/lib/domain/`, projeto compila sem erro de tipo.
 
 ### C2-05 — Catálogo completo em `catalog/`
 
+**Status:** ✅ concluído.
 **Tipo:** história · **Esforço:** médio
 **Aceite:** as 8 `ActivityDefinition` (7 da Descoberta + "Definir usuário
 principal") transcritas de `DOMAIN_MODEL.md` §7 para `app/src/lib/catalog/`,
@@ -67,6 +75,7 @@ exportando a constante `catalog: Catalog`.
 
 ### C2-06 — Fábrica e transições puras de `domain/`
 
+**Status:** ✅ concluído.
 **Tipo:** história · **Esforço:** grande
 **Aceite:** `createInitialProjectState`, `isActivityFieldsValid`,
 `shouldInvalidateSummary`, `answerActivity`, `confirmSummary`,
@@ -86,6 +95,7 @@ unitários (Vitest) cobrindo pelo menos:
 
 ### C2-07 — Serialização JSON
 
+**Status:** ✅ concluído.
 **Tipo:** tarefa · **Esforço:** médio
 **Aceite:** `serializeProjectState`/`deserializeProjectState`
 (`contracts.md` §6) implementadas com o envelope versionado e a validação
@@ -95,6 +105,7 @@ inválida, referência inexistente, violação de invariante).
 
 ### C2-08 — `orientation-engine/`
 
+**Status:** ✅ concluído.
 **Tipo:** história · **Esforço:** médio
 **Aceite:** `computePhaseStatus`, `computeProjectStatus`,
 `computeNextActivity`, `computeOpenPendingItems`, `computeHypotheses`,
@@ -105,6 +116,7 @@ Trilha B expondo pendências vinculadas a atividades puladas.
 
 ### C2-09 — `server/persistence/` com `better-sqlite3`
 
+**Status:** ✅ concluído.
 **Tipo:** história · **Esforço:** médio
 **Aceite:** `ProjectRepository` (`insert`/`findById`/`save`) implementado
 contra um schema SQL inicial, versionado como um único arquivo (ex.:
@@ -117,6 +129,7 @@ rodando contra um arquivo SQLite descartável de teste.
 
 ### C2-10 — `server/application/` (casos de uso)
 
+**Status:** ✅ concluído.
 **Tipo:** história · **Esforço:** grande
 **Aceite:** os 8 casos de uso de `contracts.md` §10 implementados e testados
 de ponta a ponta contra a persistência real (`createProject`,
@@ -127,6 +140,7 @@ de entrada própria (sem biblioteca) e a colisão de ID na importação via
 
 ### C2-11 — `routes/` mínimas
 
+**Status:** ✅ concluído.
 **Tipo:** história · **Esforço:** grande
 **Aceite:** Home (criar projeto), Agora (próxima ação + responder atividade
 via formulário genérico dirigido pelo catálogo — um único componente serve
@@ -136,6 +150,7 @@ exportar/importar (download/upload do JSON). `routes/` só consome
 
 ### C2-12 — Teste de jornada ponta a ponta
 
+**Status:** ✅ concluído (commit `3838c87`).
 **Tipo:** tarefa · **Esforço:** médio
 **Aceite:** teste Playwright percorrendo as **oito atividades reais** do
 catálogo completo (não uma fatia de 2) — criar projeto, responder cada uma
@@ -144,6 +159,8 @@ usuário principal", e verificar que a próxima recomendação passa a
 `catalog_limit_reached`. Cobre exportar e importar o projeto ao final.
 
 ## Should
+
+Itens não iniciados. Migram para um ciclo seguinte se priorizados.
 
 ### C2-13 — Tela Mapa mínima
 
@@ -176,6 +193,20 @@ Antes de considerar o Walking Skeleton entregue:
 - **persistência sobrevive a reinício:** salvar um projeto, reiniciar o
   processo do servidor, e confirmar que os dados carregam corretamente do
   arquivo SQLite — não só que os testes passam durante uma única execução.
+
+### Resultado do Gate de conclusão do Ciclo 2
+
+**Atendido — Walking Skeleton entregue.**
+
+| Critério | Resultado |
+|---|---|
+| `tsc --noEmit` limpo | ✅ 0 erros, 0 avisos |
+| Suíte Vitest passando | ✅ 137/137 |
+| Teste de jornada Playwright (C2-12) passando | ✅ commit `3838c87`, duas execuções consecutivas |
+| Build de produção sem erro | ✅ |
+| Persistência sobrevive a reinício | ✅ validado manualmente (salvar projeto, reiniciar o processo, confirmar carregamento do SQLite) |
+
+C2-13, C2-14 (Should) e C2-15 (Could) permanecem não iniciados.
 
 ## Won't neste ciclo
 

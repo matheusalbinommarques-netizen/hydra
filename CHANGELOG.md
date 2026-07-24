@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.3.0] — 24/07/2026
+
+### Adicionado
+
+- Walking Skeleton funcional do Release 0, executável de ponta a ponta no
+  navegador (Ciclo 2, itens Must C2-01 a C2-12);
+- domínio (`domain/`): tipos, fábrica e transições puras, serialização JSON
+  versionada;
+- catálogo completo do Release 0 (`catalog/`): oito atividades (sete da
+  Descoberta + "Definir usuário principal");
+- motor de orientação (`orientation-engine/`): status de fase, próxima
+  atividade recomendada, pendências e hipóteses;
+- persistência em SQLite (`server/persistence/`, via `better-sqlite3`);
+- camada de aplicação (`server/application/`) com os oito casos de uso do
+  Walking Skeleton;
+- rotas mínimas (Home, Agora, Resumo, Exportar/Importar);
+- exportação e importação de projeto em JSON versionado, com validação de
+  invariantes e rejeição de colisão de identificador;
+- teste de jornada ponta a ponta (Playwright) cobrindo as oito atividades
+  reais, o Resumo, `catalog_limit_reached`, exportação e importação em
+  bancos SQLite isolados.
+
+### Verificado
+
+- typecheck (`tsc --noEmit` via `svelte-check`): 0 erros, 0 avisos;
+- Vitest (unitário + integração): 137/137;
+- teste de jornada Playwright: aprovado, em execuções consecutivas sem
+  resíduo de processos ou arquivos temporários;
+- suíte Playwright padrão: aprovada;
+- build de produção (`adapter-node`): aprovado;
+- persistência validada manualmente após reinício do processo do servidor.
+
+### Pendente
+
+- Tela Mapa mínima (C2-13);
+- Tela Registros mínima (C2-14);
+- "Pular etapa" na interface (C2-15).
+
 ## [0.1.0] — 22/07/2026
 
 ### Adicionado
