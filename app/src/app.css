@@ -1,0 +1,67 @@
+/* Identidade visual mínima do Hydra — ver docs/core/UX_DESIGN_SPEC.md.
+   Não é um design system completo: só a paleta e a tipografia de base. */
+
+:root {
+	--hydra-bg: #0d1420;
+	--hydra-surface: #161f2c;
+	--hydra-surface-raised: #1b2430;
+	--hydra-border: #2c3946;
+	--hydra-text: #e8edf2;
+	--hydra-muted: #9aa5b1;
+	--hydra-accent: #4fd1c5;
+	--hydra-warning: #e0b04c;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--hydra-bg);
+	color: var(--hydra-text);
+	font-family:
+		'Manrope',
+		system-ui,
+		-apple-system,
+		sans-serif;
+	line-height: 1.5;
+}
+
+a {
+	color: var(--hydra-accent);
+}
+
+button,
+.button {
+	font: inherit;
+	font-weight: 700;
+	background: var(--hydra-accent);
+	color: #0a1420;
+	border: none;
+	border-radius: 8px;
+	padding: 0.7rem 1.4rem;
+	cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+	outline: 2px solid var(--hydra-accent);
+	outline-offset: 2px;
+}
+
+.button-secondary {
+	background: transparent;
+	color: var(--hydra-text);
+	border: 1px solid var(--hydra-border);
+}
+
+.container {
+	max-width: 960px;
+	margin: 0 auto;
+	padding: 2rem 1.5rem;
+}
+
+[role='alert'] {
+	color: var(--hydra-warning);
+}
