@@ -151,7 +151,7 @@ function parseBacklog(content) {
 			continue;
 		}
 
-		const itemHeading = line.match(/^### (C\d+-\d+) — (.+)$/);
+		const itemHeading = line.match(/^### (C\d+-\d+[A-Z]?) — (.+)$/);
 		if (itemHeading && currentPriority !== null) {
 			// Só conta como definição de item dentro de uma seção Must/Should/
 			// Could — o mesmo padrão "### C3-01 — Título" também aparece em
