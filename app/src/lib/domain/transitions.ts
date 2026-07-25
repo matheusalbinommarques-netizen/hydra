@@ -2,15 +2,35 @@
 // e docs/core/STATE_MACHINE.md.
 
 import type { ActivityDefinition, Catalog, RequiredFieldsActivity } from './catalog-types';
-import type { ActivityProgress, ActivityStatus, PendingItem, ProjectState } from './state-types';
+import type {
+	ActivityProgress,
+	ActivityStatus,
+	PendingItem,
+	ProjectState,
+	ScopeBucket,
+	ScopeEffort,
+	ScopeItem,
+	ScopeValue,
+	ScopeVersion
+} from './state-types';
 import type { Result } from './result';
+
+export type ScopeConfirmationIssue =
+	| 'no_items'
+	| 'no_now_items'
+	| 'missing_value'
+	| 'missing_effort'
+	| 'missing_hypothesis';
 
 export type DomainTransitionError =
 	| { kind: 'activity_not_found' }
 	| { kind: 'wrong_completion_mode' }
 	| { kind: 'activity_not_skippable' }
 	| { kind: 'unknown_field'; fieldDefinitionId: string }
-	| { kind: 'transition_not_allowed'; from: ActivityStatus };
+	| { kind: 'transition_not_allowed'; from: ActivityStatus }
+	| { kind: 'scope_item_not_found' }
+	| { kind: 'scope_reorder_mismatch' }
+	| { kind: 'scope_confirmation_invalid'; issues: ScopeConfirmationIssue[] };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -32,6 +52,36 @@ function findExplicitConfirmationActivity(catalog: Catalog): ActivityDefinition 
 		if (found) return found;
 	}
 	return undefined;
+}
+
+function findScopeConfirmationActivity(catalog: Catalog): ActivityDefinition | undefined {
+	for (const phase of catalog.phases) {
+		const found = phase.activities.find((activity) => activity.completionMode === 'scope_confirmation');
+		if (found) return found;
+	}
+	return undefined;
+}
+
+function findScopeItem(state: ProjectState, itemId: string): ScopeItem | undefined {
+	return state.scopeItems.find((item) => item.id === itemId);
+}
+
+function agoraItemsSorted(items: ScopeItem[]): ScopeItem[] {
+	return items.filter((item) => item.bucket === 'agora').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+function invalidateScopeConfirmation(catalog: Catalog, state: ProjectState): ProjectState {
+	if (state.scopeVersion.confirmedAt === null) return state;
+
+	let next: ProjectState = { ...state, scopeVersion: { ...state.scopeVersion, confirmedAt: null } };
+	const activity = findScopeConfirmationActivity(catalog);
+	if (activity) {
+		const progress = findActivityProgress(next, activity.id);
+		if (progress?.status === 'concluída') {
+			next = setActivityStatus(next, activity.id, 'em_andamento');
+		}
+	}
+	return next;
 }
 
 function findActivityProgress(state: ProjectState, activityId: string): ActivityProgress | undefined {
@@ -276,4 +326,235 @@ export function renameProject(
 	}
 
 	return { ok: true, value: nextState };
+}
+
+// --- Monte a próxima versão (ScopeItem / ScopeVersion) --------------------
+//
+// Qualquer alteração num ScopeItem ou na hipótese invalida uma confirmação
+// anterior (limpa scopeVersion.confirmedAt e reabre a atividade
+// scope_confirmation), espelhando invalidateSummary — edição pós-confirmação
+// nunca é bloqueada, só reabre. Mudança que repete o valor já existente é
+// no-op (nem persiste, nem invalida), mesmo padrão de answerActivity/
+// renameProject.
+
+/**
+ * Retorna a lista de motivos pelos quais a versão de escopo ainda não pode
+ * ser confirmada (array vazio = pode confirmar). Função pura, sem
+ * dependência do catálogo — usada pela interface (checklist), pelo domínio
+ * (confirmScopeVersion) e pelos testes; nenhum dos três deve duplicar esta
+ * lógica.
+ */
+export function getScopeConfirmationIssues(
+	scopeItems: ScopeItem[],
+	scopeVersion: ScopeVersion
+): ScopeConfirmationIssue[] {
+	const issues: ScopeConfirmationIssue[] = [];
+	if (scopeItems.length === 0) issues.push('no_items');
+	if (!scopeItems.some((item) => item.bucket === 'agora')) issues.push('no_now_items');
+	if (scopeItems.some((item) => item.value === null)) issues.push('missing_value');
+	if (scopeItems.some((item) => item.effort === null)) issues.push('missing_effort');
+	if (scopeVersion.hypothesis.trim().length === 0) issues.push('missing_hypothesis');
+	return issues;
+}
+
+export function addScopeItem(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	text: string,
+	bucket: ScopeBucket,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const order = bucket === 'agora' ? agoraItemsSorted(state.scopeItems).length : null;
+	const item: ScopeItem = {
+		id: itemId,
+		projectId: state.project.id,
+		text,
+		bucket,
+		value: null,
+		effort: null,
+		order,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	let next: ProjectState = { ...state, scopeItems: [...state.scopeItems, item] };
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function setScopeItemText(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	text: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findScopeItem(state, itemId);
+	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
+	if (item.text === text) return { ok: true, value: state };
+
+	let next: ProjectState = {
+		...state,
+		scopeItems: state.scopeItems.map((i) => (i.id === itemId ? { ...i, text, updatedAt: occurredAt } : i))
+	};
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function moveScopeItem(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	bucket: ScopeBucket,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findScopeItem(state, itemId);
+	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
+	if (item.bucket === bucket) return { ok: true, value: state };
+
+	const leavingAgora = item.bucket === 'agora';
+	const enteringAgora = bucket === 'agora';
+	const oldOrder = item.order;
+	const appendOrder = enteringAgora ? agoraItemsSorted(state.scopeItems).length : null;
+
+	const items = state.scopeItems.map((i) => {
+		if (i.id === itemId) {
+			return { ...i, bucket, order: appendOrder, updatedAt: occurredAt };
+		}
+		if (leavingAgora && i.bucket === 'agora' && i.order !== null && oldOrder !== null && i.order > oldOrder) {
+			return { ...i, order: i.order - 1 };
+		}
+		return i;
+	});
+
+	let next: ProjectState = { ...state, scopeItems: items };
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function setScopeItemValue(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	value: ScopeValue,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findScopeItem(state, itemId);
+	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
+	if (item.value === value) return { ok: true, value: state };
+
+	let next: ProjectState = {
+		...state,
+		scopeItems: state.scopeItems.map((i) => (i.id === itemId ? { ...i, value, updatedAt: occurredAt } : i))
+	};
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function setScopeItemEffort(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	effort: ScopeEffort,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findScopeItem(state, itemId);
+	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
+	if (item.effort === effort) return { ok: true, value: state };
+
+	let next: ProjectState = {
+		...state,
+		scopeItems: state.scopeItems.map((i) => (i.id === itemId ? { ...i, effort, updatedAt: occurredAt } : i))
+	};
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+/** orderedItemIds deve conter exatamente os ids atualmente em `agora`, na nova ordem desejada. */
+export function reorderAgoraItems(
+	catalog: Catalog,
+	state: ProjectState,
+	orderedItemIds: string[],
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const currentAgoraIds = agoraItemsSorted(state.scopeItems).map((item) => item.id);
+	const sameSet =
+		orderedItemIds.length === currentAgoraIds.length &&
+		new Set(orderedItemIds).size === orderedItemIds.length &&
+		currentAgoraIds.every((id) => orderedItemIds.includes(id));
+	if (!sameSet) return { ok: false, error: { kind: 'scope_reorder_mismatch' } };
+
+	const orderById = new Map(orderedItemIds.map((id, index) => [id, index]));
+	let changed = false;
+	const items = state.scopeItems.map((item) => {
+		if (item.bucket !== 'agora') return item;
+		const newOrder = orderById.get(item.id)!;
+		if (item.order === newOrder) return item;
+		changed = true;
+		return { ...item, order: newOrder, updatedAt: occurredAt };
+	});
+
+	if (!changed) return { ok: true, value: state };
+
+	let next: ProjectState = { ...state, scopeItems: items };
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function removeScopeItem(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findScopeItem(state, itemId);
+	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
+
+	let items = state.scopeItems.filter((i) => i.id !== itemId);
+	if (item.bucket === 'agora' && item.order !== null) {
+		const removedOrder = item.order;
+		items = items.map((i) =>
+			i.bucket === 'agora' && i.order !== null && i.order > removedOrder ? { ...i, order: i.order - 1 } : i
+		);
+	}
+
+	let next: ProjectState = { ...state, scopeItems: items };
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function setHypothesis(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesis: string
+): Result<ProjectState, DomainTransitionError> {
+	if (state.scopeVersion.hypothesis === hypothesis) return { ok: true, value: state };
+
+	let next: ProjectState = { ...state, scopeVersion: { ...state.scopeVersion, hypothesis } };
+	next = invalidateScopeConfirmation(catalog, next);
+	return { ok: true, value: next };
+}
+
+export function confirmScopeVersion(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findScopeConfirmationActivity(catalog);
+	if (!activity) return { ok: false, error: { kind: 'activity_not_found' } };
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	const issues = getScopeConfirmationIssues(state.scopeItems, state.scopeVersion);
+	if (issues.length > 0) {
+		return { ok: false, error: { kind: 'scope_confirmation_invalid', issues } };
+	}
+
+	let next: ProjectState = { ...state, scopeVersion: { ...state.scopeVersion, confirmedAt: occurredAt } };
+	next = setActivityStatus(next, activity.id, 'concluída');
+	return { ok: true, value: next };
 }

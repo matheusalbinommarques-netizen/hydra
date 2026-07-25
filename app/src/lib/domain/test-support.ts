@@ -6,7 +6,16 @@
 // os mesmos blocos de "responder as N atividades anteriores campo a campo"
 // espalhados pelos testes de orientation-engine.
 
-import { answerActivity, confirmSummary, skipActivity } from './transitions';
+import {
+	addScopeItem,
+	answerActivity,
+	confirmScopeVersion,
+	confirmSummary,
+	setHypothesis,
+	setScopeItemEffort,
+	setScopeItemValue,
+	skipActivity
+} from './transitions';
 import type { ActivityDefinition, Catalog, PhaseDefinition } from './catalog-types';
 import type { ProjectState } from './state-types';
 import type { Result } from './result';
@@ -59,19 +68,42 @@ export function skipActivityForTest(
 }
 
 /**
+ * Confirma uma versão de escopo (`scope_confirmation`) com o mínimo que
+ * satisfaz {@link getScopeConfirmationIssues}: um item em `agora` com
+ * valor/esforço definidos e uma hipótese não vazia — para quando o teste só
+ * precisa que `montar_proxima_versao` fique `concluída`, sem se importar com
+ * o conteúdo do escopo.
+ */
+export function confirmScopeVersionMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	occurredAt: string
+): ProjectState {
+	let next = unwrapResult(addScopeItem(catalog, state, itemId, 'Item de teste', 'agora', occurredAt));
+	next = unwrapResult(setScopeItemValue(catalog, next, itemId, 'medio', occurredAt));
+	next = unwrapResult(setScopeItemEffort(catalog, next, itemId, 'medio', occurredAt));
+	next = unwrapResult(setHypothesis(catalog, next, 'Hipótese de teste'));
+	return unwrapResult(confirmScopeVersion(catalog, next, occurredAt));
+}
+
+/**
  * Completa todas as atividades de uma fase, na ordem do catálogo:
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
- * via `confirmSummary`.
+ * via `confirmSummary`, `scope_confirmation` via {@link confirmScopeVersionMinimally}.
  */
 export function completePhase(catalog: Catalog, state: ProjectState, phaseId: string, occurredAt: string): ProjectState {
 	const phase = catalog.phases.find((p) => p.id === phaseId);
 	if (!phase) throw new Error(`fase de teste não encontrada: "${phaseId}"`);
 	let next = state;
 	for (const activity of phase.activities) {
-		next =
-			activity.completionMode === 'explicit_confirmation'
-				? unwrapResult(confirmSummary(catalog, next))
-				: answerActivityMinimally(catalog, next, activity.id, occurredAt);
+		if (activity.completionMode === 'explicit_confirmation') {
+			next = unwrapResult(confirmSummary(catalog, next));
+		} else if (activity.completionMode === 'scope_confirmation') {
+			next = confirmScopeVersionMinimally(catalog, next, `${activity.id}-scope-item-1`, occurredAt);
+		} else {
+			next = answerActivityMinimally(catalog, next, activity.id, occurredAt);
+		}
 	}
 	return next;
 }

@@ -3,7 +3,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { catalog } from '../../catalog';
-import { answerActivity, confirmSummary, createInitialProjectState, renameProject, skipActivity } from '$lib/domain';
+import {
+	addScopeItem,
+	answerActivity,
+	confirmScopeVersion,
+	confirmSummary,
+	createInitialProjectState,
+	moveScopeItem,
+	renameProject,
+	setHypothesis,
+	setScopeItemEffort,
+	setScopeItemValue,
+	skipActivity
+} from '$lib/domain';
 import type { ProjectState } from '$lib/domain';
 import { createSqliteProjectRepository, type SqliteProjectRepository } from './sqlite-project-repository';
 
@@ -61,6 +73,19 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(answerActivity(catalog, state, 'estado_atual', { estado_atual_detail: 'y' }, T2));
 	// resolve a pendência de "publico"
 	state = unwrap(answerActivity(catalog, state, 'publico', { publico_detail: 'Clientes' }, T2));
+
+	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
+	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'agora', T1));
+	state = unwrap(addScopeItem(catalog, state, 'scope-3', 'Integrações externas', 'fora', T1));
+	state = unwrap(moveScopeItem(catalog, state, 'scope-3', 'depois', T2));
+	state = unwrap(setScopeItemValue(catalog, state, 'scope-1', 'alto', T1));
+	state = unwrap(setScopeItemEffort(catalog, state, 'scope-1', 'pequeno', T1));
+	state = unwrap(setScopeItemValue(catalog, state, 'scope-2', 'baixo', T1));
+	state = unwrap(setScopeItemEffort(catalog, state, 'scope-2', 'grande', T1));
+	state = unwrap(setScopeItemValue(catalog, state, 'scope-3', 'medio', T1));
+	state = unwrap(setScopeItemEffort(catalog, state, 'scope-3', 'medio', T1));
+	state = unwrap(setHypothesis(catalog, state, 'Usuários concluem a jornada sem ajuda externa'));
+	state = unwrap(confirmScopeVersion(catalog, state, T2));
 	return state;
 }
 
@@ -289,14 +314,14 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 4 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 6 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
 		const found = await repo.findById(state.project.id);
 
 		expect(found && Object.keys(found).sort()).toEqual(
-			['project', 'activityProgress', 'answers', 'pendingItems'].sort()
+			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion'].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');
 		expect(found).not.toHaveProperty('projectStatus');

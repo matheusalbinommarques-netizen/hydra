@@ -28,13 +28,12 @@ describe('catalog', () => {
 		]);
 	});
 
-	it('Definição do produto tem as 5 atividades na ordem esperada', () => {
+	it('Definição do produto tem as 4 atividades na ordem esperada', () => {
 		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
 		expect(definicao?.activities.map((activity) => activity.id)).toEqual([
 			'usuario_principal',
 			'visao_produto',
-			'funcionalidades_essenciais',
-			'priorizar_primeira_versao',
+			'montar_proxima_versao',
 			'criterios_sucesso_produto'
 		]);
 	});
@@ -103,25 +102,21 @@ describe('catalog', () => {
 		expect(confirmar?.allowsSkip).toBe(false);
 	});
 
-	it('só "Resumo da descoberta" e "Confirmar encerramento do projeto" têm allowsSkip false', () => {
+	it('só "Resumo da descoberta", "Monte a próxima versão" e "Confirmar encerramento do projeto" têm allowsSkip false', () => {
 		const nonSkippable = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.allowsSkip === false)
 			.map((activity) => activity.id)
 			.sort();
-		expect(nonSkippable).toEqual(['confirmar_encerramento', 'resumo']);
+		expect(nonSkippable).toEqual(['confirmar_encerramento', 'montar_proxima_versao', 'resumo']);
 	});
 
-	it('"Priorizar primeira versão" projeta uma hipótese', () => {
+	it('"Monte a próxima versão" é scope_confirmation, não pulável e sem fields', () => {
 		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
-		const priorizar = definicao?.activities.find((activity) => activity.id === 'priorizar_primeira_versao');
-		if (!priorizar || priorizar.completionMode !== 'required_fields') {
-			throw new Error('atividade "priorizar_primeira_versao" deveria ser required_fields');
-		}
-		const hypothesisField = priorizar.fields.find(
-			(field) => field.dataTarget === 'answer' && field.semanticRole === 'hypothesis'
-		);
-		expect(hypothesisField?.id).toBe('hipotese_validada');
+		const montar = definicao?.activities.find((activity) => activity.id === 'montar_proxima_versao');
+		expect(montar?.completionMode).toBe('scope_confirmation');
+		expect(montar?.allowsSkip).toBe(false);
+		expect('fields' in (montar ?? {})).toBe(false);
 	});
 
 	it('"Problema ou oportunidade" tem só situação e dificuldade como obrigatórios', () => {

@@ -63,18 +63,19 @@ export function validateCatalog(catalog: Catalog): string[] {
 
 			const record = activity as unknown as Record<string, unknown>;
 
-			if (activity.completionMode === 'explicit_confirmation') {
+			if (activity.completionMode === 'explicit_confirmation' || activity.completionMode === 'scope_confirmation') {
+				const mode = activity.completionMode;
 				if ('fields' in record && record.fields !== undefined) {
-					violations.push(`Atividade "${activity.id}" é explicit_confirmation mas possui fields`);
+					violations.push(`Atividade "${activity.id}" é ${mode} mas possui fields`);
 				}
 				if ('pendingItemLabel' in record && record.pendingItemLabel !== undefined) {
-					violations.push(`Atividade "${activity.id}" é explicit_confirmation mas possui pendingItemLabel`);
+					violations.push(`Atividade "${activity.id}" é ${mode} mas possui pendingItemLabel`);
 				}
 				if ('pendingItemDetail' in record && record.pendingItemDetail !== undefined) {
-					violations.push(`Atividade "${activity.id}" é explicit_confirmation mas possui pendingItemDetail`);
+					violations.push(`Atividade "${activity.id}" é ${mode} mas possui pendingItemDetail`);
 				}
 				if (record.allowsSkip !== false) {
-					violations.push(`Atividade "${activity.id}" é explicit_confirmation mas allowsSkip não é false`);
+					violations.push(`Atividade "${activity.id}" é ${mode} mas allowsSkip não é false`);
 				}
 				continue;
 			}

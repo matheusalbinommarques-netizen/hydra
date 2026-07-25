@@ -21,6 +21,12 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Um dos campos enviados não pertence a esta atividade.';
 		case 'transition_not_allowed':
 			return 'Esta ação não é permitida neste momento.';
+		case 'scope_item_not_found':
+			return 'Item de escopo não encontrado.';
+		case 'scope_reorder_mismatch':
+			return 'A nova ordem enviada não corresponde aos itens atuais de "Agora".';
+		case 'scope_confirmation_invalid':
+			return 'Ainda faltam critérios para confirmar esta versão.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

@@ -30,7 +30,14 @@ type ProjectPropertyFieldDefinition = FieldDefinitionBase & {
 
 export type FieldDefinition = AnswerFieldDefinition | ProjectPropertyFieldDefinition;
 
-export type CompletionMode = 'required_fields' | 'explicit_confirmation';
+// scope_confirmation é uma solução deliberadamente específica para a
+// experiência "Monte a próxima versão" (ScopeItem/ScopeVersion), não uma
+// infraestrutura genérica de "Plays". Se uma segunda experiência
+// especializada precisar de outro completion mode com o mesmo formato
+// (confirmação explícita de um agregado próprio, fora de Answer), o conceito
+// deve ser generalizado nesse momento — não acumular valores do tipo
+// "risk_confirmation", "pulse_confirmation" etc.
+export type CompletionMode = 'required_fields' | 'explicit_confirmation' | 'scope_confirmation';
 
 interface ActivityDefinitionBase {
 	id: string;
@@ -62,7 +69,17 @@ type ExplicitConfirmationActivity = ActivityDefinitionBase & {
 	pendingItemDetail?: never;
 };
 
-export type ActivityDefinition = RequiredFieldsActivity | ExplicitConfirmationActivity;
+// Confirmação deriva de ScopeVersion.confirmedAt (ver domain/state-types.ts),
+// nunca de Answer — mesmo raciocínio de "sem campos/pendência" acima.
+type ScopeConfirmationActivity = ActivityDefinitionBase & {
+	completionMode: 'scope_confirmation';
+	allowsSkip: false;
+	fields?: never;
+	pendingItemLabel?: never;
+	pendingItemDetail?: never;
+};
+
+export type ActivityDefinition = RequiredFieldsActivity | ExplicitConfirmationActivity | ScopeConfirmationActivity;
 
 export type CatalogStatus = 'complete' | 'partial' | 'unavailable';
 

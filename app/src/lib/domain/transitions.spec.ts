@@ -2,10 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addScopeItem,
 	answerActivity,
+	confirmScopeVersion,
 	confirmSummary,
+	getScopeConfirmationIssues,
 	isActivityFieldsValid,
+	moveScopeItem,
+	removeScopeItem,
 	renameProject,
+	reorderAgoraItems,
+	setHypothesis,
+	setScopeItemEffort,
+	setScopeItemText,
+	setScopeItemValue,
 	shouldInvalidateSummary,
 	skipActivity
 } from './transitions';
@@ -315,5 +325,310 @@ describe('renameProject', () => {
 		const renamed = unwrap(renameProject(catalog, withSummary, 'Portal Novo'));
 		const resumo = renamed.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
+	});
+});
+
+describe('getScopeConfirmationIssues', () => {
+	it('sem itens: no_items, no_now_items e missing_hypothesis (missing_value/effort são vacuamente satisfeitos)', () => {
+		const state = freshState();
+		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual([
+			'no_items',
+			'no_now_items',
+			'missing_hypothesis'
+		]);
+	});
+
+	it('array vazio quando todos os critérios são atendidos', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual([]);
+	});
+
+	it('no_now_items quando só há itens fora de agora', () => {
+		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'depois', T1));
+		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toContain('no_now_items');
+		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).not.toContain('no_items');
+	});
+
+	it('missing_value/missing_effort persistem mesmo com item em agora', () => {
+		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		const issues = getScopeConfirmationIssues(state.scopeItems, state.scopeVersion);
+		expect(issues).toContain('missing_value');
+		expect(issues).toContain('missing_effort');
+		expect(issues).not.toContain('no_now_items');
+	});
+
+	it('missing_hypothesis para hipótese só com espaços', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, '   '));
+		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual(['missing_hypothesis']);
+	});
+});
+
+describe('addScopeItem', () => {
+	it('item novo em "agora" recebe order 0 quando é o primeiro', () => {
+		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Primeiro', 'agora', T1));
+		expect(state.scopeItems).toEqual([
+			{
+				id: 'item-1',
+				projectId: 'proj-1',
+				text: 'Primeiro',
+				bucket: 'agora',
+				value: null,
+				effort: null,
+				order: 0,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+	});
+
+	it('itens sucessivos em "agora" entram no fim (order contínuo)', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-3', 'Três', 'agora', T1));
+		expect(state.scopeItems.map((i) => [i.id, i.order])).toEqual([
+			['item-1', 0],
+			['item-2', 1],
+			['item-3', 2]
+		]);
+	});
+
+	it('item novo fora de "agora" tem order null', () => {
+		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Fora', 'fora', T1));
+		expect(state.scopeItems[0].order).toBeNull();
+	});
+
+	it('adicionar item invalida uma confirmação existente', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+		expect(state.scopeVersion.confirmedAt).toBe(T1);
+
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'depois', T2));
+		expect(state.scopeVersion.confirmedAt).toBeNull();
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'montar_proxima_versao');
+		expect(progress?.status).toBe('em_andamento');
+	});
+});
+
+describe('setScopeItemText / setScopeItemValue / setScopeItemEffort', () => {
+	it('erro scope_item_not_found para id inexistente', () => {
+		expect(setScopeItemText(catalog, freshState(), 'inexistente', 'x', T1)).toEqual({
+			ok: false,
+			error: { kind: 'scope_item_not_found' }
+		});
+	});
+
+	it('repetir o mesmo texto é no-op e não invalida confirmação', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Texto', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		const same = unwrap(setScopeItemText(catalog, state, 'item-1', 'Texto', T2));
+		expect(same.scopeVersion.confirmedAt).toBe(T1);
+	});
+
+	it('mudar o texto invalida a confirmação existente', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Texto', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		const changed = unwrap(setScopeItemText(catalog, state, 'item-1', 'Texto novo', T2));
+		expect(changed.scopeVersion.confirmedAt).toBeNull();
+		expect(changed.scopeItems[0].text).toBe('Texto novo');
+	});
+
+	it('setScopeItemValue/Effort atualizam o item e invalidam confirmação em mudança real', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'baixo', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'grande', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		const revalued = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T2));
+		expect(revalued.scopeItems[0].value).toBe('alto');
+		expect(revalued.scopeVersion.confirmedAt).toBeNull();
+	});
+});
+
+describe('moveScopeItem', () => {
+	it('mover para "agora" a partir de outro bucket entra no fim', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'depois', T1));
+		state = unwrap(moveScopeItem(catalog, state, 'item-2', 'agora', T2));
+
+		const item2 = state.scopeItems.find((i) => i.id === 'item-2')!;
+		expect(item2.order).toBe(1);
+	});
+
+	it('sair de "agora" zera order e fecha a lacuna dos itens restantes', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-3', 'Três', 'agora', T1));
+		state = unwrap(moveScopeItem(catalog, state, 'item-2', 'fora', T2));
+
+		expect(state.scopeItems.map((i) => [i.id, i.bucket, i.order])).toEqual([
+			['item-1', 'agora', 0],
+			['item-2', 'fora', null],
+			['item-3', 'agora', 1]
+		]);
+	});
+
+	it('mover para o mesmo bucket é no-op', () => {
+		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		const result = unwrap(moveScopeItem(catalog, state, 'item-1', 'agora', T2));
+		expect(result).toBe(state);
+	});
+
+	it('erro scope_item_not_found para id inexistente', () => {
+		expect(moveScopeItem(catalog, freshState(), 'inexistente', 'agora', T1)).toEqual({
+			ok: false,
+			error: { kind: 'scope_item_not_found' }
+		});
+	});
+});
+
+describe('reorderAgoraItems', () => {
+	function threeAgoraItems(): ProjectState {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-3', 'Três', 'agora', T1));
+		return state;
+	}
+
+	it('reordena mantendo contiguidade 0..n-1', () => {
+		const state = threeAgoraItems();
+		const result = unwrap(reorderAgoraItems(catalog, state, ['item-3', 'item-1', 'item-2'], T2));
+		expect(result.scopeItems.map((i) => [i.id, i.order])).toEqual([
+			['item-1', 1],
+			['item-2', 2],
+			['item-3', 0]
+		]);
+	});
+
+	it('erro scope_reorder_mismatch quando falta ou sobra um id', () => {
+		const state = threeAgoraItems();
+		expect(reorderAgoraItems(catalog, state, ['item-1', 'item-2'], T2)).toEqual({
+			ok: false,
+			error: { kind: 'scope_reorder_mismatch' }
+		});
+		expect(reorderAgoraItems(catalog, state, ['item-1', 'item-2', 'item-3', 'item-1'], T2)).toEqual({
+			ok: false,
+			error: { kind: 'scope_reorder_mismatch' }
+		});
+	});
+
+	it('ordem idêntica é no-op', () => {
+		const state = threeAgoraItems();
+		const result = unwrap(reorderAgoraItems(catalog, state, ['item-1', 'item-2', 'item-3'], T2));
+		expect(result).toBe(state);
+	});
+});
+
+describe('removeScopeItem', () => {
+	it('remove o item e fecha a lacuna de order em "agora"', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-3', 'Três', 'agora', T1));
+
+		const result = unwrap(removeScopeItem(catalog, state, 'item-2'));
+		expect(result.scopeItems.map((i) => [i.id, i.order])).toEqual([
+			['item-1', 0],
+			['item-3', 1]
+		]);
+	});
+
+	it('remover item invalida uma confirmação existente', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'depois', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-2', 'baixo', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-2', 'grande', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		const result = unwrap(removeScopeItem(catalog, state, 'item-2'));
+		expect(result.scopeVersion.confirmedAt).toBeNull();
+	});
+
+	it('erro scope_item_not_found para id inexistente', () => {
+		expect(removeScopeItem(catalog, freshState(), 'inexistente')).toEqual({
+			ok: false,
+			error: { kind: 'scope_item_not_found' }
+		});
+	});
+});
+
+describe('setHypothesis', () => {
+	it('define a hipótese e invalida confirmação em mudança real', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Original'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		const changed = unwrap(setHypothesis(catalog, state, 'Nova hipótese'));
+		expect(changed.scopeVersion.hypothesis).toBe('Nova hipótese');
+		expect(changed.scopeVersion.confirmedAt).toBeNull();
+	});
+
+	it('repetir o mesmo texto é no-op', () => {
+		const state = unwrap(setHypothesis(catalog, freshState(), 'Hipótese'));
+		const result = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		expect(result).toBe(state);
+	});
+});
+
+describe('confirmScopeVersion', () => {
+	function validState(): ProjectState {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		return unwrap(setHypothesis(catalog, state, 'Hipótese'));
+	}
+
+	it('confirma e conclui montar_proxima_versao quando todos os critérios são atendidos', () => {
+		const result = unwrap(confirmScopeVersion(catalog, validState(), T1));
+		expect(result.scopeVersion.confirmedAt).toBe(T1);
+		const progress = result.activityProgress.find((p) => p.activityDefinitionId === 'montar_proxima_versao');
+		expect(progress?.status).toBe('concluída');
+	});
+
+	it('erro scope_confirmation_invalid com os issues pendentes', () => {
+		const result = confirmScopeVersion(catalog, freshState(), T1);
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				kind: 'scope_confirmation_invalid',
+				issues: ['no_items', 'no_now_items', 'missing_hypothesis']
+			}
+		});
+	});
+
+	it('erro transition_not_allowed ao confirmar de novo sem edição', () => {
+		const state = unwrap(confirmScopeVersion(catalog, validState(), T1));
+		expect(confirmScopeVersion(catalog, state, T2)).toEqual({
+			ok: false,
+			error: { kind: 'transition_not_allowed', from: 'concluída' }
+		});
+	});
+
+	it('depois de invalidada por edição, confirmar de novo funciona', () => {
+		let state = unwrap(confirmScopeVersion(catalog, validState(), T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese revisada'));
+		const reconfirmed = unwrap(confirmScopeVersion(catalog, state, T2));
+		expect(reconfirmed.scopeVersion.confirmedAt).toBe(T2);
 	});
 });

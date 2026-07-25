@@ -9,6 +9,8 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		activityProgress: [],
 		answers: [],
 		pendingItems: [],
+		scopeItems: [],
+		scopeVersion: { projectId: 'p1', hypothesis: '', confirmedAt: null },
 		...overrides
 	};
 }
@@ -170,7 +172,10 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'nextActivity',
 				'openPendingItems',
 				'pendingItemHistory',
-				'hypotheses'
+				'hypotheses',
+				'scopeItems',
+				'scopeVersion',
+				'scopeConfirmationIssues'
 			].sort()
 		);
 	});

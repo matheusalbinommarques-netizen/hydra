@@ -2,8 +2,9 @@
 // interno; nunca expõe ProjectState bruto (ver contracts.md §10).
 
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
+import { getScopeConfirmationIssues } from '$lib/domain';
 import { computeSnapshot } from '$lib/orientation-engine';
-import type { PendingItemHistoryView, ProjectView } from './types';
+import type { PendingItemHistoryView, ProjectView, ScopeItemView } from './types';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -43,6 +44,17 @@ function buildPendingItemHistory(catalog: Catalog, state: ProjectState): Pending
 	return history;
 }
 
+function buildScopeItemView(item: ProjectState['scopeItems'][number]): ScopeItemView {
+	return {
+		id: item.id,
+		text: item.text,
+		bucket: item.bucket,
+		value: item.value,
+		effort: item.effort,
+		order: item.order
+	};
+}
+
 export function buildProjectView(catalog: Catalog, state: ProjectState): ProjectView {
 	const snapshot = computeSnapshot(catalog, state);
 
@@ -66,6 +78,9 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		nextActivity: snapshot.nextActivity,
 		openPendingItems: snapshot.openPendingItems,
 		pendingItemHistory: buildPendingItemHistory(catalog, state),
-		hypotheses: snapshot.hypotheses
+		hypotheses: snapshot.hypotheses,
+		scopeItems: state.scopeItems.map(buildScopeItemView),
+		scopeVersion: { hypothesis: state.scopeVersion.hypothesis, confirmedAt: state.scopeVersion.confirmedAt },
+		scopeConfirmationIssues: getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)
 	};
 }

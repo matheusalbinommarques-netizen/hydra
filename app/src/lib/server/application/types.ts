@@ -1,6 +1,15 @@
 // DTO, erros e casos de uso — ver docs/06-architecture/contracts.md §10.
 
-import type { ActivityStatus, DomainTransitionError, ProjectStateParseError, Result } from '$lib/domain';
+import type {
+	ActivityStatus,
+	DomainTransitionError,
+	ProjectStateParseError,
+	Result,
+	ScopeBucket,
+	ScopeConfirmationIssue,
+	ScopeEffort,
+	ScopeValue
+} from '$lib/domain';
 import type {
 	HypothesisView,
 	NextActivityResult,
@@ -42,6 +51,22 @@ export interface ProjectListItem {
 	createdAt: string;
 }
 
+// "Monte a próxima versão" (C5) — view leve de ScopeItem/ScopeVersion, sem
+// projectId/createdAt/updatedAt, que a interface não precisa.
+export interface ScopeItemView {
+	id: string;
+	text: string;
+	bucket: ScopeBucket;
+	value: ScopeValue | null;
+	effort: ScopeEffort | null;
+	order: number | null;
+}
+
+export interface ScopeVersionView {
+	hypothesis: string;
+	confirmedAt: string | null;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -53,6 +78,12 @@ export interface ProjectView {
 	openPendingItems: PendingItemView[];
 	pendingItemHistory: PendingItemHistoryView[];
 	hypotheses: HypothesisView[];
+	scopeItems: ScopeItemView[];
+	scopeVersion: ScopeVersionView;
+	// Sempre computado (não só sob demanda) para a interface poder desabilitar
+	// o botão "Confirmar" e mostrar o checklist sem round-trip extra —
+	// mesma função pura usada pelo domínio na confirmação (getScopeConfirmationIssues).
+	scopeConfirmationIssues: ScopeConfirmationIssue[];
 }
 
 export type UseCaseError =
@@ -83,6 +114,55 @@ export interface RenameProjectInput {
 	name: string;
 }
 
+export interface AddScopeItemInput {
+	projectId: string;
+	text: string;
+	bucket: ScopeBucket;
+}
+
+export interface SetScopeItemTextInput {
+	projectId: string;
+	itemId: string;
+	text: string;
+}
+
+export interface MoveScopeItemInput {
+	projectId: string;
+	itemId: string;
+	bucket: ScopeBucket;
+}
+
+export interface SetScopeItemValueInput {
+	projectId: string;
+	itemId: string;
+	value: ScopeValue;
+}
+
+export interface SetScopeItemEffortInput {
+	projectId: string;
+	itemId: string;
+	effort: ScopeEffort;
+}
+
+export interface ReorderAgoraItemsInput {
+	projectId: string;
+	orderedItemIds: string[];
+}
+
+export interface RemoveScopeItemInput {
+	projectId: string;
+	itemId: string;
+}
+
+export interface SetHypothesisInput {
+	projectId: string;
+	hypothesis: string;
+}
+
+export interface ConfirmScopeVersionInput {
+	projectId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>>;
@@ -91,6 +171,15 @@ export interface ProjectUseCases {
 	answerActivity(input: AnswerActivityInput): Promise<UseCaseOutcome<ProjectView>>;
 	skipActivity(input: SkipActivityInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmSummary(input: ConfirmSummaryInput): Promise<UseCaseOutcome<ProjectView>>;
+	addScopeItem(input: AddScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
+	setScopeItemText(input: SetScopeItemTextInput): Promise<UseCaseOutcome<ProjectView>>;
+	moveScopeItem(input: MoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
+	setScopeItemValue(input: SetScopeItemValueInput): Promise<UseCaseOutcome<ProjectView>>;
+	setScopeItemEffort(input: SetScopeItemEffortInput): Promise<UseCaseOutcome<ProjectView>>;
+	reorderAgoraItems(input: ReorderAgoraItemsInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeScopeItem(input: RemoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
+	setHypothesis(input: SetHypothesisInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmScopeVersion(input: ConfirmScopeVersionInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

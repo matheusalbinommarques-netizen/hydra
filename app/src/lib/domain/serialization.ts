@@ -3,8 +3,21 @@
 // exceção, sempre retorna Result; nenhum cast é usado para presumir validade.
 
 import type { ActivityDefinition, Catalog } from './catalog-types';
-import type { ActivityProgress, ActivityStatus, Answer, PendingItem, Project, ProjectState } from './state-types';
+import type {
+	ActivityProgress,
+	ActivityStatus,
+	Answer,
+	PendingItem,
+	Project,
+	ProjectState,
+	ScopeBucket,
+	ScopeEffort,
+	ScopeItem,
+	ScopeValue,
+	ScopeVersion
+} from './state-types';
 import type { Result } from './result';
+import { getScopeConfirmationIssues } from './transitions';
 
 export interface ExportedProjectState {
 	version: 1;
@@ -158,6 +171,73 @@ function parsePendingItemList(value: unknown): Result<RawPendingItem[], ProjectS
 	return { ok: true, value: result };
 }
 
+const SCOPE_BUCKETS: readonly string[] = ['agora', 'depois', 'fora'];
+function isScopeBucket(value: unknown): value is ScopeBucket {
+	return typeof value === 'string' && SCOPE_BUCKETS.includes(value);
+}
+
+const SCOPE_VALUES: readonly string[] = ['baixo', 'medio', 'alto'];
+function isScopeValueOrNull(value: unknown): value is ScopeValue | null {
+	return value === null || (typeof value === 'string' && SCOPE_VALUES.includes(value));
+}
+
+const SCOPE_EFFORTS: readonly string[] = ['pequeno', 'medio', 'grande'];
+function isScopeEffortOrNull(value: unknown): value is ScopeEffort | null {
+	return value === null || (typeof value === 'string' && SCOPE_EFFORTS.includes(value));
+}
+
+function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStateParseError> {
+	if (!Array.isArray(value)) return shapeError('scopeItems deve ser um array');
+	const result: ScopeItem[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada ScopeItem deve ser um objeto');
+		if (!isString(item.id)) return shapeError('ScopeItem.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('ScopeItem.projectId deve ser uma string');
+		if (!isString(item.text)) return shapeError('ScopeItem.text deve ser uma string');
+		if (!isScopeBucket(item.bucket)) return shapeError('ScopeItem.bucket deve ser um dos literais aprovados');
+		if (!isScopeValueOrNull(item.value)) {
+			return shapeError('ScopeItem.value deve ser um dos literais aprovados ou null');
+		}
+		if (!isScopeEffortOrNull(item.effort)) {
+			return shapeError('ScopeItem.effort deve ser um dos literais aprovados ou null');
+		}
+		if (item.order !== null && (typeof item.order !== 'number' || !Number.isInteger(item.order) || item.order < 0)) {
+			return shapeError('ScopeItem.order deve ser um inteiro não negativo ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('ScopeItem.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('ScopeItem.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			text: item.text,
+			bucket: item.bucket,
+			value: item.value,
+			effort: item.effort,
+			order: item.order as number | null,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+function parseScopeVersion(value: unknown): Result<ScopeVersion, ProjectStateParseError> {
+	if (!isRecord(value)) return shapeError('scopeVersion deve ser um objeto');
+	if (!isString(value.projectId)) return shapeError('ScopeVersion.projectId deve ser uma string');
+	if (!isString(value.hypothesis)) return shapeError('ScopeVersion.hypothesis deve ser uma string');
+	if (value.confirmedAt !== null && !isIsoDateString(value.confirmedAt)) {
+		return shapeError('ScopeVersion.confirmedAt deve ser uma data ISO 8601 válida ou null');
+	}
+	return {
+		ok: true,
+		value: {
+			projectId: value.projectId,
+			hypothesis: value.hypothesis,
+			confirmedAt: (value.confirmedAt as string | null) ?? null
+		}
+	};
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -175,7 +255,9 @@ function assembleProjectState(
 	project: Project,
 	activityProgress: ActivityProgress[],
 	answers: Answer[],
-	rawPendingItems: RawPendingItem[]
+	rawPendingItems: RawPendingItem[],
+	scopeItems: ScopeItem[],
+	scopeVersion: ScopeVersion
 ): Result<ProjectState, ProjectStateParseError> {
 	// referências: ActivityProgress
 	for (const progress of activityProgress) {
@@ -306,9 +388,50 @@ function assembleProjectState(
 		}
 	}
 
+	// referências + invariantes: ScopeItem
+	const seenScopeItemIds = new Set<string>();
+	for (const item of scopeItems) {
+		if (item.projectId !== project.id) {
+			return invariantError(`ScopeItem "${item.id}" usa projectId diferente do Project`);
+		}
+		if (seenScopeItemIds.has(item.id)) {
+			return invariantError(`ScopeItem.id duplicado: "${item.id}"`);
+		}
+		seenScopeItemIds.add(item.id);
+		if (item.bucket === 'agora' && item.order === null) {
+			return invariantError(`ScopeItem "${item.id}" está em "agora" mas não tem order`);
+		}
+		if (item.bucket !== 'agora' && item.order !== null) {
+			return invariantError(`ScopeItem "${item.id}" não está em "agora" mas tem order definido`);
+		}
+	}
+
+	const agoraOrders = scopeItems
+		.filter((item) => item.bucket === 'agora')
+		.map((item) => item.order as number)
+		.sort((a, b) => a - b);
+	for (let i = 0; i < agoraOrders.length; i++) {
+		if (agoraOrders[i] !== i) {
+			return invariantError('Os itens de "agora" não têm order contíguo começando em 0');
+		}
+	}
+
+	// referências + invariantes: ScopeVersion
+	if (scopeVersion.projectId !== project.id) {
+		return invariantError('ScopeVersion usa projectId diferente do Project');
+	}
+	if (scopeVersion.confirmedAt !== null) {
+		const issues = getScopeConfirmationIssues(scopeItems, scopeVersion);
+		if (issues.length > 0) {
+			return invariantError(
+				`ScopeVersion está confirmada (confirmedAt definido) mas não atende aos critérios de confirmação: ${issues.join(', ')}`
+			);
+		}
+	}
+
 	return {
 		ok: true,
-		value: { project, activityProgress, answers, pendingItems }
+		value: { project, activityProgress, answers, pendingItems, scopeItems, scopeVersion }
 	};
 }
 
@@ -356,11 +479,19 @@ export function deserializeProjectState(
 	const pendingItemsResult = parsePendingItemList(state.pendingItems);
 	if (!pendingItemsResult.ok) return pendingItemsResult;
 
+	const scopeItemsResult = parseScopeItemList(state.scopeItems);
+	if (!scopeItemsResult.ok) return scopeItemsResult;
+
+	const scopeVersionResult = parseScopeVersion(state.scopeVersion);
+	if (!scopeVersionResult.ok) return scopeVersionResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
 		activityProgressResult.value,
 		answersResult.value,
-		pendingItemsResult.value
+		pendingItemsResult.value,
+		scopeItemsResult.value,
+		scopeVersionResult.value
 	);
 }

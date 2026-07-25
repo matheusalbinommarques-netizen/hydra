@@ -2,7 +2,18 @@
 // Nenhum detalhe SQL (nomes de coluna, tipos SQL) atravessa a interface
 // ProjectRepository.
 
-import type { ActivityProgress, ActivityStatus, Answer, PendingItem, Project } from '$lib/domain';
+import type {
+	ActivityProgress,
+	ActivityStatus,
+	Answer,
+	PendingItem,
+	Project,
+	ScopeBucket,
+	ScopeEffort,
+	ScopeItem,
+	ScopeValue,
+	ScopeVersion
+} from '$lib/domain';
 
 export interface ProjectRow {
 	id: string;
@@ -55,6 +66,42 @@ export function mapAnswerRow(row: AnswerRow): Answer {
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};
+}
+
+export interface ScopeItemRow {
+	id: string;
+	project_id: string;
+	text: string;
+	bucket: ScopeBucket;
+	value: ScopeValue | null;
+	effort: ScopeEffort | null;
+	item_order: number | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface ScopeVersionRow {
+	project_id: string;
+	hypothesis: string;
+	confirmed_at: string | null;
+}
+
+export function mapScopeItemRow(row: ScopeItemRow): ScopeItem {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		text: row.text,
+		bucket: row.bucket,
+		value: row.value,
+		effort: row.effort,
+		order: row.item_order,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
+	};
+}
+
+export function mapScopeVersionRow(row: ScopeVersionRow): ScopeVersion {
+	return { projectId: row.project_id, hypothesis: row.hypothesis, confirmedAt: row.confirmed_at };
 }
 
 export function mapPendingItemRow(row: PendingItemRow): PendingItem {

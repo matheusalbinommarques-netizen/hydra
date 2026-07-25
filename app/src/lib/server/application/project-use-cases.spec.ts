@@ -490,6 +490,154 @@ describe('createProjectUseCases — listRecentProjects', () => {
 	});
 });
 
+describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
+	it('addScopeItem cria o item e reflete em ProjectView.scopeItems', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.addScopeItem({
+			projectId: created.value.projectId,
+			text: 'Criar projeto',
+			bucket: 'agora'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.scopeItems).toEqual([
+			{ id: 'id-2', text: 'Criar projeto', bucket: 'agora', value: null, effort: null, order: 0 }
+		]);
+	});
+
+	it('checklist e confirmação: falha com issues pendentes, sucede após completar os critérios', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const withItem = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
+		if (!withItem.ok) throw new Error('esperado ok');
+		expect(withItem.value.scopeConfirmationIssues).toEqual(['missing_value', 'missing_effort', 'missing_hypothesis']);
+
+		const failedConfirm = await useCases.confirmScopeVersion({ projectId });
+		expect(failedConfirm).toEqual({
+			ok: false,
+			error: {
+				kind: 'scope_confirmation_invalid',
+				issues: ['missing_value', 'missing_effort', 'missing_hypothesis']
+			}
+		});
+
+		const itemId = withItem.value.scopeItems[0].id;
+		await useCases.setScopeItemValue({ projectId, itemId, value: 'alto' });
+		await useCases.setScopeItemEffort({ projectId, itemId, effort: 'pequeno' });
+		await useCases.setHypothesis({ projectId, hypothesis: 'Hipótese' });
+
+		const confirmed = await useCases.confirmScopeVersion({ projectId });
+		expect(confirmed.ok).toBe(true);
+		if (!confirmed.ok) return;
+		expect(confirmed.value.scopeVersion).toEqual({ hypothesis: 'Hipótese', confirmedAt: expect.any(String) });
+		expect(confirmed.value.scopeConfirmationIssues).toEqual([]);
+		expect(confirmed.value.activityStatuses['montar_proxima_versao']).toBe('concluída');
+	});
+
+	it('editar um item depois de confirmado reabre montar_proxima_versao', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const withItem = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
+		if (!withItem.ok) throw new Error('esperado ok');
+		const itemId = withItem.value.scopeItems[0].id;
+		await useCases.setScopeItemValue({ projectId, itemId, value: 'alto' });
+		await useCases.setScopeItemEffort({ projectId, itemId, effort: 'pequeno' });
+		await useCases.setHypothesis({ projectId, hypothesis: 'Hipótese' });
+		await useCases.confirmScopeVersion({ projectId });
+
+		const edited = await useCases.setScopeItemText({ projectId, itemId, text: 'Item revisado' });
+		expect(edited.ok).toBe(true);
+		if (!edited.ok) return;
+		expect(edited.value.scopeVersion.confirmedAt).toBeNull();
+		expect(edited.value.activityStatuses['montar_proxima_versao']).toBe('em_andamento');
+	});
+
+	it('reorderAgoraItems reflete a nova ordem em ProjectView', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const first = await useCases.addScopeItem({ projectId, text: 'Um', bucket: 'agora' });
+		if (!first.ok) throw new Error('esperado ok');
+		const second = await useCases.addScopeItem({ projectId, text: 'Dois', bucket: 'agora' });
+		if (!second.ok) throw new Error('esperado ok');
+		const [idOne, idTwo] = [first.value.scopeItems[0].id, second.value.scopeItems[1].id];
+
+		const reordered = await useCases.reorderAgoraItems({ projectId, orderedItemIds: [idTwo, idOne] });
+		expect(reordered.ok).toBe(true);
+		if (!reordered.ok) return;
+		expect(reordered.value.scopeItems.map((i) => [i.id, i.order])).toEqual([
+			[idOne, 1],
+			[idTwo, 0]
+		]);
+	});
+
+	it('removeScopeItem remove o item de ProjectView', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
+		if (!added.ok) throw new Error('esperado ok');
+		const itemId = added.value.scopeItems[0].id;
+
+		const removed = await useCases.removeScopeItem({ projectId, itemId });
+		expect(removed.ok).toBe(true);
+		if (!removed.ok) return;
+		expect(removed.value.scopeItems).toEqual([]);
+	});
+
+	it('moveScopeItem para "agora" acrescenta order no fim', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'depois' });
+		if (!added.ok) throw new Error('esperado ok');
+		const itemId = added.value.scopeItems[0].id;
+
+		const moved = await useCases.moveScopeItem({ projectId, itemId, bucket: 'agora' });
+		expect(moved.ok).toBe(true);
+		if (!moved.ok) return;
+		expect(moved.value.scopeItems[0]).toEqual({
+			id: itemId,
+			text: 'Item',
+			bucket: 'agora',
+			value: null,
+			effort: null,
+			order: 0
+		});
+	});
+
+	it('erros de domínio (scope_item_not_found) são repassados sem persistir', async () => {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.setScopeItemValue({
+			projectId: created.value.projectId,
+			itemId: 'inexistente',
+			value: 'alto'
+		});
+		expect(result).toEqual({ ok: false, error: { kind: 'scope_item_not_found' } });
+
+		const stored = await repo.findById(created.value.projectId);
+		expect(stored?.scopeItems).toEqual([]);
+	});
+});
+
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
 	it('o registro persistido contém só os 4 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
@@ -503,11 +651,11 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 
 		const stored = await repo.findById(created.value.projectId);
 		expect(stored && Object.keys(stored).sort()).toEqual(
-			['project', 'activityProgress', 'answers', 'pendingItems'].sort()
+			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion'].sort()
 		);
 	});
 
-	it('ProjectView contém só os 10 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 13 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -523,7 +671,10 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'nextActivity',
 				'openPendingItems',
 				'pendingItemHistory',
-				'hypotheses'
+				'hypotheses',
+				'scopeItems',
+				'scopeVersion',
+				'scopeConfirmationIssues'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');

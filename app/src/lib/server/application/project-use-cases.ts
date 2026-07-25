@@ -4,23 +4,41 @@
 
 import type { Catalog, ProjectState } from '$lib/domain';
 import {
+	addScopeItem as addScopeItemInDomain,
 	answerActivity as answerActivityInDomain,
+	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
 	createInitialProjectState,
 	deserializeProjectState,
+	moveScopeItem as moveScopeItemInDomain,
+	removeScopeItem as removeScopeItemInDomain,
 	renameProject as renameProjectInDomain,
+	reorderAgoraItems as reorderAgoraItemsInDomain,
 	serializeProjectState,
+	setHypothesis as setHypothesisInDomain,
+	setScopeItemEffort as setScopeItemEffortInDomain,
+	setScopeItemText as setScopeItemTextInDomain,
+	setScopeItemValue as setScopeItemValueInDomain,
 	skipActivity as skipActivityInDomain
 } from '$lib/domain';
 import type { ProjectRepository } from '../persistence';
 import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
 import type {
+	AddScopeItemInput,
 	AnswerActivityInput,
+	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
+	MoveScopeItemInput,
 	ProjectListItem,
 	ProjectUseCases,
+	RemoveScopeItemInput,
 	RenameProjectInput,
+	ReorderAgoraItemsInput,
+	SetHypothesisInput,
+	SetScopeItemEffortInput,
+	SetScopeItemTextInput,
+	SetScopeItemValueInput,
 	SkipActivityInput,
 	UseCaseOutcome
 } from './types';
@@ -118,6 +136,112 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmSummaryInDomain(catalog, state);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async addScopeItem(input: AddScopeItemInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addScopeItemInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.text,
+				input.bucket,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setScopeItemText(input: SetScopeItemTextInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setScopeItemTextInDomain(catalog, state, input.itemId, input.text, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async moveScopeItem(input: MoveScopeItemInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = moveScopeItemInDomain(catalog, state, input.itemId, input.bucket, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setScopeItemValue(input: SetScopeItemValueInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setScopeItemValueInDomain(catalog, state, input.itemId, input.value, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setScopeItemEffort(input: SetScopeItemEffortInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setScopeItemEffortInDomain(catalog, state, input.itemId, input.effort, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async reorderAgoraItems(input: ReorderAgoraItemsInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reorderAgoraItemsInDomain(catalog, state, input.orderedItemIds, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeScopeItem(input: RemoveScopeItemInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeScopeItemInDomain(catalog, state, input.itemId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setHypothesis(input: SetHypothesisInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setHypothesisInDomain(catalog, state, input.hypothesis);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmScopeVersion(input: ConfirmScopeVersionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmScopeVersionInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
-import { answerActivity, confirmSummary, skipActivity } from './transitions';
+import {
+	addScopeItem,
+	answerActivity,
+	confirmScopeVersion,
+	confirmSummary,
+	setHypothesis,
+	setScopeItemEffort,
+	setScopeItemValue,
+	skipActivity
+} from './transitions';
 import { deserializeProjectState, serializeProjectState } from './serialization';
 import type { ProjectState } from './state-types';
 import type { ProjectStateParseError } from './serialization';
@@ -27,6 +36,14 @@ function nonTrivialState(): ProjectState {
 		answerActivity(catalog, state, 'publico', { publico_detail: 'Clientes' }, T2)
 	);
 	state = unwrap(confirmSummary(catalog, state));
+	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
+	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'depois', T1));
+	state = unwrap(setScopeItemValue(catalog, state, 'scope-1', 'alto', T1));
+	state = unwrap(setScopeItemEffort(catalog, state, 'scope-1', 'pequeno', T1));
+	state = unwrap(setScopeItemValue(catalog, state, 'scope-2', 'baixo', T1));
+	state = unwrap(setScopeItemEffort(catalog, state, 'scope-2', 'grande', T1));
+	state = unwrap(setHypothesis(catalog, state, 'Usuários concluem a jornada sem ajuda externa'));
+	state = unwrap(confirmScopeVersion(catalog, state, T2));
 	return state;
 }
 
@@ -278,6 +295,99 @@ describe('deserializeProjectState — invariant_violation', () => {
 			state: { pendingItems: Array<Record<string, unknown>> };
 		};
 		delete envelope.state.pendingItems[0].resolvedAt;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — ScopeItem / ScopeVersion', () => {
+	function scopeState(): ProjectState {
+		let state = unwrap(
+			addScopeItem(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'scope-1', 'Item', 'agora', T1)
+		);
+		return state;
+	}
+
+	it('rejeita ScopeItem.bucket fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].bucket = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita ScopeItem.value fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].value = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita ScopeItem.order negativo', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].order = -1;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita ScopeItem com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ScopeItem.id duplicado', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: unknown[] };
+		};
+		envelope.state.scopeItems.push(envelope.state.scopeItems[0]);
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ScopeItem em "agora" sem order', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].order = null;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ScopeItem fora de "agora" com order definido', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].bucket = 'depois';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita order não contíguo entre itens de "agora"', () => {
+		let state = unwrap(
+			addScopeItem(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'scope-1', 'Um', 'agora', T1)
+		);
+		state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Dois', 'agora', T1));
+		const envelope = JSON.parse(serializeProjectState(state)) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[1].order = 5;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ScopeVersion com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeVersion: Record<string, unknown> };
+		};
+		envelope.state.scopeVersion.projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ScopeVersion confirmada que não atende aos critérios de confirmação', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeVersion: Record<string, unknown> };
+		};
+		envelope.state.scopeVersion.confirmedAt = T2;
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 });

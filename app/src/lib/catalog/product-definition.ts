@@ -87,105 +87,23 @@ const visaoProduto: ActivityDefinition = {
 	]
 };
 
-const funcionalidadesEssenciais: ActivityDefinition = {
-	id: 'funcionalidades_essenciais',
+const montarProximaVersao: ActivityDefinition = {
+	id: 'montar_proxima_versao',
 	phaseId: 'definicao',
 	order: 3,
-	title: 'Definir funcionalidades essenciais',
-	mainQuestion: 'Quais funcionalidades são indispensáveis para entregar a visão do produto?',
-	why: 'Definir o essencial ajuda a proteger o foco do produto e evita que a primeira versão cresça antes de comprovar seu valor principal.',
-	example: 'Para uma plataforma guiada de gestão de projetos, as funcionalidades essenciais podem ser criar um projeto, responder atividades metodológicas, visualizar a próxima ação e registrar pendências.',
-	completionCriteria: 'Funcionalidades essenciais e o valor entregue ao usuário descritos de forma coerente com a visão do produto.',
-	completionMode: 'required_fields',
-	allowsSkip: true,
-	pendingItemLabel: 'Funcionalidades essenciais não foram definidas',
-	pendingItemDetail: 'Sem uma definição do que é essencial, o escopo inicial pode crescer sem conexão clara com o valor central do produto.',
-	fields: [
-		{
-			id: 'funcionalidades_essenciais',
-			activityId: 'funcionalidades_essenciais',
-			label: 'Quais funcionalidades são essenciais?',
-			required: true,
-			help: 'Liste apenas as funcionalidades necessárias para entregar o valor central do produto.',
-			placeholder: 'Ex.: criar projeto, orientar a próxima atividade e registrar decisões',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'valor_entregue',
-			activityId: 'funcionalidades_essenciais',
-			label: 'Que valor essas funcionalidades entregam ao usuário?',
-			required: true,
-			help: 'Relacione as funcionalidades com a necessidade e o benefício definidos na visão do produto.',
-			placeholder: 'Ex.: ajudam o usuário a estruturar o projeto e avançar sem depender de conhecimento avançado',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'fora_escopo_inicial',
-			activityId: 'funcionalidades_essenciais',
-			label: 'O que pode ficar fora da primeira versão?',
-			required: false,
-			help: 'Registre funcionalidades interessantes, mas que não são necessárias para validar o valor central.',
-			placeholder: 'Ex.: colaboração em equipe, integrações externas e automações com IA',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
-};
-
-const priorizarPrimeiraVersao: ActivityDefinition = {
-	id: 'priorizar_primeira_versao',
-	phaseId: 'definicao',
-	order: 4,
-	title: 'Priorizar primeira versão',
-	mainQuestion: 'O que entra na primeira versão do produto, o que fica para depois, e qual hipótese esse recorte vai validar?',
-	why: 'Priorizar o recorte inicial evita que a primeira versão cresça antes de validar se a proposta realmente entrega o valor esperado.',
-	example: 'Primeira versão: criar projeto e responder a Descoberta guiada. Depois: fases avançadas de planejamento detalhado. Hipótese: profissionais iniciantes conseguem avançar sozinhos só com a orientação contextual.',
-	completionCriteria: 'O que entra, o que fica para depois e a hipótese a validar estão descritos de forma coerente com a visão e as funcionalidades essenciais já definidas.',
-	completionMode: 'required_fields',
-	allowsSkip: true,
-	pendingItemLabel: 'Primeira versão do produto não foi priorizada',
-	pendingItemDetail: 'Sem esse recorte, o projeto corre o risco de tentar entregar tudo de uma vez, sem validar o essencial primeiro.',
-	fields: [
-		{
-			id: 'entra_primeira_versao',
-			activityId: 'priorizar_primeira_versao',
-			label: 'O que entra na primeira versão?',
-			required: true,
-			help: 'Liste só o que é necessário para validar o valor central.',
-			placeholder: 'Ex.: criar projeto e completar a jornada guiada de Descoberta',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'fica_para_depois',
-			activityId: 'priorizar_primeira_versao',
-			label: 'O que fica para depois?',
-			required: true,
-			help: 'Registre o que é interessante, mas não indispensável agora.',
-			placeholder: 'Ex.: relatórios avançados, integrações externas',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'hipotese_validada',
-			activityId: 'priorizar_primeira_versao',
-			label: 'Qual hipótese será validada com esse recorte?',
-			required: true,
-			help: 'Descreva o que você espera confirmar ao lançar essa primeira versão.',
-			placeholder: 'Ex.: usuários conseguem concluir a jornada sem ajuda externa',
-			dataTarget: 'answer',
-			semanticRole: 'hypothesis',
-			type: 'texto_longo'
-		}
-	]
+	title: 'Monte a próxima versão',
+	mainQuestion: 'O que entra na próxima versão, o que fica para depois, e qual hipótese esse recorte vai validar?',
+	why: 'Estruturar o escopo em Agora/Depois/Fora, com valor e esforço por item, protege o foco do produto e evita que a próxima versão cresça antes de validar o essencial.',
+	example: 'Agora: criar projeto e completar a jornada guiada. Depois: relatórios avançados. Fora: integrações externas. Hipótese: profissionais iniciantes conseguem avançar sozinhos só com a orientação contextual.',
+	completionCriteria: 'Escopo confirmado — ScopeVersion com pelo menos um item em Agora, todos os itens com valor e esforço definidos, e hipótese preenchida.',
+	completionMode: 'scope_confirmation',
+	allowsSkip: false
 };
 
 const criteriosSucessoProduto: ActivityDefinition = {
 	id: 'criterios_sucesso_produto',
 	phaseId: 'definicao',
-	order: 5,
+	order: 4,
 	title: 'Definir critérios de sucesso do produto',
 	mainQuestion: 'Como você vai perceber se essa proposta entregou valor?',
 	why: 'Critérios de sucesso claros evitam que o julgamento sobre a primeira versão fique subjetivo ou seja adiado indefinidamente.',
@@ -232,7 +150,6 @@ const criteriosSucessoProduto: ActivityDefinition = {
 export const productDefinitionActivities: ActivityDefinition[] = [
 	usuarioPrincipal,
 	visaoProduto,
-	funcionalidadesEssenciais,
-	priorizarPrimeiraVersao,
+	montarProximaVersao,
 	criteriosSucessoProduto
 ];

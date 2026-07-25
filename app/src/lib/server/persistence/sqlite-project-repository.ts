@@ -10,10 +10,14 @@ import {
 	mapAnswerRow,
 	mapPendingItemRow,
 	mapProjectRow,
+	mapScopeItemRow,
+	mapScopeVersionRow,
 	type ActivityProgressRow,
 	type AnswerRow,
 	type PendingItemRow,
-	type ProjectRow
+	type ProjectRow,
+	type ScopeItemRow,
+	type ScopeVersionRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
 
@@ -58,6 +62,19 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				resolvedAt: item.status === 'resolvida' ? item.resolvedAt : null
 			});
 		}
+
+		const insertScopeItem = db.prepare(
+			`INSERT INTO scope_item (id, project_id, text, bucket, value, effort, item_order, created_at, updated_at)
+			 VALUES (@id, @projectId, @text, @bucket, @value, @effort, @order, @createdAt, @updatedAt)`
+		);
+		for (const item of state.scopeItems) {
+			insertScopeItem.run(item);
+		}
+
+		db.prepare(
+			`INSERT INTO scope_version (project_id, hypothesis, confirmed_at)
+			 VALUES (@projectId, @hypothesis, @confirmedAt)`
+		).run(state.scopeVersion);
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -79,6 +96,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM activity_progress WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM answer WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM pending_item WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
 
@@ -116,11 +135,27 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as PendingItemRow[];
 
+			const scopeItemRows = db
+				.prepare(
+					`SELECT id, project_id, text, bucket, value, effort, item_order, created_at, updated_at
+					 FROM scope_item WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as ScopeItemRow[];
+
+			const scopeVersionRow = db
+				.prepare('SELECT project_id, hypothesis, confirmed_at FROM scope_version WHERE project_id = ?')
+				.get(projectId) as ScopeVersionRow | undefined;
+			if (!scopeVersionRow) {
+				throw new Error(`Projeto "${projectId}" não tem scope_version (violação do schema — 1:1 com project)`);
+			}
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
 				answers: answerRows.map(mapAnswerRow),
-				pendingItems: pendingItemRows.map(mapPendingItemRow)
+				pendingItems: pendingItemRows.map(mapPendingItemRow),
+				scopeItems: scopeItemRows.map(mapScopeItemRow),
+				scopeVersion: mapScopeVersionRow(scopeVersionRow)
 			};
 		},
 
