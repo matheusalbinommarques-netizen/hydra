@@ -31,6 +31,19 @@ leitura. C3-03 (Pular etapa, Could) não foi iniciada e foi adiada para
 eventual reavaliação em ciclo futuro — sua ausência não bloqueou o
 encerramento do ciclo, conforme previsto no gate.
 
+O Ciclo 4 foi concluído (`docs/08-delivery/cycle-04-backlog.md`), com gate
+formalmente aprovado em 25/07/2026. Os quatro itens Must foram entregues:
+C4-01 — especificação reconciliada (commit `a399191`); C4-02 — interface
+de "Pular etapa" (commit `39fdc06`), com modal de confirmação acessível e
+retomada segura da atividade pulada; C4-03 — checkpoint de dogfooding com
+um projeto real de Matheus, que identificou a ausência de listagem/
+reabertura de projetos como defeito bloqueador; e C4-03A — item corretivo
+que resolveu esse bloqueador (commit `f66c06a`). C4-04 validou a baseline
+completa (`hydra-verify full` PASS e QA aprovada nas jornadas normal e com
+atividade pulada), sem divergência crítica entre produto e especificação
+reconciliada. A baseline funcional do Release 0 está, com isso, validada
+de ponta a ponta.
+
 ## Entregas consolidadas
 
 - Opportunity & Project Brief;
@@ -108,6 +121,28 @@ conclusão do Ciclo 3").
   sua ausência não bloqueou o encerramento do ciclo, conforme previsto no
   gate.
 
+**Gate do Ciclo 4 — baseline funcional do Release 0:** aprovado em
+25/07/2026. Detalhamento completo em
+`docs/08-delivery/cycle-04-backlog.md` ("Resultado do Gate de conclusão
+do Ciclo 4").
+
+**Progresso do Ciclo 4** (`docs/08-delivery/cycle-04-backlog.md`):
+
+- C4-01 — Reconciliar a especificação do Release 0 (Must): concluída
+  (commit `a399191`);
+- C4-02 — Interface mínima de "Pular etapa" (Must): concluída (commit
+  `39fdc06`);
+- C4-03 — Checkpoint de dogfooding do Release 0 (Must): concluída (uso
+  real, sem commit de código) — encontrou o defeito corrigido em C4-03A;
+- C4-03A — Permitir localizar e reabrir projetos existentes (Must,
+  corretivo): concluída (commit `f66c06a`);
+- C4-04 — Validar a baseline completa do Release 0 (Must): concluída
+  (verificação e QA, sem commit de código) — `hydra-verify full` PASS,
+  QA das duas jornadas aprovada, nenhuma divergência crítica.
+- Should/Could do Ciclo 4: nenhum item foi efetivamente iniciado (a
+  melhoria da mensagem de colisão de importação, cogitada como Should,
+  ficou adiada para um ciclo futuro).
+
 ## Ciclo 4
 
 O Ciclo 4 foi formalmente aberto (`docs/08-delivery/cycle-04-backlog.md`).
@@ -141,7 +176,12 @@ Itens Must:
   (`created_at DESC, id DESC`), dados existentes preservados; testes
   unitários, Playwright e E2E aprovados, `hydra-verify full` PASS. O
   bloqueador de C4-04 identificado no dogfooding está resolvido;
-- C4-04 — Validar a baseline completa do Release 0: não iniciada.
+- C4-04 — Validar a baseline completa do Release 0: concluída (25/07/2026,
+  item de verificação e QA, sem commit de código) — `hydra-verify full`
+  PASS (6/6 etapas) na primeira execução; QA manual aprovada nas jornadas
+  normal e com atividade pulada (incluindo importação em banco vazio,
+  colisão esperada sem sobrescrita, e listagem/reabertura); comparação
+  com `docs/core/RELEASE_0_SPEC.md` sem divergência crítica nova.
 
 Testes com usuários externos ficam fora deste ciclo, por decisão
 registrada (`docs/07-management/decision-log.md`, D021): o momento é
@@ -151,7 +191,8 @@ implementação e fora do escopo deste ciclo.
 
 ## Próxima decisão relevante
 
-C4-01, C4-02, C4-03 e C4-03A concluídas — o bloqueador de listagem/
-reabertura de projetos está resolvido. Próxima ação: C4-04 (Validar a
-baseline completa do Release 0). Gate do Ciclo 4 ainda não avaliado — o
-Release 0 não está concluído enquanto C4-04 permanecer pendente.
+Ciclo 4 concluído: C4-01, C4-02, C4-03, C4-03A e C4-04 concluídas, gate
+aprovado em 25/07/2026. A baseline funcional do Release 0 está validada
+de ponta a ponta, incluindo a interface de "Pular etapa" e a listagem/
+reabertura de projetos. Próxima decisão (não iniciada automaticamente):
+revisar riscos e roadmap, e decidir a continuidade para o Release 1.

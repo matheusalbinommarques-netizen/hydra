@@ -1,6 +1,6 @@
 # Hydra — Tarefas
 
-**Status atual:** Ciclo 4 aberto (docs/08-delivery/cycle-04-backlog.md) — C4-01, C4-02, C4-03 e C4-03A concluídos; C4-04 pendente
+**Status atual:** Ciclo 4 concluído (docs/08-delivery/cycle-04-backlog.md) — C4-01, C4-02, C4-03, C4-03A e C4-04 concluídos; gate do Ciclo 4 aprovado em 25/07/2026
 
 **Atualizado em:** 25/07/2026
 
@@ -8,15 +8,17 @@ Este arquivo é a visão operacional do trabalho atual. A documentação complet
 
 ## Agora
 
-C4-01, C4-02, C4-03 e C4-03A concluídas (commits `a399191`, `39fdc06`,
-`f66c06a`; C4-03 é checkpoint de uso real, sem commit de código). C4-03A
-corrigiu o defeito bloqueador encontrado no checkpoint (ausência de
-listagem/reabertura de projetos, `RELEASE_0_SPEC.md` §4.1). Próxima ação:
-C4-04 (Validar a baseline completa do Release 0).
+Ciclo 4 concluído: C4-01, C4-02, C4-03, C4-03A e C4-04 concluídas
+(commits `a399191`, `39fdc06`, `f66c06a`; C4-03 e C4-04 são itens de
+uso real/verificação, sem commit de código). C4-03A corrigiu o defeito
+bloqueador encontrado no checkpoint (ausência de listagem/reabertura de
+projetos, `RELEASE_0_SPEC.md` §4.1). C4-04 confirmou `hydra-verify full`
+PASS e QA aprovada nas duas jornadas, sem divergência crítica. Gate do
+Ciclo 4 aprovado. Próxima decisão (não iniciada automaticamente): revisar
+riscos/roadmap e decidir continuidade para Release 1.
 
 ## Depois
 
-- [ ] C4-04 — Validar a baseline completa do Release 0 (depende de C4-01 a C4-03A, todas concluídas).
 - [ ] Revisar riscos e roadmap.
 - [ ] Decidir continuidade para Release 1.
 
