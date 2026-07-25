@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { goto } from '$app/navigation';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
+	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
 
 	let { data, form } = $props();
 	let view = $derived(data.view);
@@ -20,21 +22,16 @@
 				<li>
 					<strong>{item.label}</strong>
 					<p>{item.detail}</p>
+					<a href="/projects/{view.projectId}/now?activity={item.activityDefinitionId}">
+						Retomar etapa
+					</a>
 				</li>
 			{/each}
 		</ul>
 	</section>
 {/if}
 
-{#if view.nextActivity.kind === 'catalog_limit_reached'}
-	<section class="next-action">
-		<h2>Você concluiu todas as atividades disponíveis</h2>
-		<p>
-			O catálogo metodológico desta versão termina aqui. Novas fases serão adicionadas em versões
-			futuras.
-		</p>
-	</section>
-{:else if data.activity?.completionMode === 'explicit_confirmation'}
+{#if data.activity?.completionMode === 'explicit_confirmation'}
 	<section class="next-action">
 		<p class="eyebrow">Próxima ação recomendada</p>
 		<h2>{data.activity.title}</h2>
@@ -43,13 +40,29 @@
 	</section>
 {:else if data.activity}
 	<section class="next-action">
-		<p class="eyebrow">Próxima ação recomendada</p>
+		<p class="eyebrow">{data.isResuming ? 'Retomando etapa pulada' : 'Próxima ação recomendada'}</p>
 		<h2>{data.activity.title}</h2>
 		<p class="main-question">{data.activity.mainQuestion}</p>
 		<p class="why"><strong>Por que isso importa:</strong> {data.activity.why}</p>
 		<p class="example"><strong>Exemplo:</strong> {data.activity.example}</p>
 
-		<form method="POST" action="?/answer" use:enhance>
+		<form
+			method="POST"
+			action="?/answer"
+			use:enhance={() => {
+				const wasResuming = data.isResuming;
+				return async ({ result, update }) => {
+					if (wasResuming && result.type === 'success') {
+						// Sai do parâmetro de retomada só quando a resposta teve sucesso —
+						// em erro, o usuário permanece na atividade retomada (update()
+						// aplica o form.message/values normalmente, sem navegar).
+						await goto(`/projects/${view.projectId}/now`, { invalidateAll: true });
+						return;
+					}
+					await update();
+				};
+			}}
+		>
 			<input type="hidden" name="activityDefinitionId" value={data.activity.id} />
 			<ActivityForm activity={data.activity} values={form?.values ?? view.answers} />
 			<button type="submit">Salvar e continuar</button>
@@ -58,6 +71,18 @@
 		{#if form?.message}
 			<p role="alert">{form.message}</p>
 		{/if}
+
+		{#if data.activity.allowsSkip && !data.isResuming}
+			<SkipActivityConfirm activity={data.activity} />
+		{/if}
+	</section>
+{:else if view.nextActivity.kind === 'catalog_limit_reached'}
+	<section class="next-action">
+		<h2>Você concluiu todas as atividades disponíveis</h2>
+		<p>
+			O catálogo metodológico desta versão termina aqui. Novas fases serão adicionadas em versões
+			futuras.
+		</p>
 	</section>
 {/if}
 
@@ -89,6 +114,11 @@
 		margin: 0.15rem 0 0;
 		color: var(--hydra-muted);
 		font-size: 0.9rem;
+	}
+
+	.pendencias li a {
+		font-size: 0.85rem;
+		font-weight: 600;
 	}
 
 	.next-action {

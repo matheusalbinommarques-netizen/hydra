@@ -3,13 +3,14 @@
 // isolados). Não modifica walking-skeleton-journey.journey.ts nem
 // map-view.journey.ts.
 //
-// C3-03 (Pular etapa) não está implementada na interface. Para exercitar
-// pendências abertas e resolvidas, este teste prepara o estado diretamente
+// A interface de "Pular etapa" existe (C4-02, ver skip-activity.journey.ts,
+// que a exercita ponta a ponta). Este teste, porém, isola deliberadamente a
+// Tela Registros: prepara pendências abertas e resolvidas escrevendo direto
 // no arquivo SQLite do servidor efêmero, contra o schema já documentado em
-// server/persistence/migrations/0001_init.sql (fixture de estado, não a
-// interface de pular) — nunca via UI, que não existe ainda. Não importa
-// módulos de app/src diretamente: eles dependem de transformações do Vite
-// (ex.: import ?raw de .sql) que o runtime do Playwright não entende.
+// server/persistence/migrations/0001_init.sql, em vez de reconstruir esse
+// estado pulando/respondendo atividades pela UI. Não importa módulos de
+// app/src diretamente: eles dependem de transformações do Vite (ex.: import
+// ?raw de .sql) que o runtime do Playwright não entende.
 
 import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
