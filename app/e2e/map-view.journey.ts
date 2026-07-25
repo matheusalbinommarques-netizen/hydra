@@ -107,7 +107,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Mapa da jornada' })).toBeVisible();
 	});
 
-	await test.step('avançar as 37 atividades reais até catalog_limit_reached', async () => {
+	await test.step('avançar as 36 atividades reais até catalog_limit_reached', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 
 		await answerAndContinue(page, {
@@ -172,22 +172,24 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			}
 		});
 
-		await answerAndContinue(page, {
-			funcionalidadesEssenciais: {
-				label: 'Quais funcionalidades são essenciais?',
-				value: 'Funcionalidades essenciais de teste do Mapa.'
-			},
-			valorEntregue: {
-				label: 'Que valor essas funcionalidades entregam ao usuário?',
-				value: 'Valor entregue de teste do Mapa.'
-			}
-		});
+		await page.getByRole('link', { name: /Ir para Monte a próxima versão/ }).click();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/next-version`);
+		await page.getByLabel('Descrição do item').fill('Item de teste do Mapa.');
+		await page.getByLabel('Onde esse item entra?').selectOption('agora');
+		await page.getByRole('button', { name: 'Adicionar' }).click();
+		await page.getByRole('button', { name: 'Alto', exact: true }).click();
+		await page.getByRole('button', { name: 'Pequeno', exact: true }).click();
+		await page.getByRole('textbox', { name: 'Hipótese' }).fill('Hipótese de teste do Mapa.');
+		await page.getByRole('button', { name: 'Salvar hipótese' }).click();
+		await page.getByRole('button', { name: 'Confirmar versão' }).click();
+		await page.getByRole('link', { name: 'Agora' }).click();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
-		// demais atividades (2 restantes da fase 2 + fases 3 a 6 = 27) —
+		// demais atividades (1 restante da fase 2 + fases 3 a 6 = 26) —
 		// conteúdo específico já coberto por catalog.spec.ts e
 		// full-catalog-journey.spec.ts; aqui só prova que a rota real
 		// atravessa até o fim sem erro.
-		await answerActivitiesGenerically(page, 27);
+		await answerActivitiesGenerically(page, 26);
 
 		await expect(
 			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })
