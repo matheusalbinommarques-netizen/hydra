@@ -11,9 +11,9 @@ describe('catalog', () => {
 		expect(catalog.phases).toHaveLength(6);
 	});
 
-	it('tem exatamente 9 atividades no total', () => {
+	it('tem exatamente 10 atividades no total', () => {
 		const total = catalog.phases.reduce((sum, phase) => sum + phase.activities.length, 0);
-		expect(total).toBe(9);
+		expect(total).toBe(10);
 	});
 
 	it('Descoberta é complete com as 7 atividades na ordem esperada', () => {
@@ -30,12 +30,13 @@ describe('catalog', () => {
 		]);
 	});
 
-	it('Definição do produto é partial com "Definir usuário principal" e "Definir visão do produto"', () => {
+	it('Definição do produto é partial com as três atividades catalogadas, na ordem esperada', () => {
 		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
 		expect(definicao?.catalogStatus).toBe('partial');
 		expect(definicao?.activities.map((activity) => activity.id)).toEqual([
 			'usuario_principal',
-			'visao_produto'
+			'visao_produto',
+			'funcionalidades_essenciais'
 		]);
 	});
 
@@ -49,6 +50,20 @@ describe('catalog', () => {
 		expect(required).toEqual(['tipo_produto', 'necessidade_central', 'beneficio_central']);
 		const optional = visao.fields.filter((field) => !field.required).map((field) => field.id);
 		expect(optional).toEqual(['diferencial']);
+	});
+
+	it('"Definir funcionalidades essenciais" tem dois campos obrigatórios e um opcional', () => {
+		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
+		const funcionalidades = definicao?.activities.find(
+			(activity) => activity.id === 'funcionalidades_essenciais'
+		);
+		if (!funcionalidades || funcionalidades.completionMode !== 'required_fields') {
+			throw new Error('atividade "funcionalidades_essenciais" deveria ser required_fields');
+		}
+		const required = funcionalidades.fields.filter((field) => field.required).map((field) => field.id);
+		expect(required).toEqual(['funcionalidades_essenciais', 'valor_entregue']);
+		const optional = funcionalidades.fields.filter((field) => !field.required).map((field) => field.id);
+		expect(optional).toEqual(['fora_escopo_inicial']);
 	});
 
 	it('fases 3 a 6 são unavailable e sem atividades catalogadas', () => {

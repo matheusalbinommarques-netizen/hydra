@@ -1,5 +1,5 @@
 // Catálogo estático — fase Definição do produto (catalogStatus: partial).
-// Fonte: docs/core/DOMAIN_MODEL.md §7 (só as duas primeiras atividades estão catalogadas nesta versão).
+// Fonte: docs/core/DOMAIN_MODEL.md §7 (só as três primeiras atividades estão catalogadas nesta versão).
 
 import type { ActivityDefinition } from '$lib/domain';
 
@@ -87,4 +87,55 @@ const visaoProduto: ActivityDefinition = {
 	]
 };
 
-export const productDefinitionActivities: ActivityDefinition[] = [usuarioPrincipal, visaoProduto];
+const funcionalidadesEssenciais: ActivityDefinition = {
+	id: 'funcionalidades_essenciais',
+	phaseId: 'definicao',
+	order: 3,
+	title: 'Definir funcionalidades essenciais',
+	mainQuestion: 'Quais funcionalidades são indispensáveis para entregar a visão do produto?',
+	why: 'Definir o essencial ajuda a proteger o foco do produto e evita que a primeira versão cresça antes de comprovar seu valor principal.',
+	example: 'Para uma plataforma guiada de gestão de projetos, as funcionalidades essenciais podem ser criar um projeto, responder atividades metodológicas, visualizar a próxima ação e registrar pendências.',
+	completionCriteria: 'Funcionalidades essenciais e o valor entregue ao usuário descritos de forma coerente com a visão do produto.',
+	completionMode: 'required_fields',
+	allowsSkip: true,
+	pendingItemLabel: 'Funcionalidades essenciais não foram definidas',
+	pendingItemDetail: 'Sem uma definição do que é essencial, o escopo inicial pode crescer sem conexão clara com o valor central do produto.',
+	fields: [
+		{
+			id: 'funcionalidades_essenciais',
+			activityId: 'funcionalidades_essenciais',
+			label: 'Quais funcionalidades são essenciais?',
+			required: true,
+			help: 'Liste apenas as funcionalidades necessárias para entregar o valor central do produto.',
+			placeholder: 'Ex.: criar projeto, orientar a próxima atividade e registrar decisões',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'valor_entregue',
+			activityId: 'funcionalidades_essenciais',
+			label: 'Que valor essas funcionalidades entregam ao usuário?',
+			required: true,
+			help: 'Relacione as funcionalidades com a necessidade e o benefício definidos na visão do produto.',
+			placeholder: 'Ex.: ajudam o usuário a estruturar o projeto e avançar sem depender de conhecimento avançado',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'fora_escopo_inicial',
+			activityId: 'funcionalidades_essenciais',
+			label: 'O que pode ficar fora da primeira versão?',
+			required: false,
+			help: 'Registre funcionalidades interessantes, mas que não são necessárias para validar o valor central.',
+			placeholder: 'Ex.: colaboração em equipe, integrações externas e automações com IA',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		}
+	]
+};
+
+export const productDefinitionActivities: ActivityDefinition[] = [
+	usuarioPrincipal,
+	visaoProduto,
+	funcionalidadesEssenciais
+];

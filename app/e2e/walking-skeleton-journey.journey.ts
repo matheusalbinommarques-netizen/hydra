@@ -190,6 +190,17 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
+	await test.step('Definir funcionalidades essenciais recomendada e respondida', async () => {
+		await expect(page.getByRole('heading', { name: 'Definir funcionalidades essenciais' })).toBeVisible();
+		await page
+			.getByLabel('Quais funcionalidades são essenciais?')
+			.fill('Registrar solicitação, priorizar e acompanhar até a conclusão.');
+		await page
+			.getByLabel('Que valor essas funcionalidades entregam ao usuário?')
+			.fill('Centralização e resposta mais rápida às solicitações.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	});
+
 	let downloadedFilePath = '';
 	let exportedJson: ExportedEnvelope;
 
@@ -211,7 +222,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		expect(exportedJson.state.activityProgress).toHaveLength(9);
+		expect(exportedJson.state.activityProgress).toHaveLength(10);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}

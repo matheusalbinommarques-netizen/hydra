@@ -97,7 +97,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Mapa da jornada' })).toBeVisible();
 	});
 
-	await test.step('avançar as 9 atividades reais até catalog_limit_reached', async () => {
+	await test.step('avançar as 10 atividades reais até catalog_limit_reached', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 
 		await answerAndContinue(page, {
@@ -159,6 +159,17 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			beneficioCentral: {
 				label: 'Qual benefício principal o produto deve entregar?',
 				value: 'Benefício central de teste do Mapa.'
+			}
+		});
+
+		await answerAndContinue(page, {
+			funcionalidadesEssenciais: {
+				label: 'Quais funcionalidades são essenciais?',
+				value: 'Funcionalidades essenciais de teste do Mapa.'
+			},
+			valorEntregue: {
+				label: 'Que valor essas funcionalidades entregam ao usuário?',
+				value: 'Valor entregue de teste do Mapa.'
 			}
 		});
 
