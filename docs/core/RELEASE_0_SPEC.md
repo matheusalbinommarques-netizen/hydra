@@ -2,7 +2,7 @@
 
 **Versão:** 0.1  
 **Status:** canônico para design  
-**Objetivo:** validar a experiência guiada antes do desenvolvimento funcional.
+**Objetivo:** especificar a baseline funcional do Release 0 — a experiência guiada já validada e incorporada ao produto real.
 
 ## 1. Resultado a validar
 
@@ -18,20 +18,18 @@ Uma pessoa deve conseguir navegar pelo fluxo e explicar:
 
 ## 2. Natureza do Release 0
 
-O Release 0 é um protótipo navegável.
+O Release 0 é a baseline funcional do produto, já implementada e em uso.
 
-Não exige:
+Continua não exigindo:
 
-- backend;
-- banco de dados;
 - autenticação;
-- integração;
+- integração externa;
 - IA;
-- regras completas;
-- persistência real;
-- arquitetura final.
+- regras de orientação completas para todas as fases do catálogo.
 
-Pode utilizar dados simulados.
+Já inclui, como parte da baseline entregue: persistência real,
+importação e exportação funcionais, e suíte de testes automatizados
+(ver §9).
 
 ## 3. Fluxo principal
 
@@ -123,7 +121,6 @@ Campos obrigatórios:
 
 - progresso visível;
 - voltar;
-- salvar rascunho simulado;
 - avançar;
 - pular somente quando permitido;
 - orientação curta ao lado ou abaixo da atividade.
@@ -318,8 +315,20 @@ Permitir que o usuário revise o que foi entendido antes de avançar.
 
 - editar cada bloco;
 - continuar;
-- exportar visualmente um Project Brief simulado;
 - acessar o mapa da jornada.
+
+#### Nota de implementação
+
+A implementação atual estrutura o Resumo em blocos por atividade
+respondida (pergunta e resposta), em vez dos blocos temáticos
+"fatos/hipóteses/lacunas" descritos acima. Isso é mantido como evolução
+consciente do desenho inicial, não como pendência — a revisão continua
+escaneável e editável, atendendo ao requisito de clareza desta seção.
+
+A tela de Resumo é a visualização legível vigente da descoberta. A
+exportação JSON atende à portabilidade dos dados e não representa um
+Project Brief compartilhável. Uma eventual exportação em formato humano
+será especificada separadamente caso seja priorizada no futuro.
 
 #### Requisito de clareza
 
@@ -430,7 +439,8 @@ SENÃO
     recomendar criar visão inicial do produto
 ```
 
-As regras poderão ser simuladas no protótipo.
+As regras estão implementadas no motor de orientação real
+(`orientation-engine/`).
 
 ## 7. Estados necessários
 
@@ -458,15 +468,12 @@ Cada tela importante deve prever:
 - mapa da jornada acessível;
 - resumo final consistente;
 - workspace representado;
-- identidade visual consistente;
-- teste preparado para até dois usuários.
+- identidade visual consistente.
 
 ## 9. Fora do Release 0
 
-- lógica de negócio completa;
-- persistência real;
-- importação e exportação funcionais;
-- testes automatizados;
+- lógica de negócio completa (fases do catálogo além de Descoberta e
+  Definição do produto);
 - autenticação;
 - colaboração;
 - deploy de produção;

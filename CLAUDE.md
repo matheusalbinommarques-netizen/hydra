@@ -43,7 +43,7 @@ O trabalho atual é o Release 0, destinado a validar a experiência guiada.
 
 O Release 0 cobre:
 
-- criação simulada de um projeto;
+- criação de um projeto;
 - identificação da origem;
 - registro do contexto;
 - descrição do problema ou oportunidade;

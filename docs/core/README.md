@@ -3,7 +3,7 @@
 Estes arquivos concentram o contexto operacional do Hydra:
 
 - `PRODUCT_SPEC.md`: o que é o produto;
-- `RELEASE_0_SPEC.md`: o que deve ser desenhado e validado agora;
+- `RELEASE_0_SPEC.md`: especificação reconciliada da baseline funcional do Release 0;
 - `UX_DESIGN_SPEC.md`: como a experiência deve funcionar e parecer;
 - `TECHNICAL_BRIEF.md`: restrições e critérios técnicos.
 
