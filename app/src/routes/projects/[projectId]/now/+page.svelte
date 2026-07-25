@@ -38,6 +38,13 @@
 		<p class="main-question">{data.activity.mainQuestion}</p>
 		<p><a href="/projects/{view.projectId}/summary">Ir para o Resumo da descoberta →</a></p>
 	</section>
+{:else if data.activity?.completionMode === 'scope_confirmation'}
+	<section class="next-action">
+		<p class="eyebrow">Próxima ação recomendada</p>
+		<h2>{data.activity.title}</h2>
+		<p class="main-question">{data.activity.mainQuestion}</p>
+		<p><a href="/projects/{view.projectId}/next-version">Ir para Monte a próxima versão →</a></p>
+	</section>
 {:else if data.activity}
 	<section class="next-action">
 		<p class="eyebrow">{data.isResuming ? 'Retomando etapa pulada' : 'Próxima ação recomendada'}</p>

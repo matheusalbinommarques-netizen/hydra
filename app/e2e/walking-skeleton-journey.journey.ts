@@ -191,25 +191,41 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
-	await test.step('Definir funcionalidades essenciais recomendada e respondida', async () => {
-		await expect(page.getByRole('heading', { name: 'Definir funcionalidades essenciais' })).toBeVisible();
+	await test.step('Monte a próxima versão recomendada, montada e confirmada', async () => {
+		await expect(page.getByRole('heading', { name: 'Monte a próxima versão' })).toBeVisible();
+		await page.getByRole('link', { name: /Ir para Monte a próxima versão/ }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/next-version`);
+
+		await page.getByLabel('Descrição do item').fill('Registrar, priorizar e acompanhar solicitações.');
+		await page.getByLabel('Onde esse item entra?').selectOption('agora');
+		await page.getByRole('button', { name: 'Adicionar' }).click();
+
+		await expect(page.locator('.item-card input[type="text"]')).toHaveValue(
+			'Registrar, priorizar e acompanhar solicitações.'
+		);
+		await page.getByRole('button', { name: 'Alto', exact: true }).click();
+		await page.getByRole('button', { name: 'Pequeno', exact: true }).click();
 		await page
-			.getByLabel('Quais funcionalidades são essenciais?')
-			.fill('Registrar solicitação, priorizar e acompanhar até a conclusão.');
-		await page
-			.getByLabel('Que valor essas funcionalidades entregam ao usuário?')
-			.fill('Centralização e resposta mais rápida às solicitações.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+			.getByRole('textbox', { name: 'Hipótese' })
+			.fill('Usuários conseguem concluir a jornada guiada sem ajuda externa.');
+		await page.getByRole('button', { name: 'Salvar hipótese' }).click();
+
+		await expect(page.getByText('Tudo pronto para confirmar.')).toBeVisible();
+		await page.getByRole('button', { name: 'Confirmar versão' }).click();
+		await expect(page.getByText('Versão confirmada.')).toBeVisible();
+
+		await page.getByRole('link', { name: 'Agora' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
 	});
 
-	await test.step('demais atividades do catálogo (fases 2 restante a 6) respondidas genericamente até o encerramento', async () => {
-		// priorizar_primeira_versao + criterios_sucesso_produto (2, fase 2) +
-		// estruturação (6) + planejamento (7) + execução (6) + validação (6,
-		// incluindo "Confirmar encerramento do projeto") = 27. Conteúdo
-		// específico de cada campo já é coberto por catalog.spec.ts e por
+	await test.step('demais atividades do catálogo (fase 2 restante a 6) respondidas genericamente até o encerramento', async () => {
+		// criterios_sucesso_produto (1, fase 2) + estruturação (6) +
+		// planejamento (7) + execução (6) + validação (6, incluindo
+		// "Confirmar encerramento do projeto") = 26. Conteúdo específico de
+		// cada campo já é coberto por catalog.spec.ts e por
 		// full-catalog-journey.spec.ts — aqui só precisa provar que a rota
 		// real atravessa essas fases sem erro.
-		await answerActivitiesGenerically(page, 27);
+		await answerActivitiesGenerically(page, 26);
 	});
 
 	let downloadedFilePath = '';
@@ -233,7 +249,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		expect(exportedJson.state.activityProgress).toHaveLength(37);
+		expect(exportedJson.state.activityProgress).toHaveLength(36);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}
