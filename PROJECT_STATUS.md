@@ -1,6 +1,6 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 24/07/2026
+**Data de referência:** 25/07/2026
 
 **Versão da baseline:** 0.1
 
@@ -19,15 +19,17 @@ revisar e confirmar o Resumo, receber a recomendação de próxima atividade,
 persistir em SQLite, e exportar/importar o projeto em JSON versionado —,
 coberto por um teste de jornada Playwright automatizado.
 
-O Ciclo 3 foi iniciado (`docs/08-delivery/cycle-03-backlog.md`). Os dois
-itens Must estão concluídos: C3-01 — Tela Mapa mínima (commit `b98c840`),
-disponível em `/projects/[projectId]/map`, mostrando as seis fases do
-catálogo em ordem, status de fase e de atividade, e a atividade recomendada
-pela Trilha A; e C3-02 — Tela Registros mínima (commit `784dd34`),
-disponível em `/projects/[projectId]/records`, mostrando respostas
-agrupadas por fase e atividade e o histórico de pendências (abertas e
-resolvidas), somente leitura. C3-03 (Pular etapa, Could) ainda não foi
-iniciada.
+O Ciclo 3 foi concluído (`docs/08-delivery/cycle-03-backlog.md`), com gate
+formalmente aprovado em 25/07/2026. Os dois itens Must foram entregues:
+C3-01 — Tela Mapa mínima (commit `b98c840`), disponível em
+`/projects/[projectId]/map`, mostrando as seis fases do catálogo em ordem,
+status de fase e de atividade, e a atividade recomendada pela Trilha A; e
+C3-02 — Tela Registros mínima (commit `784dd34`), disponível em
+`/projects/[projectId]/records`, mostrando respostas agrupadas por fase e
+atividade e o histórico de pendências (abertas e resolvidas), somente
+leitura. C3-03 (Pular etapa, Could) não foi iniciada e foi adiada para
+eventual reavaliação em ciclo futuro — sua ausência não bloqueou o
+encerramento do ciclo, conforme previsto no gate.
 
 ## Entregas consolidadas
 
@@ -87,17 +89,20 @@ iniciada.
    manualmente: salvar um projeto, reiniciar o servidor, confirmar que os
    dados carregam do arquivo SQLite).
 
+**Gate do Ciclo 3 — Mapa e Registros:** aprovado em 25/07/2026, 6/6
+verificações (`hydra-verify full`, escopo global do projeto). Detalhamento
+completo em `docs/08-delivery/cycle-03-backlog.md` ("Resultado do Gate de
+conclusão do Ciclo 3").
+
 **Progresso do Ciclo 3** (`docs/08-delivery/cycle-03-backlog.md`):
 
 - C3-01 — Tela Mapa mínima (Must): concluída (commit `b98c840`);
 - C3-02 — Tela Registros mínima (Must): concluída (commit `784dd34`);
-- C3-03 — "Pular etapa" na interface (Could): não iniciada.
-
-Os dois itens Must do Ciclo 3 estão concluídos. Gate do Ciclo 3 ainda não
-avaliado — falta decidir se C3-03 (Could) entra neste ciclo antes da
-avaliação final.
+- C3-03 — "Pular etapa" na interface (Could): não iniciada — era opcional e
+  sua ausência não bloqueou o encerramento do ciclo, conforme previsto no
+  gate.
 
 ## Próxima decisão relevante
 
-Decidir entre executar C3-03 — "Pular etapa" na interface (Could) — ou
-encerrar o Ciclo 3 sem ela, já que os dois itens Must estão concluídos.
+A definição do escopo do Ciclo 4 está pendente — nenhuma decisão foi
+tomada até o momento.

@@ -299,3 +299,38 @@ Antes de considerar o Ciclo 3 entregue:
   se não for iniciada, sua ausência não bloqueia a conclusão do Ciclo 3; se
   for iniciada, seu teste Playwright dedicado (ver "Testes planejados")
   passa a ser exigido no gate.
+
+### Resultado do Gate de conclusão do Ciclo 3
+
+**Atendido — Ciclo 3 encerrado em 25/07/2026.**
+
+| Critério | Resultado |
+|---|---|
+| Mapa funcional e navegável (C3-01) | ✅ commit `b98c840` |
+| Registros exibindo respostas e histórico de pendências, abertas e resolvidas, via `pendingItemHistory` (C3-02) | ✅ commit `784dd34` |
+| `tsc --noEmit` limpo | ✅ `npm run check` |
+| Suíte Vitest completa passando, incluindo testes novos de C3-01/C3-02 | ✅ |
+| Teste(s) Playwright cobrindo Mapa e Registros passando | ✅ journey dedicado + suíte E2E completa |
+| Build de produção (`adapter-node`) sem erro | ✅ |
+| Nenhum `ProjectState` bruto enviado ao cliente em nenhuma rota | ✅ validado pelos testes de `project-view.spec.ts` |
+| Nenhuma alteração em `domain/`, `catalog/` ou `orientation-engine/` | ✅ confirmado nos commits `b98c840`/`784dd34` |
+| `cycle-02-backlog.md` permanece inalterado | ✅ |
+| C3-03 só entra no gate se iniciada | ✅ não foi iniciada — não bloqueou o gate |
+
+Validação executada via `hydra-verify full` (item C3-02, escopo global do
+projeto — cobre também C3-01):
+
+| Etapa | Resultado |
+|---|---|
+| `npm run check` | ✅ PASS |
+| `npm run test:unit -- --run` | ✅ PASS |
+| Playwright journey dedicado | ✅ PASS |
+| `npm run test:e2e` | ✅ PASS |
+| `npm run build` | ✅ PASS |
+| `git diff --check` | ✅ PASS |
+
+**6/6 etapas — PASS.**
+
+**C3-03 — "Pular etapa" na interface:** não iniciada. Item Could; sua
+ausência não bloqueou o encerramento do Ciclo 3, conforme previsto no
+próprio gate acima. Adiada para eventual reavaliação em ciclo futuro.
