@@ -108,7 +108,7 @@ describe('computeNextActivity (Trilha A)', () => {
 		});
 	});
 
-	it('retorna catalog_limit_reached depois de concluir as 8 atividades disponíveis', () => {
+	it('recomenda "Definir visão do produto" depois de concluir "Definir usuário principal"', () => {
 		let state = createInitialProjectState(catalog, 'proj-1', T1);
 		state = unwrap(answerActivity(catalog, state, 'origem', { origem: 'x' }, T1));
 		state = unwrap(
@@ -135,6 +135,54 @@ describe('computeNextActivity (Trilha A)', () => {
 		state = unwrap(confirmSummary(catalog, state));
 		state = unwrap(
 			answerActivity(catalog, state, 'usuario_principal', { usuario_principal: 'Analista' }, T1)
+		);
+
+		expect(computeNextActivity(catalog, state.activityProgress)).toEqual({
+			kind: 'recommendation',
+			activityDefinitionId: 'visao_produto'
+		});
+	});
+
+	it('retorna catalog_limit_reached depois de concluir as 9 atividades disponíveis', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(answerActivity(catalog, state, 'origem', { origem: 'x' }, T1));
+		state = unwrap(
+			answerActivity(
+				catalog,
+				state,
+				'contexto',
+				{
+					nome_provisorio: 'Portal',
+					breve_descricao: 'x',
+					modo_trabalho: 'Individual',
+					nivel_experiencia: 'Iniciante',
+					estagio_atual: 'Ideia inicial'
+				},
+				T1
+			)
+		);
+		state = unwrap(answerActivity(catalog, state, 'problema', { situacao: 'x', dificuldade: 'y' }, T1));
+		state = unwrap(answerActivity(catalog, state, 'publico', { publico_detail: 'x' }, T1));
+		state = unwrap(answerActivity(catalog, state, 'estado_atual', { estado_atual_detail: 'x' }, T1));
+		state = unwrap(
+			answerActivity(catalog, state, 'resultado', { mudanca: 'x', beneficiario: 'y', percepcao: 'z' }, T1)
+		);
+		state = unwrap(confirmSummary(catalog, state));
+		state = unwrap(
+			answerActivity(catalog, state, 'usuario_principal', { usuario_principal: 'Analista' }, T1)
+		);
+		state = unwrap(
+			answerActivity(
+				catalog,
+				state,
+				'visao_produto',
+				{
+					tipo_produto: 'Aplicativo web',
+					necessidade_central: 'x',
+					beneficio_central: 'y'
+				},
+				T1
+			)
 		);
 
 		expect(computeNextActivity(catalog, state.activityProgress)).toEqual({ kind: 'catalog_limit_reached' });

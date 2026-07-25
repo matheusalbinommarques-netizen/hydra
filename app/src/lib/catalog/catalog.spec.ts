@@ -11,9 +11,9 @@ describe('catalog', () => {
 		expect(catalog.phases).toHaveLength(6);
 	});
 
-	it('tem exatamente 8 atividades no total', () => {
+	it('tem exatamente 9 atividades no total', () => {
 		const total = catalog.phases.reduce((sum, phase) => sum + phase.activities.length, 0);
-		expect(total).toBe(8);
+		expect(total).toBe(9);
 	});
 
 	it('Descoberta é complete com as 7 atividades na ordem esperada', () => {
@@ -30,10 +30,25 @@ describe('catalog', () => {
 		]);
 	});
 
-	it('Definição do produto é partial com só "Definir usuário principal"', () => {
+	it('Definição do produto é partial com "Definir usuário principal" e "Definir visão do produto"', () => {
 		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
 		expect(definicao?.catalogStatus).toBe('partial');
-		expect(definicao?.activities.map((activity) => activity.id)).toEqual(['usuario_principal']);
+		expect(definicao?.activities.map((activity) => activity.id)).toEqual([
+			'usuario_principal',
+			'visao_produto'
+		]);
+	});
+
+	it('"Definir visão do produto" tem três campos obrigatórios e um opcional', () => {
+		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
+		const visao = definicao?.activities.find((activity) => activity.id === 'visao_produto');
+		if (!visao || visao.completionMode !== 'required_fields') {
+			throw new Error('atividade "visao_produto" deveria ser required_fields');
+		}
+		const required = visao.fields.filter((field) => field.required).map((field) => field.id);
+		expect(required).toEqual(['tipo_produto', 'necessidade_central', 'beneficio_central']);
+		const optional = visao.fields.filter((field) => !field.required).map((field) => field.id);
+		expect(optional).toEqual(['diferencial']);
 	});
 
 	it('fases 3 a 6 são unavailable e sem atividades catalogadas', () => {

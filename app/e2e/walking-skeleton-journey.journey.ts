@@ -178,6 +178,18 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
+	await test.step('Definir visão do produto recomendada e respondida', async () => {
+		await expect(page.getByRole('heading', { name: 'Definir visão do produto' })).toBeVisible();
+		await page.getByLabel('Que tipo de produto será?').fill('Portal web de solicitações.');
+		await page
+			.getByLabel('Qual necessidade principal esse produto atende?')
+			.fill('Centralizar e priorizar solicitações internas.');
+		await page
+			.getByLabel('Qual benefício principal o produto deve entregar?')
+			.fill('Resposta mais rápida e menos retrabalho.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	});
+
 	let downloadedFilePath = '';
 	let exportedJson: ExportedEnvelope;
 
@@ -199,7 +211,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		expect(exportedJson.state.activityProgress).toHaveLength(8);
+		expect(exportedJson.state.activityProgress).toHaveLength(9);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}
@@ -215,6 +227,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(usuarioPrincipalAnswer?.value).toBe(
 			'Analista de atendimento que registra e acompanha solicitações.'
 		);
+
+		const necessidadeCentralAnswer = exportedJson.state.answers.find(
+			(answer) => answer.fieldDefinitionId === 'necessidade_central'
+		);
+		expect(necessidadeCentralAnswer?.value).toBe('Centralizar e priorizar solicitações internas.');
 	});
 
 	await test.step('importar em banco limpo', async () => {

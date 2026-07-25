@@ -97,7 +97,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Mapa da jornada' })).toBeVisible();
 	});
 
-	await test.step('avançar as 8 atividades reais até catalog_limit_reached', async () => {
+	await test.step('avançar as 9 atividades reais até catalog_limit_reached', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 
 		await answerAndContinue(page, {
@@ -147,6 +147,18 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			usuarioPrincipal: {
 				label: 'Quem é o usuário principal do produto?',
 				value: 'Usuário principal de teste do Mapa.'
+			}
+		});
+
+		await answerAndContinue(page, {
+			tipoProduto: { label: 'Que tipo de produto será?', value: 'Aplicativo web de teste do Mapa.' },
+			necessidadeCentral: {
+				label: 'Qual necessidade principal esse produto atende?',
+				value: 'Necessidade central de teste do Mapa.'
+			},
+			beneficioCentral: {
+				label: 'Qual benefício principal o produto deve entregar?',
+				value: 'Benefício central de teste do Mapa.'
 			}
 		});
 

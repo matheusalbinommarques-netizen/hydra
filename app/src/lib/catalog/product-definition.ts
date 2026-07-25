@@ -1,5 +1,5 @@
 // Catálogo estático — fase Definição do produto (catalogStatus: partial).
-// Fonte: docs/core/DOMAIN_MODEL.md §7 (só a primeira atividade está catalogada nesta versão).
+// Fonte: docs/core/DOMAIN_MODEL.md §7 (só as duas primeiras atividades estão catalogadas nesta versão).
 
 import type { ActivityDefinition } from '$lib/domain';
 
@@ -30,4 +30,61 @@ const usuarioPrincipal: ActivityDefinition = {
 	]
 };
 
-export const productDefinitionActivities: ActivityDefinition[] = [usuarioPrincipal];
+const visaoProduto: ActivityDefinition = {
+	id: 'visao_produto',
+	phaseId: 'definicao',
+	order: 2,
+	title: 'Definir visão do produto',
+	mainQuestion: 'Qual produto estamos construindo e qual valor central ele entrega?',
+	why: 'Uma visão clara conecta o usuário, sua necessidade e o valor esperado, evitando que o produto vire apenas uma lista desconectada de funcionalidades.',
+	example: 'Plataforma web de gestão de projetos que orienta profissionais iniciantes sobre a próxima decisão, ajudando-os a estruturar e conduzir projetos com clareza e autonomia.',
+	completionCriteria: 'Tipo de produto, necessidade central e benefício principal definidos de forma coerente.',
+	completionMode: 'required_fields',
+	allowsSkip: true,
+	pendingItemLabel: 'Visão do produto não foi definida',
+	pendingItemDetail: 'Sem uma visão clara, funcionalidades e prioridades podem perder conexão com o valor esperado para o usuário.',
+	fields: [
+		{
+			id: 'tipo_produto',
+			activityId: 'visao_produto',
+			label: 'Que tipo de produto será?',
+			required: true,
+			help: 'Descreva a categoria ou formato principal da solução.',
+			placeholder: 'Ex.: aplicativo web para planejamento de projetos',
+			dataTarget: 'answer',
+			type: 'texto_curto'
+		},
+		{
+			id: 'necessidade_central',
+			activityId: 'visao_produto',
+			label: 'Qual necessidade principal esse produto atende?',
+			required: true,
+			help: 'Foque na necessidade do usuário, não em uma lista de funcionalidades.',
+			placeholder: 'Ex.: saber o que fazer em seguida sem depender de conhecimento avançado',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'beneficio_central',
+			activityId: 'visao_produto',
+			label: 'Qual benefício principal o produto deve entregar?',
+			required: true,
+			help: 'Descreva a transformação ou resultado esperado para o usuário.',
+			placeholder: 'Ex.: conduzir projetos com mais clareza, consistência e autonomia',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'diferencial',
+			activityId: 'visao_produto',
+			label: 'O que diferencia essa proposta das alternativas atuais?',
+			required: false,
+			help: 'Pode ser uma abordagem, experiência ou princípio do produto.',
+			placeholder: 'Ex.: orientação contextual em vez de apenas ferramentas soltas',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		}
+	]
+};
+
+export const productDefinitionActivities: ActivityDefinition[] = [usuarioPrincipal, visaoProduto];

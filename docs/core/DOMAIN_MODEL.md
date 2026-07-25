@@ -137,6 +137,7 @@ Invariantes de integridade:
 
 ### Fase 2 — Definição do produto (`catalogStatus: partial`)
 1. **Definir usuário principal** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: descrição do usuário principal.
+2. **Definir visão do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: tipo de produto, necessidade central, benefício central (`dataTarget: answer`). Opcional: diferencial.
 
 Demais atividades desta fase não estão catalogadas nesta versão.
 
