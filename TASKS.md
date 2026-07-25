@@ -8,7 +8,7 @@ Este arquivo é a visão operacional do trabalho atual. A documentação complet
 
 ## Agora
 
-Abertura do Ciclo 4 concluída. Próxima ação: planejar C4-01 (Reconciliar a especificação do Release 0).
+C4-01 concluída (commit `a399191`). Próxima ação: planejar C4-02 (Implementar a interface mínima de "Pular etapa").
 
 ## Depois
 

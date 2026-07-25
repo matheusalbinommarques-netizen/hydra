@@ -20,6 +20,8 @@ resultado com uso real, sem depender de teste com usuários externos
 
 ### C4-01 — Reconciliar a especificação do Release 0
 
+**Status:** ✅ concluído (commit `a399191` — `docs(release-0): reconcile specification with functional baseline`).
+
 **Resultado esperado:**
 - `docs/core/RELEASE_0_SPEC.md` passa a representar o produto funcional
   atual;
@@ -43,6 +45,26 @@ resultado com uso real, sem depender de teste com usuários externos
   produto fica sem decisão registrada.
 
 **Tipo:** documentação e decisão de produto.
+
+**Evidências:**
+- `docs/core/RELEASE_0_SPEC.md`: cabeçalho, §2 e §9 não descrevem mais o
+  documento como protótipo pré-desenvolvimento; persistência real,
+  importação/exportação e testes automatizados removidos de "Fora do
+  Release 0"; §6 sem linguagem de regras simuladas; §8 sem teste com
+  usuários externos como critério de conclusão da baseline; §4.7 registra
+  a estrutura atual do Resumo e a diferenciação entre a tela de Resumo e
+  a exportação JSON como decisões conscientes; numeração §4.1–§4.9
+  preservada, sem impacto na referência de
+  `app/src/lib/catalog/discovery.ts`;
+- `CLAUDE.md`: "criação simulada de um projeto" corrigido para "criação
+  de um projeto";
+- `docs/core/README.md`: descrição de `RELEASE_0_SPEC.md` atualizada para
+  refletir seu papel como especificação reconciliada da baseline;
+- uma divergência adicional (exportação legível de "Project Brief") foi
+  identificada durante a implementação e resolvida como decisão de
+  produto: não pertence à baseline funcional atual, registrada em §4.7 do
+  documento reconciliado;
+- commit `a3991913e35874c2ea92c803fd6d1cf9a9e35e9f`.
 
 ---
 
