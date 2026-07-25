@@ -159,6 +159,9 @@ autorização.
 
 ### C4-03 — Executar checkpoint de dogfooding do Release 0
 
+**Status:** ✅ concluído (25/07/2026 — checkpoint conduzido por Matheus com
+projeto real; item de uso real, sem commit de código associado).
+
 **Resultado esperado:** Matheus utiliza o Hydra com um projeto real e
 percorre o checkpoint delimitado da jornada.
 
@@ -189,6 +192,86 @@ percorre o checkpoint delimitado da jornada.
 
 **Tipo:** uso real.
 
+**Evidências (checkpoint realizado):**
+- projeto real utilizado: "Level Me Up — Refatoração e evolução da
+  baseline";
+- capacidades percorridas: criação e preenchimento da Descoberta;
+  salvamento e continuidade da jornada; confirmação do Resumo; Mapa;
+  Registros; "Pular etapa"; criação e exibição da pendência; retomada e
+  resolução da atividade pulada; exportação JSON; proteção esperada contra
+  colisão de ID na reimportação; persistência validada reabrindo a URL
+  direta do projeto após fechar e reabrir a aba;
+- Mapa: aprovado — fase Descoberta concluída (sete atividades), Definição
+  do produto disponível, "Definir usuário principal" como próxima
+  atividade recomendada;
+- Registros: aprovado — respostas do projeto real preservadas, nenhuma
+  pendência aberta, "Público afetado" corretamente listado como pendência
+  resolvida no histórico;
+- achados classificados:
+  1. mensagem de colisão na importação não orienta o próximo passo —
+     dificuldade de UX, candidata a backlog Should;
+  2. "Importar como cópia" — funcionalidade nova fora do Release 0, sem
+     inclusão automática no Ciclo 4;
+  3. ausência de listagem de projetos existentes e de navegação de
+     retorno à área de projetos — defeito funcional da baseline
+     (`docs/core/RELEASE_0_SPEC.md` §4.1: "área de projetos recentes",
+     "abrir projeto existente") e bloqueador de C4-04; tratado como item
+     corretivo **C4-03A** (abaixo), com inclusão no Ciclo 4 já autorizada
+     e implementação pendente de planejamento e aprovação separados;
+- nenhum outro problema relevante encontrado;
+- nenhuma alteração de código realizada durante o checkpoint.
+
+---
+
+### C4-03A — Permitir localizar e reabrir projetos existentes
+
+**Status:** não iniciado (item corretivo criado a partir de achado do
+checkpoint de dogfooding C4-03).
+
+**Origem:** ausência de listagem de projetos existentes e de ação para
+reabrir um projeto já criado, contrariando `docs/core/RELEASE_0_SPEC.md`
+§4.1 — "Conteúdo obrigatório" exige "área de projetos recentes";
+"Ações" exige "abrir projeto existente". Nenhum dos dois está
+implementado hoje (a página inicial só oferece criar e importar; o
+cabeçalho do projeto só navega entre Agora, Mapa, Registros, Resumo e
+Exportar). Classificado como defeito funcional da baseline e bloqueador
+de C4-04.
+
+**Resultado esperado (mínimo funcional):**
+- exibir na página inicial os projetos persistidos;
+- permitir abrir um projeto existente a partir dessa lista;
+- oferecer, dentro do workspace de um projeto, um caminho claro de
+  retorno à área de projetos;
+- preservar integralmente os dados e o projeto atual;
+- manter o estado vazio já previsto em §4.1 quando não houver projetos.
+
+**Fora do pacote (explicitamente excluído nesta versão):**
+- exclusão ou arquivamento de projeto;
+- busca;
+- paginação;
+- filtros;
+- exibição detalhada de status na lista;
+- renomeação pela lista;
+- redesenho amplo da página inicial.
+
+**Dependência:** C4-03 concluído (achado consolidado).
+
+**Bloqueia:** C4-04 — a ausência desta capacidade é um bloqueador
+registrado do gate do Ciclo 4.
+
+**Áreas prováveis (a confirmar em planejamento):** `server/persistence/`
+(novo método de listagem no `ProjectRepository`) e `server/application/`
+(novo caso de uso) — ambas exigem autorização explícita antes de qualquer
+alteração. Rotas (`app/src/routes/+page.server.ts`, `+page.svelte`,
+`+layout.svelte` do workspace do projeto) não são áreas protegidas.
+
+**Tipo:** código e testes.
+
+**Status de autorização:** inclusão no Ciclo 4 autorizada. Planejamento
+(`/hydra-plan-item C4-03A`) ainda não realizado. Implementação e qualquer
+alteração em área protegida permanecem não autorizadas até aprovação do
+plano.
+
 ---
 
 ### C4-04 — Validar a baseline completa do Release 0
@@ -207,7 +290,8 @@ regressão crítica.
 - nenhum bloqueador crítico encontrado no dogfooding permanece sem
   decisão.
 
-**Dependências:** C4-01, C4-02, C4-03.
+**Dependências:** C4-01, C4-02, C4-03, C4-03A (bloqueador registrado no
+checkpoint de dogfooding — ver C4-03A).
 
 **Tipo:** verificação e QA.
 
@@ -258,4 +342,4 @@ Antes de considerar o Ciclo 4 entregue:
 - nenhum bloqueador crítico do dogfooding sem decisão;
 - Should e Could só entram no gate quando efetivamente iniciados.
 
-Gate ainda não avaliado — C4-03 e C4-04 permanecem pendentes.
+Gate ainda não avaliado — C4-03A e C4-04 permanecem pendentes.

@@ -121,7 +121,18 @@ Itens Must:
   (commit `39fdc06`), com modal de confirmação acessível, retomada segura
   da atividade pulada e teste Playwright dedicado (`hydra-verify full`
   PASS, QA manual aprovada);
-- C4-03 — Executar checkpoint de dogfooding do Release 0: não iniciada;
+- C4-03 — Executar checkpoint de dogfooding do Release 0: concluída
+  (checkpoint de uso real, sem commit de código) — Matheus percorreu a
+  jornada completa com um projeto real ("Level Me Up — Refatoração e
+  evolução da baseline"), incluindo Descoberta, Resumo, Mapa, Registros,
+  "Pular etapa" (pendência + retomada + resolução), exportação e a
+  proteção esperada contra colisão de ID na reimportação. O checkpoint
+  encontrou um defeito bloqueador (ausência de listagem/reabertura de
+  projetos existentes, `docs/core/RELEASE_0_SPEC.md` §4.1), tratado como
+  item corretivo C4-03A;
+- C4-03A — Permitir localizar e reabrir projetos existentes (corretivo,
+  bloqueador de C4-04): não iniciada — inclusão no ciclo autorizada,
+  planejamento e implementação ainda pendentes;
 - C4-04 — Validar a baseline completa do Release 0: não iniciada.
 
 Testes com usuários externos ficam fora deste ciclo, por decisão
@@ -132,6 +143,7 @@ implementação e fora do escopo deste ciclo.
 
 ## Próxima decisão relevante
 
-C4-01 e C4-02 concluídas. Próxima ação: C4-03 (checkpoint de dogfooding do
-Release 0). Gate do Ciclo 4 ainda não avaliado — o Release 0 não está
-concluído enquanto C4-03 e C4-04 permanecerem pendentes.
+C4-01, C4-02 e C4-03 concluídas. Próxima ação: planejar C4-03A (Permitir
+localizar e reabrir projetos existentes — item corretivo, bloqueador de
+C4-04). Gate do Ciclo 4 ainda não avaliado — o Release 0 não está
+concluído enquanto C4-03A e C4-04 permanecerem pendentes.
