@@ -1,8 +1,8 @@
 # Hydra — Release 0 Specification
 
-**Versão:** 0.1  
+**Versão:** 0.2
 **Status:** canônico para design  
-**Objetivo:** especificar a baseline funcional do Release 0 — a experiência guiada já validada e incorporada ao produto real.
+**Objetivo:** especificar a baseline funcional do Release 0 — a experiência guiada já validada e incorporada ao produto real, agora cobrindo a jornada linear completa, da Descoberta ao encerramento do projeto (fases 1 a 6 do catálogo).
 
 ## 1. Resultado a validar
 
@@ -25,11 +25,14 @@ Continua não exigindo:
 - autenticação;
 - integração externa;
 - IA;
-- regras de orientação completas para todas as fases do catálogo.
+- colaboração ou múltiplos usuários;
+- ciclos recorrentes, instâncias repetidas de atividade ou histórico de atualizações (a fase Execução e acompanhamento representa o retrato atual, editável pelo Mapa — ver `docs/core/DOMAIN_MODEL.md` §7 e `docs/core/STATE_MACHINE.md`).
 
 Já inclui, como parte da baseline entregue: persistência real,
-importação e exportação funcionais, e suíte de testes automatizados
-(ver §9).
+importação e exportação funcionais, catálogo metodológico completo das
+seis fases (Descoberta, Definição do produto, Estruturação do projeto,
+Planejamento da entrega, Execução e acompanhamento, Validação e
+encerramento), e suíte de testes automatizados (ver §9).
 
 ## 3. Fluxo principal
 
@@ -472,11 +475,15 @@ Cada tela importante deve prever:
 
 ## 9. Fora do Release 0
 
-- lógica de negócio completa (fases do catálogo além de Descoberta e
-  Definição do produto);
 - autenticação;
-- colaboração;
+- colaboração ou múltiplos usuários;
 - deploy de produção;
 - acessibilidade completa;
 - design mobile completo;
-- IA.
+- IA;
+- integrações externas;
+- ciclos recorrentes ou instâncias repetidas de atividade;
+- histórico de atualizações (a fase Execução e acompanhamento é um retrato atual, editável, sem histórico);
+- gestão financeira avançada;
+- notificações;
+- novas entidades de domínio além das já existentes (`Project`, `ActivityProgress`, `Answer`, `PendingItem`).

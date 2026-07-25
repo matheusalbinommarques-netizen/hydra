@@ -7,18 +7,16 @@ describe('catalog', () => {
 		expect(validateCatalog(catalog)).toEqual([]);
 	});
 
-	it('tem exatamente 6 fases', () => {
+	it('tem exatamente 6 fases, todas complete e com pelo menos uma atividade', () => {
 		expect(catalog.phases).toHaveLength(6);
+		for (const phase of catalog.phases) {
+			expect(phase.catalogStatus).toBe('complete');
+			expect(phase.activities.length).toBeGreaterThan(0);
+		}
 	});
 
-	it('tem exatamente 10 atividades no total', () => {
-		const total = catalog.phases.reduce((sum, phase) => sum + phase.activities.length, 0);
-		expect(total).toBe(10);
-	});
-
-	it('Descoberta é complete com as 7 atividades na ordem esperada', () => {
+	it('Descoberta tem as 7 atividades na ordem esperada', () => {
 		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
-		expect(descoberta?.catalogStatus).toBe('complete');
 		expect(descoberta?.activities.map((activity) => activity.id)).toEqual([
 			'origem',
 			'contexto',
@@ -30,48 +28,64 @@ describe('catalog', () => {
 		]);
 	});
 
-	it('Definição do produto é partial com as três atividades catalogadas, na ordem esperada', () => {
+	it('Definição do produto tem as 5 atividades na ordem esperada', () => {
 		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
-		expect(definicao?.catalogStatus).toBe('partial');
 		expect(definicao?.activities.map((activity) => activity.id)).toEqual([
 			'usuario_principal',
 			'visao_produto',
-			'funcionalidades_essenciais'
+			'funcionalidades_essenciais',
+			'priorizar_primeira_versao',
+			'criterios_sucesso_produto'
 		]);
 	});
 
-	it('"Definir visão do produto" tem três campos obrigatórios e um opcional', () => {
-		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
-		const visao = definicao?.activities.find((activity) => activity.id === 'visao_produto');
-		if (!visao || visao.completionMode !== 'required_fields') {
-			throw new Error('atividade "visao_produto" deveria ser required_fields');
-		}
-		const required = visao.fields.filter((field) => field.required).map((field) => field.id);
-		expect(required).toEqual(['tipo_produto', 'necessidade_central', 'beneficio_central']);
-		const optional = visao.fields.filter((field) => !field.required).map((field) => field.id);
-		expect(optional).toEqual(['diferencial']);
+	it('Estruturação do projeto tem as 6 atividades na ordem esperada', () => {
+		const estruturacao = catalog.phases.find((phase) => phase.id === 'estruturacao');
+		expect(estruturacao?.activities.map((activity) => activity.id)).toEqual([
+			'objetivo_entregaveis',
+			'partes_interessadas',
+			'papeis_responsabilidades',
+			'restricoes_premissas',
+			'riscos_projeto',
+			'comunicacao_governanca'
+		]);
 	});
 
-	it('"Definir funcionalidades essenciais" tem dois campos obrigatórios e um opcional', () => {
-		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
-		const funcionalidades = definicao?.activities.find(
-			(activity) => activity.id === 'funcionalidades_essenciais'
-		);
-		if (!funcionalidades || funcionalidades.completionMode !== 'required_fields') {
-			throw new Error('atividade "funcionalidades_essenciais" deveria ser required_fields');
-		}
-		const required = funcionalidades.fields.filter((field) => field.required).map((field) => field.id);
-		expect(required).toEqual(['funcionalidades_essenciais', 'valor_entregue']);
-		const optional = funcionalidades.fields.filter((field) => !field.required).map((field) => field.id);
-		expect(optional).toEqual(['fora_escopo_inicial']);
+	it('Planejamento da entrega tem as 7 atividades na ordem esperada', () => {
+		const planejamento = catalog.phases.find((phase) => phase.id === 'planejamento');
+		expect(planejamento?.activities.map((activity) => activity.id)).toEqual([
+			'decompor_trabalho',
+			'priorizar_entregas',
+			'mapear_dependencias',
+			'estimar_esforco_capacidade',
+			'definir_marcos',
+			'criterios_aceitacao_entrega',
+			'consolidar_plano_entrega'
+		]);
 	});
 
-	it('fases 3 a 6 são unavailable e sem atividades catalogadas', () => {
-		for (const id of ['estruturacao', 'planejamento', 'execucao', 'validacao']) {
-			const phase = catalog.phases.find((p) => p.id === id);
-			expect(phase?.catalogStatus).toBe('unavailable');
-			expect(phase?.activities).toEqual([]);
-		}
+	it('Execução e acompanhamento tem as 6 atividades na ordem esperada', () => {
+		const execucao = catalog.phases.find((phase) => phase.id === 'execucao');
+		expect(execucao?.activities.map((activity) => activity.id)).toEqual([
+			'foco_atual_execucao',
+			'registrar_andamento',
+			'impedimentos_execucao',
+			'decisoes_mudancas',
+			'atualizar_riscos',
+			'proxima_acao_acompanhamento'
+		]);
+	});
+
+	it('Validação e encerramento tem as 6 atividades na ordem esperada', () => {
+		const validacao = catalog.phases.find((phase) => phase.id === 'validacao');
+		expect(validacao?.activities.map((activity) => activity.id)).toEqual([
+			'validar_entregas_criterios',
+			'coletar_feedback',
+			'resolver_pendencias_finais',
+			'licoes_aprendidas',
+			'transicao_proximos_passos',
+			'confirmar_encerramento'
+		]);
 	});
 
 	it('"Resumo da descoberta" é explicit_confirmation, não pulável e sem fields', () => {
@@ -80,6 +94,34 @@ describe('catalog', () => {
 		expect(resumo?.completionMode).toBe('explicit_confirmation');
 		expect(resumo?.allowsSkip).toBe(false);
 		expect('fields' in (resumo ?? {})).toBe(false);
+	});
+
+	it('"Confirmar encerramento do projeto" é required_fields com allowsSkip false', () => {
+		const validacao = catalog.phases.find((phase) => phase.id === 'validacao');
+		const confirmar = validacao?.activities.find((activity) => activity.id === 'confirmar_encerramento');
+		expect(confirmar?.completionMode).toBe('required_fields');
+		expect(confirmar?.allowsSkip).toBe(false);
+	});
+
+	it('só "Resumo da descoberta" e "Confirmar encerramento do projeto" têm allowsSkip false', () => {
+		const nonSkippable = catalog.phases
+			.flatMap((phase) => phase.activities)
+			.filter((activity) => activity.allowsSkip === false)
+			.map((activity) => activity.id)
+			.sort();
+		expect(nonSkippable).toEqual(['confirmar_encerramento', 'resumo']);
+	});
+
+	it('"Priorizar primeira versão" projeta uma hipótese', () => {
+		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
+		const priorizar = definicao?.activities.find((activity) => activity.id === 'priorizar_primeira_versao');
+		if (!priorizar || priorizar.completionMode !== 'required_fields') {
+			throw new Error('atividade "priorizar_primeira_versao" deveria ser required_fields');
+		}
+		const hypothesisField = priorizar.fields.find(
+			(field) => field.dataTarget === 'answer' && field.semanticRole === 'hypothesis'
+		);
+		expect(hypothesisField?.id).toBe('hipotese_validada');
 	});
 
 	it('"Problema ou oportunidade" tem só situação e dificuldade como obrigatórios', () => {

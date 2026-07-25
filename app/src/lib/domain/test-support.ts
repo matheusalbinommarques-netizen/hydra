@@ -1,0 +1,137 @@
+// Helpers e fixtures de teste sobre domain/orientation-engine — não é código
+// de produção, não é exportado por domain/index.ts, só consumido por specs
+// (`.spec.ts`) via import direto deste caminho.
+//
+// Objetivo: evitar que cada atividade nova do catálogo exija editar de novo
+// os mesmos blocos de "responder as N atividades anteriores campo a campo"
+// espalhados pelos testes de orientation-engine.
+
+import { answerActivity, confirmSummary, skipActivity } from './transitions';
+import type { ActivityDefinition, Catalog, PhaseDefinition } from './catalog-types';
+import type { ProjectState } from './state-types';
+import type { Result } from './result';
+
+export function unwrapResult<T>(result: Result<T, unknown>): T {
+	if (!result.ok) throw new Error(`esperado ok, recebido erro: ${JSON.stringify(result.error)}`);
+	return result.value as T;
+}
+
+function findActivity(catalog: Catalog, activityId: string): ActivityDefinition {
+	for (const phase of catalog.phases) {
+		const found = phase.activities.find((activity) => activity.id === activityId);
+		if (found) return found;
+	}
+	throw new Error(`atividade de teste não encontrada no catálogo: "${activityId}"`);
+}
+
+/**
+ * Responde uma atividade `required_fields` preenchendo todos os campos
+ * obrigatórios com um valor trivial não vazio — para quando o teste só
+ * precisa que a atividade fique `concluída`, sem se importar com o
+ * conteúdo específico de cada campo.
+ */
+export function answerActivityMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	activityId: string,
+	occurredAt: string
+): ProjectState {
+	const activity = findActivity(catalog, activityId);
+	if (activity.completionMode !== 'required_fields') {
+		throw new Error(`answerActivityMinimally só se aplica a required_fields (atividade "${activityId}")`);
+	}
+	const values: Record<string, string> = {};
+	for (const field of activity.fields) {
+		if (field.required) values[field.id] = `resposta de teste (${field.id})`;
+	}
+	return unwrapResult(answerActivity(catalog, state, activityId, values, occurredAt));
+}
+
+/** `skipActivity` já desembrulhado, para não repetir `unwrapResult` em cada teste. */
+export function skipActivityForTest(
+	catalog: Catalog,
+	state: ProjectState,
+	activityId: string,
+	pendingItemId: string,
+	occurredAt: string
+): ProjectState {
+	return unwrapResult(skipActivity(catalog, state, activityId, pendingItemId, occurredAt));
+}
+
+/**
+ * Completa todas as atividades de uma fase, na ordem do catálogo:
+ * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
+ * via `confirmSummary`.
+ */
+export function completePhase(catalog: Catalog, state: ProjectState, phaseId: string, occurredAt: string): ProjectState {
+	const phase = catalog.phases.find((p) => p.id === phaseId);
+	if (!phase) throw new Error(`fase de teste não encontrada: "${phaseId}"`);
+	let next = state;
+	for (const activity of phase.activities) {
+		next =
+			activity.completionMode === 'explicit_confirmation'
+				? unwrapResult(confirmSummary(catalog, next))
+				: answerActivityMinimally(catalog, next, activity.id, occurredAt);
+	}
+	return next;
+}
+
+/** Completa o catálogo inteiro, fase a fase, na ordem — para testes de jornada ponta a ponta. */
+export function completeEntireCatalog(catalog: Catalog, state: ProjectState, occurredAt: string): ProjectState {
+	let next = state;
+	for (const phase of catalog.phases) {
+		next = completePhase(catalog, next, phase.id, occurredAt);
+	}
+	return next;
+}
+
+// --- Fixtures fabricadas ---------------------------------------------------
+//
+// Testam o comportamento de computePhaseStatus/computeNextActivity para
+// catalogStatus 'partial' e 'unavailable' sem depender de o catálogo real
+// ter uma fase nesse estado. Nesta versão o catálogo real não tem nenhuma
+// (todas as seis fases são 'complete') — ver docs/core/STATE_MACHINE.md §2,
+// que continua descrevendo os três estados como parte do modelo geral.
+
+const fixtureAtividade: ActivityDefinition = {
+	id: 'fixture_atividade',
+	phaseId: 'fixture_fase_partial',
+	order: 1,
+	title: 'Atividade fabricada de teste',
+	mainQuestion: 'Pergunta fabricada de teste?',
+	why: 'Fixture de teste — não faz parte do catálogo real.',
+	example: 'Fixture de teste.',
+	completionCriteria: 'Campo fabricado preenchido.',
+	completionMode: 'required_fields',
+	allowsSkip: true,
+	pendingItemLabel: 'Pendência fabricada de teste',
+	pendingItemDetail: 'Fixture de teste — não faz parte do catálogo real.',
+	fields: [
+		{
+			id: 'fixture_campo',
+			activityId: 'fixture_atividade',
+			label: 'Campo fabricado',
+			required: true,
+			dataTarget: 'answer',
+			type: 'texto_curto'
+		}
+	]
+};
+
+export const fabricatedPartialPhase: PhaseDefinition = {
+	id: 'fixture_fase_partial',
+	order: 999,
+	label: 'Fase parcial fabricada (fixture de teste)',
+	catalogStatus: 'partial',
+	activities: [fixtureAtividade]
+};
+
+export const fabricatedPartialCatalog: Catalog = { phases: [fabricatedPartialPhase] };
+
+export const fabricatedUnavailablePhase: PhaseDefinition = {
+	id: 'fixture_fase_unavailable',
+	order: 998,
+	label: 'Fase indisponível fabricada (fixture de teste)',
+	catalogStatus: 'unavailable',
+	activities: []
+};

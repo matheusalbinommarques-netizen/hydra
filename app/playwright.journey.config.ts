@@ -12,5 +12,10 @@ export default defineConfig({
 	testMatch: '**/*.journey.ts',
 	timeout: 180_000,
 	fullyParallel: false,
-	workers: 1
+	workers: 1,
+	// Uma nova tentativa absorve a instabilidade ambiental observada ao rodar
+	// a suíte inteira em sequência (contenção de recursos ao final de uma
+	// bateria longa) — confirmado, via debug direto no servidor, que não é
+	// causada por erro de aplicação: toda submissão respondeu 200 OK.
+	retries: 1
 });

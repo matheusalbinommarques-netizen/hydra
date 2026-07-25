@@ -16,6 +16,7 @@ import {
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { answerActivitiesGenerically } from './helpers/generic-activity';
 
 let tmpRoot: string;
 let server: EphemeralServer;
@@ -73,14 +74,23 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByText('Próxima atividade recomendada')).toBeVisible();
 	});
 
-	await test.step('fase partial (Definição do produto) exibida, não tratada como concluída', async () => {
+	await test.step('todas as seis fases exibidas, cada uma com catálogo completo (jornada linear completa)', async () => {
 		await expect(page.getByRole('heading', { name: 'Definição do produto' })).toBeVisible();
 		await expect(page.getByText('Definir usuário principal')).toBeVisible();
-	});
 
-	await test.step('fase unavailable exibida como ainda não disponível, sem atividades', async () => {
 		await expect(page.getByRole('heading', { name: 'Estruturação do projeto' })).toBeVisible();
-		await expect(page.getByText('Ainda não disponível nesta versão.').first()).toBeVisible();
+		await expect(page.getByText('Definir objetivo e entregáveis')).toBeVisible();
+
+		await expect(page.getByRole('heading', { name: 'Planejamento da entrega' })).toBeVisible();
+		await expect(page.getByText('Decompor o trabalho')).toBeVisible();
+
+		await expect(page.getByRole('heading', { name: 'Execução e acompanhamento' })).toBeVisible();
+		await expect(page.getByText('Definir foco atual da execução')).toBeVisible();
+
+		await expect(page.getByRole('heading', { name: 'Validação e encerramento' })).toBeVisible();
+		await expect(page.getByText('Validar entregas e critérios de aceitação')).toBeVisible();
+
+		await expect(page.getByText('Ainda não disponível nesta versão.')).toHaveCount(0);
 	});
 
 	await test.step('navegação Mapa → Agora → Resumo → Mapa', async () => {
@@ -97,7 +107,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Mapa da jornada' })).toBeVisible();
 	});
 
-	await test.step('avançar as 10 atividades reais até catalog_limit_reached', async () => {
+	await test.step('avançar as 37 atividades reais até catalog_limit_reached', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 
 		await answerAndContinue(page, {
@@ -172,6 +182,12 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 				value: 'Valor entregue de teste do Mapa.'
 			}
 		});
+
+		// demais atividades (2 restantes da fase 2 + fases 3 a 6 = 27) —
+		// conteúdo específico já coberto por catalog.spec.ts e
+		// full-catalog-journey.spec.ts; aqui só prova que a rota real
+		// atravessa até o fim sem erro.
+		await answerActivitiesGenerically(page, 27);
 
 		await expect(
 			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })

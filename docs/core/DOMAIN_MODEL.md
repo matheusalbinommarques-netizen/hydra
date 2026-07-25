@@ -135,17 +135,46 @@ Invariantes de integridade:
 6. **Resultado desejado** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: mudança esperada, beneficiário, percepção de melhoria.
 7. **Resumo da descoberta** — `completionMode: explicit_confirmation`, `allowsSkip: false`. Sem campos próprios; conclui quando o usuário revisa e clica "Continuar". Sujeito à regra de invalidação — ver `STATE_MACHINE.md` §3.
 
-### Fase 2 — Definição do produto (`catalogStatus: partial`)
+### Fase 2 — Definição do produto (`catalogStatus: complete`)
 1. **Definir usuário principal** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: descrição do usuário principal.
 2. **Definir visão do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: tipo de produto, necessidade central, benefício central (`dataTarget: answer`). Opcional: diferencial.
 3. **Definir funcionalidades essenciais** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: funcionalidades essenciais, valor entregue (`dataTarget: answer`). Opcional: fora do escopo inicial.
+4. **Priorizar primeira versão** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: o que entra na primeira versão, o que fica para depois, hipótese a validar (`semanticRole: hypothesis`).
+5. **Definir critérios de sucesso do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: sinais de sucesso, evidências ou indicadores, condição mínima de validação.
 
-Demais atividades desta fase não estão catalogadas nesta versão.
+### Fase 3 — Estruturação do projeto (`catalogStatus: complete`)
+1. **Definir objetivo e entregáveis** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: objetivo do projeto, entregáveis principais.
+2. **Identificar partes interessadas** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: partes interessadas. Opcional: interesse ou influência.
+3. **Definir papéis e responsabilidades** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: papéis e responsáveis. Opcional: decisor principal.
+4. **Registrar restrições e premissas** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: restrições, premissas.
+5. **Identificar riscos do projeto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: riscos identificados. Opcional: resposta inicial.
+6. **Definir comunicação e governança** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: forma de comunicação. Opcional: forma de decisão.
 
-### Fases 3 a 6 (`catalogStatus: unavailable`)
-- Estruturação do projeto
-- Planejamento da entrega
-- Execução e acompanhamento
-- Validação e encerramento
+### Fase 4 — Planejamento da entrega (`catalogStatus: complete`)
+1. **Decompor o trabalho** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: partes do trabalho.
+2. **Priorizar entregas** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: ordem de prioridade. Opcional: critério de priorização.
+3. **Mapear dependências** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: dependências entre partes do trabalho (aceita "nenhuma").
+4. **Estimar esforço e capacidade** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: estimativa de esforço, capacidade disponível.
+5. **Definir marcos** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: marcos principais.
+6. **Definir critérios de aceitação** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: critérios de aceitação da entrega.
+7. **Consolidar plano de entrega** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: resumo do plano de entrega. Opcional: data-alvo. Não reproduz um quadro de gestão de tarefas — produz um plano inicial em texto estruturado.
 
-Nenhuma `ActivityDefinition` catalogada. Ver `STATE_MACHINE.md` §2 para o efeito disso no status de fase e projeto.
+### Fase 5 — Execução e acompanhamento (`catalogStatus: complete`)
+Cada atividade representa o **retrato atual** da execução, não um histórico — editar uma resposta substitui a anterior. Não há ciclos recorrentes, instâncias repetidas nem histórico de atualizações nesta versão; o usuário revisita e edita essas respostas pelo Mapa.
+
+1. **Definir foco atual da execução** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: foco atual.
+2. **Registrar andamento** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: andamento atual.
+3. **Identificar e tratar impedimentos** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: impedimentos atuais (aceita "nenhum"). Opcional: tratamento.
+4. **Registrar decisões e mudanças** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: decisões ou mudanças recentes.
+5. **Atualizar riscos** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: situação atual dos riscos.
+6. **Definir próxima ação de acompanhamento** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: próxima ação.
+
+### Fase 6 — Validação e encerramento (`catalogStatus: complete`)
+1. **Validar entregas e critérios de aceitação** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: resultado da validação. Opcional: pendências da validação.
+2. **Coletar feedback** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: feedback coletado.
+3. **Resolver pendências finais** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: pendências finais e como foram resolvidas (aceita "nenhuma").
+4. **Registrar lições aprendidas** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: lições aprendidas.
+5. **Definir transição e próximos passos** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: forma de transição dos resultados. Opcional: próximos passos possíveis.
+6. **Confirmar encerramento do projeto** — `completionMode: required_fields`, `allowsSkip: false` (única exceção além do Resumo da descoberta). Obrigatório: resumo do encerramento. Não usa `explicit_confirmation` — essa `completionMode` é suportada nesta versão do motor apenas para uma única atividade em todo o catálogo (`transitions.ts` localiza "a" atividade de confirmação explícita por `completionMode`, sem receber um id). `required_fields` com `allowsSkip: false` já exige uma decisão explícita (o campo obrigatório não pode ser pulado) sem exigir mudança em `domain/`.
+
+Catálogo completo nesta versão: as seis fases têm `catalogStatus: complete`. Ver `STATE_MACHINE.md` §2 e §4 — com isso, o estado `concluído` do projeto passa a ser alcançável de ponta a ponta.

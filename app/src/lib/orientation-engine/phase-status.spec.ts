@@ -1,46 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
-import { answerActivity, confirmSummary, createInitialProjectState } from '$lib/domain';
+import { answerActivity, createInitialProjectState } from '$lib/domain';
 import { computePhaseStatus } from './phase-status';
+import {
+	answerActivityMinimally,
+	completePhase,
+	fabricatedPartialCatalog,
+	fabricatedPartialPhase,
+	fabricatedUnavailablePhase,
+	unwrapResult
+} from '$lib/domain/test-support';
 
 const T1 = '2026-01-01T00:00:00.000Z';
 
-function unwrap<T>(result: { ok: boolean; value?: T; error?: unknown }): T {
-	if (!result.ok) throw new Error(`esperado ok, recebido erro: ${JSON.stringify(result.error)}`);
-	return result.value as T;
-}
-
 const descoberta = catalog.phases.find((p) => p.id === 'descoberta')!;
-const definicao = catalog.phases.find((p) => p.id === 'definicao')!;
-const estruturacao = catalog.phases.find((p) => p.id === 'estruturacao')!;
-
-function completeDiscovery(): ReturnType<typeof createInitialProjectState> {
-	let state = createInitialProjectState(catalog, 'proj-1', T1);
-	state = unwrap(answerActivity(catalog, state, 'origem', { origem: 'Um problema' }, T1));
-	state = unwrap(
-		answerActivity(
-			catalog,
-			state,
-			'contexto',
-			{
-				nome_provisorio: 'Portal',
-				breve_descricao: 'x',
-				modo_trabalho: 'Individual',
-				nivel_experiencia: 'Iniciante',
-				estagio_atual: 'Ideia inicial'
-			},
-			T1
-		)
-	);
-	state = unwrap(answerActivity(catalog, state, 'problema', { situacao: 'x', dificuldade: 'y' }, T1));
-	state = unwrap(answerActivity(catalog, state, 'publico', { publico_detail: 'x' }, T1));
-	state = unwrap(answerActivity(catalog, state, 'estado_atual', { estado_atual_detail: 'x' }, T1));
-	state = unwrap(
-		answerActivity(catalog, state, 'resultado', { mudanca: 'x', beneficiario: 'y', percepcao: 'z' }, T1)
-	);
-	state = unwrap(confirmSummary(catalog, state));
-	return state;
-}
 
 describe('computePhaseStatus — fase complete (Descoberta)', () => {
 	it('todas as atividades não_iniciada → não_iniciada', () => {
@@ -50,14 +23,8 @@ describe('computePhaseStatus — fase complete (Descoberta)', () => {
 
 	it('uma atividade em_andamento (preenchimento parcial) → em_andamento', () => {
 		// "contexto" tem 5 campos obrigatórios; preencher só 1 deixa a atividade em_andamento.
-		const state = unwrap(
-			answerActivity(
-				catalog,
-				createInitialProjectState(catalog, 'proj-1', T1),
-				'contexto',
-				{ breve_descricao: 'x' },
-				T1
-			)
+		const state = unwrapResult(
+			answerActivity(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'contexto', { breve_descricao: 'x' }, T1)
 		);
 		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'contexto');
 		expect(progress?.status).toBe('em_andamento');
@@ -65,7 +32,7 @@ describe('computePhaseStatus — fase complete (Descoberta)', () => {
 	});
 
 	it('todas concluídas (incluindo o Resumo confirmado) → concluída', () => {
-		const state = completeDiscovery();
+		const state = completePhase(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'descoberta', T1);
 		expect(computePhaseStatus(descoberta, state.activityProgress, state.pendingItems)).toBe('concluída');
 	});
 
@@ -91,46 +58,51 @@ describe('computePhaseStatus — fase complete (Descoberta)', () => {
 	});
 });
 
-describe('computePhaseStatus — fase partial (Definição do produto)', () => {
+describe('computePhaseStatus — fase partial (fixture fabricada)', () => {
+	// Nesta versão do catálogo real não há mais nenhuma fase 'partial' (todas
+	// as seis são 'complete') — este comportamento continua fazendo parte do
+	// modelo geral (STATE_MACHINE.md §2) e é testado aqui com uma fixture
+	// fabricada, independente do conteúdo do catálogo real.
 	it('nova (atividade não_iniciada) → não_iniciada', () => {
-		const state = createInitialProjectState(catalog, 'proj-1', T1);
-		expect(computePhaseStatus(definicao, state.activityProgress, state.pendingItems)).toBe('não_iniciada');
+		const state = createInitialProjectState(fabricatedPartialCatalog, 'proj-1', T1);
+		expect(computePhaseStatus(fabricatedPartialPhase, state.activityProgress, state.pendingItems)).toBe('não_iniciada');
 	});
 
 	it('com qualquer avanço (preenchimento parcial, em_andamento) → em_andamento', () => {
-		// "usuario_principal" tem 1 campo obrigatório; um valor vazio mantém em_andamento.
-		const state = unwrap(
-			answerActivity(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'usuario_principal', {}, T1)
-		);
-		expect(computePhaseStatus(definicao, state.activityProgress, state.pendingItems)).toBe('em_andamento');
-	});
-
-	it('com a atividade concluída → em_andamento (nunca concluída)', () => {
-		const state = unwrap(
+		const state = unwrapResult(
 			answerActivity(
-				catalog,
-				createInitialProjectState(catalog, 'proj-1', T1),
-				'usuario_principal',
-				{ usuario_principal: 'Analista' },
+				fabricatedPartialCatalog,
+				createInitialProjectState(fabricatedPartialCatalog, 'proj-1', T1),
+				'fixture_atividade',
+				{},
 				T1
 			)
 		);
-		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'usuario_principal');
+		expect(computePhaseStatus(fabricatedPartialPhase, state.activityProgress, state.pendingItems)).toBe('em_andamento');
+	});
+
+	it('com a atividade concluída → em_andamento (nunca concluída)', () => {
+		const state = answerActivityMinimally(
+			fabricatedPartialCatalog,
+			createInitialProjectState(fabricatedPartialCatalog, 'proj-1', T1),
+			'fixture_atividade',
+			T1
+		);
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'fixture_atividade');
 		expect(progress?.status).toBe('concluída');
-		expect(computePhaseStatus(definicao, state.activityProgress, state.pendingItems)).toBe('em_andamento');
+		expect(computePhaseStatus(fabricatedPartialPhase, state.activityProgress, state.pendingItems)).toBe('em_andamento');
 	});
 });
 
 describe('computePhaseStatus — fase unavailable', () => {
+	// Idem: nenhuma fase real é 'unavailable' nesta versão; comportamento
+	// testado com fixture fabricada.
 	it('é sempre não_iniciada, independentemente dos progressos recebidos', () => {
-		const state = createInitialProjectState(catalog, 'proj-1', T1);
-		expect(computePhaseStatus(estruturacao, state.activityProgress, state.pendingItems)).toBe('não_iniciada');
+		expect(computePhaseStatus(fabricatedUnavailablePhase, [], [])).toBe('não_iniciada');
 
-		// mesmo com progressos fabricados (fase sem atividades catalogadas, então
-		// nada aqui deveria sequer ser lido — a checagem confirma isso).
 		const fabricatedProgress = [
 			{ projectId: 'proj-1', activityDefinitionId: 'qualquer', status: 'concluída' as const }
 		];
-		expect(computePhaseStatus(estruturacao, fabricatedProgress, [])).toBe('não_iniciada');
+		expect(computePhaseStatus(fabricatedUnavailablePhase, fabricatedProgress, [])).toBe('não_iniciada');
 	});
 });

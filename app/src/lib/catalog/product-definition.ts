@@ -1,5 +1,5 @@
-// Catálogo estático — fase Definição do produto (catalogStatus: partial).
-// Fonte: docs/core/DOMAIN_MODEL.md §7 (só as três primeiras atividades estão catalogadas nesta versão).
+// Catálogo estático — fase Definição do produto (catalogStatus: complete).
+// Fonte: docs/core/DOMAIN_MODEL.md §7.
 
 import type { ActivityDefinition } from '$lib/domain';
 
@@ -134,8 +134,105 @@ const funcionalidadesEssenciais: ActivityDefinition = {
 	]
 };
 
+const priorizarPrimeiraVersao: ActivityDefinition = {
+	id: 'priorizar_primeira_versao',
+	phaseId: 'definicao',
+	order: 4,
+	title: 'Priorizar primeira versão',
+	mainQuestion: 'O que entra na primeira versão do produto, o que fica para depois, e qual hipótese esse recorte vai validar?',
+	why: 'Priorizar o recorte inicial evita que a primeira versão cresça antes de validar se a proposta realmente entrega o valor esperado.',
+	example: 'Primeira versão: criar projeto e responder a Descoberta guiada. Depois: fases avançadas de planejamento detalhado. Hipótese: profissionais iniciantes conseguem avançar sozinhos só com a orientação contextual.',
+	completionCriteria: 'O que entra, o que fica para depois e a hipótese a validar estão descritos de forma coerente com a visão e as funcionalidades essenciais já definidas.',
+	completionMode: 'required_fields',
+	allowsSkip: true,
+	pendingItemLabel: 'Primeira versão do produto não foi priorizada',
+	pendingItemDetail: 'Sem esse recorte, o projeto corre o risco de tentar entregar tudo de uma vez, sem validar o essencial primeiro.',
+	fields: [
+		{
+			id: 'entra_primeira_versao',
+			activityId: 'priorizar_primeira_versao',
+			label: 'O que entra na primeira versão?',
+			required: true,
+			help: 'Liste só o que é necessário para validar o valor central.',
+			placeholder: 'Ex.: criar projeto e completar a jornada guiada de Descoberta',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'fica_para_depois',
+			activityId: 'priorizar_primeira_versao',
+			label: 'O que fica para depois?',
+			required: true,
+			help: 'Registre o que é interessante, mas não indispensável agora.',
+			placeholder: 'Ex.: relatórios avançados, integrações externas',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'hipotese_validada',
+			activityId: 'priorizar_primeira_versao',
+			label: 'Qual hipótese será validada com esse recorte?',
+			required: true,
+			help: 'Descreva o que você espera confirmar ao lançar essa primeira versão.',
+			placeholder: 'Ex.: usuários conseguem concluir a jornada sem ajuda externa',
+			dataTarget: 'answer',
+			semanticRole: 'hypothesis',
+			type: 'texto_longo'
+		}
+	]
+};
+
+const criteriosSucessoProduto: ActivityDefinition = {
+	id: 'criterios_sucesso_produto',
+	phaseId: 'definicao',
+	order: 5,
+	title: 'Definir critérios de sucesso do produto',
+	mainQuestion: 'Como você vai perceber se essa proposta entregou valor?',
+	why: 'Critérios de sucesso claros evitam que o julgamento sobre a primeira versão fique subjetivo ou seja adiado indefinidamente.',
+	example: 'Sinal de sucesso: usuários concluem a jornada guiada sem abandonar no meio. Evidência: taxa de conclusão da Descoberta. Condição mínima: pelo menos um usuário real completa o fluxo e confirma que entendeu o que fazer.',
+	completionCriteria: 'Sinais de sucesso, evidências ou indicadores e a condição mínima de validação estão definidos.',
+	completionMode: 'required_fields',
+	allowsSkip: true,
+	pendingItemLabel: 'Critérios de sucesso do produto não foram definidos',
+	pendingItemDetail: 'Sem critérios claros, fica difícil saber se a primeira versão realmente validou a proposta.',
+	fields: [
+		{
+			id: 'sinais_sucesso',
+			activityId: 'criterios_sucesso_produto',
+			label: 'Quais são os sinais de sucesso?',
+			required: true,
+			help: 'Descreva o que indicaria que a proposta está funcionando.',
+			placeholder: 'Ex.: usuários voltam a usar o produto sem serem lembrados',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'evidencias_indicadores',
+			activityId: 'criterios_sucesso_produto',
+			label: 'Que evidências ou indicadores mostrarão isso?',
+			required: true,
+			help: 'Podem ser qualitativos ou quantitativos.',
+			placeholder: 'Ex.: taxa de conclusão da jornada, feedback direto dos usuários',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		},
+		{
+			id: 'condicao_minima_validacao',
+			activityId: 'criterios_sucesso_produto',
+			label: 'Qual é a condição mínima para considerar a primeira versão validada?',
+			required: true,
+			help: 'Defina um limite objetivo, mesmo que simples.',
+			placeholder: 'Ex.: pelo menos um usuário real completa o fluxo com sucesso',
+			dataTarget: 'answer',
+			type: 'texto_longo'
+		}
+	]
+};
+
 export const productDefinitionActivities: ActivityDefinition[] = [
 	usuarioPrincipal,
 	visaoProduto,
-	funcionalidadesEssenciais
+	funcionalidadesEssenciais,
+	priorizarPrimeiraVersao,
+	criteriosSucessoProduto
 ];

@@ -78,9 +78,9 @@ Invariantes:
 - uma fase `partial` ou `unavailable` nunca atinge `concluída` nem `concluída_com_pendências`, independentemente do estado de suas atividades;
 - uma coleção vazia de atividades catalogadas (`unavailable`) nunca torna uma fase `concluída`.
 
-Nesta versão: Descoberta é `complete` (usa as regras normais); Definição do produto é `partial` (só pode chegar a `em_andamento`); as fases 3–6 são `unavailable` (permanecem sempre `não_iniciada`).
+Nesta versão, as seis fases do catálogo são `complete` (usam as regras normais) — a jornada guiada cobre da Descoberta ao encerramento do projeto de ponta a ponta. Os estados `partial` e `unavailable` continuam fazendo parte do modelo geral (ex.: para uma futura fase cujo catálogo ainda não esteja completo) e são exercitados por testes com fixtures fabricadas, mesmo sem nenhuma fase real nesse estado nesta versão.
 
-Quando o Motor de Orientação esgota as atividades catalogadas de uma fase `partial` (ex.: usuário conclui "Definir usuário principal" e não há mais nada catalogado nessa fase), isso não é interpretado como a fase ou o projeto estarem concluídos — ver `ORIENTATION_ENGINE.md` §3 para a condição explícita de "limite do catálogo alcançado".
+Quando o Motor de Orientação esgota as atividades catalogadas de uma fase `partial` (comportamento do modelo geral, sem exemplo real nesta versão), isso não é interpretado como a fase ou o projeto estarem concluídos — ver `ORIENTATION_ENGINE.md` §3 para a condição explícita de "limite do catálogo alcançado", que nesta versão só é alcançada depois da última atividade da última fase (Confirmar encerramento do projeto).
 
 ## 3. Invalidação do Resumo da descoberta
 
@@ -105,7 +105,7 @@ SENÃO
     → em_andamento
 ```
 
-Como a fase Definição do produto é `partial` (nunca atinge `concluída`) e as fases 3–6 são `unavailable` (permanecem sempre `não_iniciada`), o estado `concluído` é **inalcançável na prática** nesta versão — não é apenas "fora do escopo", é uma consequência estrutural do catálogo incompleto (§2).
+Nesta versão, com as seis fases `complete`, o estado `concluído` é **alcançável de ponta a ponta**: exige que toda atividade de toda fase esteja `concluída` (nenhuma `pulada` ou `em_andamento`) — mais rígido que `concluída_com_pendências`, que já é suficiente no nível de fase. A última atividade do catálogo, "Confirmar encerramento do projeto" (`allowsSkip: false`), é o gate final — sem ela, o projeto nunca atinge `concluído`.
 
 ## 5. Estado da Pendência
 

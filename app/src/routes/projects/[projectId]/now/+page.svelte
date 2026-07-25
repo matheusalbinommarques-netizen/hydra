@@ -80,8 +80,8 @@
 	<section class="next-action">
 		<h2>Você concluiu todas as atividades disponíveis</h2>
 		<p>
-			O catálogo metodológico desta versão termina aqui. Novas fases serão adicionadas em versões
-			futuras.
+			Você percorreu a jornada guiada completa, da Descoberta ao encerramento do projeto. Pendências
+			abertas, se houver, continuam visíveis aqui e no Mapa — revise e retome quando quiser.
 		</p>
 	</section>
 {/if}

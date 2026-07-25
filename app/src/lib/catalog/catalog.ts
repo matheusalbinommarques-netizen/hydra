@@ -4,6 +4,10 @@
 import type { Catalog } from '$lib/domain';
 import { discoveryActivities } from './discovery';
 import { productDefinitionActivities } from './product-definition';
+import { structuringActivities } from './structuring';
+import { planningActivities } from './planning';
+import { executionActivities } from './execution';
+import { closureActivities } from './closure';
 
 export const catalog: Catalog = {
 	phases: [
@@ -18,36 +22,36 @@ export const catalog: Catalog = {
 			id: 'definicao',
 			order: 2,
 			label: 'Definição do produto',
-			catalogStatus: 'partial',
+			catalogStatus: 'complete',
 			activities: productDefinitionActivities
 		},
 		{
 			id: 'estruturacao',
 			order: 3,
 			label: 'Estruturação do projeto',
-			catalogStatus: 'unavailable',
-			activities: []
+			catalogStatus: 'complete',
+			activities: structuringActivities
 		},
 		{
 			id: 'planejamento',
 			order: 4,
 			label: 'Planejamento da entrega',
-			catalogStatus: 'unavailable',
-			activities: []
+			catalogStatus: 'complete',
+			activities: planningActivities
 		},
 		{
 			id: 'execucao',
 			order: 5,
 			label: 'Execução e acompanhamento',
-			catalogStatus: 'unavailable',
-			activities: []
+			catalogStatus: 'complete',
+			activities: executionActivities
 		},
 		{
 			id: 'validacao',
 			order: 6,
 			label: 'Validação e encerramento',
-			catalogStatus: 'unavailable',
-			activities: []
+			catalogStatus: 'complete',
+			activities: closureActivities
 		}
 	]
 };

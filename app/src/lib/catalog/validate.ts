@@ -6,11 +6,11 @@ import type { Catalog, CatalogStatus } from '$lib/domain';
 
 const EXPECTED_CATALOG_STATUS: Record<string, CatalogStatus> = {
 	descoberta: 'complete',
-	definicao: 'partial',
-	estruturacao: 'unavailable',
-	planejamento: 'unavailable',
-	execucao: 'unavailable',
-	validacao: 'unavailable'
+	definicao: 'complete',
+	estruturacao: 'complete',
+	planejamento: 'complete',
+	execucao: 'complete',
+	validacao: 'complete'
 };
 
 /** Retorna a lista de violações encontradas; catálogo válido = array vazio. */

@@ -43,7 +43,7 @@ Descoberta concluída e "Definir usuário principal" também concluída)
       (nunca interpretar isso como projeto ou fase concluídos)
 ```
 
-Única fonte da "Próxima ação recomendada" em Agora. Nunca retorna uma atividade `pulada` ou `concluída`. Como as fases 3–6 são `unavailable` (catálogo vazio), a Trilha A nunca as alcança nesta versão — o percurso termina em "Definir usuário principal", e a partir daí retorna sempre "limite do catálogo alcançado".
+Única fonte da "Próxima ação recomendada" em Agora. Nunca retorna uma atividade `pulada` ou `concluída`. Nesta versão as seis fases são `complete`, então a Trilha A percorre o catálogo inteiro — de "Origem do projeto" (Descoberta) até "Confirmar encerramento do projeto" (Validação e encerramento) — e só retorna "limite do catálogo alcançado" depois que a última atividade da última fase estiver `concluída` ou `pulada`.
 
 ## 4. Trilha B — pendências a resolver
 
@@ -99,4 +99,4 @@ Hipóteses exibidas (ex.: Registros) = todas as `Answer` cujo `FieldDefinition.s
 
 ## 10. Escopo do catálogo usado pelo motor nesta versão
 
-Cobre o sequenciamento das 7 atividades da fase Descoberta (`catalogStatus: complete`) + a primeira atividade da fase Definição do produto (`catalogStatus: partial`, "Definir usuário principal"). As fases 3–6 (`catalogStatus: unavailable`) não são alcançadas pelo motor nesta versão.
+Cobre o sequenciamento das 37 atividades das seis fases, todas `catalogStatus: complete`: Descoberta (7), Definição do produto (5), Estruturação do projeto (6), Planejamento da entrega (7), Execução e acompanhamento (6), Validação e encerramento (6) — ver `DOMAIN_MODEL.md` §7 para o detalhe de cada uma. O motor em si (`orientation-engine/`) não tem nenhuma lógica específica de fase ou atividade — o comportamento descrito neste documento vale igualmente para qualquer catálogo, incluindo um futuro catálogo maior ou com fases `partial`/`unavailable`.

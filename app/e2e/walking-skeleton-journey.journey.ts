@@ -16,6 +16,7 @@ import {
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { answerActivitiesGenerically } from './helpers/generic-activity';
 
 interface ExportedEnvelope {
 	version: number;
@@ -201,6 +202,16 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
+	await test.step('demais atividades do catálogo (fases 2 restante a 6) respondidas genericamente até o encerramento', async () => {
+		// priorizar_primeira_versao + criterios_sucesso_produto (2, fase 2) +
+		// estruturação (6) + planejamento (7) + execução (6) + validação (6,
+		// incluindo "Confirmar encerramento do projeto") = 27. Conteúdo
+		// específico de cada campo já é coberto por catalog.spec.ts e por
+		// full-catalog-journey.spec.ts — aqui só precisa provar que a rota
+		// real atravessa essas fases sem erro.
+		await answerActivitiesGenerically(page, 27);
+	});
+
 	let downloadedFilePath = '';
 	let exportedJson: ExportedEnvelope;
 
@@ -222,7 +233,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		expect(exportedJson.state.activityProgress).toHaveLength(10);
+		expect(exportedJson.state.activityProgress).toHaveLength(37);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}
@@ -243,6 +254,14 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 			(answer) => answer.fieldDefinitionId === 'necessidade_central'
 		);
 		expect(necessidadeCentralAnswer?.value).toBe('Centralizar e priorizar solicitações internas.');
+
+		// prova que a última atividade da última fase (Validação e
+		// encerramento) foi de fato alcançada e respondida — o encerramento
+		// exige decisão explícita (allowsSkip: false).
+		const resumoEncerramentoAnswer = exportedJson.state.answers.find(
+			(answer) => answer.fieldDefinitionId === 'resumo_encerramento'
+		);
+		expect(resumoEncerramentoAnswer?.value).toBeTruthy();
 	});
 
 	await test.step('importar em banco limpo', async () => {
