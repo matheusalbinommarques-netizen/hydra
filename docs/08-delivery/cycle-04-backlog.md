@@ -70,6 +70,8 @@ resultado com uso real, sem depender de teste com usuários externos
 
 ### C4-02 — Implementar a interface mínima de "Pular etapa"
 
+**Status:** ✅ concluído (commit `39fdc06` — `feat(discovery): add skip and resume activity flow`).
+
 **Resultado esperado:**
 - ação disponível somente quando `allowsSkip === true`;
 - consequência apresentada antes da confirmação;
@@ -110,6 +112,48 @@ tecnicamente justificado antes de qualquer mudança — não presumir
 autorização.
 
 **Tipo:** código e testes.
+
+**Evidências:**
+- `app/src/routes/projects/[projectId]/now/+page.server.ts`: `load` passa a
+  aceitar `?activity=<id>` para retomada, validado exclusivamente contra
+  `view.openPendingItems` (pendência aberta do próprio projeto — nenhum
+  identificador arbitrário abre atividade futura ou não pulada); nova
+  action `skip` delega integralmente a `getProjectUseCases().skipActivity`
+  (nenhuma validação de domínio duplicada na rota) e redireciona (303) para
+  a rota canônica de Agora, sem preservar o parâmetro de retomada;
+- `app/src/routes/projects/[projectId]/now/+page.svelte`: botão "Pular
+  etapa" condicionado a `allowsSkip === true && !isResuming`; link "Retomar
+  etapa" em cada pendência aberta; resposta a uma atividade retomada
+  navega (client-side, `goto`) para a URL canônica sem `?activity` após
+  sucesso, preservando o comportamento normal (sem retomada) inalterado;
+- `app/src/lib/components/SkipActivityConfirm.svelte` (novo): modal de
+  confirmação com `<dialog>` nativo, sem biblioteca externa — informa que
+  a etapa não será concluída, exibe `pendingItemDetail`, avisa da criação
+  da pendência; cancelar fecha sem requisição; confirmação duplicada
+  bloqueada enquanto a submissão está em andamento; erro mantém o modal
+  aberto com mensagem; sucesso fecha o modal antes de aplicar o redirect;
+- `app/e2e/skip-activity.journey.ts` (novo): teste Playwright dedicado
+  cobrindo botão condicional, conteúdo do modal, `Escape` (fecha o modal
+  sem confirmar o skip, sem criar pendência e sem mudar a URL — comprovado
+  em Chromium real via Playwright; a ferramenta de QA manual usada durante
+  a revisão não conseguiu simular corretamente esse fechamento, mas não há
+  defeito pendente relacionado), cancelamento pelo botão, confirmação
+  (pendência criada, próxima ação avança, pendência em Agora e Registros),
+  retomada pela pendência, resposta da atividade retomada (pendência
+  resolvida, URL volta a `/projects/<projectId>/now` sem `activity`,
+  recomendação canônica exibida) e ausência do botão em atividade não
+  pulável (Resumo);
+- `app/e2e/records-view.journey.ts`: apenas o comentário de cabeçalho
+  atualizado, deixando de afirmar que a interface de pular não existe;
+  lógica do teste inalterada;
+- nenhuma alteração em `domain/`, `catalog/`, `orientation-engine/` ou
+  `server/application/` — implementação consumiu exclusivamente
+  `skipActivity`/`answerActivity` já existentes;
+- `hydra-verify --mode full --item C4-02`: PASS, 6/6 etapas;
+- QA manual aprovada (fluxo completo de pular, cancelar, confirmar,
+  retomar e responder, percorrido no navegador contra um build standalone
+  com banco temporário isolado);
+- commit `39fdc06008ae510faf468b9e8baf13ef256f0837`.
 
 ---
 
@@ -214,4 +258,4 @@ Antes de considerar o Ciclo 4 entregue:
 - nenhum bloqueador crítico do dogfooding sem decisão;
 - Should e Could só entram no gate quando efetivamente iniciados.
 
-Gate ainda não avaliado — nenhum item foi iniciado.
+Gate ainda não avaliado — C4-03 e C4-04 permanecem pendentes.

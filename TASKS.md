@@ -1,6 +1,6 @@
 # Hydra — Tarefas
 
-**Status atual:** Ciclo 4 aberto (docs/08-delivery/cycle-04-backlog.md) — nenhum item iniciado
+**Status atual:** Ciclo 4 aberto (docs/08-delivery/cycle-04-backlog.md) — C4-01 e C4-02 concluídos, C4-03 e C4-04 pendentes
 
 **Atualizado em:** 25/07/2026
 
@@ -8,12 +8,11 @@ Este arquivo é a visão operacional do trabalho atual. A documentação complet
 
 ## Agora
 
-C4-01 concluída (commit `a399191`). Próxima ação: planejar C4-02 (Implementar a interface mínima de "Pular etapa").
+C4-01 e C4-02 concluídas (commits `a399191`, `39fdc06`). Próxima ação: C4-03 (Executar checkpoint de dogfooding do Release 0).
 
 ## Depois
 
-- [ ] C4-02 — Implementar a interface mínima de "Pular etapa" (depende de C4-01 concluído).
-- [ ] C4-03 — Executar checkpoint de dogfooding do Release 0 (depende de C4-02).
+- [ ] C4-03 — Executar checkpoint de dogfooding do Release 0 (depende de C4-02, concluído).
 - [ ] C4-04 — Validar a baseline completa do Release 0 (depende de C4-01 a C4-03).
 - [ ] Revisar riscos e roadmap.
 - [ ] Decidir continuidade para Release 1.

@@ -56,7 +56,10 @@ encerramento do ciclo, conforme previsto no gate.
 - Tela Mapa mínima do Ciclo 3 (C3-01), com testes Vitest e Playwright
   dedicados;
 - Tela Registros mínima do Ciclo 3 (C3-02), com histórico de pendências
-  (`pendingItemHistory`) e testes Vitest e Playwright dedicados.
+  (`pendingItemHistory`) e testes Vitest e Playwright dedicados;
+- Interface de "Pular etapa" do Ciclo 4 (C4-02), com modal de confirmação
+  acessível (`<dialog>` nativo), retomada segura da atividade pulada a
+  partir da pendência aberta e teste Playwright dedicado.
 
 ## Decisões de maior impacto
 
@@ -114,7 +117,10 @@ Itens Must:
 
 - C4-01 — Reconciliar a especificação do Release 0
   (`docs/core/RELEASE_0_SPEC.md`): concluída (commit `a399191`);
-- C4-02 — Implementar a interface mínima de "Pular etapa": não iniciada;
+- C4-02 — Implementar a interface mínima de "Pular etapa": concluída
+  (commit `39fdc06`), com modal de confirmação acessível, retomada segura
+  da atividade pulada e teste Playwright dedicado (`hydra-verify full`
+  PASS, QA manual aprovada);
 - C4-03 — Executar checkpoint de dogfooding do Release 0: não iniciada;
 - C4-04 — Validar a baseline completa do Release 0: não iniciada.
 
@@ -126,6 +132,6 @@ implementação e fora do escopo deste ciclo.
 
 ## Próxima decisão relevante
 
-C4-01 concluída. Próxima ação: planejar C4-02. Gate do Ciclo 4 ainda não
-avaliado — o Release 0 não está concluído enquanto C4-02, C4-03 e C4-04
-permanecerem pendentes.
+C4-01 e C4-02 concluídas. Próxima ação: C4-03 (checkpoint de dogfooding do
+Release 0). Gate do Ciclo 4 ainda não avaliado — o Release 0 não está
+concluído enquanto C4-03 e C4-04 permanecerem pendentes.

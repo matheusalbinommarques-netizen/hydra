@@ -9,7 +9,14 @@
   atividade recomendada como próximo passo;
 - Tela Registros (`/projects/[projectId]/records`): mostra as respostas
   registradas, agrupadas por fase e atividade, e o histórico de pendências
-  (abertas e resolvidas, com datas), somente leitura.
+  (abertas e resolvidas, com datas), somente leitura;
+- Interface de "Pular etapa" em Agora (`/projects/[projectId]/now`): botão
+  condicionado a atividades que permitem pular, modal de confirmação
+  acessível (`<dialog>` nativo) informando a consequência e a criação de
+  pendência, e retomada segura da atividade pulada a partir da pendência
+  aberta (`?activity=<id>`, validada contra o próprio projeto), com
+  resolução automática da pendência ao responder e retorno à recomendação
+  canônica.
 
 ## [0.3.0] — 24/07/2026
 
