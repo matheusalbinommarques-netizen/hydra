@@ -1,6 +1,6 @@
 # Hydra — Tarefas
 
-**Status atual:** Ciclo 3 concluído (Tela Mapa e Tela Registros entregues)
+**Status atual:** Ciclo 4 aberto (docs/08-delivery/cycle-04-backlog.md) — nenhum item iniciado
 
 **Atualizado em:** 25/07/2026
 
@@ -8,15 +8,15 @@ Este arquivo é a visão operacional do trabalho atual. A documentação complet
 
 ## Agora
 
-Nenhuma tarefa ativa no momento. O próximo trabalho depende da definição do escopo do Ciclo 4.
+Abertura do Ciclo 4 concluída. Próxima ação: planejar C4-01 (Reconciliar a especificação do Release 0).
 
 ## Depois
 
-- [ ] Testar o fluxo com até dois usuários.
-- [ ] Registrar feedback.
+- [ ] C4-02 — Implementar a interface mínima de "Pular etapa" (depende de C4-01 concluído).
+- [ ] C4-03 — Executar checkpoint de dogfooding do Release 0 (depende de C4-02).
+- [ ] C4-04 — Validar a baseline completa do Release 0 (depende de C4-01 a C4-03).
 - [ ] Revisar riscos e roadmap.
 - [ ] Decidir continuidade para Release 1.
-- [ ] Reavaliar "Pular etapa" na interface (C3-03) para um ciclo futuro — não iniciada no Ciclo 3.
 
 ## Não fazer agora
 

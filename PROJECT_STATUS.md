@@ -102,7 +102,28 @@ conclusão do Ciclo 3").
   sua ausência não bloqueou o encerramento do ciclo, conforme previsto no
   gate.
 
+## Ciclo 4
+
+O Ciclo 4 foi formalmente aberto (`docs/08-delivery/cycle-04-backlog.md`).
+Meta: concluir a baseline funcional do Release 0, implementando a
+experiência de "Pular etapa", reconciliando a especificação com o produto
+funcional atual e validando internamente a jornada completa com um
+projeto real de Matheus.
+
+Itens Must:
+
+- C4-01 — Reconciliar a especificação do Release 0
+  (`docs/core/RELEASE_0_SPEC.md`);
+- C4-02 — Implementar a interface mínima de "Pular etapa";
+- C4-03 — Executar checkpoint de dogfooding do Release 0;
+- C4-04 — Validar a baseline completa do Release 0.
+
+Testes com usuários externos ficam fora deste ciclo, por decisão
+registrada (`docs/07-management/decision-log.md`, D021): o momento é
+definido exclusivamente pelo Matheus. O Workflow v2 está registrado como
+desenho técnico (`docs/08-delivery/workflow-v2-design.md`), sem
+implementação e fora do escopo deste ciclo.
+
 ## Próxima decisão relevante
 
-A definição do escopo do Ciclo 4 está pendente — nenhuma decisão foi
-tomada até o momento.
+Nenhum item do Ciclo 4 foi iniciado ainda. Próxima ação: planejar C4-01.

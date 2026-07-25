@@ -22,3 +22,4 @@
 | D018 | 22/07/2026 | Pular gera explicação e pendência | Aprovada | Flexibilidade controlada |
 | D019 | 22/07/2026 | Comparar stacks com vantagem ao SvelteKit | Aprovada | Evita decisão prematura |
 | D020 | 22/07/2026 | Arquitetura e contratos antes da implementação assistida | Aprovada | Evita caixa-preta |
+| D021 | 25/07/2026 | Testes com usuários externos serão realizados quando Matheus decidir que o Hydra atingiu maturidade suficiente. Até lá, o desenvolvimento será orientado pela visão de produto, pelas especificações reconciliadas, pela validação técnica e pelo dogfooding em projetos reais. | Aprovada | Uma amostra externa pequena avaliando uma experiência ainda incompleta pode produzir conclusões circunstanciais e induzir mudanças prematuras de direção. A decisão não rejeita definitivamente testes externos; apenas coloca seu momento sob decisão explícita do Product Owner. |
