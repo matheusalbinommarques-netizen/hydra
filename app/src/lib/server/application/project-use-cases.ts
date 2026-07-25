@@ -18,6 +18,7 @@ import { buildProjectView } from './project-view';
 import type {
 	AnswerActivityInput,
 	ConfirmSummaryInput,
+	ProjectListItem,
 	ProjectUseCases,
 	RenameProjectInput,
 	SkipActivityInput,
@@ -44,6 +45,18 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			const state = createInitialProjectState(catalog, idGenerator.generate(), clock.now());
 			await repository.insert(state);
 			return viewOf(state);
+		},
+
+		async listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>> {
+			const projects = await repository.listRecent();
+			return {
+				ok: true,
+				value: projects.map((project) => ({
+					projectId: project.id,
+					projectName: project.name,
+					createdAt: project.createdAt
+				}))
+			};
 		},
 
 		async loadProjectView(projectId) {

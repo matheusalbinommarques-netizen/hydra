@@ -282,7 +282,9 @@ invariantes completas do agregado — não só que os IDs referenciados existem,
 mas que o conjunto de dados é consistente como um todo. A checagem de
 colisão de ID **não** entra aqui — depende de consultar persistência
 (impuro) e fica na camada de aplicação (§10), usando
-`ProjectRepository.findById`, sem adicionar um método de listagem à porta.
+`ProjectRepository.findById` (essa checagem específica nunca precisou de
+listagem; `listRecent`, §9, foi adicionada depois, para a página inicial,
+C4-03A).
 
 ```typescript
 export interface ExportedProjectState {
@@ -412,6 +414,10 @@ export interface ProjectRepository {
   // está em state.project.id). A estratégia interna (reescrita completa,
   // diffs, transação) não é parte deste contrato — fica para a
   // implementação concreta (ORM/driver a decidir, architecture-brief.md §9).
+  listRecent(): Promise<Project[]>;
+  // só id/name/createdAt (Project, §1) — nunca ActivityProgress, Answer ou
+  // PendingItem; usada pela página inicial (C4-03A) para listar projetos
+  // existentes, nunca por regra de domínio.
 }
 ```
 
@@ -462,6 +468,14 @@ export interface ProjectView {
   hypotheses: HypothesisView[];
 }
 
+// Página inicial (C4-03A) — DTO leve, sem status/snapshot; routes/ nunca
+// recebe Project (domain/) diretamente, só este DTO da camada de aplicação.
+export interface ProjectListItem {
+  projectId: string;
+  projectName: string | null;
+  createdAt: string;
+}
+
 export type UseCaseError =
   | { kind: 'project_not_found' }
   | { kind: 'invalid_import'; reason: ProjectStateParseError }
@@ -492,6 +506,9 @@ export interface RenameProjectInput {
 
 export interface ProjectUseCases {
   createProject(): Promise<UseCaseOutcome<ProjectView>>;
+  listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>>;
+  // chama ProjectRepository.listRecent (§9) e mapeia Project -> ProjectListItem;
+  // nenhuma escrita, nenhum cálculo de status/snapshot.
   loadProjectView(projectId: string): Promise<UseCaseOutcome<ProjectView>>;
   renameProject(input: RenameProjectInput): Promise<UseCaseOutcome<ProjectView>>;
   answerActivity(input: AnswerActivityInput): Promise<UseCaseOutcome<ProjectView>>;

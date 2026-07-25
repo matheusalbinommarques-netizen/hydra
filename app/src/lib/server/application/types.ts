@@ -34,6 +34,14 @@ export type PendingItemHistoryView =
 			resolvedAt: string;
 		};
 
+// Página inicial (C4-03A) — lista leve, sem ProjectStatus/snapshot: nunca
+// carrega activityProgress/answers/pendingItems nem recomputa status.
+export interface ProjectListItem {
+	projectId: string;
+	projectName: string | null;
+	createdAt: string;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -77,6 +85,7 @@ export interface RenameProjectInput {
 
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
+	listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>>;
 	loadProjectView(projectId: string): Promise<UseCaseOutcome<ProjectView>>;
 	renameProject(input: RenameProjectInput): Promise<UseCaseOutcome<ProjectView>>;
 	answerActivity(input: AnswerActivityInput): Promise<UseCaseOutcome<ProjectView>>;

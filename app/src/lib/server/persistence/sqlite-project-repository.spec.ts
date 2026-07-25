@@ -241,6 +241,53 @@ describe('createSqliteProjectRepository — fechamento e reabertura', () => {
 	});
 });
 
+describe('createSqliteProjectRepository — listRecent', () => {
+	it('banco vazio retorna []', async () => {
+		const repo = memoryRepo();
+		await expect(repo.listRecent()).resolves.toEqual([]);
+	});
+
+	it('retorna múltiplos projetos ordenados por createdAt DESC', async () => {
+		const repo = memoryRepo();
+		await repo.insert(createInitialProjectState(catalog, 'proj-1', T1));
+		await repo.insert(createInitialProjectState(catalog, 'proj-2', T2));
+
+		await expect(repo.listRecent()).resolves.toEqual([
+			{ id: 'proj-2', name: null, createdAt: T2 },
+			{ id: 'proj-1', name: null, createdAt: T1 }
+		]);
+	});
+
+	it('empate de createdAt usa id DESC como desempate determinístico', async () => {
+		const repo = memoryRepo();
+		await repo.insert(createInitialProjectState(catalog, 'proj-a', T1));
+		await repo.insert(createInitialProjectState(catalog, 'proj-b', T1));
+
+		await expect(repo.listRecent()).resolves.toEqual([
+			{ id: 'proj-b', name: null, createdAt: T1 },
+			{ id: 'proj-a', name: null, createdAt: T1 }
+		]);
+	});
+
+	it('retorna somente id/name/createdAt — nunca activityProgress, answers ou pendingItems', async () => {
+		const repo = memoryRepo();
+		await repo.insert(nonTrivialState());
+
+		const [project] = await repo.listRecent();
+		expect(Object.keys(project).sort()).toEqual(['id', 'name', 'createdAt'].sort());
+	});
+
+	it('listRecent não modifica nenhum projeto existente', async () => {
+		const repo = memoryRepo();
+		const state = nonTrivialState();
+		await repo.insert(state);
+
+		await repo.listRecent();
+
+		await expect(repo.findById(state.project.id)).resolves.toEqual(state);
+	});
+});
+
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
 	it('o ProjectState carregado contém só os 4 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();

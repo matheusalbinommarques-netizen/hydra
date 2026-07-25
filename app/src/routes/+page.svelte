@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
-	let { form } = $props();
+	let { data, form } = $props();
+
+	const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+	function formatDate(iso: string): string {
+		const parsed = new Date(iso);
+		return Number.isNaN(parsed.getTime()) ? iso : dateFormatter.format(parsed);
+	}
 </script>
 
 <svelte:head>
@@ -30,6 +37,22 @@
 	{#if form?.message}
 		<p role="alert">{form.message}</p>
 	{/if}
+
+	<section class="projects" aria-label="Seus projetos">
+		<h2>Seus projetos</h2>
+		{#if data.projects.length === 0}
+			<p class="empty">Nenhum projeto ainda. Crie o primeiro acima.</p>
+		{:else}
+			<ul>
+				{#each data.projects as project (project.projectId)}
+					<li>
+						<a href="/projects/{project.projectId}/now">{project.projectName ?? 'Projeto sem nome'}</a>
+						<span class="created-at">Criado em {formatDate(project.createdAt)}</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
 </main>
 
 <style>
@@ -53,5 +76,40 @@
 
 	label {
 		font-weight: 600;
+	}
+
+	.projects {
+		margin-top: 2.5rem;
+	}
+
+	.projects h2 {
+		font-size: 1rem;
+		margin: 0 0 0.75rem;
+	}
+
+	.projects .empty {
+		color: var(--hydra-muted);
+		font-size: 0.9rem;
+		margin: 0;
+	}
+
+	.projects ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.projects li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+	}
+
+	.created-at {
+		color: var(--hydra-muted);
+		font-size: 0.8rem;
 	}
 </style>

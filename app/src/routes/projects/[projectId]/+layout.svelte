@@ -12,6 +12,7 @@
 			<p class="status">Status: {data.view.projectStatus}</p>
 		</div>
 		<nav>
+			<a href="/">Projetos</a>
 			<a href="/projects/{projectId}/now">Agora</a>
 			<a href="/projects/{projectId}/map">Mapa</a>
 			<a href="/projects/{projectId}/records">Registros</a>

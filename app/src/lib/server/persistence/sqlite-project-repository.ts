@@ -3,7 +3,7 @@
 // falar com o banco diretamente.
 
 import Database from 'better-sqlite3';
-import type { ProjectState } from '$lib/domain';
+import type { Project, ProjectState } from '$lib/domain';
 import type { ProjectRepository } from './project-repository';
 import {
 	mapActivityProgressRow,
@@ -126,6 +126,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 		async save(state: ProjectState): Promise<void> {
 			saveTransaction(state);
+		},
+
+		async listRecent(): Promise<Project[]> {
+			const rows = db
+				.prepare('SELECT id, name, created_at FROM project ORDER BY created_at DESC, id DESC')
+				.all() as ProjectRow[];
+			return rows.map(mapProjectRow);
 		},
 
 		close(): void {

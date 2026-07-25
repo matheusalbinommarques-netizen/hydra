@@ -34,7 +34,8 @@ function countingRepository(inner: ProjectRepository): { repository: ProjectRepo
 			save: async (state) => {
 				counts.save++;
 				return inner.save(state);
-			}
+			},
+			listRecent: () => inner.listRecent()
 		},
 		counts
 	};
@@ -433,7 +434,8 @@ describe('createProjectUseCases — propagação de erros e falhas', () => {
 			findById: async () => null,
 			save: async () => {
 				throw new Error('falha simulada de persistência');
-			}
+			},
+			listRecent: async () => []
 		};
 		const useCases = createProjectUseCases({
 			repository: brokenRepository,
@@ -443,6 +445,48 @@ describe('createProjectUseCases — propagação de erros e falhas', () => {
 		});
 
 		await expect(useCases.createProject()).rejects.toThrow('falha simulada de persistência');
+	});
+});
+
+describe('createProjectUseCases — listRecentProjects', () => {
+	it('retorna [] quando não há projetos', async () => {
+		const { useCases } = setup();
+		await expect(useCases.listRecentProjects()).resolves.toEqual({ ok: true, value: [] });
+	});
+
+	it('mapeia id/name/createdAt para o DTO, projeto sem nome mantém projectName: null', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual([
+			{
+				projectId: created.value.projectId,
+				projectName: null,
+				createdAt: expect.any(String)
+			}
+		]);
+	});
+
+	it('não executa insert nem save ao listar', async () => {
+		const inner = memoryRepo();
+		const { repository, counts } = countingRepository(inner);
+		const useCases = createProjectUseCases({
+			repository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		await useCases.createProject();
+		expect(counts.insert).toBe(1);
+
+		await useCases.listRecentProjects();
+		expect(counts.insert).toBe(1);
+		expect(counts.save).toBe(0);
 	});
 });
 
