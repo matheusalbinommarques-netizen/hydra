@@ -27,6 +27,6 @@ export function computeSnapshot(catalog: Catalog, state: ProjectState): Orientat
 		phaseStatuses,
 		nextActivity: computeNextActivity(catalog, state.activityProgress),
 		openPendingItems: computeOpenPendingItems(catalog, state.pendingItems),
-		hypotheses: computeHypotheses(catalog, state.answers)
+		hypotheses: computeHypotheses(catalog, state.answers, state.scopeVersion)
 	};
 }

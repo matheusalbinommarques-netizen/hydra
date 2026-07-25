@@ -175,7 +175,8 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'hypotheses',
 				'scopeItems',
 				'scopeVersion',
-				'scopeConfirmationIssues'
+				'scopeConfirmationIssues',
+				'scopeProjection'
 			].sort()
 		);
 	});

@@ -15,7 +15,8 @@ import type {
 	NextActivityResult,
 	PendingItemView,
 	PhaseStatus,
-	ProjectStatus
+	ProjectStatus,
+	ScopeProjectionView
 } from '$lib/orientation-engine';
 
 // Histórico completo de pendências (Registros, C3-02) — deriva diretamente
@@ -84,6 +85,10 @@ export interface ProjectView {
 	// o botão "Confirmar" e mostrar o checklist sem round-trip extra —
 	// mesma função pura usada pelo domínio na confirmação (getScopeConfirmationIssues).
 	scopeConfirmationIssues: ScopeConfirmationIssue[];
+	// Projeção somente-leitura do artefato confirmado — sempre computada,
+	// nunca persistida (computeScopeProjection); a tela do artefato confirmado
+	// só a exibe quando scopeVersion.confirmedAt não é nulo.
+	scopeProjection: ScopeProjectionView;
 }
 
 export type UseCaseError =

@@ -655,7 +655,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 13 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 14 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -674,7 +674,8 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'hypotheses',
 				'scopeItems',
 				'scopeVersion',
-				'scopeConfirmationIssues'
+				'scopeConfirmationIssues',
+				'scopeProjection'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');

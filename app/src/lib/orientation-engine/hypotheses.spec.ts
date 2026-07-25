@@ -56,4 +56,60 @@ describe('computeHypotheses', () => {
 		);
 		expect(computeHypotheses(catalog, state.answers)).toEqual([]);
 	});
+
+	it('não inclui scopeVersion.hypothesis quando não confirmada', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const withHypothesis = { ...state, scopeVersion: { ...state.scopeVersion, hypothesis: 'Rascunho' } };
+		expect(computeHypotheses(catalog, withHypothesis.answers, withHypothesis.scopeVersion)).toEqual([]);
+	});
+
+	it('inclui scopeVersion.hypothesis quando confirmada', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const confirmed = {
+			...state,
+			scopeVersion: { ...state.scopeVersion, hypothesis: 'Escopo validado', confirmedAt: T1 }
+		};
+		expect(computeHypotheses(catalog, confirmed.answers, confirmed.scopeVersion)).toEqual([
+			{ text: 'Escopo validado' }
+		]);
+	});
+
+	it('deduplica quando a hipótese de Answer e a de ScopeVersion têm o mesmo texto', () => {
+		const answered = unwrap(
+			answerActivity(
+				catalog,
+				createInitialProjectState(catalog, 'proj-1', T1),
+				'problema',
+				{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'Mesmo texto' },
+				T1
+			)
+		);
+		const confirmed = {
+			...answered,
+			scopeVersion: { ...answered.scopeVersion, hypothesis: 'Mesmo texto', confirmedAt: T1 }
+		};
+		expect(computeHypotheses(catalog, confirmed.answers, confirmed.scopeVersion)).toEqual([
+			{ text: 'Mesmo texto' }
+		]);
+	});
+
+	it('combina as duas fontes quando os textos são diferentes', () => {
+		const answered = unwrap(
+			answerActivity(
+				catalog,
+				createInitialProjectState(catalog, 'proj-1', T1),
+				'problema',
+				{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'Hipótese da Descoberta' },
+				T1
+			)
+		);
+		const confirmed = {
+			...answered,
+			scopeVersion: { ...answered.scopeVersion, hypothesis: 'Hipótese do escopo', confirmedAt: T1 }
+		};
+		expect(computeHypotheses(catalog, confirmed.answers, confirmed.scopeVersion)).toEqual([
+			{ text: 'Hipótese da Descoberta' },
+			{ text: 'Hipótese do escopo' }
+		]);
+	});
 });

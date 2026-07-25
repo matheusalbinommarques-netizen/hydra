@@ -20,16 +20,20 @@ em_andamento
    │   + salvar                             │
    │ completionMode = explicit_confirmation:│
    │   usuário clica "Continuar"            │
+   │ completionMode = scope_confirmation:   │
+   │   ScopeVersion.confirmedAt é definido  │
    ▼                                        ▼
 concluída ◄──────────────────────────── pulada
    preenchimento completo dos campos obrigatórios
 ```
 
-Nesta versão, a única atividade com `completionMode: explicit_confirmation` é "Resumo da descoberta", que tem `allowsSkip: false` — logo seu `ActivityProgress` nunca assume `pulada`. Seu fluxo é sempre:
+Nesta versão, a única atividade com `completionMode: explicit_confirmation` é "Resumo da descoberta", e a única com `completionMode: scope_confirmation` é "Monte a próxima versão" — ambas têm `allowsSkip: false`, logo seu `ActivityProgress` nunca assume `pulada`. O fluxo das duas é sempre:
 
 ```text
 não_iniciada → em_andamento → concluída
 ```
+
+Diferente do Resumo, porém, "Monte a próxima versão" pode voltar de `concluída` para `em_andamento` por uma ação do próprio usuário na mesma tela (editar um item ou a hipótese já confirmados) — ver §3A. O Resumo só reabre por uma edição em *outra* atividade.
 
 ### Regras de edição (aplicam-se a atividades com `completionMode: required_fields`)
 
@@ -92,7 +96,19 @@ Regra: se, depois de o Resumo estar `concluída`, qualquer `Answer` de uma dessa
 2. exige nova confirmação explícita do usuário para voltar a `concluída`;
 3. permite que o Resumo volte a ser a recomendação principal da Trilha A (`ORIENTATION_ENGINE.md` §4).
 
-Esta é a única transição `concluída → em_andamento` prevista no modelo. Ela é sempre disparada externamente (por uma edição em outra atividade ou no nome do projeto) — nunca pelo próprio Resumo, que não tem campos e portanto não pode "perder" um campo obrigatório por si mesmo.
+Esta é a única transição `concluída → em_andamento` prevista no modelo disparada *externamente* (por uma edição em outra atividade ou no nome do projeto) — nunca pelo próprio Resumo, que não tem campos e portanto não pode "perder" um campo obrigatório por si mesmo. A versão de escopo (§3A) tem uma segunda transição `concluída → em_andamento`, mas disparada por edição na própria tela.
+
+## 3A. Invalidação da versão de escopo ("Monte a próxima versão")
+
+Regra: qualquer alteração em `ScopeItem` (texto, bucket, valor, esforço, ordem, inclusão, exclusão) ou em `ScopeVersion.hypothesis`, depois de `ScopeVersion.confirmedAt` já definido, faz o motor:
+
+1. limpar `ScopeVersion.confirmedAt` (volta a `null`);
+2. transicionar o `ActivityProgress` de "Monte a próxima versão" de volta para `em_andamento`;
+3. permitir nova confirmação explícita do usuário para voltar a `concluída`.
+
+Diferente do Resumo (§3), a edição que dispara esta invalidação acontece na **mesma tela** da atividade, não em outra — e nunca é bloqueada: editar depois de confirmado é um fluxo de primeira classe, não uma exceção. Mudança que repete o valor já existente (ex.: reenviar o mesmo texto) é no-op e não invalida.
+
+Confirmar exige que `getScopeConfirmationIssues` retorne uma lista vazia: pelo menos um `ScopeItem` no total; pelo menos um em `agora`; todos com `value` definido; todos com `effort` definido; `hypothesis` não vazia. Os motivos pendentes são retornados como uma lista tipada (`ScopeConfirmationIssue[]`), a mesma função pura usada pela interface (checklist) e pelos testes.
 
 ## 4. Estado do Projeto (calculado, nunca persistido)
 

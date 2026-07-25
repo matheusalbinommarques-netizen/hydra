@@ -5,7 +5,7 @@
 
 ## 1. Natureza
 
-O Motor de Orientação não guarda estado próprio: é uma função pura que recebe o estado do projeto (`ActivityProgress[]`, `Answer[]`, `PendingItem[]`, `Project.name`) e o catálogo metodológico, e produz:
+O Motor de Orientação não guarda estado próprio: é uma função pura que recebe o estado do projeto (`ActivityProgress[]`, `Answer[]`, `PendingItem[]`, `Project.name`, `ScopeItem[]`, `ScopeVersion`) e o catálogo metodológico, e produz:
 
 - status calculado de cada Fase (`STATE_MACHINE.md` §2);
 - status calculado do Projeto (`STATE_MACHINE.md` §4);
@@ -13,7 +13,8 @@ O Motor de Orientação não guarda estado próprio: é uma função pura que re
 - a lista de pendências abertas com suas atividades associadas (Trilha B);
 - a avaliação de resolução de cada pendência aberta;
 - a invalidação do Resumo da descoberta quando aplicável (`STATE_MACHINE.md` §3);
-- a projeção de hipóteses (`Answer`s com `semanticRole: hypothesis`).
+- a projeção de hipóteses (`Answer`s com `semanticRole: hypothesis`, combinada com `ScopeVersion.hypothesis` quando confirmada — §8);
+- a projeção somente-leitura do escopo confirmado (`computeScopeProjection` — `DOMAIN_MODEL.md` §7A), consumida só pela tela do artefato confirmado.
 
 Nada disso é persistido — é recalculado a cada leitura, garantindo que Home, Agora, Mapa, Resumo e Registros nunca divirjam entre si.
 
@@ -58,7 +59,7 @@ Trilha A e Trilha B nunca competem: a interface sempre tem no máximo uma recome
 
 ## 5. Avaliação de pendências
 
-Ao salvar/concluir qualquer atividade (transição para `concluída`, seja por `required_fields` ou por `explicit_confirmation`), o motor reavalia todas as `PendingItem` abertas vinculadas àquela `ActivityDefinition`; a condição é sempre a mesma — a atividade atingir `concluída` — e, quando satisfeita, a pendência passa para `resolvida`.
+Ao salvar/concluir qualquer atividade (transição para `concluída`, seja por `required_fields`, `explicit_confirmation` ou `scope_confirmation`), o motor reavalia todas as `PendingItem` abertas vinculadas àquela `ActivityDefinition`; a condição é sempre a mesma — a atividade atingir `concluída` — e, quando satisfeita, a pendência passa para `resolvida`. Na prática, isso nunca se aplica a "Monte a próxima versão": `allowsSkip = false` significa que ela jamais gera `PendingItem`.
 
 ## 6. Consequência ao pular
 
@@ -75,9 +76,17 @@ Depois que "Resumo da descoberta" atinge `concluída`, o motor observa toda alte
 2. a Trilha A volta a poder recomendar o Resumo como próxima ação principal, seguindo a ordem normal do catálogo;
 3. o Resumo só volta a `concluída` mediante nova confirmação explícita do usuário — nunca automaticamente.
 
+### 7A. Invalidação da versão de escopo ("Monte a próxima versão")
+
+Mecanismo irmão do Resumo (§7), mas disparado por edição na própria tela em vez de em outra atividade — ver `STATE_MACHINE.md` §3A para as regras completas. Diferença chave: a edição nunca é bloqueada (não existe "modo somente leitura" pós-confirmação) e mudança que repete o valor já existente não invalida.
+
 ## 8. Projeção de hipóteses
 
-Hipóteses exibidas (ex.: Registros) = todas as `Answer` cujo `FieldDefinition.semanticRole == hypothesis` e valor não vazio, no momento da leitura. Nenhuma entidade própria é consultada para isso.
+Hipóteses exibidas (ex.: Registros) combinam duas fontes, deduplicadas por texto:
+1. toda `Answer` cujo `FieldDefinition.semanticRole == hypothesis` e valor não vazio, no momento da leitura;
+2. `ScopeVersion.hypothesis`, apenas quando `ScopeVersion.confirmedAt` não é nulo.
+
+Nenhuma entidade própria é consultada para isso — ambas as fontes são projetadas em tempo de leitura.
 
 ## 9. Invariantes do motor (para testes automatizados)
 
@@ -93,7 +102,9 @@ Hipóteses exibidas (ex.: Registros) = todas as `Answer` cujo `FieldDefinition.s
 - `Project.name` possui uma única fonte canônica — nunca duplicado em `Answer`.
 - "Resumo da descoberta" só conclui por confirmação explícita, nunca por preenchimento de campo (não tem campos), e nunca pode ser pulado (`allowsSkip = false`).
 - Editar qualquer resposta das seis atividades anteriores da Descoberta, ou `Project.name`, depois que o Resumo estiver `concluída`, sempre o volta para `em_andamento` e exige nova confirmação.
-- Hipóteses exibidas são sempre projeção de `Answer`s com `semanticRole: hypothesis` — nunca uma entidade separada.
+- "Monte a próxima versão" só conclui quando `getScopeConfirmationIssues` retorna lista vazia, nunca por preenchimento de campo (não tem campos), e nunca pode ser pulada (`allowsSkip = false`).
+- Editar qualquer `ScopeItem` ou `ScopeVersion.hypothesis` depois que "Monte a próxima versão" estiver `concluída` sempre a volta para `em_andamento` e exige nova confirmação — mudança que repete o valor já existente é no-op.
+- Hipóteses exibidas são sempre projeção de `Answer`s com `semanticRole: hypothesis` combinada com `ScopeVersion.hypothesis` (quando confirmada) — nunca uma entidade separada.
 - Trilha A nunca retorna uma atividade `pulada` ou `concluída`.
 - Confirmar "pular" é uma operação de efeito único (uma transição de status, uma `PendingItem` criada) mesmo diante de cliques repetidos.
 

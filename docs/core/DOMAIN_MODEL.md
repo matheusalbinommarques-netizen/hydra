@@ -41,7 +41,7 @@ O domínio usa somente dois termos para os dois níveis de progresso: **Fase** e
 - `why`
 - `example`
 - `completionCriteria` (texto)
-- `completionMode: required_fields | explicit_confirmation`
+- `completionMode: required_fields | explicit_confirmation | scope_confirmation`
 - `allowsSkip: boolean`
 - `pendingItemLabel`, `pendingItemDetail` (texto exibido quando esta atividade gera uma pendência por skip — usado em vez de persistir texto por instância)
 - `fields: FieldDefinition[]` (ordenados)
@@ -49,6 +49,7 @@ O domínio usa somente dois termos para os dois níveis de progresso: **Fase** e
 `completionMode`:
 - `required_fields` — a atividade conclui quando todos os campos obrigatórios estão válidos e o usuário salva. Modo padrão de todas as atividades com formulário.
 - `explicit_confirmation` — a atividade conclui por uma ação explícita do usuário (ex.: clicar "Continuar"), independente de campos. Único uso nesta versão: "Resumo da descoberta" (que não tem campos próprios e não permite pular — `allowsSkip = false`).
+- `scope_confirmation` — a atividade conclui quando `ScopeVersion.confirmedAt` é definido, nunca por `Answer`. Único uso nesta versão: "Monte a próxima versão" (sem campos próprios, `allowsSkip = false`). É uma solução deliberadamente específica para esta experiência (ver §7A) — não uma infraestrutura genérica de "Plays". Se uma segunda experiência especializada precisar de um completion mode com o mesmo formato, o conceito deve ser generalizado nesse momento, não acumulado como um novo valor solto.
 
 ### FieldDefinition
 - `id`
@@ -96,13 +97,34 @@ O domínio usa somente dois termos para os dois níveis de progresso: **Fase** e
 
 Sem `fieldDefinitionId`, sem `resolutionCondition`, sem `label`/`detail` persistidos — a condição de resolução é sempre a mesma (a atividade vinculada atingir `concluída`) e os textos exibidos vêm de `ActivityDefinition.pendingItemLabel`/`pendingItemDetail`.
 
+### ScopeItem
+- `id`
+- `projectId`
+- `text`
+- `bucket: agora | depois | fora` (escolhido no ato de adicionar; nunca nasce implícito, sem estado "a classificar")
+- `value: baixo | medio | alto | null` (nulo até o usuário classificar)
+- `effort: pequeno | medio | grande | null` (nulo até o usuário classificar)
+- `order: number | null` (só definido quando `bucket = agora`; sequência contígua começando em 0 — normalizada a cada inclusão, exclusão, movimentação ou reordenação)
+- `createdAt`
+- `updatedAt`
+
+### ScopeVersion
+- `projectId` (1:1 com `Project` — sempre existe desde a criação do projeto, mesmo padrão de `Project` em si)
+- `hypothesis` (string; vazia até preenchida)
+- `confirmedAt: string | null` (nulo = rascunho; qualquer alteração em `ScopeItem` ou nesta hipótese limpa `confirmedAt`, reabrindo a atividade "Monte a próxima versão" — mesmo comportamento de invalidação do Resumo da Descoberta, ver `STATE_MACHINE.md` §3A)
+
+Suportam a experiência estruturada "Monte a próxima versão" (§7A) — ver `docs/06-architecture/contracts.md` para as transições puras e a validação de confirmação.
+
 ## 4. Contexto — nota de modelagem
 
 Não existe uma entidade `Context` persistida separadamente do Projeto. `Project` guarda apenas identidade e metadados. Quando a interface ou o motor precisarem de um `ProjectContext` (modo de trabalho, nível de experiência, estágio atual), ele é **derivado por projeção** a partir das `Answer` da atividade "Contexto inicial" — nunca duplicado como estado próprio.
 
 ## 5. Hipóteses — projeção, não entidade
 
-Não existe `Hypothesis` persistida nesta versão. Hipóteses exibidas (ex.: em Registros) são **derivadas** em tempo de leitura: toda `Answer` cujo `FieldDefinition.semanticRole == hypothesis` e valor não vazio é apresentada como uma hipótese. Nesta versão do catálogo, o único campo com esse papel é o campo opcional "hipótese" da atividade "Problema ou oportunidade".
+Não existe `Hypothesis` persistida nesta versão. Hipóteses exibidas (ex.: em Registros) são **derivadas** em tempo de leitura, de duas fontes combinadas (deduplicadas por texto):
+
+1. toda `Answer` cujo `FieldDefinition.semanticRole == hypothesis` e valor não vazio — nesta versão do catálogo, o único campo com esse papel é o campo opcional "hipótese" da atividade "Problema ou oportunidade";
+2. `ScopeVersion.hypothesis`, apenas quando `ScopeVersion.confirmedAt` não é nulo (versão de escopo confirmada) — ver §7A.
 
 ## 6. Relações
 
@@ -113,6 +135,8 @@ ActivityDefinition 1───N FieldDefinition
 Project 1───N ActivityProgress   (uma por ActivityDefinition do catálogo)
 Project 1───N Answer             (uma por FieldDefinition com dataTarget=answer respondido)
 Project 1───N PendingItem
+Project 1───N ScopeItem
+Project 1───1 ScopeVersion
 
 ActivityProgress N───1 ActivityDefinition
 Answer N───1 ActivityDefinition
@@ -138,9 +162,22 @@ Invariantes de integridade:
 ### Fase 2 — Definição do produto (`catalogStatus: complete`)
 1. **Definir usuário principal** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: descrição do usuário principal.
 2. **Definir visão do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: tipo de produto, necessidade central, benefício central (`dataTarget: answer`). Opcional: diferencial.
-3. **Definir funcionalidades essenciais** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: funcionalidades essenciais, valor entregue (`dataTarget: answer`). Opcional: fora do escopo inicial.
-4. **Priorizar primeira versão** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: o que entra na primeira versão, o que fica para depois, hipótese a validar (`semanticRole: hypothesis`).
-5. **Definir critérios de sucesso do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: sinais de sucesso, evidências ou indicadores, condição mínima de validação.
+3. **Monte a próxima versão** — `completionMode: scope_confirmation`, `allowsSkip: false`. Sem campos próprios; conclui quando `ScopeVersion.confirmedAt` é definido. Ver §7A.
+4. **Definir critérios de sucesso do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: sinais de sucesso, evidências ou indicadores, condição mínima de validação.
+
+### Fase 2A — "Monte a próxima versão" em detalhe
+
+Substitui as antigas atividades em texto livre "Definir funcionalidades essenciais" e "Priorizar primeira versão" por uma experiência estruturada, apoiada em `ScopeItem`/`ScopeVersion` (§3) em vez de `Answer`:
+
+1. o usuário adiciona itens de escopo, escolhendo o bucket (`agora | depois | fora`) no próprio ato de adicionar — nunca um item nasce sem bucket;
+2. cada item recebe valor e esforço (três níveis cada);
+3. itens em `agora` são ordenados (posição contígua, sem drag-and-drop — reordenação por ação explícita);
+4. o usuário registra a hipótese que esse recorte deve validar;
+5. a confirmação (`confirmScopeVersion`) exige: pelo menos um item no total; pelo menos um item em `agora`; todos os itens com valor definido; todos os itens com esforço definido; hipótese não vazia — os motivos pendentes são uma lista tipada (`ScopeConfirmationIssue`), nunca uma mensagem livre;
+6. a versão pode ser editada livremente depois de confirmada — qualquer alteração (item, bucket, valor, esforço, ordem, inclusão, exclusão, hipótese) limpa `confirmedAt` e reabre a atividade, espelhando a invalidação do Resumo da Descoberta (`STATE_MACHINE.md` §3A);
+7. a projeção do artefato confirmado (agrupamento por bucket, leitura de valor×esforço, e um alerta simples quando muitos itens de esforço médio/grande se acumulam em `agora`) é sempre calculada em tempo de leitura (`computeScopeProjection`), nunca persistida como texto duplicado — mesmo princípio de `buildMapView`/`buildRecordsView`.
+
+Dados de projetos anteriores ao corte (que ainda referenciassem as duas atividades antigas) não são suportados — todos os projetos existentes até esta mudança eram dados de teste, sem necessidade de migração.
 
 ### Fase 3 — Estruturação do projeto (`catalogStatus: complete`)
 1. **Definir objetivo e entregáveis** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: objetivo do projeto, entregáveis principais.
