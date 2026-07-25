@@ -16,7 +16,11 @@
   pendência, e retomada segura da atividade pulada a partir da pendência
   aberta (`?activity=<id>`, validada contra o próprio projeto), com
   resolução automática da pendência ao responder e retorno à recomendação
-  canônica.
+  canônica;
+- Listagem de projetos na página inicial (`/`): mostra os projetos
+  persistidos, mais recentes primeiro, cada um com link para reabrir em
+  `/projects/[projectId]/now`; estado vazio quando não há projetos; link
+  "Projetos" no cabeçalho do workspace para retornar à página inicial.
 
 ## [0.3.0] — 24/07/2026
 

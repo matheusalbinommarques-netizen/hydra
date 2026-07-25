@@ -1,6 +1,6 @@
 # Hydra — Tarefas
 
-**Status atual:** Ciclo 4 aberto (docs/08-delivery/cycle-04-backlog.md) — C4-01, C4-02 e C4-03 concluídos; C4-03A (corretivo, bloqueador de C4-04) e C4-04 pendentes
+**Status atual:** Ciclo 4 aberto (docs/08-delivery/cycle-04-backlog.md) — C4-01, C4-02, C4-03 e C4-03A concluídos; C4-04 pendente
 
 **Atualizado em:** 25/07/2026
 
@@ -8,16 +8,15 @@ Este arquivo é a visão operacional do trabalho atual. A documentação complet
 
 ## Agora
 
-C4-01, C4-02 e C4-03 concluídas (commits `a399191`, `39fdc06`; C4-03 é
-checkpoint de uso real, sem commit de código). Checkpoint encontrou um
-defeito bloqueador (ausência de listagem/reabertura de projetos,
-`RELEASE_0_SPEC.md` §4.1) — item corretivo C4-03A criado no backlog.
-Próxima ação: planejar C4-03A (`/hydra-plan-item C4-03A`).
+C4-01, C4-02, C4-03 e C4-03A concluídas (commits `a399191`, `39fdc06`,
+`f66c06a`; C4-03 é checkpoint de uso real, sem commit de código). C4-03A
+corrigiu o defeito bloqueador encontrado no checkpoint (ausência de
+listagem/reabertura de projetos, `RELEASE_0_SPEC.md` §4.1). Próxima ação:
+C4-04 (Validar a baseline completa do Release 0).
 
 ## Depois
 
-- [ ] C4-03A — Permitir localizar e reabrir projetos existentes (corretivo, bloqueador de C4-04; planejamento ainda não realizado).
-- [ ] C4-04 — Validar a baseline completa do Release 0 (depende de C4-01 a C4-03A).
+- [ ] C4-04 — Validar a baseline completa do Release 0 (depende de C4-01 a C4-03A, todas concluídas).
 - [ ] Revisar riscos e roadmap.
 - [ ] Decidir continuidade para Release 1.
 

@@ -59,7 +59,10 @@ encerramento do ciclo, conforme previsto no gate.
   (`pendingItemHistory`) e testes Vitest e Playwright dedicados;
 - Interface de "Pular etapa" do Ciclo 4 (C4-02), com modal de confirmação
   acessível (`<dialog>` nativo), retomada segura da atividade pulada a
-  partir da pendência aberta e teste Playwright dedicado.
+  partir da pendência aberta e teste Playwright dedicado;
+- Listagem e reabertura de projetos existentes do Ciclo 4 (C4-03A), na
+  página inicial, com link de retorno no workspace e teste Playwright
+  dedicado.
 
 ## Decisões de maior impacto
 
@@ -131,8 +134,13 @@ Itens Must:
   projetos existentes, `docs/core/RELEASE_0_SPEC.md` §4.1), tratado como
   item corretivo C4-03A;
 - C4-03A — Permitir localizar e reabrir projetos existentes (corretivo,
-  bloqueador de C4-04): não iniciada — inclusão no ciclo autorizada,
-  planejamento e implementação ainda pendentes;
+  bloqueador de C4-04): concluída (commit `f66c06a`) — listagem dos
+  projetos persistidos na página inicial, abertura por
+  `/projects/<id>/now`, estado vazio quando não há projetos, link
+  "Projetos" no workspace, ordenação determinística por criação
+  (`created_at DESC, id DESC`), dados existentes preservados; testes
+  unitários, Playwright e E2E aprovados, `hydra-verify full` PASS. O
+  bloqueador de C4-04 identificado no dogfooding está resolvido;
 - C4-04 — Validar a baseline completa do Release 0: não iniciada.
 
 Testes com usuários externos ficam fora deste ciclo, por decisão
@@ -143,7 +151,7 @@ implementação e fora do escopo deste ciclo.
 
 ## Próxima decisão relevante
 
-C4-01, C4-02 e C4-03 concluídas. Próxima ação: planejar C4-03A (Permitir
-localizar e reabrir projetos existentes — item corretivo, bloqueador de
-C4-04). Gate do Ciclo 4 ainda não avaliado — o Release 0 não está
-concluído enquanto C4-03A e C4-04 permanecerem pendentes.
+C4-01, C4-02, C4-03 e C4-03A concluídas — o bloqueador de listagem/
+reabertura de projetos está resolvido. Próxima ação: C4-04 (Validar a
+baseline completa do Release 0). Gate do Ciclo 4 ainda não avaliado — o
+Release 0 não está concluído enquanto C4-04 permanecer pendente.

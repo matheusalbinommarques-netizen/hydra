@@ -225,8 +225,7 @@ percorre o checkpoint delimitado da jornada.
 
 ### C4-03A — Permitir localizar e reabrir projetos existentes
 
-**Status:** não iniciado (item corretivo criado a partir de achado do
-checkpoint de dogfooding C4-03).
+**Status:** ✅ concluído (commit `f66c06a` — `feat(projects): list and reopen existing projects`).
 
 **Origem:** ausência de listagem de projetos existentes e de ação para
 reabrir um projeto já criado, contrariando `docs/core/RELEASE_0_SPEC.md`
@@ -267,10 +266,54 @@ alteração. Rotas (`app/src/routes/+page.server.ts`, `+page.svelte`,
 
 **Tipo:** código e testes.
 
-**Status de autorização:** inclusão no Ciclo 4 autorizada. Planejamento
-(`/hydra-plan-item C4-03A`) ainda não realizado. Implementação e qualquer
-alteração em área protegida permanecem não autorizadas até aprovação do
-plano.
+**Evidências:**
+- `app/src/lib/server/persistence/project-repository.ts` /
+  `sqlite-project-repository.ts`: `ProjectRepository` ganhou
+  `listRecent(): Promise<Project[]>`, implementado como uma única leitura
+  (`SELECT id, name, created_at FROM project ORDER BY created_at DESC, id
+  DESC`, reaproveitando `mapProjectRow`) — nenhuma escrita, nenhuma
+  migration, nenhuma mudança de schema; `insert`/`findById`/`save`
+  inalterados;
+- `app/src/lib/server/application/types.ts` /
+  `project-use-cases.ts`: DTO `ProjectListItem` (`projectId`,
+  `projectName`, `createdAt`) e caso de uso `listRecentProjects()`, que
+  mapeia `Project` → `ProjectListItem` sem calcular status, fase,
+  progresso ou próxima ação;
+- `app/src/routes/+page.server.ts` / `+page.svelte`: página inicial
+  ganhou a seção "Seus projetos" (não "recentes" — ordenação é por
+  criação), cada projeto abre por link em `/projects/<id>/now`,
+  `projectName: null` aparece como "Projeto sem nome", banco vazio mostra
+  mensagem curta preservando o CTA "Criar novo projeto"; `create`/`import`
+  inalterados;
+- `app/src/routes/projects/[projectId]/+layout.svelte`: link "Projetos"
+  na navegação do workspace, apontando para `/`; Agora/Mapa/Registros/
+  Resumo/Exportar inalterados;
+- `docs/06-architecture/contracts.md`: `listRecent`, `ProjectListItem` e
+  `listRecentProjects` documentados; frase antiga sobre "não adicionar
+  método de listagem" recontextualizada como específica da checagem de
+  colisão de importação; contrato de `importProject`/`import_id_collision`
+  preservado sem alteração;
+- testes novos: 5 no repositório SQLite (banco vazio, ordenação por
+  `createdAt DESC`, desempate por `id DESC`, formato leve sem
+  `activityProgress`/`answers`/`pendingItems`, ausência de escrita), 3 no
+  caso de uso (DTO correto, projeto sem nome, nenhuma escrita disparada),
+  e o teste Playwright dedicado `app/e2e/project-list.journey.ts` (estado
+  vazio, criação aparece na lista, dois projetos em ordem determinística,
+  abertura pela lista, link "Projetos" retorna, reload preserva a lista,
+  criação e importação sem regressão, acesso direto por URL preservado);
+- `hydra-verify --mode full --item C4-03A`: PASS, 6/6 etapas (check,
+  test:unit, playwright journey, test:e2e, build, git diff --check); QA
+  manual aprovada (servidor standalone com banco temporário isolado, sem
+  erros de console, sem overflow horizontal em ~1280px/~390px);
+- o bloqueador de listagem/reabertura de projetos, registrado no
+  checkpoint de dogfooding (C4-03), está resolvido;
+- commit `f66c06a996dba492044b21ef95916f9f3afc2f85`.
+
+Fora do escopo desta entrega, deliberadamente não implementados: importação
+como cópia, melhoria da mensagem de colisão de importação, exclusão,
+arquivamento, busca, filtros, paginação, e a correção do parser de Status
+multilinha em `hydra-state.mjs` — todos permanecem registrados como achados
+ou limitações separadas, sem virar escopo automático deste item.
 
 ---
 
@@ -290,8 +333,7 @@ regressão crítica.
 - nenhum bloqueador crítico encontrado no dogfooding permanece sem
   decisão.
 
-**Dependências:** C4-01, C4-02, C4-03, C4-03A (bloqueador registrado no
-checkpoint de dogfooding — ver C4-03A).
+**Dependências:** C4-01, C4-02, C4-03, C4-03A — todas concluídas.
 
 **Tipo:** verificação e QA.
 
@@ -342,4 +384,4 @@ Antes de considerar o Ciclo 4 entregue:
 - nenhum bloqueador crítico do dogfooding sem decisão;
 - Should e Could só entram no gate quando efetivamente iniciados.
 
-Gate ainda não avaliado — C4-03A e C4-04 permanecem pendentes.
+Gate ainda não avaliado — C4-04 permanece pendente.
