@@ -43,8 +43,12 @@ type AnswerFieldDefinition = FieldDefinitionBase &
 		// este campo não tiver Answer própria; aceitar copia o valor uma única
 		// vez, e o campo continua sendo uma Answer independente dali em diante.
 		// `activityId`/`fieldId` devem apontar para outro AnswerFieldDefinition
-		// de tipo texto (validado em catalog/validate.ts).
-		suggestedSource?: { activityId: string; fieldId: string; helpText: string };
+		// de tipo texto (validado em catalog/validate.ts). `actionLabel`/
+		// `helpText` são texto de produto — vivem no catálogo, não derivados
+		// automaticamente do título da atividade de origem, porque o texto da
+		// ação varia por par (ex.: "Usar o problema como ponto de partida" não
+		// é só o título de "Problema ou oportunidade").
+		suggestedSource?: { activityId: string; fieldId: string; actionLabel: string; helpText: string };
 	};
 
 type ProjectPropertyFieldDefinition = FieldDefinitionBase & {

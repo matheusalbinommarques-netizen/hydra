@@ -86,13 +86,12 @@
 
 				{#if suggestion && (suggestedFieldValues[field.id] ?? '') === ''}
 					<div class="field-suggestion">
-						<p class="field-suggestion-lead">Você já descreveu {suggestion.sourceActivityTitle}.</p>
 						<button
 							type="button"
 							class="button-secondary"
 							onclick={() => acceptSuggestion(field.id, suggestion.sourceValue)}
 						>
-							Usar como ponto de partida
+							{suggestion.actionLabel}
 						</button>
 						<p class="field-suggestion-help">{suggestion.helpText}</p>
 					</div>
@@ -243,11 +242,6 @@
 		border-radius: 8px;
 		padding: 0.6rem 0.85rem;
 		background: var(--hydra-surface-raised, #232e3b);
-	}
-
-	.field-suggestion-lead {
-		margin: 0 0 0.5rem;
-		font-size: 0.9rem;
 	}
 
 	.field-suggestion-help {

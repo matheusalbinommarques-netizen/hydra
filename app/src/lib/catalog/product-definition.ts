@@ -29,6 +29,7 @@ const usuarioPrincipal: ActivityDefinition = {
 			suggestedSource: {
 				activityId: 'publico',
 				fieldId: 'publico_detail',
+				actionLabel: 'Usar Público afetado como ponto de partida',
 				helpText: 'Você poderá ajustar o texto para representar quem utilizará diretamente o produto.'
 			}
 		}
@@ -67,7 +68,14 @@ const visaoProduto: ActivityDefinition = {
 			help: 'Foque na necessidade do usuário, não em uma lista de funcionalidades.',
 			placeholder: 'Ex.: saber o que fazer em seguida sem depender de conhecimento avançado',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			suggestedSource: {
+				activityId: 'problema',
+				fieldId: 'situacao',
+				actionLabel: 'Usar o problema como ponto de partida',
+				helpText:
+					'Você poderá ajustar o texto para representar especificamente a necessidade que o produto deverá atender.'
+			}
 		},
 		{
 			id: 'beneficio_central',
@@ -77,7 +85,13 @@ const visaoProduto: ActivityDefinition = {
 			help: 'Descreva a transformação ou resultado esperado para o usuário.',
 			placeholder: 'Ex.: conduzir projetos com mais clareza, consistência e autonomia',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			suggestedSource: {
+				activityId: 'resultado',
+				fieldId: 'mudanca',
+				actionLabel: 'Usar o resultado desejado como ponto de partida',
+				helpText: 'Você poderá ajustar o texto para representar o principal benefício entregue pelo produto.'
+			}
 		},
 		{
 			id: 'diferencial',
@@ -127,7 +141,13 @@ const criteriosSucessoProduto: ActivityDefinition = {
 			help: 'Descreva o que indicaria que a proposta está funcionando.',
 			placeholder: 'Ex.: usuários voltam a usar o produto sem serem lembrados',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			suggestedSource: {
+				activityId: 'resultado',
+				fieldId: 'percepcao',
+				actionLabel: 'Usar a percepção de melhoria como ponto de partida',
+				helpText: 'Use o texto anterior como base e refine-o para definir sinais de sucesso mais específicos.'
+			}
 		},
 		{
 			id: 'evidencias_indicadores',

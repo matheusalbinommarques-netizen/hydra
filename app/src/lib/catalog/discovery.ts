@@ -293,6 +293,7 @@ const resultado: ActivityDefinition = {
 			suggestedSource: {
 				activityId: 'publico',
 				fieldId: 'publico_detail',
+				actionLabel: 'Usar Público afetado como ponto de partida',
 				helpText:
 					'Você poderá ajustar o texto para representar especificamente quem percebe essa mudança primeiro.'
 			}

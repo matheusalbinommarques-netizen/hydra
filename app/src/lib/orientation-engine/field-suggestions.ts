@@ -5,19 +5,19 @@
 // FieldDefinition.suggestedSource (catalog/validate.ts garante que a
 // referência é estruturalmente válida) — não interpreta texto, não gera
 // prosa nova, só localiza uma Answer já existente para oferecer como ponto
-// de partida editável.
+// de partida editável. `actionLabel`/`helpText` são texto de produto que já
+// vive no catálogo — esta função só os repassa, nunca os deriva.
 //
 // Não decide se o campo já foi "digitado localmente" na tela atual — isso é
 // estado de interface (ver ActivityForm.svelte), não de domínio.
 
 import type { Answer, Catalog } from '$lib/domain';
-import { findActivityDefinition } from './catalog-lookup';
 
 export interface FieldSuggestionView {
 	fieldId: string;
-	sourceActivityTitle: string;
-	sourceValue: string;
+	actionLabel: string;
 	helpText: string;
+	sourceValue: string;
 }
 
 export function computeFieldSuggestions(catalog: Catalog, answers: Answer[]): FieldSuggestionView[] {
@@ -39,14 +39,11 @@ export function computeFieldSuggestions(catalog: Catalog, answers: Answer[]): Fi
 				const sourceValue = answerValueByField.get(field.suggestedSource.fieldId);
 				if (!sourceValue || sourceValue.trim().length === 0) continue;
 
-				const sourceActivity = findActivityDefinition(catalog, field.suggestedSource.activityId);
-				if (!sourceActivity) continue;
-
 				suggestions.push({
 					fieldId: field.id,
-					sourceActivityTitle: sourceActivity.title,
-					sourceValue,
-					helpText: field.suggestedSource.helpText
+					actionLabel: field.suggestedSource.actionLabel,
+					helpText: field.suggestedSource.helpText,
+					sourceValue
 				});
 			}
 		}
