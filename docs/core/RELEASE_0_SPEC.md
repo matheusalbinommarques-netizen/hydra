@@ -143,10 +143,11 @@ Ajudar o usuário a compreender a necessidade antes de definir funcionalidades.
 #### Campos obrigatórios
 
 - situação que precisa mudar;
-- principal dificuldade.
+- sinais que representam melhor a situação (seleção múltipla — excesso de etapas, informação duplicada, retrabalho, falta de clareza, decisões dispersas, acompanhamento insuficiente, outro).
 
 #### Campos opcionais
 
+- descrição do sinal "Outro" (só aparece quando "Outro" é selecionado acima; não alimenta regra nenhuma nesta versão);
 - evidências;
 - consequências de não agir;
 - hipótese;

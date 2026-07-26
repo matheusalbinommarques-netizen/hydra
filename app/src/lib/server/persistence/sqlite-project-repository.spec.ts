@@ -9,6 +9,7 @@ import {
 	confirmScopeVersion,
 	confirmSummary,
 	createInitialProjectState,
+	encodeMultiSelectValue,
 	moveScopeItem,
 	renameProject,
 	setHypothesis,
@@ -58,7 +59,7 @@ function nonTrivialState(): ProjectState {
 			catalog,
 			state,
 			'problema',
-			{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'Uma hipótese' },
+			{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Uma hipótese' },
 			T1
 		)
 	);

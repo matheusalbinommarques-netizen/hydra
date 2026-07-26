@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { encodeMultiSelectValue } from '$lib/domain';
 import { catalog } from '../../catalog';
 import { createSqliteProjectRepository, type ProjectRepository, type SqliteProjectRepository } from '../persistence';
 import { createProjectUseCases } from './project-use-cases';
@@ -222,7 +223,7 @@ describe('createProjectUseCases — answerActivity', () => {
 		await useCases.answerActivity({
 			projectId,
 			activityDefinitionId: 'problema',
-			values: { situacao: 'x', dificuldade: 'y' }
+			values: { situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']) }
 		});
 		await useCases.answerActivity({ projectId, activityDefinitionId: 'publico', values: { publico_detail: 'x' } });
 		await useCases.answerActivity({
@@ -504,7 +505,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.scopeItems).toEqual([
-			{ id: 'id-2', text: 'Criar projeto', bucket: 'agora', effort: null, order: 0 }
+			{ id: 'id-2', text: 'Criar projeto', bucket: 'agora', effort: null, order: 0, sourceSuggestionId: null }
 		]);
 	});
 
@@ -617,7 +618,8 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 			text: 'Item',
 			bucket: 'agora',
 			effort: null,
-			order: 0
+			order: 0,
+			sourceSuggestionId: null
 		});
 	});
 
@@ -635,6 +637,50 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 
 		const stored = await repo.findById(created.value.projectId);
 		expect(stored?.scopeItems).toEqual([]);
+	});
+
+	it('sinal → sugestão → aceite → ScopeItem: usar a sugestão a remove da lista; excluir o item a traz de volta', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'problema',
+			values: { situacao: 'x', sinais_situacao: encodeMultiSelectValue(['duplicated_information']) }
+		});
+
+		const withSuggestion = await useCases.loadProjectView(projectId);
+		if (!withSuggestion.ok) throw new Error('esperado ok');
+		expect(withSuggestion.value.scopeSuggestions).toEqual([
+			{
+				id: 'reuse_existing_information',
+				title: 'Reaproveitar informações já registradas',
+				reason: 'Sugerido porque você indicou informação duplicada.'
+			}
+		]);
+
+		const accepted = await useCases.addScopeItem({
+			projectId,
+			text: 'Reaproveitar informações já registradas',
+			bucket: 'agora',
+			sourceSuggestionId: 'reuse_existing_information'
+		});
+		if (!accepted.ok) throw new Error('esperado ok');
+		expect(accepted.value.scopeSuggestions).toEqual([]);
+		expect(accepted.value.scopeItems[0].sourceSuggestionId).toBe('reuse_existing_information');
+
+		const itemId = accepted.value.scopeItems[0].id;
+		const afterRemoval = await useCases.removeScopeItem({ projectId, itemId });
+		if (!afterRemoval.ok) throw new Error('esperado ok');
+		expect(afterRemoval.value.scopeSuggestions).toEqual([
+			{
+				id: 'reuse_existing_information',
+				title: 'Reaproveitar informações já registradas',
+				reason: 'Sugerido porque você indicou informação duplicada.'
+			}
+		]);
 	});
 });
 
@@ -655,7 +701,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 14 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 15 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -675,7 +721,8 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'scopeItems',
 				'scopeVersion',
 				'scopeConfirmationIssues',
-				'scopeProjection'
+				'scopeProjection',
+				'scopeSuggestions'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');

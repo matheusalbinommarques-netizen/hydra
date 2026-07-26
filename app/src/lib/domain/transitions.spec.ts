@@ -380,6 +380,7 @@ describe('addScopeItem', () => {
 				bucket: 'agora',
 				effort: null,
 				order: 0,
+				sourceSuggestionId: null,
 				createdAt: T1,
 				updatedAt: T1
 			}
@@ -400,6 +401,26 @@ describe('addScopeItem', () => {
 	it('item novo fora de "agora" tem order null', () => {
 		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Fora', 'fora', T1));
 		expect(state.scopeItems[0].order).toBeNull();
+	});
+
+	it('item manual (sem sugestão) tem sourceSuggestionId null por padrão', () => {
+		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Manual', 'agora', T1));
+		expect(state.scopeItems[0].sourceSuggestionId).toBeNull();
+	});
+
+	it('item aceito a partir de uma sugestão mantém o sourceSuggestionId informado', () => {
+		const state = unwrap(
+			addScopeItem(catalog, freshState(), 'item-1', 'Reaproveitar informações já registradas', 'agora', T1, 'reuse_existing_information')
+		);
+		expect(state.scopeItems[0].sourceSuggestionId).toBe('reuse_existing_information');
+	});
+
+	it('editar o texto do item não remove a associação com a sugestão', () => {
+		let state = unwrap(
+			addScopeItem(catalog, freshState(), 'item-1', 'Texto original', 'agora', T1, 'reuse_existing_information')
+		);
+		state = unwrap(setScopeItemText(catalog, state, 'item-1', 'Texto revisado', T2));
+		expect(state.scopeItems[0].sourceSuggestionId).toBe('reuse_existing_information');
 	});
 
 	it('adicionar item invalida uma confirmação existente', () => {

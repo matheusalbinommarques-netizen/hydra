@@ -9,16 +9,34 @@ interface FieldDefinitionBase {
 	help?: string;
 }
 
+// id/label separados só existe para selecao_multipla — selecao (única
+// escolha) mantém a convenção antiga de options: string[] onde a própria
+// string já é o valor armazenado, porque em todo campo selecao existente id
+// e label coincidem. selecao_multipla precisa de ids estáveis e curtos
+// (usados por Answer.value, ver domain/multi-select.ts, e por regras do
+// orientation-engine) distintos do rótulo exibido.
+export interface SelectOption {
+	id: string;
+	label: string;
+}
+
 type AnswerFieldTypeVariant =
 	| { type: 'texto_curto'; options?: never }
 	| { type: 'texto_longo'; options?: never }
-	| { type: 'selecao'; options: string[] };
+	| { type: 'selecao'; options: string[] }
+	| { type: 'selecao_multipla'; options: SelectOption[] };
 
 type AnswerFieldDefinition = FieldDefinitionBase &
 	AnswerFieldTypeVariant & {
 		dataTarget: 'answer';
 		semanticRole?: 'hypothesis';
 		projectProperty?: never;
+		// Campo só aparece na interface quando o campo `fieldId` (irmão da
+		// mesma atividade, sempre selecao_multipla) tem `optionId` marcado —
+		// mecanismo genérico mínimo para "Outro" abrir um campo de texto,
+		// sem acoplar ActivityForm a nenhuma atividade específica. Puramente
+		// de exibição: não afeta validação nem obrigatoriedade.
+		revealWhen?: { fieldId: string; optionId: string };
 	};
 
 type ProjectPropertyFieldDefinition = FieldDefinitionBase & {

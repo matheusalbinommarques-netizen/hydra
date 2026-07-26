@@ -2,6 +2,7 @@
 // com os campos já expostos por ProjectView (respostas e histórico de
 // pendências). Não lê nem grava persistência, não conhece ProjectState bruto.
 
+import { decodeMultiSelectValue } from '$lib/domain';
 import type { ActivityDefinition, Catalog } from '$lib/domain';
 
 export interface RecordsPendingItemInput {
@@ -85,7 +86,18 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 
 			const fields: RecordsAnswerFieldView[] = activity.fields
 				.filter((field) => field.dataTarget === 'answer' && input.answers[field.id])
-				.map((field) => ({ id: field.id, label: field.label, value: input.answers[field.id] }));
+				.map((field) => {
+					if (field.dataTarget === 'answer' && field.type === 'selecao_multipla') {
+						const selectedIds = decodeMultiSelectValue(input.answers[field.id]) ?? [];
+						const labelById = new Map(field.options.map((option) => [option.id, option.label]));
+						return {
+							id: field.id,
+							label: field.label,
+							value: selectedIds.map((id) => labelById.get(id) ?? id).join(', ')
+						};
+					}
+					return { id: field.id, label: field.label, value: input.answers[field.id] };
+				});
 
 			if (fields.length > 0) {
 				activities.push({ activityId: activity.id, title: activity.title, fields });

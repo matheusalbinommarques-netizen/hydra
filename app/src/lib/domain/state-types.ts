@@ -54,6 +54,13 @@ export interface ScopeItem {
 	bucket: ScopeBucket;
 	effort: ScopeEffort | null;
 	order: number | null;
+	// Rastreia a sugestão estruturada (sinal → sugestão, ver
+	// orientation-engine/scope-suggestions.ts) que originou este item, só
+	// quando o usuário aceitou explicitamente ("Usar sugestão") — null para
+	// todo item adicionado manualmente. Usado exclusivamente para ocultar a
+	// sugestão já aceita e deixá-la reaparecer se o item for excluído;
+	// editar o texto do item não afeta esta referência.
+	sourceSuggestionId: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

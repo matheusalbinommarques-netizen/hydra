@@ -109,11 +109,22 @@ export function validateCatalog(catalog: Catalog): string[] {
 					if ('projectProperty' in fieldRecord && fieldRecord.projectProperty !== undefined) {
 						violations.push(`Campo "${field.id}" é answer mas possui projectProperty`);
 					}
-					if (field.type !== 'selecao' && 'options' in fieldRecord && fieldRecord.options !== undefined) {
-						violations.push(`Campo "${field.id}" não é selecao mas possui options`);
+
+					const isChoiceType = field.type === 'selecao' || field.type === 'selecao_multipla';
+					if (!isChoiceType && 'options' in fieldRecord && fieldRecord.options !== undefined) {
+						violations.push(`Campo "${field.id}" não é selecao/selecao_multipla mas possui options`);
 					}
-					if (field.type === 'selecao' && (!('options' in fieldRecord) || fieldRecord.options === undefined)) {
-						violations.push(`Campo "${field.id}" é selecao mas não possui options`);
+					if (isChoiceType && (!('options' in fieldRecord) || fieldRecord.options === undefined)) {
+						violations.push(`Campo "${field.id}" é ${field.type} mas não possui options`);
+					}
+					if (field.type === 'selecao_multipla') {
+						const seenOptionIds = new Set<string>();
+						for (const option of field.options) {
+							if (seenOptionIds.has(option.id)) {
+								violations.push(`Campo "${field.id}" tem option.id duplicado: "${option.id}"`);
+							}
+							seenOptionIds.add(option.id);
+						}
 					}
 				}
 			}

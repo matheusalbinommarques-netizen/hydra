@@ -127,14 +127,33 @@ const problema: ActivityDefinition = {
 			type: 'texto_longo'
 		},
 		{
-			id: 'dificuldade',
+			id: 'sinais_situacao',
 			activityId: 'problema',
-			label: 'Qual é a principal dificuldade?',
+			label: 'Quais sinais representam melhor a situação?',
 			required: true,
-			help: 'Aponte o maior obstáculo para resolver essa situação.',
-			placeholder: 'Descreva o principal obstáculo...',
+			help: 'Selecione os sinais que melhor descrevem o obstáculo — pode escolher mais de um.',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'selecao_multipla',
+			options: [
+				{ id: 'too_many_steps', label: 'Excesso de etapas' },
+				{ id: 'duplicated_information', label: 'Informação duplicada' },
+				{ id: 'rework', label: 'Retrabalho' },
+				{ id: 'lack_of_clarity', label: 'Falta de clareza' },
+				{ id: 'dispersed_decisions', label: 'Decisões dispersas' },
+				{ id: 'insufficient_tracking', label: 'Acompanhamento insuficiente' },
+				{ id: 'other', label: 'Outro' }
+			]
+		},
+		{
+			id: 'sinais_situacao_outro',
+			activityId: 'problema',
+			label: 'Descreva o sinal "Outro"',
+			required: false,
+			help: 'Não alimenta nenhuma regra nesta prova.',
+			placeholder: 'Descreva o sinal...',
+			dataTarget: 'answer',
+			type: 'texto_curto',
+			revealWhen: { fieldId: 'sinais_situacao', optionId: 'other' }
 		},
 		{
 			id: 'evidencias',

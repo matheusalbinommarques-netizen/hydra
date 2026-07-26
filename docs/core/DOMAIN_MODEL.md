@@ -49,19 +49,20 @@ O domínio usa somente dois termos para os dois níveis de progresso: **Fase** e
 `completionMode`:
 - `required_fields` — a atividade conclui quando todos os campos obrigatórios estão válidos e o usuário salva. Modo padrão de todas as atividades com formulário.
 - `explicit_confirmation` — a atividade conclui por uma ação explícita do usuário (ex.: clicar "Continuar"), independente de campos. Único uso nesta versão: "Resumo da descoberta" (que não tem campos próprios e não permite pular — `allowsSkip = false`).
-- `scope_confirmation` — a atividade conclui quando `ScopeVersion.confirmedAt` é definido, nunca por `Answer`. Único uso nesta versão: "Monte a próxima versão" (sem campos próprios, `allowsSkip = false`). É uma solução deliberadamente específica para esta experiência (ver §7A) — não uma infraestrutura genérica de "Plays". Se uma segunda experiência especializada precisar de um completion mode com o mesmo formato, o conceito deve ser generalizado nesse momento, não acumulado como um novo valor solto.
+- `scope_confirmation` — a atividade conclui quando `ScopeVersion.confirmedAt` é definido, nunca por `Answer`. Único uso nesta versão: "Escolha o próximo foco" (sem campos próprios, `allowsSkip = false`). É uma solução deliberadamente específica para esta experiência (ver §7A) — não uma infraestrutura genérica de "Plays". Se uma segunda experiência especializada precisar de um completion mode com o mesmo formato, o conceito deve ser generalizado nesse momento, não acumulado como um novo valor solto.
 
 ### FieldDefinition
 - `id`
 - `activityId`
 - `label`
 - `required: boolean`
-- `type` (texto curto | texto longo | seleção)
-- `options` (quando seleção)
+- `type` (texto curto | texto longo | seleção | seleção múltipla)
+- `options` (quando seleção; `string[]` — a própria string já é o valor armazenado. Quando seleção múltipla: `{ id, label }[]` — precisa de id estável e curto, separado do rótulo exibido, porque o valor vira um array de ids em `Answer.value`, ver §3A "seleção múltipla")
 - `placeholder` / `help`
 - `dataTarget: project_property | answer` (default `answer`)
 - `projectProperty` (presente somente quando `dataTarget = project_property`; nome da propriedade de `Project` atualizada por este campo)
 - `semanticRole` (opcional; ex.: `hypothesis` — marca campos cujo conteúdo deve ser exibido como hipótese)
+- `revealWhen` (opcional; `{ fieldId, optionId }` — este campo só aparece na interface quando o campo irmão `fieldId` (sempre `selecao_multipla`) tem `optionId` selecionado. Mecanismo genérico mínimo para opções tipo "Outro" abrirem um campo de texto; puramente de exibição, não afeta validação nem obrigatoriedade)
 
 `dataTarget`:
 - `answer` (padrão) — o valor do campo vira uma `Answer`.
@@ -102,18 +103,20 @@ Sem `fieldDefinitionId`, sem `resolutionCondition`, sem `label`/`detail` persist
 - `projectId`
 - `text`
 - `bucket: agora | depois | fora` (escolhido no ato de adicionar; nunca nasce implícito, sem estado "a classificar")
-- `value: baixo | medio | alto | null` (nulo até o usuário classificar)
-- `effort: pequeno | medio | grande | null` (nulo até o usuário classificar)
+- `effort: pequeno | medio | grande | null` (nulo até o usuário classificar; exigido pela confirmação só quando `bucket = agora` — fora de `agora` o valor, se já definido, permanece armazenado e apenas deixa de ser obrigatório/destacado, não é limpo ao mover o item)
 - `order: number | null` (só definido quando `bucket = agora`; sequência contígua começando em 0 — normalizada a cada inclusão, exclusão, movimentação ou reordenação)
+- `sourceSuggestionId: string | null` (rastreia a sugestão estruturada — ver §7B — que originou este item, só quando aceita explicitamente via "Usar sugestão"; `null` para item manual. Usado exclusivamente para ocultar a sugestão já aceita e deixá-la reaparecer se o item for excluído; editar o texto do item não afeta esta referência)
 - `createdAt`
 - `updatedAt`
+
+Não existe um eixo de "valor" (prioridade/importância) em `ScopeItem` — foi considerado e removido deliberadamente por não alimentar nenhuma regra determinística. A prioridade é comunicada só por `bucket` (momento) e `order` dentro de `agora` (ordem); `effort` comunica viabilidade aproximada.
 
 ### ScopeVersion
 - `projectId` (1:1 com `Project` — sempre existe desde a criação do projeto, mesmo padrão de `Project` em si)
 - `hypothesis` (string; vazia até preenchida)
-- `confirmedAt: string | null` (nulo = rascunho; qualquer alteração em `ScopeItem` ou nesta hipótese limpa `confirmedAt`, reabrindo a atividade "Monte a próxima versão" — mesmo comportamento de invalidação do Resumo da Descoberta, ver `STATE_MACHINE.md` §3A)
+- `confirmedAt: string | null` (nulo = rascunho; qualquer alteração em `ScopeItem` ou nesta hipótese limpa `confirmedAt`, reabrindo a atividade "Escolha o próximo foco" — mesmo comportamento de invalidação do Resumo da Descoberta, ver `STATE_MACHINE.md` §3A)
 
-Suportam a experiência estruturada "Monte a próxima versão" (§7A) — ver `docs/06-architecture/contracts.md` para as transições puras e a validação de confirmação.
+Suportam a experiência estruturada "Escolha o próximo foco" (§7A) — ver `docs/06-architecture/contracts.md` para as transições puras e a validação de confirmação.
 
 ## 4. Contexto — nota de modelagem
 
@@ -153,7 +156,7 @@ Invariantes de integridade:
 ### Fase 1 — Descoberta (`catalogStatus: complete`)
 1. **Origem do projeto** — `completionMode: required_fields`, `allowsSkip: true`. Campo: origem (seleção, obrigatório, `dataTarget: answer`).
 2. **Contexto inicial** — `completionMode: required_fields`, `allowsSkip: true`. Campos obrigatórios: nome provisório (`dataTarget: project_property`, `projectProperty: name` — não gera `Answer`), breve descrição, modo de trabalho, nível de experiência, estágio atual (estes quatro `dataTarget: answer`).
-3. **Problema ou oportunidade** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: situação que precisa mudar, principal dificuldade. Opcionais: evidências, consequências de não agir, hipótese (`semanticRole: hypothesis`), solução imaginada, observações.
+3. **Problema ou oportunidade** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: situação que precisa mudar (texto curto); sinais que representam a situação (`selecao_multipla`, 7 opções incluindo "Outro" — ver §7B). Opcionais: descrição do sinal "Outro" (`revealWhen` — só aparece quando "Outro" é selecionado; não alimenta regra nenhuma), evidências, consequências de não agir, hipótese (`semanticRole: hypothesis`), solução imaginada, observações.
 4. **Público afetado** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: público afetado em detalhe.
 5. **Estado atual** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: estado atual em detalhe.
 6. **Resultado desejado** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: mudança esperada, beneficiário, percepção de melhoria.
@@ -162,22 +165,36 @@ Invariantes de integridade:
 ### Fase 2 — Definição do produto (`catalogStatus: complete`)
 1. **Definir usuário principal** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatório: descrição do usuário principal.
 2. **Definir visão do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: tipo de produto, necessidade central, benefício central (`dataTarget: answer`). Opcional: diferencial.
-3. **Monte a próxima versão** — `completionMode: scope_confirmation`, `allowsSkip: false`. Sem campos próprios; conclui quando `ScopeVersion.confirmedAt` é definido. Ver §7A.
+3. **Escolha o próximo foco** — `completionMode: scope_confirmation`, `allowsSkip: false`. Sem campos próprios; conclui quando `ScopeVersion.confirmedAt` é definido. Ver §7A.
 4. **Definir critérios de sucesso do produto** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: sinais de sucesso, evidências ou indicadores, condição mínima de validação.
 
-### Fase 2A — "Monte a próxima versão" em detalhe
+### Fase 2A — "Escolha o próximo foco" em detalhe
 
 Substitui as antigas atividades em texto livre "Definir funcionalidades essenciais" e "Priorizar primeira versão" por uma experiência estruturada, apoiada em `ScopeItem`/`ScopeVersion` (§3) em vez de `Answer`:
 
 1. o usuário adiciona itens de escopo, escolhendo o bucket (`agora | depois | fora`) no próprio ato de adicionar — nunca um item nasce sem bucket;
-2. cada item recebe valor e esforço (três níveis cada);
+2. itens em `agora` recebem tamanho (três níveis); fora de `agora`, tamanho não é exigido nem destacado;
 3. itens em `agora` são ordenados (posição contígua, sem drag-and-drop — reordenação por ação explícita);
 4. o usuário registra a hipótese que esse recorte deve validar;
-5. a confirmação (`confirmScopeVersion`) exige: pelo menos um item no total; pelo menos um item em `agora`; todos os itens com valor definido; todos os itens com esforço definido; hipótese não vazia — os motivos pendentes são uma lista tipada (`ScopeConfirmationIssue`), nunca uma mensagem livre;
-6. a versão pode ser editada livremente depois de confirmada — qualquer alteração (item, bucket, valor, esforço, ordem, inclusão, exclusão, hipótese) limpa `confirmedAt` e reabre a atividade, espelhando a invalidação do Resumo da Descoberta (`STATE_MACHINE.md` §3A);
-7. a projeção do artefato confirmado (agrupamento por bucket, leitura de valor×esforço, e um alerta simples quando muitos itens de esforço médio/grande se acumulam em `agora`) é sempre calculada em tempo de leitura (`computeScopeProjection`), nunca persistida como texto duplicado — mesmo princípio de `buildMapView`/`buildRecordsView`.
+5. a confirmação (`confirmScopeVersion`) exige: pelo menos um item no total; pelo menos um item em `agora`; todos os itens de `agora` com tamanho definido; hipótese não vazia — os motivos pendentes são uma lista tipada (`ScopeConfirmationIssue`) que, quando aplicável, aponta os ids exatos dos itens incompletos (`missing_effort.itemIds`), nunca uma mensagem livre e genérica;
+6. a versão pode ser editada livremente depois de confirmada — qualquer alteração (item, bucket, tamanho, ordem, inclusão, exclusão, hipótese) limpa `confirmedAt` e reabre a atividade, espelhando a invalidação do Resumo da Descoberta (`STATE_MACHINE.md` §3A);
+7. a projeção do artefato confirmado (agrupamento por bucket, leitura de tamanho, e um alerta simples quando muitos itens de tamanho médio/grande se acumulam em `agora`) é sempre calculada em tempo de leitura (`computeScopeProjection`), nunca persistida como texto duplicado — mesmo princípio de `buildMapView`/`buildRecordsView`.
 
-Dados de projetos anteriores ao corte (que ainda referenciassem as duas atividades antigas) não são suportados — todos os projetos existentes até esta mudança eram dados de teste, sem necessidade de migração.
+Dados de projetos anteriores ao corte (que ainda referenciassem as duas atividades antigas, ou o campo `value` já removido) não são suportados — todos os projetos existentes até esta mudança eram dados de teste, sem necessidade de migração.
+
+### Fase 2B — Sinal → sugestão → aceite (prova pequena)
+
+Prova pontual de que uma escolha estruturada anterior pode gerar uma sugestão explicada para "Escolha o próximo foco", sem interpretação de texto livre nem motor genérico de regras:
+
+1. a atividade "Problema ou oportunidade" tem um campo `selecao_multipla` (`sinais_situacao`, 7 opções — ver §7);
+2. `computeScopeSuggestions` (orientation-engine) lê esse campo e aplica **exatamente duas regras explícitas e específicas** — não uma tabela configurável de sinal→sugestão:
+   - `duplicated_information` → sugestão `reuse_existing_information` ("Reaproveitar informações já registradas"), motivo "Sugerido porque você indicou informação duplicada.";
+   - `too_many_steps` → sugestão `combine_redundant_steps` ("Reduzir ou combinar etapas redundantes"), motivo "Sugerido porque você indicou excesso de etapas.";
+3. na tela "Escolha o próximo foco", sugestões aparecem separadas dos itens reais; a única ação é "Usar sugestão", que pré-preenche o formulário de novo item (texto + `suggestionId`) sem escolher bucket — o usuário ainda precisa escolher Agora/Depois/Fora e confirmar a inclusão; nada entra silenciosamente no escopo;
+4. ao aceitar, o `ScopeItem` criado guarda `sourceSuggestionId` igual ao id da sugestão; enquanto existir um `ScopeItem` com esse `sourceSuggestionId`, a sugestão correspondente fica oculta; se o item for excluído, a sugestão reaparece;
+5. o usuário pode ignorar uma sugestão simplesmente não a usando — não há botão "Descartar" nem estado de descarte persistido nesta prova.
+
+Se uma terceira regra ou uma segunda fonte de sinal surgir, isso é o sinal para reconsiderar o desenho (generalizar), não para acumular mais regras aqui silenciosamente.
 
 ### Fase 3 — Estruturação do projeto (`catalogStatus: complete`)
 1. **Definir objetivo e entregáveis** — `completionMode: required_fields`, `allowsSkip: true`. Obrigatórios: objetivo do projeto, entregáveis principais.

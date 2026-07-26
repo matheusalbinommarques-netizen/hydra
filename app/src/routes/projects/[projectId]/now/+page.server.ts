@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { catalog } from '$lib/catalog';
+import { encodeMultiSelectValue } from '$lib/domain';
 import type { ActivityDefinition } from '$lib/domain';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
@@ -44,10 +45,32 @@ export const actions: Actions = {
 			return fail(400, { message: 'Atividade inválida.' });
 		}
 
+		const activity = findActivityDefinition(activityDefinitionId);
+		const multiSelectFieldIds = new Set(
+			activity && activity.completionMode === 'required_fields'
+				? activity.fields
+						.filter((field) => field.dataTarget === 'answer' && field.type === 'selecao_multipla')
+						.map((field) => field.id)
+				: []
+		);
+
 		const values: Record<string, string> = {};
-		for (const [key, value] of formData.entries()) {
-			if (key === 'activityDefinitionId') continue;
-			values[key] = typeof value === 'string' ? value : '';
+		for (const key of formData.keys()) {
+			if (key === 'activityDefinitionId' || values[key] !== undefined) continue;
+			if (multiSelectFieldIds.has(key)) {
+				values[key] = encodeMultiSelectValue(
+					formData.getAll(key).filter((v): v is string => typeof v === 'string')
+				);
+			} else {
+				const value = formData.get(key);
+				values[key] = typeof value === 'string' ? value : '';
+			}
+		}
+		// Nenhuma caixa marcada nunca aparece em formData — garante "[]"
+		// explícito em vez de deixar o campo ausente (que a validação de
+		// obrigatoriedade trataria como "nunca respondido", não como "vazio").
+		for (const fieldId of multiSelectFieldIds) {
+			if (values[fieldId] === undefined) values[fieldId] = encodeMultiSelectValue([]);
 		}
 
 		const result = await getProjectUseCases().answerActivity({

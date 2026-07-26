@@ -120,22 +120,51 @@ describe('catalog', () => {
 		expect('fields' in (montar ?? {})).toBe(false);
 	});
 
-	it('"Problema ou oportunidade" tem só situação e dificuldade como obrigatórios', () => {
+	it('"Problema ou oportunidade" tem só situação e sinais da situação como obrigatórios', () => {
 		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
 		const problema = descoberta?.activities.find((activity) => activity.id === 'problema');
 		if (!problema || problema.completionMode !== 'required_fields') {
 			throw new Error('atividade "problema" deveria ser required_fields');
 		}
 		const required = problema.fields.filter((field) => field.required).map((field) => field.id);
-		expect(required).toEqual(['situacao', 'dificuldade']);
+		expect(required).toEqual(['situacao', 'sinais_situacao']);
 		const optional = problema.fields.filter((field) => !field.required).map((field) => field.id);
 		expect(optional).toEqual([
+			'sinais_situacao_outro',
 			'evidencias',
 			'consequencias',
 			'hipotese_opt',
 			'solucao_imaginada',
 			'observacoes'
 		]);
+	});
+
+	it('"sinais_situacao" é selecao_multipla com 7 opções, incluindo "other"; "sinais_situacao_outro" só aparece quando "other" é selecionado', () => {
+		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
+		const problema = descoberta?.activities.find((activity) => activity.id === 'problema');
+		if (!problema || problema.completionMode !== 'required_fields') {
+			throw new Error('atividade "problema" deveria ser required_fields');
+		}
+		const sinais = problema.fields.find((field) => field.id === 'sinais_situacao');
+		if (!sinais || sinais.dataTarget !== 'answer' || sinais.type !== 'selecao_multipla') {
+			throw new Error('"sinais_situacao" deveria ser selecao_multipla');
+		}
+		expect(sinais.options.map((option) => option.id)).toEqual([
+			'too_many_steps',
+			'duplicated_information',
+			'rework',
+			'lack_of_clarity',
+			'dispersed_decisions',
+			'insufficient_tracking',
+			'other'
+		]);
+
+		const outro = problema.fields.find((field) => field.id === 'sinais_situacao_outro');
+		expect(outro?.required).toBe(false);
+		expect(outro?.dataTarget === 'answer' ? outro.revealWhen : undefined).toEqual({
+			fieldId: 'sinais_situacao',
+			optionId: 'other'
+		});
 	});
 
 	it('"Contexto inicial" tem o campo de nome como project_property, sem gerar Answer', () => {

@@ -195,6 +195,9 @@ function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStatePar
 		if (item.order !== null && (typeof item.order !== 'number' || !Number.isInteger(item.order) || item.order < 0)) {
 			return shapeError('ScopeItem.order deve ser um inteiro não negativo ou null');
 		}
+		if (item.sourceSuggestionId !== null && !isString(item.sourceSuggestionId)) {
+			return shapeError('ScopeItem.sourceSuggestionId deve ser uma string ou null');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('ScopeItem.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('ScopeItem.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -204,6 +207,7 @@ function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStatePar
 			bucket: item.bucket,
 			effort: item.effort,
 			order: item.order as number | null,
+			sourceSuggestionId: (item.sourceSuggestionId as string | null) ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});

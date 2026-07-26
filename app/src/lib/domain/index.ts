@@ -6,3 +6,4 @@ export type * from './result';
 export * from './factory';
 export * from './transitions';
 export * from './serialization';
+export * from './multi-select';

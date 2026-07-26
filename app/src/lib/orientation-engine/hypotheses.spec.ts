@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
-import { answerActivity, createInitialProjectState } from '$lib/domain';
+import { answerActivity, createInitialProjectState, encodeMultiSelectValue } from '$lib/domain';
 import { computeHypotheses } from './hypotheses';
 
 const T1 = '2026-01-01T00:00:00.000Z';
@@ -22,7 +22,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'A centralização reduzirá o retrabalho' },
+				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'A centralização reduzirá o retrabalho' },
 				T1
 			)
 		);
@@ -37,7 +37,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', dificuldade: 'y', evidencias: 'dados internos' },
+				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), evidencias: 'dados internos' },
 				T1
 			)
 		);
@@ -50,7 +50,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', dificuldade: 'y', hipotese_opt: '' },
+				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: '' },
 				T1
 			)
 		);
@@ -80,7 +80,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'Mesmo texto' },
+				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Mesmo texto' },
 				T1
 			)
 		);
@@ -99,7 +99,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'Hipótese da Descoberta' },
+				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Hipótese da Descoberta' },
 				T1
 			)
 		);

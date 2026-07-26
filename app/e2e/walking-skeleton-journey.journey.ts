@@ -97,7 +97,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page
 			.getByLabel('Qual situação precisa mudar?')
 			.fill('As solicitações internas chegam sem padrão.');
-		await page.getByLabel('Qual é a principal dificuldade?').fill('Falta de histórico centralizado.');
+		await page.getByLabel('Informação duplicada').check();
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
@@ -152,7 +152,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 		// Problema ou oportunidade
 		await expect(page.getByText('As solicitações internas chegam sem padrão.')).toBeVisible();
-		await expect(page.getByText('Falta de histórico centralizado.')).toBeVisible();
+		await expect(page.getByText('Informação duplicada')).toBeVisible();
 
 		// Público afetado
 		await expect(page.getByText('Agentes de atendimento e clientes internos.')).toBeVisible();

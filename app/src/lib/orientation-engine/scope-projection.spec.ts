@@ -12,6 +12,7 @@ function makeItem(overrides: Partial<ScopeItem> & Pick<ScopeItem, 'id' | 'bucket
 		bucket: overrides.bucket,
 		effort: overrides.effort ?? null,
 		order: overrides.order ?? null,
+		sourceSuggestionId: overrides.sourceSuggestionId ?? null,
 		createdAt: T1,
 		updatedAt: T1
 	};

@@ -32,6 +32,20 @@
 	let highlightedItemId = $state<string | null>(null);
 	let highlightTimeout: ReturnType<typeof setTimeout> | undefined;
 
+	// Formulário de "Adicionar item" — controlado para que "Usar sugestão"
+	// possa pré-preencher texto + suggestionId sem submeter nada sozinho; o
+	// bucket continua exigindo escolha ativa do usuário (nunca pré-selecionado).
+	let newItemText = $state('');
+	let newItemBucket = $state('');
+	let pendingSuggestionId = $state<string | null>(null);
+
+	function useSuggestion(suggestion: { id: string; title: string }) {
+		newItemText = suggestion.title;
+		pendingSuggestionId = suggestion.id;
+		document.getElementById('add-item-text')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		document.getElementById('add-item-text')?.focus();
+	}
+
 	function itemsIn(bucket: Bucket) {
 		return view.scopeItems
 			.filter((item) => item.bucket === bucket)
@@ -81,10 +95,13 @@
 			if (result.type === 'failure') {
 				saveStatus = 'error';
 				saveError = (result.data as { message?: string } | undefined)?.message ?? 'Não foi possível adicionar o item.';
-				await update();
+				await update({ reset: false });
 				return;
 			}
-			await update();
+			newItemText = '';
+			newItemBucket = '';
+			pendingSuggestionId = null;
+			await update({ reset: false });
 			saveStatus = 'saved';
 		};
 	}
@@ -176,14 +193,39 @@
 	<p role="alert">{form.message}</p>
 {/if}
 
+{#if view.scopeSuggestions.length > 0}
+	<section class="suggestions" aria-labelledby="suggestions-heading">
+		<h2 id="suggestions-heading">Sugestões</h2>
+		<ul class="suggestion-list">
+			{#each view.scopeSuggestions as suggestion (suggestion.id)}
+				<li class="suggestion-card">
+					<p class="suggestion-title">{suggestion.title}</p>
+					<p class="suggestion-reason">{suggestion.reason}</p>
+					<button type="button" class="button-secondary" onclick={() => useSuggestion(suggestion)}>
+						Usar sugestão
+					</button>
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
+
 <section class="add-item" aria-labelledby="add-item-heading">
 	<h2 id="add-item-heading">Adicionar item</h2>
 	<form method="POST" action="?/addItem" use:enhance={handleAddItemSubmit}>
+		<input type="hidden" name="suggestionId" value={pendingSuggestionId ?? ''} />
 		<label for="add-item-text">Descrição do item</label>
-		<input id="add-item-text" type="text" name="text" placeholder="Descreva o item..." required />
+		<input
+			id="add-item-text"
+			type="text"
+			name="text"
+			placeholder="Descreva o item..."
+			required
+			bind:value={newItemText}
+		/>
 		<label for="add-item-bucket">Onde esse item entra?</label>
-		<select id="add-item-bucket" name="bucket" required>
-			<option value="" disabled selected>Selecione...</option>
+		<select id="add-item-bucket" name="bucket" required bind:value={newItemBucket}>
+			<option value="" disabled>Selecione...</option>
 			{#each BUCKETS as bucket (bucket)}
 				<option value={bucket}>{bucketLabel[bucket]}</option>
 			{/each}
@@ -404,6 +446,7 @@
 	}
 
 	.how-it-works,
+	.suggestions,
 	.add-item,
 	.hypothesis,
 	.confirmation {
@@ -415,11 +458,39 @@
 	}
 
 	.how-it-works h2,
+	.suggestions h2,
 	.add-item h2,
 	.hypothesis h2,
 	.confirmation h2 {
 		margin: 0 0 0.75rem;
 		font-size: 0.95rem;
+	}
+
+	.suggestion-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.suggestion-card {
+		border: 1px solid var(--hydra-border);
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		background: var(--hydra-surface-raised);
+	}
+
+	.suggestion-title {
+		margin: 0 0 0.25rem;
+		font-weight: 600;
+	}
+
+	.suggestion-reason {
+		margin: 0 0 0.6rem;
+		font-size: 0.85rem;
+		color: var(--hydra-muted);
 	}
 
 	.how-it-works p {

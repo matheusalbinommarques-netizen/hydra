@@ -15,7 +15,8 @@ import type {
 	PendingItemView,
 	PhaseStatus,
 	ProjectStatus,
-	ScopeProjectionView
+	ScopeProjectionView,
+	ScopeSuggestionView
 } from '$lib/orientation-engine';
 
 // Histórico completo de pendências (Registros, C3-02) — deriva diretamente
@@ -59,6 +60,7 @@ export interface ScopeItemView {
 	bucket: ScopeBucket;
 	effort: ScopeEffort | null;
 	order: number | null;
+	sourceSuggestionId: string | null;
 }
 
 export interface ScopeVersionView {
@@ -87,6 +89,9 @@ export interface ProjectView {
 	// nunca persistida (computeScopeProjection); a tela do artefato confirmado
 	// só a exibe quando scopeVersion.confirmedAt não é nulo.
 	scopeProjection: ScopeProjectionView;
+	// Sinal → sugestão (ver orientation-engine/scope-suggestions.ts) — só as
+	// duas regras explícitas da prova, já filtradas das que viraram ScopeItem.
+	scopeSuggestions: ScopeSuggestionView[];
 }
 
 export type UseCaseError =
@@ -121,6 +126,7 @@ export interface AddScopeItemInput {
 	projectId: string;
 	text: string;
 	bucket: ScopeBucket;
+	sourceSuggestionId?: string | null;
 }
 
 export interface SetScopeItemTextInput {

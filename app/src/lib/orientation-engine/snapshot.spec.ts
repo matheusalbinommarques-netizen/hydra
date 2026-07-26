@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
-import { answerActivity, createInitialProjectState, skipActivity } from '$lib/domain';
+import { answerActivity, createInitialProjectState, encodeMultiSelectValue, skipActivity } from '$lib/domain';
 import { computeSnapshot } from './snapshot';
 import { computePhaseStatus } from './phase-status';
 import { computeProjectStatus } from './project-status';
@@ -23,7 +23,7 @@ describe('computeSnapshot', () => {
 				catalog,
 				state,
 				'problema',
-				{ situacao: 'x', dificuldade: 'y', hipotese_opt: 'Uma hipótese' },
+				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Uma hipótese' },
 				T1
 			)
 		);

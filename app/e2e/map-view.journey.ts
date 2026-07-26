@@ -40,11 +40,13 @@ test.afterAll(async () => {
 
 async function answerAndContinue(
 	page: import('@playwright/test').Page,
-	fields: Record<string, { label: string; value: string; kind?: 'select' }>
+	fields: Record<string, { label: string; value: string; kind?: 'select' | 'check' }>
 ) {
 	for (const { label, value, kind } of Object.values(fields)) {
 		if (kind === 'select') {
 			await page.getByLabel(label).selectOption(value);
+		} else if (kind === 'check') {
+			await page.getByLabel(label).check();
 		} else {
 			await page.getByLabel(label).fill(value);
 		}
@@ -128,7 +130,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 
 		await answerAndContinue(page, {
 			situacao: { label: 'Qual situação precisa mudar?', value: 'Situação de teste do Mapa.' },
-			dificuldade: { label: 'Qual é a principal dificuldade?', value: 'Dificuldade de teste do Mapa.' }
+			sinais: { label: 'Informação duplicada', value: '', kind: 'check' }
 		});
 
 		await answerAndContinue(page, {

@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { catalog } from '$lib/catalog';
+import { decodeMultiSelectValue } from '$lib/domain';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
 import type { Actions, PageServerLoad } from './$types';
@@ -14,7 +15,14 @@ export const load: PageServerLoad = async ({ parent }) => {
 			title: activity.title,
 			fields: activity.fields
 				.filter((field) => field.dataTarget === 'answer' && view.answers[field.id])
-				.map((field) => ({ label: field.label, value: view.answers[field.id] }))
+				.map((field) => {
+					if (field.dataTarget === 'answer' && field.type === 'selecao_multipla') {
+						const selectedIds = decodeMultiSelectValue(view.answers[field.id]) ?? [];
+						const labelById = new Map(field.options.map((option) => [option.id, option.label]));
+						return { label: field.label, value: selectedIds.map((id) => labelById.get(id) ?? id).join(', ') };
+					}
+					return { label: field.label, value: view.answers[field.id] };
+				})
 		}));
 
 	return { blocks };

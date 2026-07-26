@@ -27,13 +27,13 @@ concluída ◄──────────────────────
    preenchimento completo dos campos obrigatórios
 ```
 
-Nesta versão, a única atividade com `completionMode: explicit_confirmation` é "Resumo da descoberta", e a única com `completionMode: scope_confirmation` é "Monte a próxima versão" — ambas têm `allowsSkip: false`, logo seu `ActivityProgress` nunca assume `pulada`. O fluxo das duas é sempre:
+Nesta versão, a única atividade com `completionMode: explicit_confirmation` é "Resumo da descoberta", e a única com `completionMode: scope_confirmation` é "Escolha o próximo foco" — ambas têm `allowsSkip: false`, logo seu `ActivityProgress` nunca assume `pulada`. O fluxo das duas é sempre:
 
 ```text
 não_iniciada → em_andamento → concluída
 ```
 
-Diferente do Resumo, porém, "Monte a próxima versão" pode voltar de `concluída` para `em_andamento` por uma ação do próprio usuário na mesma tela (editar um item ou a hipótese já confirmados) — ver §3A. O Resumo só reabre por uma edição em *outra* atividade.
+Diferente do Resumo, porém, "Escolha o próximo foco" pode voltar de `concluída` para `em_andamento` por uma ação do próprio usuário na mesma tela (editar um item ou a hipótese já confirmados) — ver §3A. O Resumo só reabre por uma edição em *outra* atividade.
 
 ### Regras de edição (aplicam-se a atividades com `completionMode: required_fields`)
 
@@ -98,17 +98,17 @@ Regra: se, depois de o Resumo estar `concluída`, qualquer `Answer` de uma dessa
 
 Esta é a única transição `concluída → em_andamento` prevista no modelo disparada *externamente* (por uma edição em outra atividade ou no nome do projeto) — nunca pelo próprio Resumo, que não tem campos e portanto não pode "perder" um campo obrigatório por si mesmo. A versão de escopo (§3A) tem uma segunda transição `concluída → em_andamento`, mas disparada por edição na própria tela.
 
-## 3A. Invalidação da versão de escopo ("Monte a próxima versão")
+## 3A. Invalidação da versão de escopo ("Escolha o próximo foco")
 
-Regra: qualquer alteração em `ScopeItem` (texto, bucket, valor, esforço, ordem, inclusão, exclusão) ou em `ScopeVersion.hypothesis`, depois de `ScopeVersion.confirmedAt` já definido, faz o motor:
+Regra: qualquer alteração em `ScopeItem` (texto, bucket, tamanho, ordem, inclusão, exclusão) ou em `ScopeVersion.hypothesis`, depois de `ScopeVersion.confirmedAt` já definido, faz o motor:
 
 1. limpar `ScopeVersion.confirmedAt` (volta a `null`);
-2. transicionar o `ActivityProgress` de "Monte a próxima versão" de volta para `em_andamento`;
+2. transicionar o `ActivityProgress` de "Escolha o próximo foco" de volta para `em_andamento`;
 3. permitir nova confirmação explícita do usuário para voltar a `concluída`.
 
-Diferente do Resumo (§3), a edição que dispara esta invalidação acontece na **mesma tela** da atividade, não em outra — e nunca é bloqueada: editar depois de confirmado é um fluxo de primeira classe, não uma exceção. Mudança que repete o valor já existente (ex.: reenviar o mesmo texto) é no-op e não invalida.
+Diferente do Resumo (§3), a edição que dispara esta invalidação acontece na **mesma tela** da atividade, não em outra — e nunca é bloqueada: editar depois de confirmado é um fluxo de primeira classe, não uma exceção. Mudança que repete o valor já existente (ex.: reenviar o mesmo texto) é no-op e não invalida. Mover um item para fora de `agora` não limpa seu `effort` — ele só deixa de ser exigido/destacado; ao voltar para `agora`, o valor anterior reaparece.
 
-Confirmar exige que `getScopeConfirmationIssues` retorne uma lista vazia: pelo menos um `ScopeItem` no total; pelo menos um em `agora`; todos com `value` definido; todos com `effort` definido; `hypothesis` não vazia. Os motivos pendentes são retornados como uma lista tipada (`ScopeConfirmationIssue[]`), a mesma função pura usada pela interface (checklist) e pelos testes.
+Confirmar exige que `getScopeConfirmationIssues` retorne uma lista vazia: pelo menos um `ScopeItem` no total; pelo menos um em `agora`; todos os itens de `agora` com `effort` definido; `hypothesis` não vazia. Os motivos pendentes são retornados como uma lista tipada (`ScopeConfirmationIssue[]`) — quando o motivo é tamanho faltando, o item carrega os `itemIds` exatos, nunca só uma contagem — a mesma função pura usada pela interface (checklist navegável) e pelos testes.
 
 ## 4. Estado do Projeto (calculado, nunca persistido)
 

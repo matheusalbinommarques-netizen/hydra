@@ -150,7 +150,8 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				idGenerator.generate(),
 				input.text,
 				input.bucket,
-				clock.now()
+				clock.now(),
+				input.sourceSuggestionId ?? null
 			);
 			if (!result.ok) return { ok: false, error: result.error };
 

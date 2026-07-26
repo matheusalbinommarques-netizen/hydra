@@ -13,6 +13,7 @@ import type {
 	ScopeVersion
 } from './state-types';
 import type { Result } from './result';
+import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
 
 // missing_effort carrega os ids dos itens concretos que faltam classificar —
 // a interface precisa apontar exatamente quais, não só dizer "falta algo"
@@ -29,6 +30,7 @@ export type DomainTransitionError =
 	| { kind: 'wrong_completion_mode' }
 	| { kind: 'activity_not_skippable' }
 	| { kind: 'unknown_field'; fieldDefinitionId: string }
+	| { kind: 'invalid_field_value'; fieldDefinitionId: string }
 	| { kind: 'transition_not_allowed'; from: ActivityStatus }
 	| { kind: 'scope_item_not_found' }
 	| { kind: 'scope_reorder_mismatch' }
@@ -132,7 +134,14 @@ export function isActivityFieldsValid(activity: RequiredFieldsActivity, state: P
 		const answer = state.answers.find(
 			(a) => a.activityDefinitionId === activity.id && a.fieldDefinitionId === field.id
 		);
-		return !!answer && answer.value.trim().length > 0;
+		if (!answer) return false;
+		if (field.type === 'selecao_multipla') {
+			// "[]" (nada selecionado) tem length > 0 como string — precisa
+			// decodificar para saber se o array está de fato vazio.
+			const decoded = decodeMultiSelectValue(answer.value);
+			return !!decoded && decoded.length > 0;
+		}
+		return answer.value.trim().length > 0;
 	});
 }
 
@@ -181,6 +190,13 @@ export function answerActivity(
 
 	for (const [fieldId, newValue] of Object.entries(values)) {
 		const field = fieldById.get(fieldId)!;
+
+		if (field.dataTarget === 'answer' && field.type === 'selecao_multipla') {
+			const validIds = field.options.map((option) => option.id);
+			if (!isValidMultiSelectValue(newValue, validIds)) {
+				return { ok: false, error: { kind: 'invalid_field_value', fieldDefinitionId: fieldId } };
+			}
+		}
 
 		if (field.dataTarget === 'project_property') {
 			const oldValue = nextState.project.name ?? '';
@@ -369,7 +385,8 @@ export function addScopeItem(
 	itemId: string,
 	text: string,
 	bucket: ScopeBucket,
-	occurredAt: string
+	occurredAt: string,
+	sourceSuggestionId: string | null = null
 ): Result<ProjectState, DomainTransitionError> {
 	const order = bucket === 'agora' ? agoraItemsSorted(state.scopeItems).length : null;
 	const item: ScopeItem = {
@@ -379,6 +396,7 @@ export function addScopeItem(
 		bucket,
 		effort: null,
 		order,
+		sourceSuggestionId,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};

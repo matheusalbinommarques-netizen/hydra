@@ -61,8 +61,14 @@ export const actions: Actions = {
 		if (!text || !bucket) {
 			return fail(400, { message: 'Informe o texto e escolha Agora, Depois ou Fora.' });
 		}
+		const sourceSuggestionId = readString(formData, 'suggestionId');
 
-		const result = await getProjectUseCases().addScopeItem({ projectId: params.projectId, text, bucket });
+		const result = await getProjectUseCases().addScopeItem({
+			projectId: params.projectId,
+			text,
+			bucket,
+			sourceSuggestionId
+		});
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
 	},

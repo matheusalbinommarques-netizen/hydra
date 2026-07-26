@@ -6,4 +6,5 @@ export * from './next-activity';
 export * from './pending-items';
 export * from './hypotheses';
 export * from './scope-projection';
+export * from './scope-suggestions';
 export * from './snapshot';

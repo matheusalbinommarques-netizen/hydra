@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS scope_item (
 	bucket TEXT NOT NULL CHECK (bucket IN ('agora', 'depois', 'fora')),
 	effort TEXT CHECK (effort IN ('pequeno', 'medio', 'grande')),
 	item_order INTEGER,
+	-- Rastreia a sugestão estruturada aceita que originou este item (ver
+	-- orientation-engine/scope-suggestions.ts) — null para item manual.
+	source_suggestion_id TEXT,
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	CHECK (

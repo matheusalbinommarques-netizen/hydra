@@ -74,6 +74,7 @@ export interface ScopeItemRow {
 	bucket: ScopeBucket;
 	effort: ScopeEffort | null;
 	item_order: number | null;
+	source_suggestion_id: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -92,6 +93,7 @@ export function mapScopeItemRow(row: ScopeItemRow): ScopeItem {
 		bucket: row.bucket,
 		effort: row.effort,
 		order: row.item_order,
+		sourceSuggestionId: row.source_suggestion_id,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

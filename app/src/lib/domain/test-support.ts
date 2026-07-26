@@ -15,6 +15,7 @@ import {
 	setScopeItemEffort,
 	skipActivity
 } from './transitions';
+import { encodeMultiSelectValue } from './multi-select';
 import type { ActivityDefinition, Catalog, PhaseDefinition } from './catalog-types';
 import type { ProjectState } from './state-types';
 import type { Result } from './result';
@@ -50,7 +51,14 @@ export function answerActivityMinimally(
 	}
 	const values: Record<string, string> = {};
 	for (const field of activity.fields) {
-		if (field.required) values[field.id] = `resposta de teste (${field.id})`;
+		if (!field.required) continue;
+		if (field.dataTarget === 'answer' && field.type === 'selecao') {
+			values[field.id] = field.options[0];
+		} else if (field.dataTarget === 'answer' && field.type === 'selecao_multipla') {
+			values[field.id] = encodeMultiSelectValue([field.options[0].id]);
+		} else {
+			values[field.id] = `resposta de teste (${field.id})`;
+		}
 	}
 	return unwrapResult(answerActivity(catalog, state, activityId, values, occurredAt));
 }
