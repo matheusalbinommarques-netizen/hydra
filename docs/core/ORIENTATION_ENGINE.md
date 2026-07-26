@@ -15,7 +15,8 @@ O Motor de Orientação não guarda estado próprio: é uma função pura que re
 - a invalidação do Resumo da descoberta quando aplicável (`STATE_MACHINE.md` §3);
 - a projeção de hipóteses (`Answer`s com `semanticRole: hypothesis`, combinada com `ScopeVersion.hypothesis` quando confirmada — §8);
 - a projeção somente-leitura do escopo confirmado (`computeScopeProjection` — `DOMAIN_MODEL.md` §7A), consumida só pela tela do artefato confirmado;
-- as sugestões estruturadas (`computeScopeSuggestions` — `DOMAIN_MODEL.md` §7B), já filtradas das que viraram `ScopeItem`.
+- as sugestões estruturadas (`computeScopeSuggestions` — `DOMAIN_MODEL.md` §7B), já filtradas das que viraram `ScopeItem`;
+- o reaproveitamento explícito de resposta anterior (`computeFieldSuggestions` — `DOMAIN_MODEL.md` §2, campo `suggestedSource`), resolvido sempre a partir das `Answer`s persistidas, já filtrado dos campos que já têm `Answer` própria.
 
 Nada disso é persistido — é recalculado a cada leitura, garantindo que Home, Agora, Mapa, Resumo e Registros nunca divirjam entre si.
 
@@ -111,6 +112,7 @@ Nenhuma entidade própria é consultada para isso — ambas as fontes são proje
 - Editar qualquer `ScopeItem` ou `ScopeVersion.hypothesis` depois que "Escolha o próximo foco" estiver `concluída` sempre a volta para `em_andamento` e exige nova confirmação — mudança que repete o valor já existente é no-op.
 - Hipóteses exibidas são sempre projeção de `Answer`s com `semanticRole: hypothesis` combinada com `ScopeVersion.hypothesis` (quando confirmada) — nunca uma entidade separada.
 - `computeScopeSuggestions` nunca sugere um id já presente como `ScopeItem.sourceSuggestionId` — aceitar uma sugestão a remove da lista; excluir esse item a traz de volta.
+- `computeFieldSuggestions` nunca sugere um campo que já tem `Answer` própria não vazia, e nunca sugere a partir de uma origem sem `Answer` ou com valor vazio; aceitar a sugestão copia o texto uma única vez para o campo — origem e destino permanecem `Answer`s independentes dali em diante.
 - Trilha A nunca retorna uma atividade `pulada` ou `concluída`.
 - Confirmar "pular" é uma operação de efeito único (uma transição de status, uma `PendingItem` criada) mesmo diante de cliques repetidos.
 

@@ -37,6 +37,14 @@ type AnswerFieldDefinition = FieldDefinitionBase &
 		// sem acoplar ActivityForm a nenhuma atividade específica. Puramente
 		// de exibição: não afeta validação nem obrigatoriedade.
 		revealWhen?: { fieldId: string; optionId: string };
+		// Oferece o texto de outra Answer já respondida como ponto de partida
+		// editável — nunca cópia silenciosa, nunca vínculo persistente (ver
+		// orientation-engine/field-suggestions.ts). Só é considerada enquanto
+		// este campo não tiver Answer própria; aceitar copia o valor uma única
+		// vez, e o campo continua sendo uma Answer independente dali em diante.
+		// `activityId`/`fieldId` devem apontar para outro AnswerFieldDefinition
+		// de tipo texto (validado em catalog/validate.ts).
+		suggestedSource?: { activityId: string; fieldId: string; helpText: string };
 	};
 
 type ProjectPropertyFieldDefinition = FieldDefinitionBase & {

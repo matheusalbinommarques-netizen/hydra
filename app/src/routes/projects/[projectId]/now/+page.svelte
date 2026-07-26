@@ -71,7 +71,11 @@
 			}}
 		>
 			<input type="hidden" name="activityDefinitionId" value={data.activity.id} />
-			<ActivityForm activity={data.activity} values={form?.values ?? view.answers} />
+			<ActivityForm
+				activity={data.activity}
+				values={form?.values ?? view.answers}
+				fieldSuggestions={view.fieldSuggestions}
+			/>
 			<button type="submit">Salvar e continuar</button>
 		</form>
 

@@ -25,7 +25,12 @@ const usuarioPrincipal: ActivityDefinition = {
 			help: 'Descreva contexto, objetivos e necessidades-chave.',
 			placeholder: 'Descreva o usuário principal...',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			suggestedSource: {
+				activityId: 'publico',
+				fieldId: 'publico_detail',
+				helpText: 'Você poderá ajustar o texto para representar quem utilizará diretamente o produto.'
+			}
 		}
 	]
 };

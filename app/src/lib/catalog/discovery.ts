@@ -289,7 +289,13 @@ const resultado: ActivityDefinition = {
 			help: 'Identifique quem sente essa mudança primeiro.',
 			placeholder: 'Ex.: clientes, equipe de atendimento...',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			suggestedSource: {
+				activityId: 'publico',
+				fieldId: 'publico_detail',
+				helpText:
+					'Você poderá ajustar o texto para representar especificamente quem percebe essa mudança primeiro.'
+			}
 		},
 		{
 			id: 'percepcao',

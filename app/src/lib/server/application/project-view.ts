@@ -3,7 +3,12 @@
 
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
 import { getScopeConfirmationIssues } from '$lib/domain';
-import { computeScopeProjection, computeScopeSuggestions, computeSnapshot } from '$lib/orientation-engine';
+import {
+	computeFieldSuggestions,
+	computeScopeProjection,
+	computeScopeSuggestions,
+	computeSnapshot
+} from '$lib/orientation-engine';
 import type { PendingItemHistoryView, ProjectView, ScopeItemView } from './types';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
@@ -83,6 +88,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		scopeVersion: { hypothesis: state.scopeVersion.hypothesis, confirmedAt: state.scopeVersion.confirmedAt },
 		scopeConfirmationIssues: getScopeConfirmationIssues(state.scopeItems, state.scopeVersion),
 		scopeProjection: computeScopeProjection(state.scopeItems, state.scopeVersion),
-		scopeSuggestions: computeScopeSuggestions(state.answers, state.scopeItems)
+		scopeSuggestions: computeScopeSuggestions(state.answers, state.scopeItems),
+		fieldSuggestions: computeFieldSuggestions(catalog, state.answers)
 	};
 }

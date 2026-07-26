@@ -10,6 +10,7 @@ import type {
 	ScopeEffort
 } from '$lib/domain';
 import type {
+	FieldSuggestionView,
 	HypothesisView,
 	NextActivityResult,
 	PendingItemView,
@@ -92,6 +93,11 @@ export interface ProjectView {
 	// Sinal → sugestão (ver orientation-engine/scope-suggestions.ts) — só as
 	// duas regras explícitas da prova, já filtradas das que viraram ScopeItem.
 	scopeSuggestions: ScopeSuggestionView[];
+	// Reaproveitamento explícito de resposta anterior (ver
+	// orientation-engine/field-suggestions.ts) — sempre resolvido a partir das
+	// Answers persistidas, independente de valores temporários de formulário em
+	// andamento; já filtrado dos campos que já têm Answer própria.
+	fieldSuggestions: FieldSuggestionView[];
 }
 
 export type UseCaseError =

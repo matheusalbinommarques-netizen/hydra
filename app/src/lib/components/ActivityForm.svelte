@@ -1,14 +1,43 @@
 <script lang="ts">
 	import { decodeMultiSelectValue } from '$lib/domain';
 	import type { RequiredFieldsActivity } from '$lib/domain';
+	import type { FieldSuggestionView } from '$lib/orientation-engine';
 
 	let {
 		activity,
-		values = {}
+		values = {},
+		fieldSuggestions = []
 	}: {
 		activity: RequiredFieldsActivity;
 		values?: Record<string, string>;
+		fieldSuggestions?: FieldSuggestionView[];
 	} = $props();
+
+	let suggestionByFieldId = $derived(
+		new Map(fieldSuggestions.map((suggestion) => [suggestion.fieldId, suggestion]))
+	);
+
+	// Só os campos com sugestão precisam de valor controlado — para decidir,
+	// reativamente, quando esconder a affordance porque o usuário já digitou
+	// algo (mesmo sem ter salvo ainda). Os demais campos continuam
+	// não-controlados, sem mudança de comportamento.
+	// svelte-ignore state_referenced_locally -- seed intencional a partir de
+	// `values` (prop de montagem); diverge depois por input/aceitar sugestão.
+	let suggestedFieldValues = $state<Record<string, string>>(
+		Object.fromEntries(
+			activity.fields
+				.filter((field) => field.dataTarget === 'answer' && suggestionByFieldId.has(field.id))
+				.map((field) => [field.id, values[field.id] ?? ''])
+		)
+	);
+
+	function acceptSuggestion(fieldId: string, sourceValue: string) {
+		suggestedFieldValues = { ...suggestedFieldValues, [fieldId]: sourceValue };
+		queueMicrotask(() => {
+			const el = document.getElementById(fieldId) as HTMLInputElement | HTMLTextAreaElement | null;
+			el?.focus();
+		});
+	}
 
 	// Estado local dos checkboxes de cada campo selecao_multipla — precisa
 	// ser reativo no cliente (não só refletir `values` do último submit) para
@@ -41,6 +70,7 @@
 <div class="fields">
 	{#each activity.fields as field (field.id)}
 		{#if isVisible(field)}
+			{@const suggestion = field.dataTarget === 'answer' ? suggestionByFieldId.get(field.id) : undefined}
 			<div class="field">
 				<label for={field.id}>
 					{field.label}
@@ -52,6 +82,20 @@
 				</label>
 				{#if field.help}
 					<p class="help">{field.help}</p>
+				{/if}
+
+				{#if suggestion && (suggestedFieldValues[field.id] ?? '') === ''}
+					<div class="field-suggestion">
+						<p class="field-suggestion-lead">Você já descreveu {suggestion.sourceActivityTitle}.</p>
+						<button
+							type="button"
+							class="button-secondary"
+							onclick={() => acceptSuggestion(field.id, suggestion.sourceValue)}
+						>
+							Usar como ponto de partida
+						</button>
+						<p class="field-suggestion-help">{suggestion.helpText}</p>
+					</div>
 				{/if}
 
 				{#if field.type === 'selecao'}
@@ -77,13 +121,33 @@
 						{/each}
 					</div>
 				{:else if field.type === 'texto_longo'}
-					<textarea
+					{#if field.dataTarget === 'answer' && suggestionByFieldId.has(field.id)}
+						<textarea
+							id={field.id}
+							name={field.id}
+							placeholder={field.placeholder ?? ''}
+							required={field.required}
+							rows="4"
+							bind:value={suggestedFieldValues[field.id]}
+						></textarea>
+					{:else}
+						<textarea
+							id={field.id}
+							name={field.id}
+							placeholder={field.placeholder ?? ''}
+							required={field.required}
+							rows="4">{values[field.id] ?? ''}</textarea
+						>
+					{/if}
+				{:else if field.dataTarget === 'answer' && suggestionByFieldId.has(field.id)}
+					<input
 						id={field.id}
 						name={field.id}
+						type="text"
 						placeholder={field.placeholder ?? ''}
 						required={field.required}
-						rows="4">{values[field.id] ?? ''}</textarea
-					>
+						bind:value={suggestedFieldValues[field.id]}
+					/>
 				{:else}
 					<input
 						id={field.id}
@@ -172,5 +236,23 @@
 	.checkbox-option input[type='checkbox'] {
 		width: auto;
 		padding: 0;
+	}
+
+	.field-suggestion {
+		border: 1px solid var(--hydra-border, #3a4552);
+		border-radius: 8px;
+		padding: 0.6rem 0.85rem;
+		background: var(--hydra-surface-raised, #232e3b);
+	}
+
+	.field-suggestion-lead {
+		margin: 0 0 0.5rem;
+		font-size: 0.9rem;
+	}
+
+	.field-suggestion-help {
+		margin: 0.5rem 0 0;
+		font-size: 0.8rem;
+		color: var(--hydra-muted, #9aa5b1);
 	}
 </style>

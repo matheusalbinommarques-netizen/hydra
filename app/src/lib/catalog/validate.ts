@@ -2,7 +2,9 @@
 // Não verifica ActivityProgress nem qualquer estado de projeto — isso é
 // responsabilidade da fábrica de estado (C2-06).
 
-import type { Catalog, CatalogStatus } from '$lib/domain';
+import type { ActivityDefinition, Catalog, CatalogStatus, FieldDefinition } from '$lib/domain';
+
+const TEXT_FIELD_TYPES = new Set(['texto_curto', 'texto_longo']);
 
 const EXPECTED_CATALOG_STATUS: Record<string, CatalogStatus> = {
 	descoberta: 'complete',
@@ -21,6 +23,11 @@ export function validateCatalog(catalog: Catalog): string[] {
 	const phaseOrders = new Set<number>();
 	const activityIds = new Set<string>();
 	const fieldIds = new Set<string>();
+	// Coletados durante o percurso principal para validar `suggestedSource`
+	// numa segunda passagem, independente da ordem de declaração das
+	// atividades/campos no catálogo.
+	const activityById = new Map<string, ActivityDefinition>();
+	const fieldById = new Map<string, FieldDefinition>();
 
 	for (const phase of catalog.phases) {
 		if (phaseIds.has(phase.id)) {
@@ -49,6 +56,7 @@ export function validateCatalog(catalog: Catalog): string[] {
 				violations.push(`Atividade duplicada: id "${activity.id}"`);
 			}
 			activityIds.add(activity.id);
+			activityById.set(activity.id, activity);
 
 			if (activity.phaseId !== phase.id) {
 				violations.push(
@@ -86,6 +94,7 @@ export function validateCatalog(catalog: Catalog): string[] {
 					violations.push(`Campo duplicado: id "${field.id}"`);
 				}
 				fieldIds.add(field.id);
+				fieldById.set(field.id, field);
 
 				if (field.activityId !== activity.id) {
 					violations.push(
@@ -126,6 +135,53 @@ export function validateCatalog(catalog: Catalog): string[] {
 							seenOptionIds.add(option.id);
 						}
 					}
+				}
+			}
+		}
+	}
+
+	// Segunda passagem: valida suggestedSource com os mapas completos
+	// (activityById/fieldById), sem depender da ordem de declaração.
+	for (const phase of catalog.phases) {
+		for (const activity of phase.activities) {
+			if (activity.completionMode !== 'required_fields') continue;
+
+			for (const field of activity.fields) {
+				if (field.dataTarget !== 'answer' || !field.suggestedSource) continue;
+				const { activityId: sourceActivityId, fieldId: sourceFieldId } = field.suggestedSource;
+
+				if (sourceActivityId === activity.id && sourceFieldId === field.id) {
+					violations.push(`Campo "${field.id}" tem suggestedSource apontando para si mesmo`);
+					continue;
+				}
+
+				const sourceActivity = activityById.get(sourceActivityId);
+				if (!sourceActivity) {
+					violations.push(
+						`Campo "${field.id}" tem suggestedSource.activityId "${sourceActivityId}", que não existe no catálogo`
+					);
+					continue;
+				}
+
+				const sourceField = fieldById.get(sourceFieldId);
+				if (!sourceField || sourceField.activityId !== sourceActivityId) {
+					violations.push(
+						`Campo "${field.id}" tem suggestedSource.fieldId "${sourceFieldId}", que não existe na atividade "${sourceActivityId}"`
+					);
+					continue;
+				}
+
+				if (sourceField.dataTarget !== 'answer') {
+					violations.push(
+						`Campo "${field.id}" tem suggestedSource apontando para "${sourceFieldId}", que não é um campo de resposta (dataTarget answer)`
+					);
+					continue;
+				}
+
+				if (!TEXT_FIELD_TYPES.has(sourceField.type) || !TEXT_FIELD_TYPES.has(field.type)) {
+					violations.push(
+						`Campo "${field.id}" tem suggestedSource incompatível: origem e destino precisam ser ambos texto_curto/texto_longo`
+					);
 				}
 			}
 		}
