@@ -254,19 +254,19 @@
 	}
 
 	.required {
-		color: var(--hydra-accent, #4fd1c5);
+		color: var(--hydra-accent, #151918);
 	}
 
 	.optional {
 		font-weight: 400;
 		font-size: 0.8rem;
-		color: var(--hydra-muted, #9aa5b1);
+		color: var(--hydra-muted, #65686c);
 	}
 
 	.help {
 		margin: 0;
 		font-size: 0.85rem;
-		color: var(--hydra-muted, #9aa5b1);
+		color: var(--hydra-muted, #65686c);
 	}
 
 	input,
@@ -275,15 +275,15 @@
 		font: inherit;
 		padding: 0.6rem 0.75rem;
 		border-radius: 8px;
-		border: 1px solid var(--hydra-border, #3a4552);
-		background: var(--hydra-surface, #1b2430);
-		color: var(--hydra-text, #e8edf2);
+		border: 1px solid var(--hydra-border, #65686c);
+		background: var(--hydra-surface, #f8f8f8);
+		color: var(--hydra-text, #151918);
 	}
 
 	input:focus-visible,
 	textarea:focus-visible,
 	select:focus-visible {
-		outline: 2px solid var(--hydra-accent, #4fd1c5);
+		outline: 2px solid var(--hydra-accent, #151918);
 		outline-offset: 1px;
 	}
 
@@ -311,23 +311,23 @@
 	}
 
 	.field-suggestion {
-		border: 1px solid var(--hydra-border, #3a4552);
+		border: 1px solid var(--hydra-border, #65686c);
 		border-radius: 8px;
 		padding: 0.6rem 0.85rem;
-		background: var(--hydra-surface-raised, #232e3b);
+		background: var(--hydra-surface-raised, #f8f8f8);
 	}
 
 	.field-suggestion-help {
 		margin: 0.5rem 0 0;
 		font-size: 0.8rem;
-		color: var(--hydra-muted, #9aa5b1);
+		color: var(--hydra-muted, #65686c);
 	}
 
 	.optional-group {
-		border: 1px solid var(--hydra-border, #3a4552);
+		border: 1px solid var(--hydra-border, #65686c);
 		border-radius: 10px;
 		padding: 0.75rem 1rem;
-		background: var(--hydra-surface, #1b2430);
+		background: var(--hydra-surface, #f8f8f8);
 	}
 
 	.optional-group summary {
@@ -338,14 +338,14 @@
 	}
 
 	.optional-group summary:focus-visible {
-		outline: 2px solid var(--hydra-accent, #4fd1c5);
+		outline: 2px solid var(--hydra-accent, #151918);
 		outline-offset: 2px;
 	}
 
 	.group-count {
 		font-weight: 400;
 		font-size: 0.85rem;
-		color: var(--hydra-muted, #9aa5b1);
+		color: var(--hydra-muted, #65686c);
 	}
 
 	.optional-group .group-fields {

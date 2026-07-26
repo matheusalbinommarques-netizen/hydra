@@ -626,12 +626,15 @@
 
 	.effort-group button.selected {
 		background: var(--hydra-accent);
-		color: #0a1420;
+		color: #f8f8f8;
 		border-color: var(--hydra-accent);
 	}
 
+	/* Sem cor própria: "Excluir" é uma ação do usuário, não conteúdo
+	   gerado/derivado pelo sistema — --hydra-warning (vermelho de lápis) é
+	   reservado a sugestões/alertas/conflitos. Herda a cor de texto padrão
+	   de .button-secondary. */
 	.remove {
-		color: var(--hydra-warning);
 		margin-left: auto;
 	}
 

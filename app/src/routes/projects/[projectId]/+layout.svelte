@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { projectStatusLabel } from '$lib/project-status-label';
 
 	let { data, children } = $props();
 	let projectId = $derived(page.params.projectId);
@@ -7,9 +8,12 @@
 
 <div class="project-shell">
 	<header class="project-header">
-		<div>
-			<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
-			<p class="status">Status: {data.view.projectStatus}</p>
+		<div class="identity">
+			<img class="symbol" src="/brand/hydra-symbol-primary-transparent.png" alt="" />
+			<div>
+				<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
+				<p class="status">Status: {projectStatusLabel[data.view.projectStatus]}</p>
+			</div>
 		</div>
 		<nav>
 			<a href="/">Projetos</a>
@@ -34,6 +38,18 @@
 		padding: 1rem 1.5rem;
 		border-bottom: 1px solid var(--hydra-border);
 		background: var(--hydra-surface);
+	}
+
+	.identity {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.symbol {
+		height: 2rem;
+		width: auto;
+		display: block;
 	}
 
 	.eyebrow {

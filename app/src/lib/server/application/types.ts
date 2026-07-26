@@ -46,12 +46,15 @@ export type PendingItemHistoryView =
 			resolvedAt: string;
 		};
 
-// Página inicial (C4-03A) — lista leve, sem ProjectStatus/snapshot: nunca
-// carrega activityProgress/answers/pendingItems nem recomputa status.
+// Página inicial (C4-03A) — lista leve, sem snapshot completo: nunca expõe
+// activityProgress/answers/pendingItems brutos. projectStatus (adicionado
+// depois, ver project-use-cases.ts) reaproveita computeProjectStatus por
+// projeto — não é um cálculo novo, só passou a ser lido também aqui.
 export interface ProjectListItem {
 	projectId: string;
 	projectName: string | null;
 	createdAt: string;
+	projectStatus: ProjectStatus;
 }
 
 // "Escolha o próximo foco" (C5) — view leve de ScopeItem/ScopeVersion, sem

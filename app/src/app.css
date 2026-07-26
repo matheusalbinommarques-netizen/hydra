@@ -1,15 +1,22 @@
 /* Identidade visual mínima do Hydra — ver docs/core/UX_DESIGN_SPEC.md.
-   Não é um design system completo: só a paleta e a tipografia de base. */
+   Não é um design system completo: só a paleta e a tipografia de base.
+
+   Paleta "papel/tinta/grafite": sem cor de destaque colorida — ações
+   primárias, links e foco usam a própria tinta (--hydra-text) sobre papel,
+   não uma cor de acento separada. --hydra-warning é o único ponto de cor
+   fora do neutro (o vermelho de lápis), e é reservado a conteúdo
+   gerado/derivado pelo sistema (sugestões, alertas, conflitos) — nunca a
+   ações do usuário ou decoração. */
 
 :root {
-	--hydra-bg: #0d1420;
-	--hydra-surface: #161f2c;
-	--hydra-surface-raised: #1b2430;
-	--hydra-border: #2c3946;
-	--hydra-text: #e8edf2;
-	--hydra-muted: #9aa5b1;
-	--hydra-accent: #4fd1c5;
-	--hydra-warning: #e0b04c;
+	--hydra-bg: #e8e9e3;
+	--hydra-surface: #f8f8f8;
+	--hydra-surface-raised: #f8f8f8;
+	--hydra-border: #65686c;
+	--hydra-text: #151918;
+	--hydra-muted: #65686c;
+	--hydra-accent: #151918;
+	--hydra-warning: #8b3227;
 }
 
 * {
@@ -28,8 +35,24 @@ body {
 	line-height: 1.5;
 }
 
+/* Reservada ao wordmark "Hydra" e a títulos de destaque de página — nunca
+   como fonte geral da interface (corpo, labels, campos, botões, listas
+   continuam em Manrope). Todo <h1> do produto já é o título principal de
+   sua tela, então uma única regra aqui cobre todas as telas sem precisar
+   tocar cada uma. */
+h1 {
+	font-family:
+		'Source Serif 4',
+		Georgia,
+		serif;
+}
+
 a {
 	color: var(--hydra-accent);
+	/* accent == text nesta paleta (sem cor de destaque própria) — o
+	   sublinhado é o que distingue um link de texto comum, já que a cor
+	   sozinha não faz mais essa distinção. */
+	text-decoration: underline;
 }
 
 button,
@@ -37,7 +60,7 @@ button,
 	font: inherit;
 	font-weight: 700;
 	background: var(--hydra-accent);
-	color: #0a1420;
+	color: #f8f8f8;
 	border: none;
 	border-radius: 8px;
 	padding: 0.7rem 1.4rem;

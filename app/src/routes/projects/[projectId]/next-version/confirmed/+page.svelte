@@ -180,7 +180,7 @@
 		padding: 0.65rem 1.25rem;
 		border-radius: 8px;
 		background: var(--hydra-accent);
-		color: #0a1420;
+		color: #f8f8f8;
 		font-weight: 700;
 		text-decoration: none;
 	}

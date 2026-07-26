@@ -467,9 +467,29 @@ describe('createProjectUseCases — listRecentProjects', () => {
 			{
 				projectId: created.value.projectId,
 				projectName: null,
-				createdAt: expect.any(String)
+				createdAt: expect.any(String),
+				projectStatus: 'rascunho'
 			}
 		]);
+	});
+
+	it('projectStatus reflete o estado real de cada projeto (rascunho vs. em_andamento)', async () => {
+		const { useCases } = setup();
+		const draft = await useCases.createProject();
+		if (!draft.ok) throw new Error('esperado ok');
+
+		const started = await useCases.createProject();
+		if (!started.ok) throw new Error('esperado ok');
+		const renamed = await useCases.renameProject({ projectId: started.value.projectId, name: 'Em andamento' });
+		if (!renamed.ok) throw new Error('esperado ok');
+
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const byId = new Map(result.value.map((item) => [item.projectId, item.projectStatus]));
+		expect(byId.get(draft.value.projectId)).toBe('rascunho');
+		expect(byId.get(started.value.projectId)).toBe('em_andamento');
 	});
 
 	it('não executa insert nem save ao listar', async () => {

@@ -3,6 +3,7 @@
 // Nenhum SQL, nenhuma rota, nenhum HTML — só orquestração.
 
 import type { Catalog, ProjectState } from '$lib/domain';
+import { computeProjectStatus } from '$lib/orientation-engine';
 import {
 	addScopeItem as addScopeItemInDomain,
 	answerActivity as answerActivityInDomain,
@@ -65,14 +66,24 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 
 		async listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>> {
 			const projects = await repository.listRecent();
-			return {
-				ok: true,
-				value: projects.map((project) => ({
+			const items: ProjectListItem[] = [];
+			for (const project of projects) {
+				// listRecent() só traz id/name/createdAt (ver ports.ts) — o status
+				// exige activityProgress, então cada item busca seu próprio estado
+				// completo aqui. Reaproveita computeProjectStatus (mesma função pura
+				// usada por buildProjectView), sem nenhum cálculo novo.
+				const state = await repository.findById(project.id);
+				const projectStatus = state
+					? computeProjectStatus(state.project, catalog, state.activityProgress)
+					: 'rascunho';
+				items.push({
 					projectId: project.id,
 					projectName: project.name,
-					createdAt: project.createdAt
-				}))
-			};
+					createdAt: project.createdAt,
+					projectStatus
+				});
+			}
+			return { ok: true, value: items };
 		},
 
 		async loadProjectView(projectId) {

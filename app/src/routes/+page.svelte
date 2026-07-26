@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { projectStatusLabel } from '$lib/project-status-label';
 
 	let { data, form } = $props();
 
@@ -16,7 +17,7 @@
 </svelte:head>
 
 <main class="container">
-	<h1>Hydra</h1>
+	<img class="wordmark" src="/brand/hydra-lockup-primary-transparent.png" alt="Hydra" />
 	<p>Estruture seu projeto de software passo a passo.</p>
 	<p class="subtitle">
 		O Hydra ajuda você a entender o que definir agora, por que isso importa e o que fazer depois.
@@ -47,6 +48,7 @@
 				{#each data.projects as project (project.projectId)}
 					<li>
 						<a href="/projects/{project.projectId}/now">{project.projectName ?? 'Projeto sem nome'}</a>
+						<span class="status-tag">{projectStatusLabel[project.projectStatus]}</span>
 						<span class="created-at">Criado em {formatDate(project.createdAt)}</span>
 					</li>
 				{/each}
@@ -56,6 +58,12 @@
 </main>
 
 <style>
+	.wordmark {
+		height: 2.75rem;
+		width: auto;
+		display: block;
+	}
+
 	.subtitle {
 		color: var(--hydra-muted);
 		max-width: 40ch;
@@ -76,6 +84,37 @@
 
 	label {
 		font-weight: 600;
+	}
+
+	/* input[type=file] é um widget nativo do SO — cor/fonte do texto e do
+	   próprio controle são estilizáveis, mas o botão "Escolher arquivo" só
+	   aceita estilo via ::file-selector-button. Reaproveita a mesma receita
+	   visual de .button-secondary (app.css), sem criar um padrão novo. */
+	input[type='file'] {
+		font: inherit;
+		color: var(--hydra-text);
+		/* A largura interna do texto nativo ("Nenhum arquivo escolhido"/nome do
+		   arquivo) não é controlável via CSS entre navegadores — só a largura
+		   total do próprio elemento. Sem isso, o texto trunca no meio da
+		   palavra assim que o botão reestilizado (::file-selector-button)
+		   divide o espaço disponível. */
+		min-width: 26rem;
+	}
+
+	input[type='file']::file-selector-button {
+		font: inherit;
+		font-weight: 700;
+		background: transparent;
+		color: var(--hydra-text);
+		border: 1px solid var(--hydra-border);
+		border-radius: 8px;
+		padding: 0.55rem 1rem;
+		margin-right: 0.75rem;
+		cursor: pointer;
+	}
+
+	input[type='file']::file-selector-button:hover {
+		background: var(--hydra-surface-raised);
 	}
 
 	.projects {
@@ -106,6 +145,26 @@
 		display: flex;
 		align-items: baseline;
 		gap: 0.75rem;
+	}
+
+	/* mesma convenção de link textual já usada em projects/[projectId]/+layout.svelte (nav a). */
+	.projects a {
+		color: var(--hydra-accent);
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.projects a:hover {
+		text-decoration: underline;
+	}
+
+	.status-tag {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--hydra-muted);
+		border: 1px solid var(--hydra-border);
+		border-radius: 999px;
+		padding: 0.1rem 0.55rem;
 	}
 
 	.created-at {
