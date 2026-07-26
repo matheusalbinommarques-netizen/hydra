@@ -43,7 +43,7 @@
 		<p class="eyebrow">Próxima ação recomendada</p>
 		<h2>{data.activity.title}</h2>
 		<p class="main-question">{data.activity.mainQuestion}</p>
-		<p><a href="/projects/{view.projectId}/next-version">Ir para Monte a próxima versão →</a></p>
+		<p><a href="/projects/{view.projectId}/next-version">Ir para Escolha o próximo foco →</a></p>
 	</section>
 {:else if data.activity}
 	<section class="next-action">

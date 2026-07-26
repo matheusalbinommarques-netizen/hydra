@@ -49,7 +49,6 @@ function buildScopeItemView(item: ProjectState['scopeItems'][number]): ScopeItem
 		id: item.id,
 		text: item.text,
 		bucket: item.bucket,
-		value: item.value,
 		effort: item.effort,
 		order: item.order
 	};

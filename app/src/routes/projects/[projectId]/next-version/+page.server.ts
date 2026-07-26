@@ -1,11 +1,11 @@
 import { fail } from '@sveltejs/kit';
-import type { ScopeBucket, ScopeEffort, ScopeValue } from '$lib/domain';
+import type { ScopeBucket, ScopeEffort } from '$lib/domain';
+import { catalog } from '$lib/catalog';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 const SCOPE_BUCKETS: readonly ScopeBucket[] = ['agora', 'depois', 'fora'];
-const SCOPE_VALUES: readonly ScopeValue[] = ['baixo', 'medio', 'alto'];
 const SCOPE_EFFORTS: readonly ScopeEffort[] = ['pequeno', 'medio', 'grande'];
 
 function readString(formData: FormData, key: string): string | null {
@@ -16,11 +16,6 @@ function readString(formData: FormData, key: string): string | null {
 function readBucket(formData: FormData, key: string): ScopeBucket | null {
 	const value = readString(formData, key);
 	return value && (SCOPE_BUCKETS as readonly string[]).includes(value) ? (value as ScopeBucket) : null;
-}
-
-function readValue(formData: FormData, key: string): ScopeValue | null {
-	const value = readString(formData, key);
-	return value && (SCOPE_VALUES as readonly string[]).includes(value) ? (value as ScopeValue) : null;
 }
 
 function readEffort(formData: FormData, key: string): ScopeEffort | null {
@@ -51,6 +46,12 @@ async function shiftAgoraOrder(projectId: string, itemId: string, direction: -1 
 
 	return useCases.reorderAgoraItems({ projectId, orderedItemIds: reordered });
 }
+
+export const load: PageServerLoad = async () => {
+	const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
+	const activity = definicao?.activities.find((a) => a.id === 'montar_proxima_versao');
+	return { activity };
+};
 
 export const actions: Actions = {
 	addItem: async ({ request, params }) => {
@@ -88,22 +89,11 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	setValue: async ({ request, params }) => {
-		const formData = await request.formData();
-		const itemId = readString(formData, 'itemId');
-		const value = readValue(formData, 'value');
-		if (!itemId || !value) return fail(400, { message: 'Item ou valor inválido.' });
-
-		const result = await getProjectUseCases().setScopeItemValue({ projectId: params.projectId, itemId, value });
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
 	setEffort: async ({ request, params }) => {
 		const formData = await request.formData();
 		const itemId = readString(formData, 'itemId');
 		const effort = readEffort(formData, 'effort');
-		if (!itemId || !effort) return fail(400, { message: 'Item ou esforço inválido.' });
+		if (!itemId || !effort) return fail(400, { message: 'Item ou tamanho inválido.' });
 
 		const result = await getProjectUseCases().setScopeItemEffort({ projectId: params.projectId, itemId, effort });
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });

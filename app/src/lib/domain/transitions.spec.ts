@@ -15,7 +15,6 @@ import {
 	setHypothesis,
 	setScopeItemEffort,
 	setScopeItemText,
-	setScopeItemValue,
 	shouldInvalidateSummary,
 	skipActivity
 } from './transitions';
@@ -329,18 +328,17 @@ describe('renameProject', () => {
 });
 
 describe('getScopeConfirmationIssues', () => {
-	it('sem itens: no_items, no_now_items e missing_hypothesis (missing_value/effort são vacuamente satisfeitos)', () => {
+	it('sem itens: no_items, no_now_items e missing_hypothesis (missing_effort é vacuamente satisfeito)', () => {
 		const state = freshState();
 		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual([
-			'no_items',
-			'no_now_items',
-			'missing_hypothesis'
+			{ kind: 'no_items' },
+			{ kind: 'no_now_items' },
+			{ kind: 'missing_hypothesis' }
 		]);
 	});
 
 	it('array vazio quando todos os critérios são atendidos', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
 		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual([]);
@@ -348,24 +346,26 @@ describe('getScopeConfirmationIssues', () => {
 
 	it('no_now_items quando só há itens fora de agora', () => {
 		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'depois', T1));
-		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toContain('no_now_items');
-		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).not.toContain('no_items');
+		const issues = getScopeConfirmationIssues(state.scopeItems, state.scopeVersion);
+		expect(issues).toContainEqual({ kind: 'no_now_items' });
+		expect(issues).not.toContainEqual({ kind: 'no_items' });
 	});
 
-	it('missing_value/missing_effort persistem mesmo com item em agora', () => {
-		const state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+	it('missing_effort só considera itens em agora, com os ids exatos que faltam', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Em agora', 'agora', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Fora de agora', 'fora', T1));
 		const issues = getScopeConfirmationIssues(state.scopeItems, state.scopeVersion);
-		expect(issues).toContain('missing_value');
-		expect(issues).toContain('missing_effort');
-		expect(issues).not.toContain('no_now_items');
+		expect(issues).toContainEqual({ kind: 'missing_effort', itemIds: ['item-1'] });
+		expect(issues).not.toContainEqual({ kind: 'no_now_items' });
 	});
 
 	it('missing_hypothesis para hipótese só com espaços', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(setHypothesis(catalog, state, '   '));
-		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual(['missing_hypothesis']);
+		expect(getScopeConfirmationIssues(state.scopeItems, state.scopeVersion)).toEqual([
+			{ kind: 'missing_hypothesis' }
+		]);
 	});
 });
 
@@ -378,7 +378,6 @@ describe('addScopeItem', () => {
 				projectId: 'proj-1',
 				text: 'Primeiro',
 				bucket: 'agora',
-				value: null,
 				effort: null,
 				order: 0,
 				createdAt: T1,
@@ -405,7 +404,6 @@ describe('addScopeItem', () => {
 
 	it('adicionar item invalida uma confirmação existente', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
 		state = unwrap(confirmScopeVersion(catalog, state, T1));
@@ -418,7 +416,7 @@ describe('addScopeItem', () => {
 	});
 });
 
-describe('setScopeItemText / setScopeItemValue / setScopeItemEffort', () => {
+describe('setScopeItemText / setScopeItemEffort', () => {
 	it('erro scope_item_not_found para id inexistente', () => {
 		expect(setScopeItemText(catalog, freshState(), 'inexistente', 'x', T1)).toEqual({
 			ok: false,
@@ -428,7 +426,6 @@ describe('setScopeItemText / setScopeItemValue / setScopeItemEffort', () => {
 
 	it('repetir o mesmo texto é no-op e não invalida confirmação', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Texto', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
 		state = unwrap(confirmScopeVersion(catalog, state, T1));
@@ -439,7 +436,6 @@ describe('setScopeItemText / setScopeItemValue / setScopeItemEffort', () => {
 
 	it('mudar o texto invalida a confirmação existente', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Texto', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
 		state = unwrap(confirmScopeVersion(catalog, state, T1));
@@ -449,16 +445,30 @@ describe('setScopeItemText / setScopeItemValue / setScopeItemEffort', () => {
 		expect(changed.scopeItems[0].text).toBe('Texto novo');
 	});
 
-	it('setScopeItemValue/Effort atualizam o item e invalidam confirmação em mudança real', () => {
+	it('setScopeItemEffort atualiza o item e invalida confirmação em mudança real', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'baixo', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'grande', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
 		state = unwrap(confirmScopeVersion(catalog, state, T1));
 
-		const revalued = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T2));
-		expect(revalued.scopeItems[0].value).toBe('alto');
-		expect(revalued.scopeVersion.confirmedAt).toBeNull();
+		const reeffort = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T2));
+		expect(reeffort.scopeItems[0].effort).toBe('pequeno');
+		expect(reeffort.scopeVersion.confirmedAt).toBeNull();
+	});
+
+	it('effort de um item em "agora" não é limpo ao mover para "depois" ou "fora"', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'grande', T1));
+		state = unwrap(moveScopeItem(catalog, state, 'item-1', 'fora', T2));
+		expect(state.scopeItems[0].effort).toBe('grande');
+	});
+
+	it('effort permanece ao mover de volta para "agora" depois de ter saído', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'grande', T1));
+		state = unwrap(moveScopeItem(catalog, state, 'item-1', 'depois', T2));
+		state = unwrap(moveScopeItem(catalog, state, 'item-1', 'agora', T2));
+		expect(state.scopeItems[0].effort).toBe('grande');
 	});
 });
 
@@ -551,11 +561,8 @@ describe('removeScopeItem', () => {
 
 	it('remover item invalida uma confirmação existente', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'depois', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-2', 'baixo', T1));
-		state = unwrap(setScopeItemEffort(catalog, state, 'item-2', 'grande', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
 		state = unwrap(confirmScopeVersion(catalog, state, T1));
 
@@ -574,7 +581,6 @@ describe('removeScopeItem', () => {
 describe('setHypothesis', () => {
 	it('define a hipótese e invalida confirmação em mudança real', () => {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		state = unwrap(setHypothesis(catalog, state, 'Original'));
 		state = unwrap(confirmScopeVersion(catalog, state, T1));
@@ -594,7 +600,6 @@ describe('setHypothesis', () => {
 describe('confirmScopeVersion', () => {
 	function validState(): ProjectState {
 		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
-		state = unwrap(setScopeItemValue(catalog, state, 'item-1', 'alto', T1));
 		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
 		return unwrap(setHypothesis(catalog, state, 'Hipótese'));
 	}
@@ -612,7 +617,7 @@ describe('confirmScopeVersion', () => {
 			ok: false,
 			error: {
 				kind: 'scope_confirmation_invalid',
-				issues: ['no_items', 'no_now_items', 'missing_hypothesis']
+				issues: [{ kind: 'no_items' }, { kind: 'no_now_items' }, { kind: 'missing_hypothesis' }]
 			}
 		});
 	});

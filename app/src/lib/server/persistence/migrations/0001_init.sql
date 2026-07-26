@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS pending_item (
 	)
 );
 
--- Escopo da "Monte a próxima versão" (scope_confirmation) — ver
+-- Escopo da "Escolha o próximo foco" (scope_confirmation) — ver
 -- app/src/lib/domain/state-types.ts. item_order (não "order", palavra
 -- reservada em SQL) só é preenchido para bucket = 'agora'.
 CREATE TABLE IF NOT EXISTS scope_item (
@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS scope_item (
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
 	text TEXT NOT NULL,
 	bucket TEXT NOT NULL CHECK (bucket IN ('agora', 'depois', 'fora')),
-	value TEXT CHECK (value IN ('baixo', 'medio', 'alto')),
 	effort TEXT CHECK (effort IN ('pequeno', 'medio', 'grande')),
 	item_order INTEGER,
 	created_at TEXT NOT NULL,

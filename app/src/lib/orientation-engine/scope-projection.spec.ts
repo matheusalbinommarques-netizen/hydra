@@ -10,7 +10,6 @@ function makeItem(overrides: Partial<ScopeItem> & Pick<ScopeItem, 'id' | 'bucket
 		projectId: 'proj-1',
 		text: overrides.text ?? `Item ${overrides.id}`,
 		bucket: overrides.bucket,
-		value: overrides.value ?? null,
 		effort: overrides.effort ?? null,
 		order: overrides.order ?? null,
 		createdAt: T1,
@@ -25,8 +24,8 @@ function makeVersion(overrides: Partial<ScopeVersion> = {}): ScopeVersion {
 describe('computeScopeProjection', () => {
 	it('agrupa itens por bucket, ordenando "agora" por order', () => {
 		const items: ScopeItem[] = [
-			makeItem({ id: 'a', bucket: 'agora', order: 1, value: 'alto', effort: 'pequeno' }),
-			makeItem({ id: 'b', bucket: 'agora', order: 0, value: 'baixo', effort: 'medio' }),
+			makeItem({ id: 'a', bucket: 'agora', order: 1, effort: 'pequeno' }),
+			makeItem({ id: 'b', bucket: 'agora', order: 0, effort: 'medio' }),
 			makeItem({ id: 'c', bucket: 'depois' }),
 			makeItem({ id: 'd', bucket: 'fora' })
 		];

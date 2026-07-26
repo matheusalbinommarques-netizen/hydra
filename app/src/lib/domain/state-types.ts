@@ -34,13 +34,17 @@ export type PendingItem =
 	| (PendingItemBase & { status: 'aberta'; resolvedAt?: never })
 	| (PendingItemBase & { status: 'resolvida'; resolvedAt: string });
 
-// Escopo da "Monte a próxima versão" (scope_confirmation) — ver
+// Escopo da "Escolha o próximo foco" (scope_confirmation) — ver
 // docs/core/DOMAIN_MODEL.md §7. bucket é escolhido no ato de adicionar o
-// item (nunca nasce implícito); value/effort começam null até o usuário
-// classificar; order só é definido para bucket === 'agora', numa sequência
-// contígua começando em 0.
+// item (nunca nasce implícito); effort começa null até o usuário classificar
+// e só é exigido/destacado para bucket === 'agora' (fora de agora, um valor
+// já definido permanece armazenado — não é limpo ao mover o item, só deixa
+// de ser obrigatório); order só é definido para bucket === 'agora', numa
+// sequência contígua começando em 0. Não existe mais um eixo de "valor":
+// removido deliberadamente por não alimentar nenhuma regra determinística —
+// bucket comunica momento, order comunica prioridade dentro de agora, effort
+// comunica viabilidade aproximada.
 export type ScopeBucket = 'agora' | 'depois' | 'fora';
-export type ScopeValue = 'baixo' | 'medio' | 'alto';
 export type ScopeEffort = 'pequeno' | 'medio' | 'grande';
 
 export interface ScopeItem {
@@ -48,7 +52,6 @@ export interface ScopeItem {
 	projectId: string;
 	text: string;
 	bucket: ScopeBucket;
-	value: ScopeValue | null;
 	effort: ScopeEffort | null;
 	order: number | null;
 	createdAt: string;

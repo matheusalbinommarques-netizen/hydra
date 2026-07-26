@@ -8,7 +8,6 @@ import {
 	confirmSummary,
 	setHypothesis,
 	setScopeItemEffort,
-	setScopeItemValue,
 	skipActivity
 } from './transitions';
 import { deserializeProjectState, serializeProjectState } from './serialization';
@@ -38,10 +37,7 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(confirmSummary(catalog, state));
 	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
 	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'depois', T1));
-	state = unwrap(setScopeItemValue(catalog, state, 'scope-1', 'alto', T1));
 	state = unwrap(setScopeItemEffort(catalog, state, 'scope-1', 'pequeno', T1));
-	state = unwrap(setScopeItemValue(catalog, state, 'scope-2', 'baixo', T1));
-	state = unwrap(setScopeItemEffort(catalog, state, 'scope-2', 'grande', T1));
 	state = unwrap(setHypothesis(catalog, state, 'Usuários concluem a jornada sem ajuda externa'));
 	state = unwrap(confirmScopeVersion(catalog, state, T2));
 	return state;
@@ -315,11 +311,11 @@ describe('deserializeProjectState — ScopeItem / ScopeVersion', () => {
 		expectError(JSON.stringify(envelope), 'invalid_shape');
 	});
 
-	it('rejeita ScopeItem.value fora da união aprovada', () => {
+	it('rejeita ScopeItem.effort fora da união aprovada', () => {
 		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
 			state: { scopeItems: Array<Record<string, unknown>> };
 		};
-		envelope.state.scopeItems[0].value = 'inventado';
+		envelope.state.scopeItems[0].effort = 'inventado';
 		expectError(JSON.stringify(envelope), 'invalid_shape');
 	});
 

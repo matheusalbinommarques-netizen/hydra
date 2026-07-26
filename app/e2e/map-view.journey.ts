@@ -172,16 +172,15 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			}
 		});
 
-		await page.getByRole('link', { name: /Ir para Monte a próxima versão/ }).click();
+		await page.getByRole('link', { name: /Ir para Escolha o próximo foco/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/next-version`);
 		await page.getByLabel('Descrição do item').fill('Item de teste do Mapa.');
 		await page.getByLabel('Onde esse item entra?').selectOption('agora');
 		await page.getByRole('button', { name: 'Adicionar' }).click();
-		await page.getByRole('button', { name: 'Alto', exact: true }).click();
 		await page.getByRole('button', { name: 'Pequeno', exact: true }).click();
 		await page.getByRole('textbox', { name: 'Hipótese' }).fill('Hipótese de teste do Mapa.');
-		await page.getByRole('button', { name: 'Salvar hipótese' }).click();
-		await page.getByRole('button', { name: 'Confirmar versão' }).click();
+		await page.getByRole('textbox', { name: 'Hipótese' }).press('Tab'); // autosave dispara ao sair do campo
+		await page.getByRole('button', { name: 'Confirmar foco' }).click();
 		await page.getByRole('link', { name: 'Agora' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 

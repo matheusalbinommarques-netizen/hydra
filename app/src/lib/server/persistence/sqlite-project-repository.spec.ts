@@ -13,7 +13,6 @@ import {
 	renameProject,
 	setHypothesis,
 	setScopeItemEffort,
-	setScopeItemValue,
 	skipActivity
 } from '$lib/domain';
 import type { ProjectState } from '$lib/domain';
@@ -78,11 +77,8 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'agora', T1));
 	state = unwrap(addScopeItem(catalog, state, 'scope-3', 'Integrações externas', 'fora', T1));
 	state = unwrap(moveScopeItem(catalog, state, 'scope-3', 'depois', T2));
-	state = unwrap(setScopeItemValue(catalog, state, 'scope-1', 'alto', T1));
 	state = unwrap(setScopeItemEffort(catalog, state, 'scope-1', 'pequeno', T1));
-	state = unwrap(setScopeItemValue(catalog, state, 'scope-2', 'baixo', T1));
 	state = unwrap(setScopeItemEffort(catalog, state, 'scope-2', 'grande', T1));
-	state = unwrap(setScopeItemValue(catalog, state, 'scope-3', 'medio', T1));
 	state = unwrap(setScopeItemEffort(catalog, state, 'scope-3', 'medio', T1));
 	state = unwrap(setHypothesis(catalog, state, 'Usuários concluem a jornada sem ajuda externa'));
 	state = unwrap(confirmScopeVersion(catalog, state, T2));

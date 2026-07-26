@@ -10,17 +10,19 @@ import type {
 	ScopeBucket,
 	ScopeEffort,
 	ScopeItem,
-	ScopeValue,
 	ScopeVersion
 } from './state-types';
 import type { Result } from './result';
 
+// missing_effort carrega os ids dos itens concretos que faltam classificar —
+// a interface precisa apontar exatamente quais, não só dizer "falta algo"
+// (ver docs/core/DOMAIN_MODEL.md). Os demais issues não referenciam item
+// nenhum, então não carregam dado extra.
 export type ScopeConfirmationIssue =
-	| 'no_items'
-	| 'no_now_items'
-	| 'missing_value'
-	| 'missing_effort'
-	| 'missing_hypothesis';
+	| { kind: 'no_items' }
+	| { kind: 'no_now_items' }
+	| { kind: 'missing_effort'; itemIds: string[] }
+	| { kind: 'missing_hypothesis' };
 
 export type DomainTransitionError =
 	| { kind: 'activity_not_found' }
@@ -328,7 +330,7 @@ export function renameProject(
 	return { ok: true, value: nextState };
 }
 
-// --- Monte a próxima versão (ScopeItem / ScopeVersion) --------------------
+// --- Escolha o próximo foco (ScopeItem / ScopeVersion) --------------------
 //
 // Qualquer alteração num ScopeItem ou na hipótese invalida uma confirmação
 // anterior (limpa scopeVersion.confirmedAt e reabre a atividade
@@ -349,11 +351,15 @@ export function getScopeConfirmationIssues(
 	scopeVersion: ScopeVersion
 ): ScopeConfirmationIssue[] {
 	const issues: ScopeConfirmationIssue[] = [];
-	if (scopeItems.length === 0) issues.push('no_items');
-	if (!scopeItems.some((item) => item.bucket === 'agora')) issues.push('no_now_items');
-	if (scopeItems.some((item) => item.value === null)) issues.push('missing_value');
-	if (scopeItems.some((item) => item.effort === null)) issues.push('missing_effort');
-	if (scopeVersion.hypothesis.trim().length === 0) issues.push('missing_hypothesis');
+	if (scopeItems.length === 0) issues.push({ kind: 'no_items' });
+
+	const agoraItems = scopeItems.filter((item) => item.bucket === 'agora');
+	if (agoraItems.length === 0) issues.push({ kind: 'no_now_items' });
+
+	const missingEffortIds = agoraItems.filter((item) => item.effort === null).map((item) => item.id);
+	if (missingEffortIds.length > 0) issues.push({ kind: 'missing_effort', itemIds: missingEffortIds });
+
+	if (scopeVersion.hypothesis.trim().length === 0) issues.push({ kind: 'missing_hypothesis' });
 	return issues;
 }
 
@@ -371,7 +377,6 @@ export function addScopeItem(
 		projectId: state.project.id,
 		text,
 		bucket,
-		value: null,
 		effort: null,
 		order,
 		createdAt: occurredAt,
@@ -429,25 +434,6 @@ export function moveScopeItem(
 	});
 
 	let next: ProjectState = { ...state, scopeItems: items };
-	next = invalidateScopeConfirmation(catalog, next);
-	return { ok: true, value: next };
-}
-
-export function setScopeItemValue(
-	catalog: Catalog,
-	state: ProjectState,
-	itemId: string,
-	value: ScopeValue,
-	occurredAt: string
-): Result<ProjectState, DomainTransitionError> {
-	const item = findScopeItem(state, itemId);
-	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
-	if (item.value === value) return { ok: true, value: state };
-
-	let next: ProjectState = {
-		...state,
-		scopeItems: state.scopeItems.map((i) => (i.id === itemId ? { ...i, value, updatedAt: occurredAt } : i))
-	};
 	next = invalidateScopeConfirmation(catalog, next);
 	return { ok: true, value: next };
 }

@@ -102,7 +102,7 @@ describe('catalog', () => {
 		expect(confirmar?.allowsSkip).toBe(false);
 	});
 
-	it('só "Resumo da descoberta", "Monte a próxima versão" e "Confirmar encerramento do projeto" têm allowsSkip false', () => {
+	it('só "Resumo da descoberta", "Escolha o próximo foco" e "Confirmar encerramento do projeto" têm allowsSkip false', () => {
 		const nonSkippable = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.allowsSkip === false)
@@ -111,9 +111,10 @@ describe('catalog', () => {
 		expect(nonSkippable).toEqual(['confirmar_encerramento', 'montar_proxima_versao', 'resumo']);
 	});
 
-	it('"Monte a próxima versão" é scope_confirmation, não pulável e sem fields', () => {
+	it('"Escolha o próximo foco" é scope_confirmation, não pulável e sem fields', () => {
 		const definicao = catalog.phases.find((phase) => phase.id === 'definicao');
 		const montar = definicao?.activities.find((activity) => activity.id === 'montar_proxima_versao');
+		expect(montar?.title).toBe('Escolha o próximo foco');
 		expect(montar?.completionMode).toBe('scope_confirmation');
 		expect(montar?.allowsSkip).toBe(false);
 		expect('fields' in (montar ?? {})).toBe(false);

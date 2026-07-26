@@ -87,15 +87,15 @@ const visaoProduto: ActivityDefinition = {
 	]
 };
 
-const montarProximaVersao: ActivityDefinition = {
+const escolhaProximoFoco: ActivityDefinition = {
 	id: 'montar_proxima_versao',
 	phaseId: 'definicao',
 	order: 3,
-	title: 'Monte a próxima versão',
-	mainQuestion: 'O que entra na próxima versão, o que fica para depois, e qual hipótese esse recorte vai validar?',
-	why: 'Estruturar o escopo em Agora/Depois/Fora, com valor e esforço por item, protege o foco do produto e evita que a próxima versão cresça antes de validar o essencial.',
-	example: 'Agora: criar projeto e completar a jornada guiada. Depois: relatórios avançados. Fora: integrações externas. Hipótese: profissionais iniciantes conseguem avançar sozinhos só com a orientação contextual.',
-	completionCriteria: 'Escopo confirmado — ScopeVersion com pelo menos um item em Agora, todos os itens com valor e esforço definidos, e hipótese preenchida.',
+	title: 'Escolha o próximo foco',
+	mainQuestion: 'O que deve ser feito agora, o que pode esperar, e o que não pertence a este recorte?',
+	why: 'Organizar o escopo em Agora, Depois e Fora — com tamanho e ordem só para o que está em Agora — protege o foco do próximo passo e evita tentar avançar tudo ao mesmo tempo antes de validar o essencial.',
+	example: 'Agora: criar projeto e completar a jornada guiada (1º, tamanho pequeno). Depois: relatórios avançados. Fora: integrações externas. Hipótese: profissionais iniciantes conseguem avançar sozinhos só com a orientação contextual.',
+	completionCriteria: 'Recorte confirmado — pelo menos um item em Agora, todos os itens de Agora com tamanho definido, e hipótese preenchida.',
 	completionMode: 'scope_confirmation',
 	allowsSkip: false
 };
@@ -150,6 +150,6 @@ const criteriosSucessoProduto: ActivityDefinition = {
 export const productDefinitionActivities: ActivityDefinition[] = [
 	usuarioPrincipal,
 	visaoProduto,
-	montarProximaVersao,
+	escolhaProximoFoco,
 	criteriosSucessoProduto
 ];

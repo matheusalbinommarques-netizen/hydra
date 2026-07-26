@@ -2,20 +2,19 @@
 	let { data } = $props();
 	let view = $derived(data.view);
 
-	const valueLabel: Record<string, string> = { baixo: 'Baixo', medio: 'Médio', alto: 'Alto' };
 	const effortLabel: Record<string, string> = { pequeno: 'Pequeno', medio: 'Médio', grande: 'Grande' };
 </script>
 
 <svelte:head>
-	<title>Próxima versão confirmada</title>
+	<title>Próximo foco confirmado</title>
 </svelte:head>
 
-<h1>Próxima versão confirmada</h1>
+<h1>Próximo foco confirmado</h1>
 
 {#if !view.scopeVersion.confirmedAt}
 	<section class="not-confirmed">
-		<p>Esta versão ainda não foi confirmada.</p>
-		<p><a href="/projects/{view.projectId}/next-version">Ir para Monte a próxima versão →</a></p>
+		<p>Este foco ainda não foi confirmado.</p>
+		<p><a href="/projects/{view.projectId}/next-version">Ir para Escolha o próximo foco →</a></p>
 	</section>
 {:else}
 	{#if view.scopeProjection.alert.triggered}
@@ -32,9 +31,7 @@
 					{#each view.scopeProjection.agora as item (item.id)}
 						<li>
 							<span class="item-text">{item.text}</span>
-							<span class="item-meta">
-								Valor: {valueLabel[item.value ?? '']} · Esforço: {effortLabel[item.effort ?? '']}
-							</span>
+							<span class="item-meta">Tamanho: {effortLabel[item.effort ?? '']}</span>
 						</li>
 					{/each}
 				</ul>
@@ -50,9 +47,9 @@
 					{#each view.scopeProjection.depois as item (item.id)}
 						<li>
 							<span class="item-text">{item.text}</span>
-							<span class="item-meta">
-								Valor: {valueLabel[item.value ?? '']} · Esforço: {effortLabel[item.effort ?? '']}
-							</span>
+							{#if item.effort}
+								<span class="item-meta">Tamanho: {effortLabel[item.effort]}</span>
+							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -68,9 +65,9 @@
 					{#each view.scopeProjection.fora as item (item.id)}
 						<li>
 							<span class="item-text">{item.text}</span>
-							<span class="item-meta">
-								Valor: {valueLabel[item.value ?? '']} · Esforço: {effortLabel[item.effort ?? '']}
-							</span>
+							{#if item.effort}
+								<span class="item-meta">Tamanho: {effortLabel[item.effort]}</span>
+							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -83,7 +80,10 @@
 		<p>{view.scopeProjection.hypothesis}</p>
 	</section>
 
-	<p><a href="/projects/{view.projectId}/next-version">← Editar escopo</a></p>
+	<div class="actions">
+		<a class="button-primary" href="/projects/{view.projectId}/now">Continuar jornada →</a>
+		<a class="secondary-link" href="/projects/{view.projectId}/next-version">Editar foco</a>
+	</div>
 {/if}
 
 <style>
@@ -167,5 +167,26 @@
 
 	.hypothesis p {
 		margin: 0;
+	}
+
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+	}
+
+	.button-primary {
+		display: inline-block;
+		padding: 0.65rem 1.25rem;
+		border-radius: 8px;
+		background: var(--hydra-accent);
+		color: #0a1420;
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.secondary-link {
+		color: var(--hydra-muted);
+		font-size: 0.9rem;
 	}
 </style>

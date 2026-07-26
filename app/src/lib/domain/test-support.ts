@@ -13,7 +13,6 @@ import {
 	confirmSummary,
 	setHypothesis,
 	setScopeItemEffort,
-	setScopeItemValue,
 	skipActivity
 } from './transitions';
 import type { ActivityDefinition, Catalog, PhaseDefinition } from './catalog-types';
@@ -81,7 +80,6 @@ export function confirmScopeVersionMinimally(
 	occurredAt: string
 ): ProjectState {
 	let next = unwrapResult(addScopeItem(catalog, state, itemId, 'Item de teste', 'agora', occurredAt));
-	next = unwrapResult(setScopeItemValue(catalog, next, itemId, 'medio', occurredAt));
 	next = unwrapResult(setScopeItemEffort(catalog, next, itemId, 'medio', occurredAt));
 	next = unwrapResult(setHypothesis(catalog, next, 'Hipótese de teste'));
 	return unwrapResult(confirmScopeVersion(catalog, next, occurredAt));

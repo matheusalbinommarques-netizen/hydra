@@ -1,16 +1,15 @@
-// Projeção somente-leitura do artefato "Monte a próxima versão" — ver
+// Projeção somente-leitura do artefato "Escolha o próximo foco" — ver
 // docs/core/ORIENTATION_ENGINE.md. Função pura: nunca persistida, recalculada
 // a cada leitura a partir de ScopeItem[]/ScopeVersion, mesmo padrão de
 // buildMapView/buildRecordsView. A única regra determinística (alerta de
 // esforço concentrado em "agora") mora aqui — não é motor configurável, é um
 // `if` simples, deliberadamente específico desta experiência.
 
-import type { ScopeEffort, ScopeItem, ScopeValue, ScopeVersion } from '$lib/domain';
+import type { ScopeEffort, ScopeItem, ScopeVersion } from '$lib/domain';
 
 export interface ScopeProjectionItemView {
 	id: string;
 	text: string;
-	value: ScopeValue | null;
 	effort: ScopeEffort | null;
 }
 
@@ -33,7 +32,7 @@ const AGORA_HEAVY_EFFORT_ALERT_THRESHOLD = 5;
 const HEAVY_EFFORTS: readonly ScopeEffort[] = ['medio', 'grande'];
 
 function toItemView(item: ScopeItem): ScopeProjectionItemView {
-	return { id: item.id, text: item.text, value: item.value, effort: item.effort };
+	return { id: item.id, text: item.text, effort: item.effort };
 }
 
 export function computeScopeProjection(scopeItems: ScopeItem[], scopeVersion: ScopeVersion): ScopeProjectionView {

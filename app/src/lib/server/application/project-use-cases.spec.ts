@@ -490,7 +490,7 @@ describe('createProjectUseCases — listRecentProjects', () => {
 	});
 });
 
-describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
+describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 	it('addScopeItem cria o item e reflete em ProjectView.scopeItems', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
@@ -504,7 +504,7 @@ describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.scopeItems).toEqual([
-			{ id: 'id-2', text: 'Criar projeto', bucket: 'agora', value: null, effort: null, order: 0 }
+			{ id: 'id-2', text: 'Criar projeto', bucket: 'agora', effort: null, order: 0 }
 		]);
 	});
 
@@ -516,19 +516,21 @@ describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
 
 		const withItem = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
 		if (!withItem.ok) throw new Error('esperado ok');
-		expect(withItem.value.scopeConfirmationIssues).toEqual(['missing_value', 'missing_effort', 'missing_hypothesis']);
+		const itemId = withItem.value.scopeItems[0].id;
+		expect(withItem.value.scopeConfirmationIssues).toEqual([
+			{ kind: 'missing_effort', itemIds: [itemId] },
+			{ kind: 'missing_hypothesis' }
+		]);
 
 		const failedConfirm = await useCases.confirmScopeVersion({ projectId });
 		expect(failedConfirm).toEqual({
 			ok: false,
 			error: {
 				kind: 'scope_confirmation_invalid',
-				issues: ['missing_value', 'missing_effort', 'missing_hypothesis']
+				issues: [{ kind: 'missing_effort', itemIds: [itemId] }, { kind: 'missing_hypothesis' }]
 			}
 		});
 
-		const itemId = withItem.value.scopeItems[0].id;
-		await useCases.setScopeItemValue({ projectId, itemId, value: 'alto' });
 		await useCases.setScopeItemEffort({ projectId, itemId, effort: 'pequeno' });
 		await useCases.setHypothesis({ projectId, hypothesis: 'Hipótese' });
 
@@ -549,7 +551,6 @@ describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
 		const withItem = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
 		if (!withItem.ok) throw new Error('esperado ok');
 		const itemId = withItem.value.scopeItems[0].id;
-		await useCases.setScopeItemValue({ projectId, itemId, value: 'alto' });
 		await useCases.setScopeItemEffort({ projectId, itemId, effort: 'pequeno' });
 		await useCases.setHypothesis({ projectId, hypothesis: 'Hipótese' });
 		await useCases.confirmScopeVersion({ projectId });
@@ -615,7 +616,6 @@ describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
 			id: itemId,
 			text: 'Item',
 			bucket: 'agora',
-			value: null,
 			effort: null,
 			order: 0
 		});
@@ -626,10 +626,10 @@ describe('createProjectUseCases — escopo (Monte a próxima versão)', () => {
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
 
-		const result = await useCases.setScopeItemValue({
+		const result = await useCases.setScopeItemEffort({
 			projectId: created.value.projectId,
 			itemId: 'inexistente',
-			value: 'alto'
+			effort: 'pequeno'
 		});
 		expect(result).toEqual({ ok: false, error: { kind: 'scope_item_not_found' } });
 

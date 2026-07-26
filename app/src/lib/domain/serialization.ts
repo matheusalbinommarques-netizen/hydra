@@ -13,7 +13,6 @@ import type {
 	ScopeBucket,
 	ScopeEffort,
 	ScopeItem,
-	ScopeValue,
 	ScopeVersion
 } from './state-types';
 import type { Result } from './result';
@@ -176,11 +175,6 @@ function isScopeBucket(value: unknown): value is ScopeBucket {
 	return typeof value === 'string' && SCOPE_BUCKETS.includes(value);
 }
 
-const SCOPE_VALUES: readonly string[] = ['baixo', 'medio', 'alto'];
-function isScopeValueOrNull(value: unknown): value is ScopeValue | null {
-	return value === null || (typeof value === 'string' && SCOPE_VALUES.includes(value));
-}
-
 const SCOPE_EFFORTS: readonly string[] = ['pequeno', 'medio', 'grande'];
 function isScopeEffortOrNull(value: unknown): value is ScopeEffort | null {
 	return value === null || (typeof value === 'string' && SCOPE_EFFORTS.includes(value));
@@ -195,9 +189,6 @@ function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStatePar
 		if (!isString(item.projectId)) return shapeError('ScopeItem.projectId deve ser uma string');
 		if (!isString(item.text)) return shapeError('ScopeItem.text deve ser uma string');
 		if (!isScopeBucket(item.bucket)) return shapeError('ScopeItem.bucket deve ser um dos literais aprovados');
-		if (!isScopeValueOrNull(item.value)) {
-			return shapeError('ScopeItem.value deve ser um dos literais aprovados ou null');
-		}
 		if (!isScopeEffortOrNull(item.effort)) {
 			return shapeError('ScopeItem.effort deve ser um dos literais aprovados ou null');
 		}
@@ -211,7 +202,6 @@ function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStatePar
 			projectId: item.projectId,
 			text: item.text,
 			bucket: item.bucket,
-			value: item.value,
 			effort: item.effort,
 			order: item.order as number | null,
 			createdAt: item.createdAt,
@@ -423,8 +413,9 @@ function assembleProjectState(
 	if (scopeVersion.confirmedAt !== null) {
 		const issues = getScopeConfirmationIssues(scopeItems, scopeVersion);
 		if (issues.length > 0) {
+			const issueKinds = issues.map((issue) => issue.kind).join(', ');
 			return invariantError(
-				`ScopeVersion está confirmada (confirmedAt definido) mas não atende aos critérios de confirmação: ${issues.join(', ')}`
+				`ScopeVersion está confirmada (confirmedAt definido) mas não atende aos critérios de confirmação: ${issueKinds}`
 			);
 		}
 	}

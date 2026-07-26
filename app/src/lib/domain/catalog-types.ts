@@ -31,7 +31,7 @@ type ProjectPropertyFieldDefinition = FieldDefinitionBase & {
 export type FieldDefinition = AnswerFieldDefinition | ProjectPropertyFieldDefinition;
 
 // scope_confirmation é uma solução deliberadamente específica para a
-// experiência "Monte a próxima versão" (ScopeItem/ScopeVersion), não uma
+// experiência "Escolha o próximo foco" (ScopeItem/ScopeVersion), não uma
 // infraestrutura genérica de "Plays". Se uma segunda experiência
 // especializada precisar de outro completion mode com o mesmo formato
 // (confirmação explícita de um agregado próprio, fora de Answer), o conceito

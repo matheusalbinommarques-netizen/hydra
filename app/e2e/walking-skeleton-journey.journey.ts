@@ -191,30 +191,31 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
-	await test.step('Monte a próxima versão recomendada, montada e confirmada', async () => {
-		await expect(page.getByRole('heading', { name: 'Monte a próxima versão' })).toBeVisible();
-		await page.getByRole('link', { name: /Ir para Monte a próxima versão/ }).click();
+	await test.step('Escolha o próximo foco recomendada, montada e confirmada', async () => {
+		await expect(page.getByRole('heading', { name: 'Escolha o próximo foco' })).toBeVisible();
+		await page.getByRole('link', { name: /Ir para Escolha o próximo foco/ }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/next-version`);
 
 		await page.getByLabel('Descrição do item').fill('Registrar, priorizar e acompanhar solicitações.');
 		await page.getByLabel('Onde esse item entra?').selectOption('agora');
 		await page.getByRole('button', { name: 'Adicionar' }).click();
 
-		await expect(page.locator('.item-card input[type="text"]')).toHaveValue(
+		await expect(page.locator('.item-row input[type="text"]')).toHaveValue(
 			'Registrar, priorizar e acompanhar solicitações.'
 		);
-		await page.getByRole('button', { name: 'Alto', exact: true }).click();
 		await page.getByRole('button', { name: 'Pequeno', exact: true }).click();
 		await page
 			.getByRole('textbox', { name: 'Hipótese' })
 			.fill('Usuários conseguem concluir a jornada guiada sem ajuda externa.');
-		await page.getByRole('button', { name: 'Salvar hipótese' }).click();
+		await page.getByRole('textbox', { name: 'Hipótese' }).press('Tab'); // autosave dispara ao sair do campo
 
 		await expect(page.getByText('Tudo pronto para confirmar.')).toBeVisible();
-		await page.getByRole('button', { name: 'Confirmar versão' }).click();
-		await expect(page.getByText('Versão confirmada.')).toBeVisible();
+		await page.getByRole('button', { name: 'Confirmar foco' }).click();
+		await expect(page.getByText('Foco confirmado.')).toBeVisible();
 
-		await page.getByRole('link', { name: 'Agora' }).click();
+		await page.getByRole('link', { name: 'Ver o artefato' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/next-version/confirmed`);
+		await page.getByRole('link', { name: 'Continuar jornada' }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
 	});
 

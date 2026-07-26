@@ -7,8 +7,7 @@ import type {
 	Result,
 	ScopeBucket,
 	ScopeConfirmationIssue,
-	ScopeEffort,
-	ScopeValue
+	ScopeEffort
 } from '$lib/domain';
 import type {
 	HypothesisView,
@@ -52,13 +51,12 @@ export interface ProjectListItem {
 	createdAt: string;
 }
 
-// "Monte a próxima versão" (C5) — view leve de ScopeItem/ScopeVersion, sem
+// "Escolha o próximo foco" (C5) — view leve de ScopeItem/ScopeVersion, sem
 // projectId/createdAt/updatedAt, que a interface não precisa.
 export interface ScopeItemView {
 	id: string;
 	text: string;
 	bucket: ScopeBucket;
-	value: ScopeValue | null;
 	effort: ScopeEffort | null;
 	order: number | null;
 }
@@ -137,12 +135,6 @@ export interface MoveScopeItemInput {
 	bucket: ScopeBucket;
 }
 
-export interface SetScopeItemValueInput {
-	projectId: string;
-	itemId: string;
-	value: ScopeValue;
-}
-
 export interface SetScopeItemEffortInput {
 	projectId: string;
 	itemId: string;
@@ -179,7 +171,6 @@ export interface ProjectUseCases {
 	addScopeItem(input: AddScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setScopeItemText(input: SetScopeItemTextInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveScopeItem(input: MoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
-	setScopeItemValue(input: SetScopeItemValueInput): Promise<UseCaseOutcome<ProjectView>>;
 	setScopeItemEffort(input: SetScopeItemEffortInput): Promise<UseCaseOutcome<ProjectView>>;
 	reorderAgoraItems(input: ReorderAgoraItemsInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeScopeItem(input: RemoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;

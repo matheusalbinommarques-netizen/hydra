@@ -64,8 +64,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		}
 
 		const insertScopeItem = db.prepare(
-			`INSERT INTO scope_item (id, project_id, text, bucket, value, effort, item_order, created_at, updated_at)
-			 VALUES (@id, @projectId, @text, @bucket, @value, @effort, @order, @createdAt, @updatedAt)`
+			`INSERT INTO scope_item (id, project_id, text, bucket, effort, item_order, created_at, updated_at)
+			 VALUES (@id, @projectId, @text, @bucket, @effort, @order, @createdAt, @updatedAt)`
 		);
 		for (const item of state.scopeItems) {
 			insertScopeItem.run(item);
@@ -137,7 +137,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const scopeItemRows = db
 				.prepare(
-					`SELECT id, project_id, text, bucket, value, effort, item_order, created_at, updated_at
+					`SELECT id, project_id, text, bucket, effort, item_order, created_at, updated_at
 					 FROM scope_item WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as ScopeItemRow[];

@@ -18,7 +18,6 @@ import {
 	setHypothesis as setHypothesisInDomain,
 	setScopeItemEffort as setScopeItemEffortInDomain,
 	setScopeItemText as setScopeItemTextInDomain,
-	setScopeItemValue as setScopeItemValueInDomain,
 	skipActivity as skipActivityInDomain
 } from '$lib/domain';
 import type { ProjectRepository } from '../persistence';
@@ -38,7 +37,6 @@ import type {
 	SetHypothesisInput,
 	SetScopeItemEffortInput,
 	SetScopeItemTextInput,
-	SetScopeItemValueInput,
 	SkipActivityInput,
 	UseCaseOutcome
 } from './types';
@@ -176,17 +174,6 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = moveScopeItemInDomain(catalog, state, input.itemId, input.bucket, clock.now());
-			if (!result.ok) return { ok: false, error: result.error };
-
-			if (result.value !== state) await repository.save(result.value);
-			return viewOf(result.value);
-		},
-
-		async setScopeItemValue(input: SetScopeItemValueInput) {
-			const state = await repository.findById(input.projectId);
-			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
-
-			const result = setScopeItemValueInDomain(catalog, state, input.itemId, input.value, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			if (result.value !== state) await repository.save(result.value);
