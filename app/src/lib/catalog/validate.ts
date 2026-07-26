@@ -89,6 +89,8 @@ export function validateCatalog(catalog: Catalog): string[] {
 			}
 
 			// required_fields: valida cada FieldDefinition.
+			const optionalGroupLabelById = new Map<string, string>();
+
 			for (const field of activity.fields) {
 				if (fieldIds.has(field.id)) {
 					violations.push(`Campo duplicado: id "${field.id}"`);
@@ -133,6 +135,17 @@ export function validateCatalog(catalog: Catalog): string[] {
 								violations.push(`Campo "${field.id}" tem option.id duplicado: "${option.id}"`);
 							}
 							seenOptionIds.add(option.id);
+						}
+					}
+
+					if (field.optionalGroup) {
+						const existingLabel = optionalGroupLabelById.get(field.optionalGroup.id);
+						if (existingLabel === undefined) {
+							optionalGroupLabelById.set(field.optionalGroup.id, field.optionalGroup.label);
+						} else if (existingLabel !== field.optionalGroup.label) {
+							violations.push(
+								`Campo "${field.id}" usa optionalGroup.id "${field.optionalGroup.id}" com label "${field.optionalGroup.label}", diferente do label já usado por outro campo do mesmo grupo ("${existingLabel}")`
+							);
 						}
 					}
 				}

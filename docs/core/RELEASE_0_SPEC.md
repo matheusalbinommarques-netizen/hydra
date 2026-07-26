@@ -147,12 +147,8 @@ Ajudar o usuário a compreender a necessidade antes de definir funcionalidades.
 
 #### Campos opcionais
 
-- descrição do sinal "Outro" (só aparece quando "Outro" é selecionado acima; não alimenta regra nenhuma nesta versão);
-- evidências;
-- consequências de não agir;
-- hipótese;
-- solução imaginada;
-- observações.
+- descrição do sinal "Outro" (só aparece quando "Outro" é selecionado acima; não alimenta regra nenhuma nesta versão; sempre visível, fora do agrupamento abaixo);
+- evidências, consequências de não agir, hipótese, solução imaginada e observações — agrupados numa seção expansível ("Adicionar mais contexto"), recolhida por padrão e aberta automaticamente quando algum desses campos já tiver resposta salva (`domain/catalog-types.ts`, `optionalGroup`).
 
 #### Orientação contextual
 

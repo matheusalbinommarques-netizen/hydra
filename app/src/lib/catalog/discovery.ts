@@ -3,6 +3,10 @@
 
 import type { ActivityDefinition } from '$lib/domain';
 
+// Agrupa os campos opcionais menos usados de "Problema ou oportunidade" numa
+// seção expansível — situação e sinais continuam sempre visíveis.
+const MAIS_CONTEXTO_GROUP = { id: 'mais_contexto', label: 'Adicionar mais contexto' };
+
 const origem: ActivityDefinition = {
 	id: 'origem',
 	phaseId: 'descoberta',
@@ -162,7 +166,8 @@ const problema: ActivityDefinition = {
 			required: false,
 			placeholder: 'Dados, exemplos ou registros que comprovam o problema...',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			optionalGroup: MAIS_CONTEXTO_GROUP
 		},
 		{
 			id: 'consequencias',
@@ -171,7 +176,8 @@ const problema: ActivityDefinition = {
 			required: false,
 			placeholder: 'O que acontece se essa situação continuar...',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			optionalGroup: MAIS_CONTEXTO_GROUP
 		},
 		{
 			id: 'hipotese_opt',
@@ -181,7 +187,8 @@ const problema: ActivityDefinition = {
 			placeholder: 'Suposições que ainda precisam ser validadas...',
 			dataTarget: 'answer',
 			semanticRole: 'hypothesis',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			optionalGroup: MAIS_CONTEXTO_GROUP
 		},
 		{
 			id: 'solucao_imaginada',
@@ -190,7 +197,8 @@ const problema: ActivityDefinition = {
 			required: false,
 			placeholder: 'Se já tem uma ideia de solução, descreva aqui...',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			optionalGroup: MAIS_CONTEXTO_GROUP
 		},
 		{
 			id: 'observacoes',
@@ -198,7 +206,8 @@ const problema: ActivityDefinition = {
 			label: 'Observações',
 			required: false,
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'texto_longo',
+			optionalGroup: MAIS_CONTEXTO_GROUP
 		}
 	]
 };

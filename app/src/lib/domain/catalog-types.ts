@@ -49,6 +49,15 @@ type AnswerFieldDefinition = FieldDefinitionBase &
 		// ação varia por par (ex.: "Usar o problema como ponto de partida" não
 		// é só o título de "Problema ou oportunidade").
 		suggestedSource?: { activityId: string; fieldId: string; actionLabel: string; helpText: string };
+		// Agrupa campos opcionais dentro de uma seção expansível (`<details>`),
+		// para reduzir quantas caixas de texto grandes aparecem simultaneamente
+		// numa atividade. Mecanismo genérico mínimo, no mesmo espírito de
+		// `revealWhen`: todo campo com o mesmo `optionalGroup.id`, na mesma
+		// atividade, é renderizado dentro de um único `<details>` na posição do
+		// primeiro campo do grupo, com `optionalGroup.label` como `<summary>`.
+		// Puramente de exibição — não afeta validação, obrigatoriedade nem
+		// submissão (os campos continuam no mesmo `<form>` da atividade).
+		optionalGroup?: { id: string; label: string };
 	};
 
 type ProjectPropertyFieldDefinition = FieldDefinitionBase & {
