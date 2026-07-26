@@ -178,7 +178,8 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'scopeConfirmationIssues',
 				'scopeProjection',
 				'scopeSuggestions',
-				'fieldSuggestions'
+				'fieldSuggestions',
+				'criteriaScopeConflict'
 			].sort()
 		);
 	});

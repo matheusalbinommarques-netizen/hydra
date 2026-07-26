@@ -4,6 +4,7 @@
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
 import { getScopeConfirmationIssues } from '$lib/domain';
 import {
+	computeCriteriaScopeConflict,
 	computeFieldSuggestions,
 	computeScopeProjection,
 	computeScopeSuggestions,
@@ -89,6 +90,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		scopeConfirmationIssues: getScopeConfirmationIssues(state.scopeItems, state.scopeVersion),
 		scopeProjection: computeScopeProjection(state.scopeItems, state.scopeVersion),
 		scopeSuggestions: computeScopeSuggestions(state.answers, state.scopeItems),
-		fieldSuggestions: computeFieldSuggestions(catalog, state.answers)
+		fieldSuggestions: computeFieldSuggestions(catalog, state.answers),
+		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems)
 	};
 }

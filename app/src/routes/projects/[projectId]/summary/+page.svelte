@@ -3,6 +3,7 @@
 
 	let { data, form } = $props();
 	let projectId = $derived(data.view.projectId);
+	let criteriaScopeConflict = $derived(data.view.criteriaScopeConflict);
 </script>
 
 <svelte:head>
@@ -11,6 +12,10 @@
 
 <h1>Resumo da descoberta</h1>
 <p>Revise o que entendemos até aqui antes de avançar.</p>
+
+{#if criteriaScopeConflict.triggered}
+	<p role="alert" class="scope-alert">{criteriaScopeConflict.message}</p>
+{/if}
 
 {#if data.overview.length > 0}
 	<div class="overview">
@@ -79,6 +84,14 @@
 	.empty {
 		color: var(--hydra-muted);
 		margin: 0;
+	}
+
+	.scope-alert {
+		border: 1px solid var(--hydra-warning);
+		border-radius: 10px;
+		padding: 0.85rem 1.1rem;
+		background: var(--hydra-surface);
+		margin: 1rem 0 0;
 	}
 
 	.overview {

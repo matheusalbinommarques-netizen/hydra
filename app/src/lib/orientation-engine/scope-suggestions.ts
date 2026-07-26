@@ -1,11 +1,15 @@
 // Prova pequena "seleção estruturada → sugestão explicada → ScopeItem" — ver
 // docs/core/ORIENTATION_ENGINE.md. Função pura, nunca persistida, recalculada
 // a cada leitura a partir de Answer[]/ScopeItem[] (mesmo padrão de
-// computeScopeProjection/computeHypotheses). Exatamente duas regras
-// explícitas e específicas — deliberadamente não é uma tabela configurável
-// de sinal→sugestão; se uma terceira regra ou um segundo sinal-fonte
-// aparecer, isso é o sinal para reconsiderar o desenho, não para acumular
-// mais `if`s aqui silenciosamente.
+// computeScopeProjection/computeHypotheses). Três regras explícitas e
+// específicas (decisão registrada na Especificação de Recuperação v1.1,
+// adendo item 4) — deliberadamente não é uma tabela configurável de
+// sinal→sugestão. Os ids `lack_of_clarity`, `dispersed_decisions`,
+// `insufficient_tracking` ficam de fora por decisão explícita; `other` é
+// descartado permanentemente como gatilho (sem semântica própria). Se uma
+// quarta regra for cogitada no futuro, isso é o sinal para reconsiderar o
+// desenho (ex.: generalizar sinal→sugestão), não para acumular mais `if`s
+// silenciosamente.
 
 import { decodeMultiSelectValue } from '$lib/domain';
 import type { Answer, ScopeItem } from '$lib/domain';
@@ -43,6 +47,14 @@ export function computeScopeSuggestions(answers: Answer[], scopeItems: ScopeItem
 			id: 'combine_redundant_steps',
 			title: 'Reduzir ou combinar etapas redundantes',
 			reason: 'Sugerido porque você indicou excesso de etapas.'
+		});
+	}
+
+	if (signals.includes('rework')) {
+		suggestions.push({
+			id: 'investigate_rework_cause',
+			title: 'Investigar a causa raiz do retrabalho',
+			reason: 'Sugerido porque você indicou retrabalho.'
 		});
 	}
 

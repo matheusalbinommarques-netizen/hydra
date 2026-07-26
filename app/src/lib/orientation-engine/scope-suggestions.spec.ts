@@ -65,12 +65,35 @@ describe('computeScopeSuggestions', () => {
 		expect(suggestions.map((s) => s.id)).toEqual(['reuse_existing_information', 'combine_redundant_steps']);
 	});
 
+	it('rework gera a sugestão "investigate_rework_cause" com o motivo correto', () => {
+		const suggestions = computeScopeSuggestions([signalsAnswer(['rework'])], []);
+		expect(suggestions).toEqual([
+			{
+				id: 'investigate_rework_cause',
+				title: 'Investigar a causa raiz do retrabalho',
+				reason: 'Sugerido porque você indicou retrabalho.'
+			}
+		]);
+	});
+
 	it('outros sinais não implementados não geram sugestão nenhuma', () => {
 		const suggestions = computeScopeSuggestions(
-			[signalsAnswer(['rework', 'lack_of_clarity', 'dispersed_decisions', 'insufficient_tracking', 'other'])],
+			[signalsAnswer(['lack_of_clarity', 'dispersed_decisions', 'insufficient_tracking', 'other'])],
 			[]
 		);
 		expect(suggestions).toEqual([]);
+	});
+
+	it('os três sinais implementados juntos geram as três sugestões, na ordem dos ids do catálogo', () => {
+		const suggestions = computeScopeSuggestions(
+			[signalsAnswer(['duplicated_information', 'too_many_steps', 'rework'])],
+			[]
+		);
+		expect(suggestions.map((s) => s.id)).toEqual([
+			'reuse_existing_information',
+			'combine_redundant_steps',
+			'investigate_rework_cause'
+		]);
 	});
 
 	it('sugestão não aceita (nenhum ScopeItem com o sourceSuggestionId) continua aparecendo', () => {

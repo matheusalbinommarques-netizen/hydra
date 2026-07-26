@@ -8,4 +8,5 @@ export * from './hypotheses';
 export * from './field-suggestions';
 export * from './scope-projection';
 export * from './scope-suggestions';
+export * from './criteria-scope-conflict';
 export * from './snapshot';

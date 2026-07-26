@@ -33,7 +33,7 @@
 
 {#if data.activity?.completionMode === 'explicit_confirmation'}
 	<section class="next-action">
-		<p class="eyebrow">Próxima ação recomendada</p>
+		<p class="eyebrow">Revisão recomendada</p>
 		<h2>{data.activity.title}</h2>
 		<p class="main-question">{data.activity.mainQuestion}</p>
 		<p><a href="/projects/{view.projectId}/summary">Ir para o Resumo da descoberta →</a></p>
