@@ -4,7 +4,10 @@ import { encodeMultiSelectValue } from '$lib/domain';
 import type { ActivityDefinition } from '$lib/domain';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
+import type { ProjectView } from '$lib/server/application/types';
 import type { Actions, PageServerLoad } from './$types';
+
+const DESCOBERTA_PHASE_ID = 'descoberta';
 
 function findActivityDefinition(activityId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -14,7 +17,20 @@ function findActivityDefinition(activityId: string): ActivityDefinition | undefi
 	return undefined;
 }
 
-export const load: PageServerLoad = async ({ parent, url }) => {
+// Edição a partir do Resumo da descoberta (?activity=<id>&from=summary): só
+// atividades required_fields da própria Descoberta, e só quando já
+// concluída — nunca uma atividade de outra fase, nem uma ainda não alcançada
+// pela Trilha A (não_iniciada/em_andamento nunca passa aqui), nem uma pulada
+// (essa continua exclusiva do fluxo de retomada de pendência, acima).
+function findDescobertaConcluidaActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
+	const activity = findActivityDefinition(activityId);
+	if (!activity || activity.completionMode !== 'required_fields') return undefined;
+	if (activity.phaseId !== DESCOBERTA_PHASE_ID) return undefined;
+	if (view.activityStatuses[activityId] !== 'concluída') return undefined;
+	return activity;
+}
+
+export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const { view } = await parent();
 
 	// Retomada de atividade pulada: só aceita um id que já corresponda a uma
@@ -26,6 +42,20 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 		? view.openPendingItems.find((item) => item.activityDefinitionId === resumeActivityId)
 		: undefined;
 
+	// Edição a partir do Resumo: parâmetro adicional e explícito
+	// (from=summary), só resolvido quando não é um caso de retomada de
+	// pendência. Parâmetro presente mas inválido (id de outra fase, id
+	// inexistente, ou atividade ainda não concluída) falha de forma segura —
+	// redireciona ao Resumo em vez de renderizar qualquer atividade.
+	const fromSummary = url.searchParams.get('from') === 'summary';
+	if (resumeActivityId && fromSummary && !resumingPendingItem) {
+		const editActivity = findDescobertaConcluidaActivity(view, resumeActivityId);
+		if (!editActivity) {
+			redirect(303, `/projects/${params.projectId}/summary`);
+		}
+		return { activity: editActivity, isResuming: false, isEditingFromSummary: true };
+	}
+
 	const activityId = resumingPendingItem
 		? resumingPendingItem.activityDefinitionId
 		: view.nextActivity.kind === 'recommendation'
@@ -34,7 +64,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
 	const activity = activityId ? findActivityDefinition(activityId) : undefined;
 
-	return { activity, isResuming: Boolean(resumingPendingItem) };
+	return { activity, isResuming: Boolean(resumingPendingItem), isEditingFromSummary: false };
 };
 
 export const actions: Actions = {
@@ -44,6 +74,11 @@ export const actions: Actions = {
 		if (typeof activityDefinitionId !== 'string' || !activityDefinitionId) {
 			return fail(400, { message: 'Atividade inválida.' });
 		}
+		// Marca a origem "edição a partir do Resumo" (ActivityForm/+page.svelte
+		// só a inclui quando data.isEditingFromSummary é true) — decide para
+		// onde ir após salvar, sem afetar em nada a validação/persistência.
+		const returnTo = formData.get('returnTo');
+		const returnToSummary = returnTo === 'summary';
 
 		const activity = findActivityDefinition(activityDefinitionId);
 		const multiSelectFieldIds = new Set(
@@ -56,7 +91,7 @@ export const actions: Actions = {
 
 		const values: Record<string, string> = {};
 		for (const key of formData.keys()) {
-			if (key === 'activityDefinitionId' || values[key] !== undefined) continue;
+			if (key === 'activityDefinitionId' || key === 'returnTo' || values[key] !== undefined) continue;
 			if (multiSelectFieldIds.has(key)) {
 				values[key] = encodeMultiSelectValue(
 					formData.getAll(key).filter((v): v is string => typeof v === 'string')
@@ -81,6 +116,14 @@ export const actions: Actions = {
 
 		if (!result.ok) {
 			return fail(400, { message: mapUseCaseError(result.error), values });
+		}
+
+		if (returnToSummary) {
+			// Edição a partir do Resumo nunca avança para a próxima atividade da
+			// jornada — sempre volta ao Resumo, sucesso ou não a atividade
+			// editada permanecer concluída (a invalidação, se aplicável, já
+			// aconteceu dentro de answerActivity).
+			redirect(303, `/projects/${params.projectId}/summary`);
 		}
 		return { success: true, values: undefined };
 	},

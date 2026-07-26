@@ -319,11 +319,26 @@ Permitir que o usuário revise o que foi entendido antes de avançar.
 
 #### Nota de implementação
 
-A implementação atual estrutura o Resumo em blocos por atividade
-respondida (pergunta e resposta), em vez dos blocos temáticos
-"fatos/hipóteses/lacunas" descritos acima. Isso é mantido como evolução
-consciente do desenho inicial, não como pendência — a revisão continua
-escaneável e editável, atendendo ao requisito de clareza desta seção.
+A implementação atual abre com uma visão geral compacta — problema, sinais
+identificados (como chips), público afetado, estado atual e resultado
+desejado — cada bloco com uma ação "Editar X" própria, seguida de uma
+conferência compacta (problema/público/estado atual/resultado definidos) e
+do botão de confirmação. As respostas completas de todas as seis atividades
+da Descoberta (pergunta e resposta, em vez dos blocos temáticos
+"fatos/hipóteses/lacunas" descritos acima) ficam em "Ver todas as respostas
+da descoberta", recolhida por padrão e aberta automaticamente quando alguma
+atividade da Descoberta ainda não está concluída. Isso é mantido como
+evolução consciente do desenho inicial, não como pendência — a revisão
+continua escaneável e editável, atendendo ao requisito de clareza desta
+seção.
+
+"Editar X" reabre a atividade concluída correspondente (via
+`now/+page.server.ts`, restrito às atividades da própria Descoberta — ver
+`domain/catalog-types.ts`/`?activity=…&from=summary`), reaproveitando
+integralmente o formulário, a validação e a persistência já existentes;
+salvar volta ao Resumo em vez de avançar a jornada, e invalida a confirmação
+anterior do Resumo do mesmo jeito que qualquer outra edição das seis
+atividades (ver `STATE_MACHINE.md` §3).
 
 A tela de Resumo é a visualização legível vigente da descoberta. A
 exportação JSON atende à portabilidade dos dados e não representa um

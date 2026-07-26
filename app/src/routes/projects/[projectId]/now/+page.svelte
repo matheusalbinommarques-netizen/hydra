@@ -47,7 +47,15 @@
 	</section>
 {:else if data.activity}
 	<section class="next-action">
-		<p class="eyebrow">{data.isResuming ? 'Retomando etapa pulada' : 'Próxima ação recomendada'}</p>
+		<p class="eyebrow">
+			{#if data.isEditingFromSummary}
+				Editando a partir do Resumo da descoberta
+			{:else if data.isResuming}
+				Retomando etapa pulada
+			{:else}
+				Próxima ação recomendada
+			{/if}
+		</p>
 		<h2>{data.activity.title}</h2>
 		<p class="main-question">{data.activity.mainQuestion}</p>
 		<p class="why"><strong>Por que isso importa:</strong> {data.activity.why}</p>
@@ -66,24 +74,30 @@
 						await goto(`/projects/${view.projectId}/now`, { invalidateAll: true });
 						return;
 					}
+					// Edição a partir do Resumo: em sucesso a própria action
+					// redireciona (303) para /summary — update() já segue esse
+					// redirect. Em erro, permanece nesta tela normalmente.
 					await update();
 				};
 			}}
 		>
 			<input type="hidden" name="activityDefinitionId" value={data.activity.id} />
+			{#if data.isEditingFromSummary}
+				<input type="hidden" name="returnTo" value="summary" />
+			{/if}
 			<ActivityForm
 				activity={data.activity}
 				values={form?.values ?? view.answers}
 				fieldSuggestions={view.fieldSuggestions}
 			/>
-			<button type="submit">Salvar e continuar</button>
+			<button type="submit">{data.isEditingFromSummary ? 'Salvar e voltar ao Resumo' : 'Salvar e continuar'}</button>
 		</form>
 
 		{#if form?.message}
 			<p role="alert">{form.message}</p>
 		{/if}
 
-		{#if data.activity.allowsSkip && !data.isResuming}
+		{#if data.activity.allowsSkip && !data.isResuming && !data.isEditingFromSummary}
 			<SkipActivityConfirm activity={data.activity} />
 		{/if}
 	</section>

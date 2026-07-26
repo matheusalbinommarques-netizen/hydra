@@ -141,29 +141,42 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		// nome do projeto (cabeçalho persistente do layout do projeto)
 		await expect(page.getByText('Portal de Solicitações E2E')).toBeVisible();
 
+		// Visão geral (Corte 3) — só as Answers canônicas de problema/sinais/
+		// público/estado atual/resultado, sempre visíveis, escopadas a
+		// .overview para não colidir com a cópia integral em "detalhes".
+		const overview = page.locator('.overview');
+		await expect(overview.getByText('As solicitações internas chegam sem padrão.')).toBeVisible();
+		await expect(overview.getByText('Informação duplicada')).toBeVisible();
+		await expect(overview.getByText('Agentes de atendimento e clientes internos.')).toBeVisible();
+		await expect(overview.getByText('Cada time usa sua própria planilha, sem padrão.')).toBeVisible();
+		await expect(overview.getByText('Solicitações centralizadas, priorizadas e acompanháveis.')).toBeVisible();
+
+		// Conferência compacta — as seis atividades da Descoberta já concluídas
+		// nesta jornada, então os quatro itens aparecem marcados.
+		await expect(page.getByText('Problema definido')).toBeVisible();
+		await expect(page.getByText('Público definido')).toBeVisible();
+		await expect(page.getByText('Estado atual definido')).toBeVisible();
+		await expect(page.getByText('Resultado definido')).toBeVisible();
+
+		// "Ver todas as respostas da descoberta" recolhida por padrão (todas as
+		// seis atividades já concluídas) — abre para checar os campos que só
+		// aparecem nos detalhes completos (fora da visão geral).
+		await page.getByText('Ver todas as respostas da descoberta').click();
+		const details = page.locator('.full-details');
+
 		// Origem do projeto
-		await expect(page.getByText('Um problema')).toBeVisible();
+		await expect(details.getByText('Um problema')).toBeVisible();
 
 		// Contexto inicial
-		await expect(page.getByText('Descrição breve do projeto para o teste E2E.')).toBeVisible();
-		await expect(page.getByText('Individual', { exact: true })).toBeVisible();
-		await expect(page.getByText('Intermediário')).toBeVisible();
-		await expect(page.getByText('Em planejamento')).toBeVisible();
+		await expect(details.getByText('Descrição breve do projeto para o teste E2E.')).toBeVisible();
+		await expect(details.getByText('Individual', { exact: true })).toBeVisible();
+		await expect(details.getByText('Intermediário')).toBeVisible();
+		await expect(details.getByText('Em planejamento')).toBeVisible();
 
-		// Problema ou oportunidade
-		await expect(page.getByText('As solicitações internas chegam sem padrão.')).toBeVisible();
-		await expect(page.getByText('Informação duplicada')).toBeVisible();
-
-		// Público afetado
-		await expect(page.getByText('Agentes de atendimento e clientes internos.')).toBeVisible();
-
-		// Estado atual
-		await expect(page.getByText('Cada time usa sua própria planilha, sem padrão.')).toBeVisible();
-
-		// Resultado desejado
-		await expect(page.getByText('Solicitações centralizadas, priorizadas e acompanháveis.')).toBeVisible();
-		await expect(page.getByText('Equipe de atendimento e clientes.')).toBeVisible();
-		await expect(page.getByText('Menos retrabalho e resposta mais rápida.')).toBeVisible();
+		// Resultado desejado — beneficiário e percepção não fazem parte da
+		// visão geral (só a mudança esperada), continuam nos detalhes.
+		await expect(details.getByText('Equipe de atendimento e clientes.')).toBeVisible();
+		await expect(details.getByText('Menos retrabalho e resposta mais rápida.')).toBeVisible();
 	});
 
 	await test.step('confirmar o Resumo', async () => {
