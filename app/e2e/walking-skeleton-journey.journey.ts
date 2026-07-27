@@ -80,25 +80,41 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
-	await test.step('Contexto inicial', async () => {
+	await test.step('Contexto inicial (campo a campo)', async () => {
 		await expect(page.getByRole('heading', { name: 'Contexto inicial' })).toBeVisible();
 		await page.getByLabel('Nome provisório do projeto').fill('Portal de Solicitações E2E');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
 		await page.getByLabel('Breve descrição').fill('Descrição breve do projeto para o teste E2E.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
 		await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
 		await page
 			.getByLabel('Qual seu nível de experiência com gestão de projetos?')
 			.selectOption('Intermediário');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
 		await page.getByLabel('Qual o estágio atual?').selectOption('Em planejamento');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
-	await test.step('Problema ou oportunidade', async () => {
+	await test.step('Problema ou oportunidade (campo a campo, com etapa opcional)', async () => {
 		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade' })).toBeVisible();
 		await page
 			.getByLabel('Qual situação precisa mudar?')
 			.fill('As solicitações internas chegam sem padrão.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
+		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade' })).toBeVisible();
 		await page.getByLabel('Informação duplicada').check();
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
+		// Todos os obrigatórios respondidos — etapa opcional agrupada, avança
+		// sem preencher nada.
+		await expect(page.getByText('Mais contexto (opcional)')).toBeVisible();
+		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
 	});
 
 	await test.step('Público afetado', async () => {
@@ -192,16 +208,25 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
-	await test.step('Definir visão do produto recomendada e respondida', async () => {
+	await test.step('Definir visão do produto recomendada e respondida (campo a campo)', async () => {
 		await expect(page.getByRole('heading', { name: 'Definir visão do produto' })).toBeVisible();
 		await page.getByLabel('Que tipo de produto será?').fill('Portal web de solicitações.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
 		await page
 			.getByLabel('Qual necessidade principal esse produto atende?')
 			.fill('Centralizar e priorizar solicitações internas.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
 		await page
 			.getByLabel('Qual benefício principal o produto deve entregar?')
 			.fill('Resposta mais rápida e menos retrabalho.');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
+		// "diferencial" (opcional, único campo restante) — etapa opcional,
+		// avança sem preencher.
+		await expect(page.getByText('Mais contexto (opcional)')).toBeVisible();
+		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
 	});
 
 	await test.step('Escolha o próximo foco recomendada, montada e confirmada', async () => {

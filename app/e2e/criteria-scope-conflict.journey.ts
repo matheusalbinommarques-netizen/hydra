@@ -51,15 +51,21 @@ async function completeDiscovery(page: Page): Promise<void> {
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
 	await page.getByLabel('Nome provisório do projeto').fill('Projeto Conflito Critério × Escopo');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Breve descrição').fill('Descrição breve do projeto.');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Qual seu nível de experiência com gestão de projetos?').selectOption('Intermediário');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Qual o estágio atual?').selectOption('Em planejamento');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
 	await page.getByLabel('Qual situação precisa mudar?').fill('Situação de teste do conflito.');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Informação duplicada', { exact: true }).check();
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
 
 	await page.getByLabel('Quem é afetado por esta situação, em detalhe?').fill('Público de teste.');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
@@ -100,8 +106,12 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 	});
 
 	await test.step('completar usuário principal, visão do produto e confirmar escopo com um item em "Agora"', async () => {
-		// usuario_principal, visao_produto
-		await answerActivitiesGenerically(page, 2);
+		// usuario_principal (1 campo) + visao_produto campo a campo (3
+		// obrigatórios: tipo_produto, necessidade_central, beneficio_central) +
+		// etapa opcional de visao_produto (diferencial, sem obrigatórios — o
+		// helper genérico só clica "Salvar e continuar" sem preencher nada,
+		// suficiente para avançar a etapa opcional) = 5 passos.
+		await answerActivitiesGenerically(page, 5);
 
 		await page.getByRole('link', { name: /Ir para Escolha o próximo foco/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/next-version`);

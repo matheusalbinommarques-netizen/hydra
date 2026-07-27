@@ -70,12 +70,18 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 
 		await page.getByLabel('O que deu origem a este projeto?').selectOption('Uma ideia de produto');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+		// "Contexto inicial" é decomposta campo a campo nesta rodada — um
+		// submit por campo.
 		await page.getByLabel('Nome provisório do projeto').fill('Level Me Up');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 		await page.getByLabel('Breve descrição').fill('Refatoração e evolução da baseline.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 		await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 		await page
 			.getByLabel('Qual seu nível de experiência com gestão de projetos?')
 			.selectOption('Experiente');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 		await page.getByLabel('Qual o estágio atual?').selectOption('Já em execução');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 

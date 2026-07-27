@@ -1,7 +1,11 @@
 // Teste Playwright dedicado da seção expansível "Adicionar mais contexto" em
-// "Problema ou oportunidade" (Corte 2 da macroentrega de reaproveitamento).
-// Roda via playwright.journey.config.ts (servidor efêmero + banco temporário
-// isolados) — ver e2e/helpers/ephemeral-server.ts.
+// "Problema ou oportunidade" (Corte 2 da macroentrega de reaproveitamento),
+// adaptado à apresentação campo a campo da Bancada (Descoberta + Definição
+// do produto): "problema" agora decompõe seus dois campos obrigatórios
+// (situacao, sinais_situacao) em etapas separadas, e só depois libera uma
+// etapa opcional agrupada com os campos restantes — nunca mais um único
+// formulário com tudo junto. Roda via playwright.journey.config.ts (servidor
+// efêmero + banco temporário isolados) — ver e2e/helpers/ephemeral-server.ts.
 
 import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
@@ -57,17 +61,32 @@ async function createProjectAndReachProblema(page: import('@playwright/test').Pa
 	return projectId;
 }
 
-test('seção "Adicionar mais contexto": recolhida por padrão, teclado, revealWhen e valor preservado ao salvar incompleto', async ({
+test('seção "Adicionar mais contexto": recolhida por padrão, teclado, revealWhen resolvido estaticamente na etapa opcional, e valores preservados', async ({
 	page
 }) => {
+	let projectId = '';
+
 	await test.step('criar projeto e chegar a "Problema ou oportunidade"', async () => {
-		await createProjectAndReachProblema(page);
+		projectId = await createProjectAndReachProblema(page);
+	});
+
+	await test.step('responder "situacao" (primeiro campo obrigatório)', async () => {
+		await page.getByLabel('Qual situação precisa mudar?').fill('As solicitações chegam sem padrão.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	});
+
+	await test.step('responder "sinais_situacao" com "Outro" marcado (último obrigatório)', async () => {
+		await expect(page.getByText('Quais sinais representam melhor a situação?')).toBeVisible();
+		await page.getByLabel('Outro', { exact: true }).check();
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	});
 
 	const summary = page.getByText('Adicionar mais contexto', { exact: false });
 	const details = page.locator('details.optional-group');
 
-	await test.step('recolhida inicialmente quando todos os campos estão vazios, sem contagem', async () => {
+	await test.step('etapa opcional: "Descreva o sinal Outro" já revelado (resolvido estaticamente, fora do grupo); grupo recolhido, sem contagem', async () => {
+		await expect(page.getByText('Mais contexto (opcional)')).toBeVisible();
+		await expect(page.getByLabel('Descreva o sinal "Outro"')).toBeVisible();
 		await expect(details).toBeVisible();
 		await expect(details).not.toHaveAttribute('open', '');
 		await expect(page.getByText(/informaç(ão|ões) adicionada/)).toHaveCount(0);
@@ -81,38 +100,22 @@ test('seção "Adicionar mais contexto": recolhida por padrão, teclado, revealW
 		await expect(page.getByLabel('Evidências')).toBeVisible();
 	});
 
-	await test.step('"Outro" continua revelando o campo de descrição (revealWhen fora do grupo)', async () => {
-		await expect(page.getByLabel('Descreva o sinal "Outro"')).not.toBeVisible();
-		await page.getByLabel('Outro', { exact: true }).check();
-		await expect(page.getByLabel('Descreva o sinal "Outro"')).toBeVisible();
-		await page.getByLabel('Outro', { exact: true }).uncheck();
-	});
-
-	await test.step('digitar em "Evidências" e salvar com "sinais_situacao" ainda vazio', async () => {
-		// answerActivity nunca falha (fail()/alerta) por campo obrigatório
-		// incompleto — ele salva o que foi enviado e mantém a atividade
-		// em_andamento (Trilha A continua recomendando "problema"); a página
-		// recarrega mostrando a mesma atividade, agora com os valores já
-		// persistidos (não mais os "temporários" do POST anterior).
-		await page.getByLabel('Qual situação precisa mudar?').fill('As solicitações chegam sem padrão.');
+	await test.step('preencher campos opcionais e salvar: etapa opcional sempre libera a próxima atividade', async () => {
+		await page.getByLabel('Descreva o sinal "Outro"').fill('Chegou por um canal informal.');
 		await page.getByLabel('Evidências').fill('Três reclamações registradas este mês.');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
 	});
 
-	await test.step('valor salvo e seção aberta preservados mesmo sem a atividade avançar', async () => {
-		await expect(details).toHaveAttribute('open', '');
-		await expect(page.getByLabel('Evidências')).toHaveValue('Três reclamações registradas este mês.');
+	await test.step('valores preservados exatamente como enviados, campo a campo', async () => {
+		await page.goto(`${server.baseUrl}/projects/${projectId}/now?activity=problema&from=summary`);
 		await expect(page.getByLabel('Qual situação precisa mudar?')).toHaveValue(
 			'As solicitações chegam sem padrão.'
 		);
-	});
-
-	await test.step('completar sinais e salvar com sucesso', async () => {
-		await page.getByLabel('Retrabalho', { exact: true }).check();
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
+		await expect(page.getByLabel('Outro', { exact: true })).toBeChecked();
+		await expect(page.getByLabel('Descreva o sinal "Outro"')).toHaveValue('Chegou por um canal informal.');
+		await expect(page.getByLabel('Evidências')).toHaveValue('Três reclamações registradas este mês.');
 	});
 });
 
@@ -124,7 +127,7 @@ test('seção "Adicionar mais contexto": aberta automaticamente quando já exist
 		projectId = await createProjectAndReachProblema(page);
 	});
 
-	await test.step('semear duas Answers do grupo direto no banco (atalho de fixture já usado nesta suíte)', async () => {
+	await test.step('semear Answers direto no banco: os dois obrigatórios (fora de ordem) + duas do grupo opcional (atalho de fixture já usado nesta suíte)', async () => {
 		const db = new Database(dbPath);
 		try {
 			const now = new Date().toISOString();
@@ -132,6 +135,8 @@ test('seção "Adicionar mais contexto": aberta automaticamente quando já exist
 				`INSERT INTO answer (project_id, activity_definition_id, field_definition_id, value, created_at, updated_at)
 				 VALUES (?, 'problema', ?, ?, ?, ?)`
 			);
+			insert.run(projectId, 'situacao', 'Situação semeada direto no banco.', now, now);
+			insert.run(projectId, 'sinais_situacao', JSON.stringify(['rework']), now, now);
 			insert.run(projectId, 'consequencias', 'O retrabalho aumenta a cada mês.', now, now);
 			insert.run(projectId, 'observacoes', 'Levantado com o time de suporte.', now, now);
 		} finally {
@@ -139,7 +144,13 @@ test('seção "Adicionar mais contexto": aberta automaticamente quando já exist
 		}
 	});
 
-	await test.step('recarregar e confirmar seção já aberta com a contagem correta', async () => {
+	await test.step('recarregar: obrigatórios já respondidos (fora da progressão normal) mostram o formulário inteiro, com a seção já aberta e a contagem correta', async () => {
+		// Os dois obrigatórios já têm Answer (semeados direto no banco, sem
+		// passar por activityProgress) — a progressão campo a campo não teria
+		// mais nenhum campo obrigatório pendente, então now/+page.server.ts usa
+		// o formulário inteiro como rede de segurança (ver comentário em
+		// now/+page.server.ts), que é exatamente o que este teste quer
+		// verificar: grupo aberto porque já existe conteúdo persistido.
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
 

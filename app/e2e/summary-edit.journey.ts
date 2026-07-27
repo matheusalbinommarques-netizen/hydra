@@ -50,16 +50,25 @@ async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	await page.getByLabel('O que deu origem a este projeto?').selectOption('Um problema');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
+	// "Contexto inicial" e "Problema ou oportunidade" são decompostas campo a
+	// campo nesta rodada — um submit por campo, com a etapa opcional de
+	// "problema" dispensada via "Avançar sem preencher".
 	await page.getByLabel('Nome provisório do projeto').fill('Projeto Edição no Resumo');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Breve descrição').fill('Descrição breve do projeto.');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Qual seu nível de experiência com gestão de projetos?').selectOption('Intermediário');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Qual o estágio atual?').selectOption('Em planejamento');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
 	await page.getByLabel('Qual situação precisa mudar?').fill('Situação original do problema.');
+	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 	await page.getByLabel('Informação duplicada', { exact: true }).check();
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
 
 	await page.getByLabel('Quem é afetado por esta situação, em detalhe?').fill('Público original.');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();

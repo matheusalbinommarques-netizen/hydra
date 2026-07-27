@@ -116,22 +116,34 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			origem: { label: 'O que deu origem a este projeto?', value: 'Um problema', kind: 'select' }
 		});
 
+		// "Contexto inicial" é decomposta campo a campo nesta rodada — um
+		// submit por campo, na ordem do catálogo.
+		await answerAndContinue(page, { nome: { label: 'Nome provisório do projeto', value: 'Projeto Mapa E2E' } });
 		await answerAndContinue(page, {
-			nome: { label: 'Nome provisório do projeto', value: 'Projeto Mapa E2E' },
-			descricao: { label: 'Breve descrição', value: 'Descrição breve para o teste do Mapa.' },
-			modo: { label: 'Trabalho individual ou em equipe?', value: 'Individual', kind: 'select' },
+			descricao: { label: 'Breve descrição', value: 'Descrição breve para o teste do Mapa.' }
+		});
+		await answerAndContinue(page, {
+			modo: { label: 'Trabalho individual ou em equipe?', value: 'Individual', kind: 'select' }
+		});
+		await answerAndContinue(page, {
 			nivel: {
 				label: 'Qual seu nível de experiência com gestão de projetos?',
 				value: 'Intermediário',
 				kind: 'select'
-			},
+			}
+		});
+		await answerAndContinue(page, {
 			estagio: { label: 'Qual o estágio atual?', value: 'Em planejamento', kind: 'select' }
 		});
 
+		// "Problema ou oportunidade" idem — dois campos obrigatórios (situacao,
+		// sinais_situacao) campo a campo, depois etapa opcional agrupada, sem
+		// preencher nada.
 		await answerAndContinue(page, {
-			situacao: { label: 'Qual situação precisa mudar?', value: 'Situação de teste do Mapa.' },
-			sinais: { label: 'Informação duplicada', value: '', kind: 'check' }
+			situacao: { label: 'Qual situação precisa mudar?', value: 'Situação de teste do Mapa.' }
 		});
+		await answerAndContinue(page, { sinais: { label: 'Informação duplicada', value: '', kind: 'check' } });
+		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
 
 		await answerAndContinue(page, {
 			publico: { label: 'Quem é afetado por esta situação, em detalhe?', value: 'Público de teste do Mapa.' }
@@ -162,17 +174,24 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			}
 		});
 
+		// "Definir visão do produto" idem — três campos obrigatórios campo a
+		// campo, depois etapa opcional ("diferencial"), sem preencher nada.
 		await answerAndContinue(page, {
-			tipoProduto: { label: 'Que tipo de produto será?', value: 'Aplicativo web de teste do Mapa.' },
+			tipoProduto: { label: 'Que tipo de produto será?', value: 'Aplicativo web de teste do Mapa.' }
+		});
+		await answerAndContinue(page, {
 			necessidadeCentral: {
 				label: 'Qual necessidade principal esse produto atende?',
 				value: 'Necessidade central de teste do Mapa.'
-			},
+			}
+		});
+		await answerAndContinue(page, {
 			beneficioCentral: {
 				label: 'Qual benefício principal o produto deve entregar?',
 				value: 'Benefício central de teste do Mapa.'
 			}
 		});
+		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
 
 		await page.getByRole('link', { name: /Ir para Escolha o próximo foco/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/next-version`);
