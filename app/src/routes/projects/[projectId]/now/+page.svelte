@@ -6,8 +6,6 @@
 
 	let { data, form } = $props();
 	let view = $derived(data.view);
-	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
-
 	// Layout de duas colunas só quando a atividade atual pertence a
 	// Descoberta ou Definição do produto — as demais fases continuam de
 	// coluna única, revisadas só quando o Cockpit/Colheita chegarem lá.
@@ -28,13 +26,6 @@
 
 {#snippet mainContent()}
 	<h1>Agora</h1>
-
-	{#if openImpedimentsCount > 0}
-		<p class="impediments-count">
-			{openImpedimentsCount} {openImpedimentsCount === 1 ? 'impedimento aberto' : 'impedimentos abertos'} —
-			<a href="/projects/{view.projectId}/cockpit">ver no Cockpit</a>
-		</p>
-	{/if}
 
 	{#if view.openPendingItems.length > 0}
 		<section class="pendencias" aria-label="Pendências">
@@ -183,12 +174,6 @@
 {/if}
 
 <style>
-	.impediments-count {
-		color: var(--hydra-muted);
-		font-size: 0.9rem;
-		margin: 0 0 1.25rem;
-	}
-
 	.pendencias {
 		border: 1px solid var(--hydra-warning);
 		border-radius: 10px;
