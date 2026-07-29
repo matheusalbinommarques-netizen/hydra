@@ -2,6 +2,7 @@
 name: hydra-sync-delivery
 description: Atualiza a documentação de acompanhamento do Hydra (backlog do ciclo, PROJECT_STATUS.md, CHANGELOG.md, TASKS.md) para refletir um item já commitado. Uso explícito apenas via /hydra-sync-delivery.
 disable-model-invocation: true
+context: fork
 argument-hint: <item-id> <commit-hash>
 arguments:
   - item
@@ -74,8 +75,16 @@ automática de sincronizar um item.
 
 ## 5. Relatório final
 
-Apresente: arquivos de documentação alterados; resumo do que foi
-atualizado em cada um; diff completo (`git diff` — ainda não staged);
-`git status --short`. Pare aqui para revisão — stage e commit ficam para
-`/hydra-review-item` e `/hydra-ship` numa etapa documental, se o usuário
-pedir.
+Apresente somente:
+
+- documentos alterados;
+- resumo objetivo da atualização em cada documento;
+- `git diff --stat`;
+- `git diff --name-status`;
+- resultado de `git diff --check`;
+- `git status --short`;
+- lacunas ou divergências encontradas.
+
+Não reproduza o diff completo na resposta. Mostre trechos pontuais somente
+quando necessários para justificar uma divergência. Pare para revisão; stage,
+commit e push permanecem em etapas separadas.

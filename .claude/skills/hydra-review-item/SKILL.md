@@ -2,6 +2,7 @@
 name: hydra-review-item
 description: Revisa exclusivamente um item já implementado do Hydra (ex. C3-03) — diff, QA manual isolada e stage seletivo — sem commit ou push. Uso explícito apenas via /hydra-review-item.
 disable-model-invocation: true
+context: fork
 argument-hint: <item-id>
 arguments:
   - item
@@ -95,9 +96,19 @@ git diff --cached --check
 
 ## 7. Relatório final
 
-Apresente: resultado da QA manual (com URL e banco temporário usados);
-`git diff --cached --stat`; `git diff --cached` completo; `git status
---short`; confirmação de que nenhum banco real ou processo pré-existente
-foi alterado; resultado de `hydra-verify.mjs --mode full`; problemas
-encontrados (mesmo que não corrigidos). Não rode `git commit` nem
-`git push` — isso é `/hydra-ship`.
+Apresente somente:
+
+- resultado da QA manual, quando aplicável;
+- arquivos staged;
+- `git diff --cached --stat`;
+- `git diff --cached --name-status`;
+- resultado de `git diff --cached --check`;
+- `git status --short`;
+- resultado de `hydra-verify.mjs --mode full`;
+- problemas encontrados, com arquivo e localização;
+- confirmação de que nenhum banco real, processo preexistente ou arquivo fora
+  do item foi alterado.
+
+Não reproduza o diff completo na resposta. Mostre trechos pontuais somente
+quando necessários para explicar um problema. Não rode `git commit` nem
+`git push` — isso pertence a `/hydra-ship`.

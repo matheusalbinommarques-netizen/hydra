@@ -67,10 +67,10 @@ repositório inteiro.
 
 ## 4. Verificação final
 
-Ao considerar a implementação pronta, rode a bateria completa:
+Ao considerar a implementação pronta, rode a verificação rápida final:
 
 ```
-node .claude/scripts/hydra-verify.mjs --mode full --item $item
+node .claude/scripts/hydra-verify.mjs --mode fast --item $item
 ```
 
 Se falhar, volte à implementação — não prossiga para o relatório com uma
@@ -85,5 +85,5 @@ nenhum outro item do backlog, mesmo que pareça relacionado.
 ## 6. Relatório final
 
 Apresente: item implementado; arquivos criados/alterados; decisões de
-implementação relevantes; resultado de `hydra-verify.mjs --mode full`;
+implementação relevantes; resultado de `hydra-verify.mjs --mode fast`;
 riscos ou limitações. Pare aqui — a revisão é `/hydra-review-item`.
