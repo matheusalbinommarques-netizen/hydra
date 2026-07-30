@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addImpediment,
 	addScopeItem,
 	answerActivity,
 	confirmScopeVersion,
@@ -11,8 +12,12 @@ import {
 	moveScopeItem,
 	removeScopeItem,
 	renameProject,
+	reopenImpediment,
 	reorderAgoraItems,
+	resolveImpediment,
 	setHypothesis,
+	setImpedimentNextAction,
+	setImpedimentType,
 	setScopeItemEffort,
 	setScopeItemText,
 	shouldInvalidateSummary,
@@ -656,5 +661,128 @@ describe('confirmScopeVersion', () => {
 		state = unwrap(setHypothesis(catalog, state, 'Hipótese revisada'));
 		const reconfirmed = unwrap(confirmScopeVersion(catalog, state, T2));
 		expect(reconfirmed.scopeVersion.confirmedAt).toBe(T2);
+	});
+});
+
+describe('addImpediment', () => {
+	it('cria um Impediment aberto, sem nextAction, com timestamps iguais a occurredAt', () => {
+		const state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Falta acesso ao ambiente', 'falta_de_recurso', T1));
+		expect(state.impediments).toEqual([
+			{
+				id: 'imp-1',
+				projectId: 'proj-1',
+				text: 'Falta acesso ao ambiente',
+				tipo: 'falta_de_recurso',
+				nextAction: null,
+				status: 'aberto',
+				createdAt: T1,
+				updatedAt: T1,
+				resolvedAt: null
+			}
+		]);
+	});
+
+	it('acumula múltiplos impedimentos sem afetar os já existentes', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Um', 'outro', T1));
+		state = unwrap(addImpediment(catalog, state, 'imp-2', 'Dois', 'bloqueio_tecnico', T1));
+		expect(state.impediments.map((i) => i.id)).toEqual(['imp-1', 'imp-2']);
+	});
+
+	it('erro impediment_id_already_exists ao reutilizar um impedimentId existente, sem alterar o estado', () => {
+		const state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Um', 'outro', T1));
+		const result = addImpediment(catalog, state, 'imp-1', 'Outro texto', 'bloqueio_tecnico', T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'impediment_id_already_exists' } });
+		expect(state.impediments).toHaveLength(1);
+	});
+});
+
+describe('setImpedimentType', () => {
+	it('atualiza tipo e updatedAt', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(setImpedimentType(catalog, state, 'imp-1', 'decisao_pendente', T2));
+		expect(state.impediments[0].tipo).toBe('decisao_pendente');
+		expect(state.impediments[0].updatedAt).toBe(T2);
+	});
+
+	it('mesmo tipo: no-op, não altera updatedAt', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(setImpedimentType(catalog, state, 'imp-1', 'outro', T2));
+		expect(state.impediments[0].updatedAt).toBe(T1);
+	});
+
+	it('erro impediment_not_found para id inexistente', () => {
+		const result = setImpedimentType(catalog, freshState(), 'nao-existe', 'outro', T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'impediment_not_found' } });
+	});
+});
+
+describe('setImpedimentNextAction', () => {
+	it('define a próxima ação e atualiza updatedAt', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', 'Solicitar acesso à TI', T2));
+		expect(state.impediments[0].nextAction).toBe('Solicitar acesso à TI');
+		expect(state.impediments[0].updatedAt).toBe(T2);
+	});
+
+	it('aceita voltar a null (limpar a próxima ação)', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', 'Ação', T2));
+		state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', null, T2));
+		expect(state.impediments[0].nextAction).toBeNull();
+	});
+
+	it('mesmo valor (incluindo null→null): no-op', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', null, T2));
+		expect(state.impediments[0].updatedAt).toBe(T1);
+	});
+
+	it('erro impediment_not_found para id inexistente', () => {
+		const result = setImpedimentNextAction(catalog, freshState(), 'nao-existe', 'Ação', T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'impediment_not_found' } });
+	});
+});
+
+describe('resolveImpediment / reopenImpediment', () => {
+	it('resolve: status vira resolvido, resolvedAt e updatedAt = occurredAt', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(resolveImpediment(catalog, state, 'imp-1', T2));
+		expect(state.impediments[0]).toMatchObject({ status: 'resolvido', resolvedAt: T2, updatedAt: T2 });
+	});
+
+	it('resolver um já resolvido é no-op (idempotente)', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(resolveImpediment(catalog, state, 'imp-1', T2));
+		const resolvedAgain = unwrap(resolveImpediment(catalog, state, 'imp-1', '2026-01-03T00:00:00.000Z'));
+		expect(resolvedAgain.impediments[0].resolvedAt).toBe(T2);
+		expect(resolvedAgain.impediments[0].updatedAt).toBe(T2);
+	});
+
+	it('reopen: status volta a aberto, resolvedAt volta a null', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(resolveImpediment(catalog, state, 'imp-1', T2));
+		state = unwrap(reopenImpediment(catalog, state, 'imp-1', '2026-01-03T00:00:00.000Z'));
+		expect(state.impediments[0]).toMatchObject({
+			status: 'aberto',
+			resolvedAt: null,
+			updatedAt: '2026-01-03T00:00:00.000Z'
+		});
+	});
+
+	it('reabrir um já aberto é no-op (idempotente)', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		const reopened = unwrap(reopenImpediment(catalog, state, 'imp-1', T2));
+		expect(reopened.impediments[0].updatedAt).toBe(T1);
+	});
+
+	it('erro impediment_not_found para id inexistente em ambas', () => {
+		expect(resolveImpediment(catalog, freshState(), 'nao-existe', T1)).toEqual({
+			ok: false,
+			error: { kind: 'impediment_not_found' }
+		});
+		expect(reopenImpediment(catalog, freshState(), 'nao-existe', T1)).toEqual({
+			ok: false,
+			error: { kind: 'impediment_not_found' }
+		});
 	});
 });

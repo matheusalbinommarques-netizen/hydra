@@ -27,6 +27,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'A nova ordem enviada não corresponde aos itens atuais de "Agora".';
 		case 'scope_confirmation_invalid':
 			return 'Ainda faltam critérios para confirmar esta versão.';
+		case 'impediment_not_found':
+			return 'Impedimento não encontrado.';
+		case 'impediment_id_already_exists':
+			return 'Já existe um impedimento com este identificador.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

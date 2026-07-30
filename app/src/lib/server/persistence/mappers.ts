@@ -6,6 +6,8 @@ import type {
 	ActivityProgress,
 	ActivityStatus,
 	Answer,
+	Impediment,
+	ImpedimentType,
 	PendingItem,
 	Project,
 	ScopeBucket,
@@ -101,6 +103,32 @@ export function mapScopeItemRow(row: ScopeItemRow): ScopeItem {
 
 export function mapScopeVersionRow(row: ScopeVersionRow): ScopeVersion {
 	return { projectId: row.project_id, hypothesis: row.hypothesis, confirmedAt: row.confirmed_at };
+}
+
+export interface ImpedimentRow {
+	id: string;
+	project_id: string;
+	text: string;
+	tipo: ImpedimentType;
+	next_action: string | null;
+	status: 'aberto' | 'resolvido';
+	created_at: string;
+	updated_at: string;
+	resolved_at: string | null;
+}
+
+export function mapImpedimentRow(row: ImpedimentRow): Impediment {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		text: row.text,
+		tipo: row.tipo,
+		nextAction: row.next_action,
+		status: row.status,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		resolvedAt: row.resolved_at
+	};
 }
 
 export function mapPendingItemRow(row: PendingItemRow): PendingItem {

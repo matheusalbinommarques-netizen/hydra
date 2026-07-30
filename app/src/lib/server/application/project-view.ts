@@ -10,7 +10,7 @@ import {
 	computeScopeSuggestions,
 	computeSnapshot
 } from '$lib/orientation-engine';
-import type { PendingItemHistoryView, ProjectView, ScopeItemView } from './types';
+import type { ImpedimentView, PendingItemHistoryView, ProjectView, ScopeItemView } from './types';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -61,6 +61,18 @@ function buildScopeItemView(item: ProjectState['scopeItems'][number]): ScopeItem
 	};
 }
 
+function buildImpedimentView(impediment: ProjectState['impediments'][number]): ImpedimentView {
+	return {
+		id: impediment.id,
+		text: impediment.text,
+		tipo: impediment.tipo,
+		nextAction: impediment.nextAction,
+		status: impediment.status,
+		createdAt: impediment.createdAt,
+		resolvedAt: impediment.resolvedAt
+	};
+}
+
 export function buildProjectView(catalog: Catalog, state: ProjectState): ProjectView {
 	const snapshot = computeSnapshot(catalog, state);
 
@@ -91,6 +103,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		scopeProjection: computeScopeProjection(state.scopeItems, state.scopeVersion),
 		scopeSuggestions: computeScopeSuggestions(state.answers, state.scopeItems),
 		fieldSuggestions: computeFieldSuggestions(catalog, state.answers),
-		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems)
+		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems),
+		impediments: state.impediments.map(buildImpedimentView)
 	};
 }

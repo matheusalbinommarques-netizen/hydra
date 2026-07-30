@@ -8,12 +8,14 @@ import type { ProjectRepository } from './project-repository';
 import {
 	mapActivityProgressRow,
 	mapAnswerRow,
+	mapImpedimentRow,
 	mapPendingItemRow,
 	mapProjectRow,
 	mapScopeItemRow,
 	mapScopeVersionRow,
 	type ActivityProgressRow,
 	type AnswerRow,
+	type ImpedimentRow,
 	type PendingItemRow,
 	type ProjectRow,
 	type ScopeItemRow,
@@ -76,6 +78,15 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			`INSERT INTO scope_version (project_id, hypothesis, confirmed_at)
 			 VALUES (@projectId, @hypothesis, @confirmedAt)`
 		).run(state.scopeVersion);
+
+		const insertImpediment = db.prepare(
+			`INSERT INTO impediment
+			   (id, project_id, text, tipo, next_action, status, created_at, updated_at, resolved_at)
+			 VALUES (@id, @projectId, @text, @tipo, @nextAction, @status, @createdAt, @updatedAt, @resolvedAt)`
+		);
+		for (const impediment of state.impediments) {
+			insertImpediment.run(impediment);
+		}
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -99,6 +110,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM pending_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
 
@@ -150,13 +162,21 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				throw new Error(`Projeto "${projectId}" não tem scope_version (violação do schema — 1:1 com project)`);
 			}
 
+			const impedimentRows = db
+				.prepare(
+					`SELECT id, project_id, text, tipo, next_action, status, created_at, updated_at, resolved_at
+					 FROM impediment WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as ImpedimentRow[];
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
 				answers: answerRows.map(mapAnswerRow),
 				pendingItems: pendingItemRows.map(mapPendingItemRow),
 				scopeItems: scopeItemRows.map(mapScopeItemRow),
-				scopeVersion: mapScopeVersionRow(scopeVersionRow)
+				scopeVersion: mapScopeVersionRow(scopeVersionRow),
+				impediments: impedimentRows.map(mapImpedimentRow)
 			};
 		},
 

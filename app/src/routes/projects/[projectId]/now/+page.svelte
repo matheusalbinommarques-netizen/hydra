@@ -18,6 +18,7 @@
 	// do painel lateral, que a essa altura da jornada já está denso. Ajuste
 	// só deste caso específico, sem alterar o layout geral de duas colunas.
 	let isReviewRecommendation = $derived(data.activity?.completionMode === 'explicit_confirmation');
+	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
 </script>
 
 <svelte:head>
@@ -42,6 +43,14 @@
 				{/each}
 			</ul>
 		</section>
+	{/if}
+
+	{#if openImpedimentsCount > 0}
+		<p class="impediments-indicator">
+			{openImpedimentsCount}
+			{openImpedimentsCount === 1 ? 'impedimento aberto' : 'impedimentos abertos'} —
+			<a href="/projects/{view.projectId}/cockpit">ver no Cockpit</a>
+		</p>
 	{/if}
 
 	{#if data.activity?.completionMode === 'explicit_confirmation'}
@@ -206,6 +215,12 @@
 	.pendencias li a {
 		font-size: 0.85rem;
 		font-weight: 600;
+	}
+
+	.impediments-indicator {
+		margin: 0 0 1.5rem;
+		font-size: 0.9rem;
+		color: var(--hydra-muted);
 	}
 
 	.next-action {

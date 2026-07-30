@@ -67,3 +67,24 @@ CREATE TABLE IF NOT EXISTS scope_version (
 	hypothesis TEXT NOT NULL,
 	confirmed_at TEXT
 );
+
+-- Cockpit, vertical 2, fatia "Impedimentos" — ver app/src/lib/domain/state-types.ts.
+-- Coleção independente do catálogo: sem activity_definition_id, não gera
+-- pending_item, manipulada direto pela tela /cockpit.
+CREATE TABLE IF NOT EXISTS impediment (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	text TEXT NOT NULL,
+	tipo TEXT NOT NULL CHECK (
+		tipo IN ('dependencia_externa', 'decisao_pendente', 'falta_de_recurso', 'bloqueio_tecnico', 'outro')
+	),
+	next_action TEXT,
+	status TEXT NOT NULL CHECK (status IN ('aberto', 'resolvido')),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	resolved_at TEXT,
+	CHECK (
+		(status = 'aberto' AND resolved_at IS NULL) OR
+		(status = 'resolvido' AND resolved_at IS NOT NULL)
+	)
+);

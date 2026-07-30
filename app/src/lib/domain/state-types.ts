@@ -73,6 +73,36 @@ export interface ScopeVersion {
 	confirmedAt: string | null;
 }
 
+// Cockpit — vertical 2, fatia "Impedimentos". Coleção independente do
+// catálogo metodológico: não referencia nenhuma ActivityDefinition, não
+// nasce de uma atividade guiada, não gera PendingItem — é manipulada
+// diretamente na tela própria (/cockpit). Mesmo molde de ScopeItem (id
+// próprio, projectId, texto livre, createdAt/updatedAt), mas sem
+// bucket/order/effort/sourceSuggestionId: não se aplicam aqui (não há
+// "momento" agora/depois/fora, nem estimativa de tamanho, nem sugestão
+// estruturada de origem para um impedimento nesta versão). Nenhum cálculo
+// de "há quanto tempo está aberto" nem alerta derivado nesta rodada —
+// createdAt/updatedAt/resolvedAt só guardam os timestamps; decisão de
+// como (e se) usá-los para um sinal fica para uma rodada futura.
+export type ImpedimentType =
+	| 'dependencia_externa'
+	| 'decisao_pendente'
+	| 'falta_de_recurso'
+	| 'bloqueio_tecnico'
+	| 'outro';
+
+export interface Impediment {
+	id: string;
+	projectId: string;
+	text: string;
+	tipo: ImpedimentType;
+	nextAction: string | null;
+	status: 'aberto' | 'resolvido';
+	createdAt: string;
+	updatedAt: string;
+	resolvedAt: string | null;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -80,4 +110,5 @@ export interface ProjectState {
 	pendingItems: PendingItem[];
 	scopeItems: ScopeItem[];
 	scopeVersion: ScopeVersion;
+	impediments: Impediment[];
 }

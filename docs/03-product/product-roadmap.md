@@ -76,7 +76,7 @@ Inclui:
 Acrescenta:
 
 - quadro de execução;
-- impedimentos;
+- impedimentos — Cockpit/Impedimentos v0 (registrar, classificar, definir próxima ação, resolver, reabrir) antecipado intencionalmente antes de Release 1, por decisão explícita (D022, `docs/07-management/decision-log.md`); o restante desta lista permanece não antecipado;
 - decisões;
 - mudanças;
 - atualização de riscos;

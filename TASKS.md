@@ -1,8 +1,8 @@
 # Hydra — Tarefas
 
-**Status atual:** Ciclo 4 concluído (docs/08-delivery/cycle-04-backlog.md) — C4-01, C4-02, C4-03, C4-03A e C4-04 concluídos; gate do Ciclo 4 aprovado em 25/07/2026
+**Status atual:** Ciclo 4 concluído (docs/08-delivery/cycle-04-backlog.md) — C4-01, C4-02, C4-03, C4-03A e C4-04 concluídos; gate do Ciclo 4 aprovado em 25/07/2026. Vertical Cockpit/Impedimentos antecipada de Release 3 por decisão explícita (D022, `docs/07-management/decision-log.md`), implementada e validada.
 
-**Atualizado em:** 25/07/2026
+**Atualizado em:** 29/07/2026
 
 Este arquivo é a visão operacional do trabalho atual. A documentação completa permanece em `docs/`.
 
@@ -16,6 +16,10 @@ projetos, `RELEASE_0_SPEC.md` §4.1). C4-04 confirmou `hydra-verify full`
 PASS e QA aprovada nas duas jornadas, sem divergência crítica. Gate do
 Ciclo 4 aprovado. Próxima decisão (não iniciada automaticamente): revisar
 riscos/roadmap e decidir continuidade para Release 1.
+
+Vertical Cockpit/Impedimentos (D022) concluída: entidade `Impediment`,
+persistência e serialização, tela `/cockpit`, integração neutra ao `/now`,
+testes unitários e jornada Playwright validados.
 
 ## Depois
 

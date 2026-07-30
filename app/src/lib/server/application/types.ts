@@ -3,6 +3,7 @@
 import type {
 	ActivityStatus,
 	DomainTransitionError,
+	ImpedimentType,
 	ProjectStateParseError,
 	Result,
 	ScopeBucket,
@@ -73,6 +74,20 @@ export interface ScopeVersionView {
 	confirmedAt: string | null;
 }
 
+// Cockpit (vertical 2, "Impedimentos") — view leve de Impediment, sem
+// projectId/updatedAt, que a interface não precisa. createdAt/resolvedAt
+// são exibidos como fato simples (mesmo padrão de PendingItemHistoryView),
+// nunca usados para calcular "há quanto tempo está aberto" nesta rodada.
+export interface ImpedimentView {
+	id: string;
+	text: string;
+	tipo: ImpedimentType;
+	nextAction: string | null;
+	status: 'aberto' | 'resolvido';
+	createdAt: string;
+	resolvedAt: string | null;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -107,6 +122,11 @@ export interface ProjectView {
 	// orientation-engine/criteria-scope-conflict.ts). Sempre computado, nunca
 	// persistido.
 	criteriaScopeConflict: CriteriaScopeConflict;
+	// Cockpit (vertical 2, "Impedimentos") — todos os impedimentos (abertos e
+	// resolvidos); a tela /cockpit e a contagem em /now filtram por status
+	// diretamente, sem campo derivado extra aqui (mesmo padrão de
+	// openPendingItems.length usado direto no template).
+	impediments: ImpedimentView[];
 }
 
 export type UseCaseError =
@@ -181,6 +201,34 @@ export interface ConfirmScopeVersionInput {
 	projectId: string;
 }
 
+export interface AddImpedimentInput {
+	projectId: string;
+	text: string;
+	tipo: ImpedimentType;
+}
+
+export interface SetImpedimentTypeInput {
+	projectId: string;
+	impedimentId: string;
+	tipo: ImpedimentType;
+}
+
+export interface SetImpedimentNextActionInput {
+	projectId: string;
+	impedimentId: string;
+	nextAction: string | null;
+}
+
+export interface ResolveImpedimentInput {
+	projectId: string;
+	impedimentId: string;
+}
+
+export interface ReopenImpedimentInput {
+	projectId: string;
+	impedimentId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>>;
@@ -197,6 +245,11 @@ export interface ProjectUseCases {
 	removeScopeItem(input: RemoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setHypothesis(input: SetHypothesisInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmScopeVersion(input: ConfirmScopeVersionInput): Promise<UseCaseOutcome<ProjectView>>;
+	addImpediment(input: AddImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
+	setImpedimentType(input: SetImpedimentTypeInput): Promise<UseCaseOutcome<ProjectView>>;
+	setImpedimentNextAction(input: SetImpedimentNextActionInput): Promise<UseCaseOutcome<ProjectView>>;
+	resolveImpediment(input: ResolveImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
+	reopenImpediment(input: ReopenImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

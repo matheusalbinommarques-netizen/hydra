@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { catalog } from '../../catalog';
 import {
+	addImpediment,
 	addScopeItem,
 	answerActivity,
 	confirmScopeVersion,
@@ -12,7 +13,9 @@ import {
 	encodeMultiSelectValue,
 	moveScopeItem,
 	renameProject,
+	resolveImpediment,
 	setHypothesis,
+	setImpedimentNextAction,
 	setScopeItemEffort,
 	skipActivity
 } from '$lib/domain';
@@ -83,6 +86,11 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(setScopeItemEffort(catalog, state, 'scope-3', 'medio', T1));
 	state = unwrap(setHypothesis(catalog, state, 'Usuários concluem a jornada sem ajuda externa'));
 	state = unwrap(confirmScopeVersion(catalog, state, T2));
+
+	state = unwrap(addImpediment(catalog, state, 'imp-1', 'Falta acesso ao ambiente', 'falta_de_recurso', T1));
+	state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', 'Solicitar acesso à TI', T1));
+	state = unwrap(addImpediment(catalog, state, 'imp-2', 'Decisão pendente do time', 'decisao_pendente', T1));
+	state = unwrap(resolveImpediment(catalog, state, 'imp-2', T2));
 	return state;
 }
 
@@ -311,14 +319,14 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 6 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 7 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
 		const found = await repo.findById(state.project.id);
 
 		expect(found && Object.keys(found).sort()).toEqual(
-			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion'].sort()
+			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion', 'impediments'].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');
 		expect(found).not.toHaveProperty('projectStatus');

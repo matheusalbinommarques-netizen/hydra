@@ -5,6 +5,7 @@
 import type { Catalog, ProjectState } from '$lib/domain';
 import { computeProjectStatus } from '$lib/orientation-engine';
 import {
+	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	answerActivity as answerActivityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
@@ -14,9 +15,13 @@ import {
 	moveScopeItem as moveScopeItemInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	renameProject as renameProjectInDomain,
+	reopenImpediment as reopenImpedimentInDomain,
 	reorderAgoraItems as reorderAgoraItemsInDomain,
+	resolveImpediment as resolveImpedimentInDomain,
 	serializeProjectState,
 	setHypothesis as setHypothesisInDomain,
+	setImpedimentNextAction as setImpedimentNextActionInDomain,
+	setImpedimentType as setImpedimentTypeInDomain,
 	setScopeItemEffort as setScopeItemEffortInDomain,
 	setScopeItemText as setScopeItemTextInDomain,
 	skipActivity as skipActivityInDomain
@@ -25,6 +30,7 @@ import type { ProjectRepository } from '../persistence';
 import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
 import type {
+	AddImpedimentInput,
 	AddScopeItemInput,
 	AnswerActivityInput,
 	ConfirmScopeVersionInput,
@@ -34,8 +40,12 @@ import type {
 	ProjectUseCases,
 	RemoveScopeItemInput,
 	RenameProjectInput,
+	ReopenImpedimentInput,
 	ReorderAgoraItemsInput,
+	ResolveImpedimentInput,
 	SetHypothesisInput,
+	SetImpedimentNextActionInput,
+	SetImpedimentTypeInput,
 	SetScopeItemEffortInput,
 	SetScopeItemTextInput,
 	SkipActivityInput,
@@ -244,6 +254,67 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async addImpediment(input: AddImpedimentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addImpedimentInDomain(catalog, state, idGenerator.generate(), input.text, input.tipo, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setImpedimentType(input: SetImpedimentTypeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setImpedimentTypeInDomain(catalog, state, input.impedimentId, input.tipo, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setImpedimentNextAction(input: SetImpedimentNextActionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setImpedimentNextActionInDomain(
+				catalog,
+				state,
+				input.impedimentId,
+				input.nextAction,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async resolveImpediment(input: ResolveImpedimentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = resolveImpedimentInDomain(catalog, state, input.impedimentId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async reopenImpediment(input: ReopenImpedimentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reopenImpedimentInDomain(catalog, state, input.impedimentId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

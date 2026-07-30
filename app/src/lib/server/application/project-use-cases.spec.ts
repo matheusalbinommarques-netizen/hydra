@@ -705,7 +705,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 });
 
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
-	it('o registro persistido contém só os 4 tipos de domínio', async () => {
+	it('o registro persistido contém só os 7 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -717,11 +717,11 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 
 		const stored = await repo.findById(created.value.projectId);
 		expect(stored && Object.keys(stored).sort()).toEqual(
-			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion'].sort()
+			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion', 'impediments'].sort()
 		);
 	});
 
-	it('ProjectView contém só os 17 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 18 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -744,11 +744,141 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'scopeProjection',
 				'scopeSuggestions',
 				'fieldSuggestions',
-				'criteriaScopeConflict'
+				'criteriaScopeConflict',
+				'impediments'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');
 		expect(created.value).not.toHaveProperty('activityProgress');
 		expect(created.value).not.toHaveProperty('pendingItems');
+	});
+});
+
+describe('createProjectUseCases — impedimentos (Cockpit)', () => {
+	it('addImpediment cria o item e reflete em ProjectView.impediments', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.addImpediment({
+			projectId: created.value.projectId,
+			text: 'Falta acesso ao ambiente',
+			tipo: 'falta_de_recurso'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.impediments).toEqual([
+			{
+				id: 'id-2',
+				text: 'Falta acesso ao ambiente',
+				tipo: 'falta_de_recurso',
+				nextAction: null,
+				status: 'aberto',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				resolvedAt: null
+			}
+		]);
+	});
+
+	it('setImpedimentType atualiza o tipo refletido em ProjectView', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Item', tipo: 'outro' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		const updated = await useCases.setImpedimentType({ projectId, impedimentId, tipo: 'bloqueio_tecnico' });
+		expect(updated.ok).toBe(true);
+		if (!updated.ok) return;
+		expect(updated.value.impediments[0].tipo).toBe('bloqueio_tecnico');
+	});
+
+	it('setImpedimentNextAction define e depois limpa (null) a próxima ação', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Item', tipo: 'outro' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		const withAction = await useCases.setImpedimentNextAction({
+			projectId,
+			impedimentId,
+			nextAction: 'Solicitar acesso à TI'
+		});
+		expect(withAction.ok).toBe(true);
+		if (!withAction.ok) return;
+		expect(withAction.value.impediments[0].nextAction).toBe('Solicitar acesso à TI');
+
+		const cleared = await useCases.setImpedimentNextAction({ projectId, impedimentId, nextAction: null });
+		expect(cleared.ok).toBe(true);
+		if (!cleared.ok) return;
+		expect(cleared.value.impediments[0].nextAction).toBeNull();
+	});
+
+	it('resolveImpediment marca resolvido com resolvedAt; reopenImpediment volta a aberto', async () => {
+		const { useCases, clock } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Item', tipo: 'outro' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		clock.set('2026-01-02T00:00:00.000Z');
+		const resolved = await useCases.resolveImpediment({ projectId, impedimentId });
+		expect(resolved.ok).toBe(true);
+		if (!resolved.ok) return;
+		expect(resolved.value.impediments[0]).toEqual({
+			id: impedimentId,
+			text: 'Item',
+			tipo: 'outro',
+			nextAction: null,
+			status: 'resolvido',
+			createdAt: '2026-01-01T00:00:00.000Z',
+			resolvedAt: '2026-01-02T00:00:00.000Z'
+		});
+
+		clock.set('2026-01-03T00:00:00.000Z');
+		const reopened = await useCases.reopenImpediment({ projectId, impedimentId });
+		expect(reopened.ok).toBe(true);
+		if (!reopened.ok) return;
+		expect(reopened.value.impediments[0]).toMatchObject({ status: 'aberto', resolvedAt: null });
+	});
+
+	it('impediment_not_found para id inexistente em cada operação', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		expect(await useCases.setImpedimentType({ projectId, impedimentId: 'nao-existe', tipo: 'outro' })).toEqual({
+			ok: false,
+			error: { kind: 'impediment_not_found' }
+		});
+		expect(
+			await useCases.setImpedimentNextAction({ projectId, impedimentId: 'nao-existe', nextAction: 'x' })
+		).toEqual({ ok: false, error: { kind: 'impediment_not_found' } });
+		expect(await useCases.resolveImpediment({ projectId, impedimentId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'impediment_not_found' }
+		});
+		expect(await useCases.reopenImpediment({ projectId, impedimentId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'impediment_not_found' }
+		});
+	});
+
+	it('project_not_found quando o projeto não existe', async () => {
+		const { useCases } = setup();
+		expect(
+			await useCases.addImpediment({ projectId: 'nao-existe', text: 'x', tipo: 'outro' })
+		).toEqual({ ok: false, error: { kind: 'project_not_found' } });
 	});
 });

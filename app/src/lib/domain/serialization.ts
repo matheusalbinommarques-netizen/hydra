@@ -7,6 +7,8 @@ import type {
 	ActivityProgress,
 	ActivityStatus,
 	Answer,
+	Impediment,
+	ImpedimentType,
 	PendingItem,
 	Project,
 	ProjectState,
@@ -57,6 +59,22 @@ function isActivityStatus(value: unknown): value is ActivityStatus {
 const PENDING_ITEM_STATUSES: readonly string[] = ['aberta', 'resolvida'];
 function isPendingItemStatus(value: unknown): value is 'aberta' | 'resolvida' {
 	return typeof value === 'string' && PENDING_ITEM_STATUSES.includes(value);
+}
+
+const IMPEDIMENT_TYPES: readonly string[] = [
+	'dependencia_externa',
+	'decisao_pendente',
+	'falta_de_recurso',
+	'bloqueio_tecnico',
+	'outro'
+];
+function isImpedimentType(value: unknown): value is ImpedimentType {
+	return typeof value === 'string' && IMPEDIMENT_TYPES.includes(value);
+}
+
+const IMPEDIMENT_STATUSES: readonly string[] = ['aberto', 'resolvido'];
+function isImpedimentStatus(value: unknown): value is 'aberto' | 'resolvido' {
+	return typeof value === 'string' && IMPEDIMENT_STATUSES.includes(value);
 }
 
 function shapeError(details: string): Result<never, ProjectStateParseError> {
@@ -232,6 +250,46 @@ function parseScopeVersion(value: unknown): Result<ScopeVersion, ProjectStatePar
 	};
 }
 
+function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('impediments deve ser um array');
+	const result: Impediment[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Impediment deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Impediment.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Impediment.projectId deve ser uma string');
+		if (!isString(item.text)) return shapeError('Impediment.text deve ser uma string');
+		if (!isImpedimentType(item.tipo)) return shapeError('Impediment.tipo deve ser um dos literais aprovados');
+		if (item.nextAction !== null && !isString(item.nextAction)) {
+			return shapeError('Impediment.nextAction deve ser string ou null');
+		}
+		if (!isImpedimentStatus(item.status)) {
+			return shapeError('Impediment.status deve ser "aberto" ou "resolvido"');
+		}
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('Impediment.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (!isIsoDateString(item.updatedAt)) {
+			return shapeError('Impediment.updatedAt deve ser uma data ISO 8601 válida');
+		}
+		if (item.resolvedAt !== null && !isIsoDateString(item.resolvedAt)) {
+			return shapeError('Impediment.resolvedAt deve ser uma data ISO 8601 válida ou null');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			text: item.text,
+			tipo: item.tipo,
+			nextAction: (item.nextAction as string | null) ?? null,
+			status: item.status,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt,
+			resolvedAt: (item.resolvedAt as string | null) ?? null
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -251,7 +309,8 @@ function assembleProjectState(
 	answers: Answer[],
 	rawPendingItems: RawPendingItem[],
 	scopeItems: ScopeItem[],
-	scopeVersion: ScopeVersion
+	scopeVersion: ScopeVersion,
+	impediments: Impediment[]
 ): Result<ProjectState, ProjectStateParseError> {
 	// referências: ActivityProgress
 	for (const progress of activityProgress) {
@@ -424,9 +483,28 @@ function assembleProjectState(
 		}
 	}
 
+	// referências + invariantes: Impediment — coleção independente do catálogo,
+	// sem activityDefinitionId para validar contra ele (ver domain/state-types.ts).
+	const seenImpedimentIds = new Set<string>();
+	for (const impediment of impediments) {
+		if (impediment.projectId !== project.id) {
+			return invariantError(`Impediment "${impediment.id}" usa projectId diferente do Project`);
+		}
+		if (seenImpedimentIds.has(impediment.id)) {
+			return invariantError(`Impediment.id duplicado: "${impediment.id}"`);
+		}
+		seenImpedimentIds.add(impediment.id);
+		if (impediment.status === 'aberto' && impediment.resolvedAt !== null) {
+			return invariantError(`Impediment "${impediment.id}" está aberto mas possui resolvedAt`);
+		}
+		if (impediment.status === 'resolvido' && impediment.resolvedAt === null) {
+			return invariantError(`Impediment "${impediment.id}" está resolvido mas não possui resolvedAt`);
+		}
+	}
+
 	return {
 		ok: true,
-		value: { project, activityProgress, answers, pendingItems, scopeItems, scopeVersion }
+		value: { project, activityProgress, answers, pendingItems, scopeItems, scopeVersion, impediments }
 	};
 }
 
@@ -480,6 +558,9 @@ export function deserializeProjectState(
 	const scopeVersionResult = parseScopeVersion(state.scopeVersion);
 	if (!scopeVersionResult.ok) return scopeVersionResult;
 
+	const impedimentsResult = parseImpedimentList(state.impediments);
+	if (!impedimentsResult.ok) return impedimentsResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
@@ -487,6 +568,7 @@ export function deserializeProjectState(
 		answersResult.value,
 		pendingItemsResult.value,
 		scopeItemsResult.value,
-		scopeVersionResult.value
+		scopeVersionResult.value,
+		impedimentsResult.value
 	);
 }

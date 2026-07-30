@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addImpediment,
 	addScopeItem,
 	answerActivity,
 	confirmScopeVersion,
 	confirmSummary,
+	resolveImpediment,
 	setHypothesis,
+	setImpedimentNextAction,
 	setScopeItemEffort,
 	skipActivity
 } from './transitions';
@@ -40,6 +43,10 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(setScopeItemEffort(catalog, state, 'scope-1', 'pequeno', T1));
 	state = unwrap(setHypothesis(catalog, state, 'Usuários concluem a jornada sem ajuda externa'));
 	state = unwrap(confirmScopeVersion(catalog, state, T2));
+	state = unwrap(addImpediment(catalog, state, 'imp-1', 'Falta acesso ao ambiente', 'falta_de_recurso', T1));
+	state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', 'Solicitar acesso à TI', T1));
+	state = unwrap(addImpediment(catalog, state, 'imp-2', 'Decisão pendente do time', 'decisao_pendente', T1));
+	state = unwrap(resolveImpediment(catalog, state, 'imp-2', T2));
 	return state;
 }
 
@@ -384,6 +391,88 @@ describe('deserializeProjectState — ScopeItem / ScopeVersion', () => {
 			state: { scopeVersion: Record<string, unknown> };
 		};
 		envelope.state.scopeVersion.confirmedAt = T2;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores à D022 (sem impediments)', () => {
+	it('trata state.impediments ausente como [] (envelope válido pré-D022)', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		delete envelope.state.impediments;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.impediments).toEqual([]);
+	});
+
+	it('continua rejeitando state.impediments: null', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		envelope.state.impediments = null;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — Impediment', () => {
+	function impedimentState(): ProjectState {
+		return unwrap(
+			addImpediment(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'imp-1', 'Texto', 'outro', T1)
+		);
+	}
+
+	it('rejeita Impediment.tipo fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].tipo = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita Impediment.status fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].status = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita Impediment.nextAction que não é string nem null', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].nextAction = 42;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita Impediment com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita Impediment.id duplicado', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentState())) as {
+			state: { impediments: unknown[] };
+		};
+		envelope.state.impediments.push(envelope.state.impediments[0]);
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita status "aberto" com resolvedAt definido', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].resolvedAt = T2;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita status "resolvido" sem resolvedAt', () => {
+		let state = impedimentState();
+		state = unwrap(resolveImpediment(catalog, state, 'imp-1', T2));
+		const envelope = JSON.parse(serializeProjectState(state)) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].resolvedAt = null;
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 });

@@ -5,6 +5,8 @@ import type { ActivityDefinition, Catalog, RequiredFieldsActivity } from './cata
 import type {
 	ActivityProgress,
 	ActivityStatus,
+	Impediment,
+	ImpedimentType,
 	PendingItem,
 	ProjectState,
 	ScopeBucket,
@@ -34,7 +36,9 @@ export type DomainTransitionError =
 	| { kind: 'transition_not_allowed'; from: ActivityStatus }
 	| { kind: 'scope_item_not_found' }
 	| { kind: 'scope_reorder_mismatch' }
-	| { kind: 'scope_confirmation_invalid'; issues: ScopeConfirmationIssue[] };
+	| { kind: 'scope_confirmation_invalid'; issues: ScopeConfirmationIssue[] }
+	| { kind: 'impediment_not_found' }
+	| { kind: 'impediment_id_already_exists' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -72,6 +76,10 @@ function findScopeItem(state: ProjectState, itemId: string): ScopeItem | undefin
 
 function agoraItemsSorted(items: ScopeItem[]): ScopeItem[] {
 	return items.filter((item) => item.bucket === 'agora').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+function findImpediment(state: ProjectState, impedimentId: string): Impediment | undefined {
+	return state.impediments.find((item) => item.id === impedimentId);
 }
 
 function invalidateScopeConfirmation(catalog: Catalog, state: ProjectState): ProjectState {
@@ -561,4 +569,131 @@ export function confirmScopeVersion(
 	let next: ProjectState = { ...state, scopeVersion: { ...state.scopeVersion, confirmedAt: occurredAt } };
 	next = setActivityStatus(next, activity.id, 'concluída');
 	return { ok: true, value: next };
+}
+
+// --- Impediment (Cockpit, vertical 2) -------------------------------------
+// Coleção independente do catálogo — `catalog` é recebido por consistência
+// de assinatura com as demais transições (ScopeItem inclusive), mas nenhuma
+// destas funções o consulta: Impediment não referencia ActivityDefinition
+// nenhuma. Sem cálculo de "há quanto tempo está aberto" nem alerta
+// derivado nesta rodada — só os timestamps são gravados.
+
+export function addImpediment(
+	catalog: Catalog,
+	state: ProjectState,
+	impedimentId: string,
+	text: string,
+	tipo: ImpedimentType,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (findImpediment(state, impedimentId)) {
+		return { ok: false, error: { kind: 'impediment_id_already_exists' } };
+	}
+
+	const impediment: Impediment = {
+		id: impedimentId,
+		projectId: state.project.id,
+		text,
+		tipo,
+		nextAction: null,
+		status: 'aberto',
+		createdAt: occurredAt,
+		updatedAt: occurredAt,
+		resolvedAt: null
+	};
+
+	return { ok: true, value: { ...state, impediments: [...state.impediments, impediment] } };
+}
+
+export function setImpedimentType(
+	catalog: Catalog,
+	state: ProjectState,
+	impedimentId: string,
+	tipo: ImpedimentType,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const impediment = findImpediment(state, impedimentId);
+	if (!impediment) return { ok: false, error: { kind: 'impediment_not_found' } };
+	if (impediment.tipo === tipo) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			impediments: state.impediments.map((item) =>
+				item.id === impedimentId ? { ...item, tipo, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+export function setImpedimentNextAction(
+	catalog: Catalog,
+	state: ProjectState,
+	impedimentId: string,
+	nextAction: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const impediment = findImpediment(state, impedimentId);
+	if (!impediment) return { ok: false, error: { kind: 'impediment_not_found' } };
+	if (impediment.nextAction === nextAction) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			impediments: state.impediments.map((item) =>
+				item.id === impedimentId ? { ...item, nextAction, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// Idempotente: resolver um impedimento já resolvido é no-op (mesmo espírito
+// dos setters de ScopeItem que não fazem nada quando o valor já é o
+// desejado) — não é uma transição de ActivityProgress gated por catálogo
+// como skipActivity/confirmScopeVersion, então não há "transition_not_allowed"
+// aqui.
+export function resolveImpediment(
+	catalog: Catalog,
+	state: ProjectState,
+	impedimentId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const impediment = findImpediment(state, impedimentId);
+	if (!impediment) return { ok: false, error: { kind: 'impediment_not_found' } };
+	if (impediment.status === 'resolvido') return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			impediments: state.impediments.map((item) =>
+				item.id === impedimentId
+					? { ...item, status: 'resolvido', resolvedAt: occurredAt, updatedAt: occurredAt }
+					: item
+			)
+		}
+	};
+}
+
+export function reopenImpediment(
+	catalog: Catalog,
+	state: ProjectState,
+	impedimentId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const impediment = findImpediment(state, impedimentId);
+	if (!impediment) return { ok: false, error: { kind: 'impediment_not_found' } };
+	if (impediment.status === 'aberto') return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			impediments: state.impediments.map((item) =>
+				item.id === impedimentId ? { ...item, status: 'aberto', resolvedAt: null, updatedAt: occurredAt } : item
+			)
+		}
+	};
 }

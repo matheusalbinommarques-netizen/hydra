@@ -11,6 +11,7 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		pendingItems: [],
 		scopeItems: [],
 		scopeVersion: { projectId: 'p1', hypothesis: '', confirmedAt: null },
+		impediments: [],
 		...overrides
 	};
 }
@@ -179,8 +180,76 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'scopeProjection',
 				'scopeSuggestions',
 				'fieldSuggestions',
-				'criteriaScopeConflict'
+				'criteriaScopeConflict',
+				'impediments'
 			].sort()
 		);
+	});
+});
+
+describe('buildProjectView — impediments', () => {
+	it('fica vazio quando não há impedimentos', () => {
+		const view = buildProjectView(catalog, baseState());
+		expect(view.impediments).toEqual([]);
+	});
+
+	it('projeta um impedimento aberto, sem projectId/updatedAt', () => {
+		const state = baseState({
+			impediments: [
+				{
+					id: 'imp-1',
+					projectId: 'p1',
+					text: 'Falta acesso ao ambiente',
+					tipo: 'falta_de_recurso',
+					nextAction: null,
+					status: 'aberto',
+					createdAt: '2026-01-02T00:00:00.000Z',
+					updatedAt: '2026-01-02T00:00:00.000Z',
+					resolvedAt: null
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.impediments).toEqual([
+			{
+				id: 'imp-1',
+				text: 'Falta acesso ao ambiente',
+				tipo: 'falta_de_recurso',
+				nextAction: null,
+				status: 'aberto',
+				createdAt: '2026-01-02T00:00:00.000Z',
+				resolvedAt: null
+			}
+		]);
+	});
+
+	it('projeta um impedimento resolvido, com resolvedAt', () => {
+		const state = baseState({
+			impediments: [
+				{
+					id: 'imp-2',
+					projectId: 'p1',
+					text: 'Decisão pendente',
+					tipo: 'decisao_pendente',
+					nextAction: 'Aguardar reunião',
+					status: 'resolvido',
+					createdAt: '2026-01-02T00:00:00.000Z',
+					updatedAt: '2026-01-03T00:00:00.000Z',
+					resolvedAt: '2026-01-03T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.impediments[0]).toEqual({
+			id: 'imp-2',
+			text: 'Decisão pendente',
+			tipo: 'decisao_pendente',
+			nextAction: 'Aguardar reunião',
+			status: 'resolvido',
+			createdAt: '2026-01-02T00:00:00.000Z',
+			resolvedAt: '2026-01-03T00:00:00.000Z'
+		});
 	});
 });

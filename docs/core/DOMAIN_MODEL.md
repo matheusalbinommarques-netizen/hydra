@@ -234,3 +234,19 @@ Cada atividade representa o **retrato atual** da execução, não um histórico 
 6. **Confirmar encerramento do projeto** — `completionMode: required_fields`, `allowsSkip: false` (única exceção além do Resumo da descoberta). Obrigatório: resumo do encerramento. Não usa `explicit_confirmation` — essa `completionMode` é suportada nesta versão do motor apenas para uma única atividade em todo o catálogo (`transitions.ts` localiza "a" atividade de confirmação explícita por `completionMode`, sem receber um id). `required_fields` com `allowsSkip: false` já exige uma decisão explícita (o campo obrigatório não pode ser pulado) sem exigir mudança em `domain/`.
 
 Catálogo completo nesta versão: as seis fases têm `catalogStatus: complete`. Ver `STATE_MACHINE.md` §2 e §4 — com isso, o estado `concluído` do projeto passa a ser alcançável de ponta a ponta.
+
+### Impedimentos: atividade e entidade são complementares, não concorrentes
+
+A atividade `impedimentos_execucao` (Fase 5, acima) e a entidade operacional
+`Impediment` (Cockpit, `/cockpit`; antecipada de Release 3 por decisão
+explícita — ver D022 em `docs/07-management/decision-log.md`) tratam de
+impedimentos em níveis diferentes e não competem pelo mesmo dado.
+`impedimentos_execucao` é um retrato pontual em texto livre, sem
+histórico — editar substitui a resposta anterior, como as demais
+atividades da Fase 5. `Impediment` é uma coleção independente do catálogo
+metodológico (sem `activityDefinitionId`, sem `PendingItem` associado):
+cada impedimento é um registro individual, classificado por tipo, com
+próxima ação e ciclo aberto/resolvido/reaberto próprio. Nenhum dos dois
+deriva ou sobrescreve o outro; a atividade é o registro periódico que
+entra no documento de acompanhamento do projeto, o Cockpit é o
+acompanhamento operacional contínuo.

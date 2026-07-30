@@ -32,6 +32,13 @@ describe('createInitialProjectState', () => {
 		expect(state.pendingItems).toEqual([]);
 	});
 
+	it('cria scopeItems e impediments vazios, e uma ScopeVersion em branco', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', '2026-01-01T00:00:00.000Z');
+		expect(state.scopeItems).toEqual([]);
+		expect(state.impediments).toEqual([]);
+		expect(state.scopeVersion).toEqual({ projectId: 'proj-1', hypothesis: '', confirmedAt: null });
+	});
+
 	it('é pura: não gera efeitos colaterais nem depende de nada além dos argumentos', () => {
 		const a = createInitialProjectState(catalog, 'proj-x', '2026-02-02T00:00:00.000Z');
 		const b = createInitialProjectState(catalog, 'proj-x', '2026-02-02T00:00:00.000Z');
