@@ -2,7 +2,6 @@
 name: hydra-plan-item
 description: Produz o plano de implementação de um item do backlog vigente do Hydra (ex. C3-03), sem editar nada. Uso explícito apenas via /hydra-plan-item.
 disable-model-invocation: true
-context: fork
 argument-hint: <item-id>
 arguments:
   - item
@@ -61,7 +60,9 @@ Estruture a resposta com estas seções:
 - **Riscos** — o que pode dar errado ou ficar ambíguo;
 - **Ordem sugerida** — passos em sequência, não em paralelo;
 - **Condições de parada** — sob quais condições `/hydra-implement-item`
-  deveria parar em vez de prosseguir.
+  deveria parar em vez de prosseguir;
+- **Nível de cerimônia preliminar** — 1, 2 ou 3, com justificativa em uma
+  frase (detalhado na §5).
 
 ## 4. Mudança em áreas sensíveis
 
@@ -72,7 +73,30 @@ sim para qualquer uma, isso deve estar destacado no início do plano, não
 enterrado no meio — é o tipo de coisa que pode exigir aprovação explícita
 antes de `/hydra-implement-item` prosseguir.
 
-## 5. O que este comando nunca faz
+## 5. Nível de cerimônia preliminar
+
+Classifique o item em um dos três níveis, com uma frase de justificativa:
+
+- **Nível 1** — só documentação, testes, scripts/skills/tooling interno,
+  sem arquivo de produção em `app/` nem mudança de comportamento do
+  produto;
+- **Nível 2** — mudança normal de produto (rotas, componentes,
+  apresentação, casos de uso, comportamento comum), fora das áreas
+  sensíveis do Nível 3;
+- **Nível 3** — qualquer mudança em área sensível: `domain/`, `catalog/`,
+  `orientation-engine/`, `server/persistence/`, schema/migrations,
+  contratos arquiteturais, dependências, arquitetura, segurança,
+  transformação/migração de dados, comportamento transversal. Se a §4
+  identificou mudança em qualquer área sensível, o nível preliminar é
+  sempre 3.
+
+Liste também, em uma ou duas frases, quais sinais no diff real poderiam
+elevar esse nível durante `/hydra-prepare-delivery` ou
+`/hydra-review-item` (ex.: o plano previa só UI, mas a implementação
+acabou tocando um contrato compartilhado). Este nível é preliminar — o
+nível final é decidido depois, com o diff real.
+
+## 6. O que este comando nunca faz
 
 Não cria, edita nem apaga nenhum arquivo do projeto. Não roda testes. Não
 faz stage, commit ou push. Não despeja documentos inteiros na resposta —

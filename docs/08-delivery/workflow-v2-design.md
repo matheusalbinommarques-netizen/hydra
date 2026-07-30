@@ -1,13 +1,18 @@
-# Workflow Hydra v2 — desenho técnico não implementado
+# Workflow Hydra v2 — desenho técnico
 
-Este documento registra o consenso técnico já alcançado sobre uma futura
-evolução do fluxo de trabalho do Hydra. É registro de contexto, não item
-de produto — nenhuma parte deste desenho foi implementada, e nenhuma
-skill existente foi alterada além do que já está em produção
-(validação de mensagem em `/hydra-ship`, adicionada no fechamento do
-Ciclo 3). Não recebe ID de ciclo. Os detalhes de implementação —
-incluindo schemas finais dos artefatos, `allowed-tools`, scripts
-auxiliares e tratamento operacional completo de falhas — permanecem
+Este documento registra o consenso técnico alcançado sobre a evolução do
+fluxo de trabalho do Hydra e o estado real da sua implementação. É
+registro de contexto, não item de produto — não recebe ID de ciclo. O
+fluxo de entrega de item (§ "Workflow futuro de item") está implementado
+por etapas: scripts determinísticos publicados
+(`hydra-state.mjs`, `hydra-verify.mjs`, `hydra-commit-lint.mjs`,
+`hydra-delivery-guard.mjs`), `/hydra-prepare-delivery` substituindo
+`/hydra-sync-delivery`, commit único por item, três níveis de cerimônia e
+recuperação segura de push em `/hydra-ship`. O fechamento de ciclo
+(§ "Workflow futuro de fechamento de ciclo") continua não implementado —
+nenhuma das skills dessa seção existe ainda. Os detalhes de implementação
+do fechamento de ciclo — incluindo schemas finais dos artefatos,
+`allowed-tools` e tratamento operacional completo de falhas — permanecem
 sujeitos ao planejamento dos respectivos itens técnicos futuros.
 
 ## Problema que motivou o redesenho
@@ -91,9 +96,27 @@ dada a baixa frequência de fechamento de ciclo.
 
 Vinculada ao conteúdo exato aprovado, não só ao `HEAD` — o mesmo `HEAD`
 pode representar árvores de trabalho diferentes se houver edição depois
-da verificação. `/hydra-review-item` gera o hash da árvore staged com
-`git write-tree` ao final da revisão, e `/hydra-ship` recalcula esse hash
-antes de commitar, bloqueando se não corresponder ao aprovado.
+da verificação. Implementada em duas peças, não uma única evidência:
+
+- `hydra-verify.mjs` grava um recibo (`hydra-verification.json`) com
+  `head`, `tree` (via `git write-tree`), `mode` (`fast`/`full`) e
+  `verifiedAt` somente quando a verificação termina em PASS, um item foi
+  informado (`--item`), existe stage, não há mudanças não staged e não há
+  arquivos não rastreados no momento em que a verificação termina — em
+  qualquer outro caso (FAIL, sem `--item`, ou árvore com sobra/pendência)
+  não há recibo utilizável;
+- `hydra-delivery-guard.mjs seal --item <item> --level <nivel>`, chamado
+  por `/hydra-review-item` ao final da revisão, confirma que o recibo
+  corresponde ao `HEAD`/árvore staged atuais e ao item informado, exige
+  `mode: "full"` para nível 2 ou 3, e grava o seal
+  (`hydra-delivery-seal.json`) com `item`, `level`, `head`, `tree` e
+  `sealedAt`;
+- `hydra-delivery-guard.mjs check`, chamado por `/hydra-ship` antes do
+  commit, recalcula `HEAD`/árvore e bloqueia se não corresponderem ao
+  seal;
+- `hydra-delivery-guard.mjs clear` apaga as duas evidências — chamado por
+  `/hydra-review-item` em caso de falha depois do stage, e por
+  `/hydra-ship` logo após um commit bem-sucedido.
 
 ## Identificação de commits
 
@@ -110,34 +133,38 @@ sem precisar de regex contra o corpo da mensagem.
 
 ## Caminho da evidência
 
-`git rev-parse --git-path hydra/approved-delivery.json` — resolve
+`git rev-parse --git-path hydra-verification.json` e
+`git rev-parse --git-path hydra-delivery-seal.json` — resolvem
 corretamente tanto o caso comum quanto worktrees, sem concatenação manual
-de caminho. Fica fora da árvore de trabalho e do índice: não participa de
-`git write-tree`, não pode ser commitado ou enviado por push por engano.
-Conteúdo mínimo: branch, `HEAD` base, item, ciclo, árvore staged,
-timestamp e resultado. Invalidado por comparação de conteúdo (branch,
-`HEAD`, árvore, item) no momento da leitura — sem depender de prazo de
-validade.
+de caminho. Os dois arquivos ficam fora da árvore de trabalho e do
+índice: não participam de `git write-tree`, não podem ser commitados ou
+enviados por push por engano. Cada um é validado por forma (campos e
+tipos esperados) e por conteúdo (`head`/`tree`/`item` batendo com o
+estado atual) no momento da leitura — sem depender de prazo de validade.
 
 ## Recuperação de falha de push
 
-A evidência é apagada assim que o commit é criado com sucesso — nesse
+O seal é apagado assim que o commit é criado com sucesso
+(`hydra-delivery-guard.mjs clear`, chamado por `/hydra-ship`) — nesse
 ponto a garantia de "conteúdo aprovado" já foi cumprida, e o que resta é
-só publicar. Se o `commit` falhar, a evidência é preservada e a tentativa
-pode ser repetida sem nova revisão. Se o `commit` for bem-sucedido mas o
-`push` falhar, `/hydra-ship` deve reconhecer esse estado (stage limpo,
-`HEAD` à frente de `origin/main` pelo commit recém-criado) e repetir
-somente o `push`, sem exigir nova revisão nem criar outro commit.
+só publicar. Se o `commit` falhar, o seal é preservado e a tentativa pode
+ser repetida sem nova revisão. Se o `commit` for bem-sucedido mas o
+`push` falhar, `/hydra-ship` reconhece esse estado (sem seal, stage
+limpo, `HEAD` à frente de `origin/main` pelo commit recém-criado cujo
+assunto e trailers batem com o pedido) e repete somente o `push`, sem
+exigir nova revisão nem criar outro commit.
 
-## Ordem incremental de implementação
+## Estado de implementação
 
-1. validação de mensagem em `/hydra-ship` — já implementada no Ciclo 3;
-2. `/hydra-prepare-delivery`;
-3. evidência via `git write-tree` + armazenamento em
-   `git rev-parse --git-path`;
-4. trailers automáticos `Hydra-Item`/`Hydra-Cycle`;
-5. commit único por item;
-6. `/hydra-verify-cycle`, `/hydra-close-cycle`, `/hydra-review-cycle-close`.
+1. validação de mensagem em `/hydra-ship` — implementada no Ciclo 3;
+2. `/hydra-prepare-delivery` — implementada;
+3. evidência via `git write-tree` + `hydra-verification.json` +
+   `hydra-delivery-seal.json`, resolvidos por `git rev-parse --git-path`
+   — implementada;
+4. trailers automáticos `Hydra-Item`/`Hydra-Cycle` — implementada;
+5. commit único por item — implementada;
+6. `/hydra-verify-cycle`, `/hydra-close-cycle`, `/hydra-review-cycle-close`
+   — não implementadas; fechamento de ciclo continua manual.
 
 ## Não será feito retroativamente
 

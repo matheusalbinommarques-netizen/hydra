@@ -2,7 +2,6 @@
 name: hydra-resume
 description: Resume o estado atual do Hydra (branch, ciclo vigente, itens, gate, próxima decisão) chamando hydra-state.mjs. Uso explícito apenas via /hydra-resume.
 disable-model-invocation: true
-context: fork
 allowed-tools: Bash(node .claude/scripts/hydra-state.mjs:*), Read, Grep, Glob
 ---
 

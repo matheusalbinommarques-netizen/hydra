@@ -65,17 +65,44 @@ Não resolver conflitos silenciosamente. Pare e apresente o conflito.
 
 ## Fluxo operacional
 
-Use as skills manualmente:
+Use as skills manualmente, nesta ordem, um item por vez:
 
 - `/hydra-resume`: retomar o estado;
 - `/hydra-plan-item <item>`: planejar sem editar;
-- `/hydra-implement-item <item>`: implementar sem stage ou commit;
-- `/hydra-review-item <item>`: revisar, validar e preparar o stage;
-- `/hydra-verify <item> <fast|full>`: executar verificação determinística;
-- `/hydra-ship "<mensagem>"`: publicar o stage aprovado;
-- `/hydra-sync-delivery <item> <hash>`: sincronizar documentação da entrega.
+- `/hydra-implement-item <item>` (ou `... <item> continue` para corrigir
+  defeito de revisão): implementar sem stage ou commit;
+- `/hydra-prepare-delivery <item>`: preparar backlog/`PROJECT_STATUS.md`/
+  `CHANGELOG.md`/`TASKS.md` do item, sem stage;
+- `/hydra-review-item <item>`: revisar código e documentação como um
+  pacote único, fazer stage seletivo e selar a entrega;
+- `/hydra-verify <item> <fast|full>`: executar verificação determinística
+  isolada, fora do fluxo fixo, quando fizer sentido;
+- `/hydra-ship "<mensagem>"`: publicar o stage selado — código e
+  documentação de acompanhamento em um único commit.
 
-Não repetir manualmente leituras ou verificações que um script já realizou.
+Não existe mais etapa de sincronização documental depois do commit. Não
+repetir manualmente leituras ou verificações que um script já realizou.
+
+### Níveis de cerimônia
+
+- **Nível 1** — documentação, testes, scripts/skills/tooling interno, sem
+  arquivo de produção em `app/` nem mudança de comportamento do produto:
+  verificação final `fast`, sem QA visual;
+- **Nível 2** — mudança normal de produto (rotas, componentes,
+  apresentação, casos de uso, comportamento comum), fora das áreas
+  sensíveis do Nível 3: verificação final `full`, QA manual obrigatória
+  quando houver interface;
+- **Nível 3** — mudança sensível (`domain/`, `catalog/`,
+  `orientation-engine/`, `server/persistence/`, schema/migrations,
+  contratos arquiteturais, dependências, arquitetura, segurança,
+  transformação/migração de dados, comportamento transversal):
+  verificação final `full`, QA manual quando aplicável, exige autorização
+  explícita registrada no item ou decisão associada.
+
+`/hydra-plan-item` estima o nível preliminar; `/hydra-prepare-delivery`
+reavalia com base no diff real; `/hydra-review-item` define o nível final.
+Em dúvida, use o nível mais alto. O stage final de cada item só é
+publicável depois de selado por `hydra-delivery-guard.mjs` na revisão.
 
 ## Economia de contexto
 

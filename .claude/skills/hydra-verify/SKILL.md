@@ -2,7 +2,6 @@
 name: hydra-verify
 description: Roda a bateria determinística de verificação do Hydra (fast ou full) chamando hydra-verify.mjs. Uso explícito apenas via /hydra-verify.
 disable-model-invocation: true
-context: fork
 argument-hint: <item-id> <fast|full>
 arguments:
   - item
