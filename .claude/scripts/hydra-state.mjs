@@ -25,6 +25,19 @@ class UsageError extends Error {}
 class NotFoundError extends Error {}
 class StateReadError extends Error {}
 
+const ITEM_ID_RE = /^C\d+-\d+[A-Z]?$/;
+
+function validateItemId(id) {
+	if (ITEM_ID_RE.test(id)) return;
+	if (/^D\d+/.test(id)) {
+		throw new UsageError(
+			`"${id}" parece um identificador de decisão (Dxxx), não um item de backlog. ` +
+				'O fluxo normal exige um identificador de item no formato Cx-y (ex.: C5-01, C4-03A).'
+		);
+	}
+	throw new UsageError(`"${id}" não é um identificador de item válido. Formato esperado: Cx-y (ex.: C5-01, C4-03A).`);
+}
+
 function parseArgs(argv) {
 	const args = { item: null, format: 'markdown' };
 	for (let i = 0; i < argv.length; i++) {
@@ -32,6 +45,7 @@ function parseArgs(argv) {
 		if (arg === '--item') {
 			args.item = argv[++i];
 			if (!args.item) throw new UsageError('--item exige um valor (ex.: --item C3-03).');
+			validateItemId(args.item);
 		} else if (arg === '--format') {
 			args.format = argv[++i];
 		} else {
@@ -172,16 +186,22 @@ function parseBacklog(content) {
 
 		if (!current) continue;
 
-		const statusMatch = line.match(/^\*\*Status:\*\*\s*(.+)$/);
+		const statusMatch = line.match(/^\*\*Status:\*\*\s*(.*)$/);
 		if (statusMatch) {
-			const text = statusMatch[1].trim();
+			let text = statusMatch[1];
+			let j = i + 1;
+			while (j < lines.length && lines[j].trim() !== '' && !/^\*\*[^*]+:\*\*/.test(lines[j]) && !/^#/.test(lines[j])) {
+				text += ' ' + lines[j].trim();
+				j++;
+			}
+			text = text.replace(/\s+/g, ' ').trim();
 			current.status = /concluíd/i.test(text) ? 'concluído' : text;
 			const commitMatch = text.match(/`([0-9a-f]{7,40})`/);
 			if (commitMatch) current.commit = commitMatch[1];
 			continue;
 		}
 
-		const acceiteMatch = line.match(/^\*\*Aceite:\*\*\s*(.*)$/);
+		const acceiteMatch = line.match(/^\*\*Aceite:\*\*\s*(.*)$/) || line.match(/^\*\*Resultado esperado(?: \(mínimo funcional\))?:\*\*\s*(.*)$/);
 		if (acceiteMatch && current.acceite === null) {
 			let text = acceiteMatch[1];
 			let j = i + 1;

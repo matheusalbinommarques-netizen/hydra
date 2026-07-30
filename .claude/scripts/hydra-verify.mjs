@@ -26,6 +26,8 @@ import path from 'node:path';
 
 class UsageError extends Error {}
 
+const ITEM_ID_RE = /^C\d+-\d+[A-Z]?$/;
+
 function parseArgs(argv) {
 	const args = { mode: null, item: null };
 	for (let i = 0; i < argv.length; i++) {
@@ -34,6 +36,10 @@ function parseArgs(argv) {
 			args.mode = argv[++i];
 		} else if (arg === '--item') {
 			args.item = argv[++i];
+			if (!args.item) throw new UsageError('--item exige um valor (ex.: --item C3-03).');
+			if (!ITEM_ID_RE.test(args.item)) {
+				throw new UsageError(`"${args.item}" não é um identificador de item válido. Formato esperado: Cx-y (ex.: C5-01, C4-03A).`);
+			}
 		} else {
 			throw new UsageError(`argumento desconhecido: ${arg}`);
 		}
@@ -50,6 +56,14 @@ function findRepoRoot() {
 		throw new UsageError('não foi possível localizar a raiz do repositório Git.');
 	}
 	return path.normalize(result.stdout.trim());
+}
+
+function git(repoRoot, gitArgs) {
+	const result = spawnSync('git', gitArgs, { cwd: repoRoot, encoding: 'utf8' });
+	if (result.error || result.status !== 0) {
+		throw new UsageError(`git ${gitArgs.join(' ')} falhou: ${result.stderr || result.error?.message || 'erro desconhecido'}`);
+	}
+	return result.stdout;
 }
 
 function slug(name) {
@@ -82,6 +96,10 @@ function runStep(step, index, total, logDir) {
 	return { name: step.name, passed, duration, logPath, output };
 }
 
+function hasStagedContent(repoRoot) {
+	return git(repoRoot, ['diff', '--cached', '--name-only']).trim().length > 0;
+}
+
 function buildSteps(mode, repoRoot) {
 	const appDir = path.join(repoRoot, 'app');
 	const isWin = process.platform === 'win32';
@@ -102,7 +120,10 @@ function buildSteps(mode, repoRoot) {
 			shell: isWin
 		}
 	];
-	const gitCheck = { name: 'git diff --check', cmd: 'git', args: ['diff', '--check'], cwd: repoRoot };
+	const staged = hasStagedContent(repoRoot);
+	const gitCheck = staged
+		? { name: 'git diff --cached --check', cmd: 'git', args: ['diff', '--cached', '--check'], cwd: repoRoot }
+		: { name: 'git diff --check', cmd: 'git', args: ['diff', '--check'], cwd: repoRoot };
 
 	if (mode === 'fast') {
 		return [...common, gitCheck];
@@ -123,9 +144,33 @@ function buildSteps(mode, repoRoot) {
 	];
 }
 
+function gitPath(repoRoot, relPath) {
+	const result = spawnSync('git', ['rev-parse', '--git-path', relPath], { cwd: repoRoot, encoding: 'utf8' });
+	if (result.error || result.status !== 0) {
+		throw new UsageError(`git rev-parse --git-path ${relPath} falhou: ${result.stderr || result.error?.message}`);
+	}
+	return path.resolve(repoRoot, result.stdout.trim());
+}
+
+function gitStatusParts(repoRoot) {
+	const lines = git(repoRoot, ['status', '--short'])
+		.split(/\r?\n/)
+		.filter((l) => l.length > 0);
+	const staged = lines.filter((l) => l[0] !== ' ' && l[0] !== '?');
+	const unstaged = lines.filter((l) => l.slice(0, 2) !== '??' && l[1] !== ' ' && l[1] !== undefined);
+	const untracked = lines.filter((l) => l.startsWith('??'));
+	return { staged, unstaged, untracked };
+}
+
 function main() {
 	const args = parseArgs(process.argv.slice(2));
 	const repoRoot = findRepoRoot();
+
+	const receiptPath = gitPath(repoRoot, 'hydra-verification.json');
+	const sealPath = gitPath(repoRoot, 'hydra-delivery-seal.json');
+	fs.rmSync(receiptPath, { force: true });
+	fs.rmSync(sealPath, { force: true });
+
 	const steps = buildSteps(args.mode, repoRoot);
 
 	const logDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydra-verify-'));
@@ -154,6 +199,25 @@ function main() {
 		`\nhydra-verify: PASS (modo ${args.mode}${itemLabel}) — ${results.length}/${results.length} etapas, ${formatDuration(totalDuration)} total\n`
 	);
 	fs.rmSync(logDir, { recursive: true, force: true });
+
+	const { staged, unstaged, untracked } = gitStatusParts(repoRoot);
+	if (args.item && staged.length > 0 && unstaged.length === 0 && untracked.length === 0) {
+		const head = git(repoRoot, ['rev-parse', 'HEAD']).trim();
+		const tree = git(repoRoot, ['write-tree']).trim();
+		const receipt = {
+			version: 1,
+			item: args.item,
+			mode: args.mode,
+			head,
+			tree,
+			verifiedAt: new Date().toISOString()
+		};
+		fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n');
+		process.stdout.write(`hydra-verify: recibo gravado em ${receiptPath}\n`);
+	} else {
+		process.stdout.write('hydra-verify: recibo não gravado (stage final não está limpo e completo para selar) — isso não é falha.\n');
+	}
+
 	process.exit(0);
 }
 
