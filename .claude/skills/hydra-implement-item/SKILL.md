@@ -99,7 +99,7 @@ implementação anterior, ou documentação já preparada por
 
 - preserve integralmente o trabalho já existente do item — não descarte
   nem reverta nada;
-- não altere `CHANGELOG.md`, `PROJECT_STATUS.md`, `TASKS.md` ou o backlog
+- não altere `CHANGELOG.md`, `PROJECT_STATUS.md` ou o backlog
   neste modo, mesmo que já estejam parte do diff não commitado;
 - corrija exclusivamente o defeito reportado pela revisão.
 
@@ -144,7 +144,7 @@ verificação falhando.
 ## 6. O que este comando nunca faz
 
 Não roda `git add`, `git commit` ou `git push`. Não edita
-`CHANGELOG.md`, `PROJECT_STATUS.md`, `TASKS.md` ou o backlog (nem em modo
+`CHANGELOG.md`, `PROJECT_STATUS.md` ou o backlog (nem em modo
 `continue`). Não inicia nenhum outro item do backlog, mesmo que pareça
 relacionado.
 

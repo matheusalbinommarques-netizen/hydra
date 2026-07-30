@@ -14,5 +14,4 @@
 | R10 | Modelo de dados inadequado | Média | Alto | Modelo conceitual antes do Walking Skeleton | Matheus | Aberto |
 | R11 | Dependência futura de IA | Baixa | Médio | Núcleo baseado em regras | Matheus | Aberto |
 | R12 | Limitação de planos gratuitos | Média | Médio | Evitar fornecedor específico | Matheus | Aberto |
-| R13 | Perda de dados no protótipo funcional | Média | Muito alto | JSON, testes e tratamento de erro | Matheus | Aberto |
 | R14 | Ferramenta não gerar valor além de checklist | Média | Muito alto | Validar motor e rastreabilidade no Release 0 | Matheus | Aberto |

@@ -4,6 +4,59 @@
 
 ### Adicionado
 
+- Catálogo completo das seis fases do Release 0 (Estruturação, Planejamento,
+  Execução e Validação, além de Descoberta e Definição do produto já
+  existentes) — o estado `concluído` do projeto passa a ser alcançável de
+  ponta a ponta;
+- duas atividades de Definição do produto: "Definir visão do produto" (tipo
+  de produto, necessidade central, benefício central, diferencial) e
+  "Definir critérios de sucesso do produto" (sinais de sucesso,
+  evidências/indicadores, condição mínima de validação);
+- "Escolha o próximo foco" (antes "Monte a próxima versão"): tela
+  estruturada de montagem de escopo — adicionar/editar itens, classificar
+  bucket e esforço, reordenar, definir hipótese, projeção de sobrecarga
+  (mais de 5 itens em "Agora" com esforço médio/grande) e artefato
+  confirmado somente leitura com atalho para retomar a jornada;
+- tipo de campo de seleção múltipla (`selecao_multipla`) e prova de
+  sinal→sugestão: respostas de "Problema ou oportunidade" (sinais da
+  situação) geram sugestões explicadas de item de escopo, aceitas
+  explicitamente pelo usuário, nunca automáticas;
+- reaproveitamento explícito de resposta anterior (`suggestedSource`) como
+  ponto de partida editável, sem preenchimento nem vínculo silencioso:
+  Público afetado → beneficiário/usuário principal; situação/mudança/
+  percepção → visão do produto e critérios de sucesso;
+- agrupamento de campos opcionais menos usados em seção recolhível (ex.:
+  "Adicionar mais contexto" em "Problema ou oportunidade");
+- Resumo da descoberta: visão compacta no topo (problema, sinais, público,
+  estado atual, resultado desejado) com link "Editar X" por bloco; detalhe
+  completo por atividade recolhido por padrão;
+- sinal de conflito critério × escopo: banner no Resumo quando critérios de
+  sucesso do produto foram definidos mas nenhum item de escopo em "Agora"
+  os sustenta;
+- identidade visual papel/tinta/grafite/vermelho-de-lápis substituindo a
+  paleta navy/prata/ciano; rótulos amigáveis de status do projeto
+  (Rascunho/Em andamento/Concluído) na lista de projetos e no cabeçalho do
+  workspace;
+- Bancada (Descoberta + Definição do produto, `/now`): layout em duas
+  colunas com painel lateral somente leitura que cresce conforme respostas
+  canônicas são registradas; atividades decompostas campo a campo, com
+  etapa opcional final agrupada e pulável;
+- Cockpit/Impedimentos (D022, antecipada de Release 3): registrar,
+  classificar, definir próxima ação, resolver e reabrir um impedimento;
+  tela `/cockpit`; integração neutra ao `/now`.
+
+### Alterado
+
+- remoção do eixo `ScopeItem.value` (mantém apenas esforço, agora
+  obrigatório só para itens em "Agora");
+- navegação do workspace reagrupada em abas primárias (Agora/Cockpit) e
+  links utilitários discretos (Mapa/Registros/Resumo/Exportar); "Projetos"
+  move para o cabeçalho de identidade.
+
+## [0.4.0] — 25/07/2026
+
+### Adicionado
+
 - Tela Mapa da jornada (`/projects/[projectId]/map`): mostra as seis fases
   do catálogo em ordem, com status de cada fase e atividade, e destaque da
   atividade recomendada como próximo passo;

@@ -1,5 +1,5 @@
-// Teste Playwright dedicado do banner de conflito critério × escopo
-// (Especificação de Recuperação v1.1, R2) na tela "Resumo da descoberta".
+// Teste Playwright dedicado do banner de conflito critério × escopo na
+// tela "Resumo da descoberta".
 // Cobre: tela sem conflito (nenhum critério respondido ainda; critério
 // respondido mas ainda sustentado por um item em "Agora") e tela com
 // conflito (critério respondido, item de escopo movido para fora de

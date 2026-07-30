@@ -117,10 +117,9 @@ export interface ProjectView {
 	// Answers persistidas, independente de valores temporários de formulário em
 	// andamento; já filtrado dos campos que já têm Answer própria.
 	fieldSuggestions: FieldSuggestionView[];
-	// Conflito critério × escopo (R2, Especificação de Recuperação v1.1) —
-	// sinal de nível de projeto, não por critério individual (ver
-	// orientation-engine/criteria-scope-conflict.ts). Sempre computado, nunca
-	// persistido.
+	// Conflito critério × escopo — sinal de nível de projeto, não por
+	// critério individual (ver orientation-engine/criteria-scope-conflict.ts).
+	// Sempre computado, nunca persistido.
 	criteriaScopeConflict: CriteriaScopeConflict;
 	// Cockpit (vertical 2, "Impedimentos") — todos os impedimentos (abertos e
 	// resolvidos); a tela /cockpit e a contagem em /now filtram por status

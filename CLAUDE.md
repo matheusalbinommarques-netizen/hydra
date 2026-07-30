@@ -32,7 +32,7 @@ Fontes disponíveis:
 - `docs/core/RELEASE_0_SPEC.md`: escopo e critérios do Release 0;
 - `docs/core/UX_DESIGN_SPEC.md`: experiência e comportamento da interface;
 - `docs/core/TECHNICAL_BRIEF.md`: stack e decisões técnicas;
-- `TASKS.md`: estado operacional e próxima tarefa;
+- `PROJECT_STATUS.md`: estado operacional e próxima decisão relevante;
 - backlog do ciclo vigente: critérios e limites do item;
 - documentação completa em `docs/`: histórico e aprofundamento.
 
@@ -40,7 +40,7 @@ Precedência:
 
 1. decisão explícita mais recente do usuário;
 2. documentos em `docs/core/`;
-3. backlog vigente e `TASKS.md`;
+3. backlog vigente e `PROJECT_STATUS.md`;
 4. documentação complementar;
 5. inferência técnica.
 
@@ -72,7 +72,7 @@ Use as skills manualmente, nesta ordem, um item por vez:
 - `/hydra-implement-item <item>` (ou `... <item> continue` para corrigir
   defeito de revisão): implementar sem stage ou commit;
 - `/hydra-prepare-delivery <item>`: preparar backlog/`PROJECT_STATUS.md`/
-  `CHANGELOG.md`/`TASKS.md` do item, sem stage;
+  `CHANGELOG.md` do item, sem stage;
 - `/hydra-review-item <item>`: revisar código e documentação como um
   pacote único, fazer stage seletivo e selar a entrega;
 - `/hydra-verify <item> <fast|full>`: executar verificação determinística

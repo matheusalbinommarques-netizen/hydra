@@ -2,8 +2,7 @@
 // docs/core/ORIENTATION_ENGINE.md. Função pura, nunca persistida, recalculada
 // a cada leitura a partir de Answer[]/ScopeItem[] (mesmo padrão de
 // computeScopeProjection/computeHypotheses). Três regras explícitas e
-// específicas (decisão registrada na Especificação de Recuperação v1.1,
-// adendo item 4) — deliberadamente não é uma tabela configurável de
+// específicas — deliberadamente não é uma tabela configurável de
 // sinal→sugestão. Os ids `lack_of_clarity`, `dispersed_decisions`,
 // `insufficient_tracking` ficam de fora por decisão explícita; `other` é
 // descartado permanentemente como gatilho (sem semântica própria). Se uma

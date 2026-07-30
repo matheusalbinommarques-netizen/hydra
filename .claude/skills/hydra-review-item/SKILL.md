@@ -50,7 +50,7 @@ stage preexistente.
 - confirme que a documentação de entrega foi preparada: a árvore pendente
   deve conter, além do código, as atualizações esperadas de
   `/hydra-prepare-delivery` (backlog do ciclo, e conforme o caso
-  `PROJECT_STATUS.md`, `CHANGELOG.md`, `TASKS.md`) — se faltar, pare e
+  `PROJECT_STATUS.md`, `CHANGELOG.md`) — se faltar, pare e
   aponte para `/hydra-prepare-delivery $item` antes de revisar.
 
 ## 3. Confirmação de escopo único

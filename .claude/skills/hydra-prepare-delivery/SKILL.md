@@ -1,6 +1,6 @@
 ---
 name: hydra-prepare-delivery
-description: Prepara a documentação de acompanhamento (backlog, PROJECT_STATUS.md, CHANGELOG.md, TASKS.md) de um item do Hydra já implementado mas ainda não commitado, sem aprovar, sem stage e sem commit. Uso explícito apenas via /hydra-prepare-delivery.
+description: Prepara a documentação de acompanhamento (backlog, PROJECT_STATUS.md, CHANGELOG.md) de um item do Hydra já implementado mas ainda não commitado, sem aprovar, sem stage e sem commit. Uso explícito apenas via /hydra-prepare-delivery.
 disable-model-invocation: true
 argument-hint: <item-id>
 arguments:
@@ -87,9 +87,6 @@ e reporte o bloqueio em vez de prosseguir com a documentação.
 3. **`CHANGELOG.md`**: registre o comportamento entregue por `$item` em
    `[Unreleased]`, descrevendo o efeito observável — não uma lista interna
    de arquivos. Não crie uma versão nova.
-4. **`TASKS.md`**: edite somente se já existir uma entrada ou estado
-   operacional relativo a `$item` — não crie uma entrada nova só para
-   espelhar o backlog.
 
 ## 5. O que este comando nunca faz
 
@@ -104,7 +101,7 @@ Se esta skill for executada de novo para o mesmo item (por exemplo, depois
 de uma correção via `/hydra-implement-item $item continue`), atualize os
 registros já preparados em vez de duplicá-los — mesma entrada no backlog,
 mesmo bloco de `PROJECT_STATUS.md`, mesma linha de `[Unreleased]` no
-`CHANGELOG.md`, mesma linha de `TASKS.md` quando aplicável.
+`CHANGELOG.md`.
 
 ## 7. Relatório final compacto
 

@@ -1,8 +1,7 @@
-// Conflito critério × escopo — ver Especificação de Recuperação do Produto
-// Hydra v1.1, adendo item 1 (R2 implementado como sinal de nível de
-// projeto, não por critério individual). Função pura, nunca persistida,
-// recalculada a cada leitura a partir de Answer[]/ScopeItem[], mesmo padrão
-// de computeScopeSuggestions/computeScopeProjection.
+// Conflito critério × escopo — sinal de nível de projeto, não por critério
+// individual. Função pura, nunca persistida, recalculada a cada leitura a
+// partir de Answer[]/ScopeItem[], mesmo padrão de
+// computeScopeSuggestions/computeScopeProjection.
 //
 // Regra: true quando existe pelo menos uma resposta não vazia em
 // "criterios_sucesso_produto" (qualquer um dos seus campos) e não existe
