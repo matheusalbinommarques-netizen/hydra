@@ -4,6 +4,7 @@ export * from './phase-status';
 export * from './project-status';
 export * from './next-activity';
 export * from './route';
+export * from './route-recommendation';
 export * from './pending-items';
 export * from './hypotheses';
 export * from './field-suggestions';

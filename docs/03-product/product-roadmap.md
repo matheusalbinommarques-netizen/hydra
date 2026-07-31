@@ -79,24 +79,31 @@ Fora (mantido fora nesta versão):
 - impactos inferidos sem regra explícita;
 - IA.
 
-### 3. Diagnóstico e rota recomendada (próxima etapa)
+### 3. Diagnóstico e rota recomendada — concluído
 
 Resultado: adaptar a jornada ao estado e ao contexto real de cada projeto,
 em vez de aplicar sempre a mesma sequência fixa de atividades.
 
-Capacidades:
+Entregue, em duas fatias:
 
-- estado atual do projeto;
-- estruturas já existentes;
-- problemas já identificados;
-- características do projeto;
-- percurso recomendado;
-- percurso completo, sempre disponível como alternativa.
+- ponto de partida explícito da rota em `/map` (`Project.routeStartPhaseId`,
+  D023, `docs/07-management/decision-log.md`) — `/now` passa a calcular a
+  próxima ação dentro da rota escolhida; percurso completo sempre
+  disponível;
+- diagnóstico de rota assistido por cinco respostas estruturadas do
+  usuário (uma por fase, Descoberta a Execução), recomendando
+  deterministicamente a primeira estrutura ainda ausente ou, se todas
+  confirmadas, "Validação e encerramento" (D024,
+  `docs/07-management/decision-log.md`); recomendação transitória,
+  aplicada pelo mesmo mecanismo de D023, sempre substituível pelo seletor
+  manual.
 
-Esta etapa provavelmente exige mudança estrutural — decisão de
-arquitetura e escopo a ser registrada antes de iniciar a implementação.
+Fora (mantido fora nesta versão — permanecem para decisão futura, quando/se
+necessários): classificação/tipos de projeto, aplicabilidade por
+atividade, status "não aplicável", diagnóstico automático derivado do
+estado persistido, IA.
 
-### 4. Entregas e backlog estruturados
+### 4. Entregas e backlog estruturados (próxima etapa)
 
 Resultado: transformar planejamento em trabalho executável e rastreável.
 

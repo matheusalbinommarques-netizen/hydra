@@ -37,8 +37,11 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   reúne checklist de completude, pendências abertas de Descoberta,
   `criteriaScopeConflict` e confirmação explícita persistida por
   `ActivityProgress`; validada (`full` PASS).
-- **Diagnóstico e rota recomendada — primeira fatia** (roadmap, etapa 3):
-  em andamento — ponto de partida explícito da rota em `/map` (D023,
+- **Diagnóstico e rota recomendada** (roadmap, etapa 3): concluída — ponto
+  de partida explícito da rota em `/map` (D023,
+  `docs/07-management/decision-log.md`) e diagnóstico de rota assistido
+  por cinco respostas estruturadas, recomendando deterministicamente a
+  primeira estrutura ainda ausente (D024,
   `docs/07-management/decision-log.md`); ausência de escolha preserva o
   comportamento anterior; percurso completo continua disponível; validada
   (`full` PASS).
@@ -75,9 +78,9 @@ Histórico completo em `docs/07-management/decision-log.md`.
 ## Próxima decisão relevante
 
 Etapa 3 do roadmap ("Diagnóstico e rota recomendada",
-`docs/03-product/product-roadmap.md`) segue em andamento — primeira fatia
-entregue, resultado completo da etapa ainda não alcançado. Próxima
-decisão: escopo da menor fatia funcional restante da etapa 3.
+`docs/03-product/product-roadmap.md`) está concluída. Próxima etapa da
+sequência: etapa 4, "Entregas e backlog estruturados" — escopo e menor
+fatia funcional ainda não definidos.
 
 ## Não fazer agora
 

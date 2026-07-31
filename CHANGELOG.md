@@ -68,7 +68,15 @@
   continuam visíveis no Mapa e não recebem nenhuma alteração automática
   de progresso; a escolha persiste em SQLite e é preservada na
   exportação/importação do projeto (D023,
-  `docs/07-management/decision-log.md`).
+  `docs/07-management/decision-log.md`);
+- em `/map`, diagnóstico de rota assistido por cinco perguntas fixas (uma
+  por fase, Descoberta a Execução): a recomendação aponta a primeira
+  estrutura ainda não confirmada ou, se todas confirmadas, "Validação e
+  encerramento", com justificativa objetiva; as respostas não são salvas,
+  só a fase que o usuário decidir aplicar; aplicar a recomendação usa o
+  mesmo mecanismo já existente de definir o ponto de partida da rota; o
+  seletor manual de fase continua disponível e a recomendação pode ser
+  ignorada ou substituída (D024, `docs/07-management/decision-log.md`).
 
 ### Alterado
 
