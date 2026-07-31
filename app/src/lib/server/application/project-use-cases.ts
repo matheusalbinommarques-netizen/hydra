@@ -24,6 +24,7 @@ import {
 	setImpedimentType as setImpedimentTypeInDomain,
 	setRouteStartPhase as setRouteStartPhaseInDomain,
 	setScopeItemEffort as setScopeItemEffortInDomain,
+	setScopeItemExecutionStatus as setScopeItemExecutionStatusInDomain,
 	setScopeItemText as setScopeItemTextInDomain,
 	skipActivity as skipActivityInDomain
 } from '$lib/domain';
@@ -49,6 +50,7 @@ import type {
 	SetImpedimentTypeInput,
 	SetRouteStartPhaseInput,
 	SetScopeItemEffortInput,
+	SetScopeItemExecutionStatusInput,
 	SetScopeItemTextInput,
 	SkipActivityInput,
 	UseCaseOutcome
@@ -222,6 +224,17 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = setScopeItemEffortInDomain(catalog, state, input.itemId, input.effort, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setScopeItemExecutionStatus(input: SetScopeItemExecutionStatusInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setScopeItemExecutionStatusInDomain(catalog, state, input.itemId, input.status, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			if (result.value !== state) await repository.save(result.value);

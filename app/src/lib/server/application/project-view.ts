@@ -57,7 +57,8 @@ function buildScopeItemView(item: ProjectState['scopeItems'][number]): ScopeItem
 		bucket: item.bucket,
 		effort: item.effort,
 		order: item.order,
-		sourceSuggestionId: item.sourceSuggestionId
+		sourceSuggestionId: item.sourceSuggestionId,
+		executionStatus: item.executionStatus ?? 'a_fazer'
 	};
 }
 

@@ -8,7 +8,8 @@ import type {
 	Result,
 	ScopeBucket,
 	ScopeConfirmationIssue,
-	ScopeEffort
+	ScopeEffort,
+	ScopeExecutionStatus
 } from '$lib/domain';
 import type {
 	CriteriaScopeConflict,
@@ -67,6 +68,10 @@ export interface ScopeItemView {
 	effort: ScopeEffort | null;
 	order: number | null;
 	sourceSuggestionId: string | null;
+	// Acompanhamento de execução (D025, etapa 4 do roadmap) — só relevante
+	// para bucket 'agora'; presente sempre (default 'a_fazer' vindo do
+	// domínio), a interface decide se exibe conforme o bucket.
+	executionStatus: ScopeExecutionStatus;
 }
 
 export interface ScopeVersionView {
@@ -190,6 +195,12 @@ export interface SetScopeItemEffortInput {
 	effort: ScopeEffort;
 }
 
+export interface SetScopeItemExecutionStatusInput {
+	projectId: string;
+	itemId: string;
+	status: ScopeExecutionStatus;
+}
+
 export interface ReorderAgoraItemsInput {
 	projectId: string;
 	orderedItemIds: string[];
@@ -250,6 +261,7 @@ export interface ProjectUseCases {
 	setScopeItemText(input: SetScopeItemTextInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveScopeItem(input: MoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setScopeItemEffort(input: SetScopeItemEffortInput): Promise<UseCaseOutcome<ProjectView>>;
+	setScopeItemExecutionStatus(input: SetScopeItemExecutionStatusInput): Promise<UseCaseOutcome<ProjectView>>;
 	reorderAgoraItems(input: ReorderAgoraItemsInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeScopeItem(input: RemoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setHypothesis(input: SetHypothesisInput): Promise<UseCaseOutcome<ProjectView>>;

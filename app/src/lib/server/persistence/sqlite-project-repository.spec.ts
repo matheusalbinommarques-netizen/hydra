@@ -19,6 +19,7 @@ import {
 	setImpedimentNextAction,
 	setRouteStartPhase,
 	setScopeItemEffort,
+	setScopeItemExecutionStatus,
 	skipActivity
 } from '$lib/domain';
 import type { ProjectState } from '$lib/domain';
@@ -159,6 +160,53 @@ describe('createSqliteProjectRepository — schema', () => {
 		openRepos.push(repo2);
 		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
 	});
+
+	it('abre um banco pré-D025 (scope_item sem execution_status) e adiciona a coluna com default "a_fazer"', async () => {
+		const filePath = tempFilePath();
+
+		// Simula um banco criado antes de D025: scope_item sem execution_status,
+		// já com route_start_phase_id (pós-D023).
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL, route_start_phase_id TEXT)');
+		legacyDb.exec(
+			`CREATE TABLE scope_item (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL,
+				text TEXT NOT NULL,
+				bucket TEXT NOT NULL,
+				effort TEXT,
+				item_order INTEGER,
+				source_suggestion_id TEXT,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`
+		);
+		legacyDb.prepare('INSERT INTO project (id, name, created_at) VALUES (?, ?, ?)').run('legacy-1', null, T1);
+		legacyDb
+			.prepare(
+				`INSERT INTO scope_item (id, project_id, text, bucket, effort, item_order, source_suggestion_id, created_at, updated_at)
+				 VALUES ('scope-legacy', 'legacy-1', 'Item legado', 'agora', NULL, 0, NULL, ?, ?)`
+			)
+			.run(T1, T1);
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const verifyDb = new Database(filePath);
+		const row = verifyDb.prepare('SELECT execution_status FROM scope_item WHERE id = ?').get('scope-legacy') as {
+			execution_status: string;
+		};
+		expect(row.execution_status).toBe('a_fazer');
+		verifyDb.close();
+
+		// Novo projeto, inserido normalmente pelo repositório já migrado.
+		const state = unwrap(
+			addScopeItem(catalog, createInitialProjectState(catalog, 'proj-2', T1), 'scope-1', 'Item', 'agora', T1)
+		);
+		await repo.insert(state);
+		await expect(repo.findById('proj-2')).resolves.toEqual(state);
+	});
 });
 
 describe('createSqliteProjectRepository — insert/findById', () => {
@@ -174,6 +222,22 @@ describe('createSqliteProjectRepository — insert/findById', () => {
 		const state = nonTrivialState();
 		await repo.insert(state);
 		await expect(repo.findById(state.project.id)).resolves.toEqual(state);
+	});
+
+	it('round-trip preserva executionStatus não-padrão de um item "agora"', async () => {
+		const repo = memoryRepo();
+		let state = unwrap(
+			addScopeItem(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'scope-1', 'Item', 'agora', T1)
+		);
+		state = unwrap(setScopeItemEffort(catalog, state, 'scope-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+		state = unwrap(setScopeItemExecutionStatus(catalog, state, 'scope-1', 'em_andamento', T2));
+
+		await repo.insert(state);
+		const found = await repo.findById('proj-1');
+		expect(found?.scopeItems[0].executionStatus).toBe('em_andamento');
+		expect(found).toEqual(state);
 	});
 
 	it('findById de um id inexistente retorna null', async () => {

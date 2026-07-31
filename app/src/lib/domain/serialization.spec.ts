@@ -394,6 +394,43 @@ describe('deserializeProjectState — ScopeItem / ScopeVersion', () => {
 		envelope.state.scopeVersion.confirmedAt = T2;
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
+
+	it('rejeita ScopeItem.executionStatus fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		envelope.state.scopeItems[0].executionStatus = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores à D025 (sem executionStatus)', () => {
+	function scopeState(): ProjectState {
+		return unwrap(
+			addScopeItem(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'scope-1', 'Item', 'agora', T1)
+		);
+	}
+
+	it('trata ScopeItem.executionStatus ausente como "a_fazer" (envelope válido pré-D025)', () => {
+		const envelope = JSON.parse(serializeProjectState(scopeState())) as {
+			state: { scopeItems: Array<Record<string, unknown>> };
+		};
+		delete envelope.state.scopeItems[0].executionStatus;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.scopeItems[0].executionStatus).toBe('a_fazer');
+	});
+
+	it('exportação/importação preserva um executionStatus não-padrão', () => {
+		const state = scopeState();
+		const withStatus: ProjectState = {
+			...state,
+			scopeItems: state.scopeItems.map((item) => ({ ...item, executionStatus: 'concluido' as const }))
+		};
+		const result = deserializeProjectState(serializeProjectState(withStatus), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.scopeItems[0].executionStatus).toBe('concluido');
+	});
 });
 
 describe('deserializeProjectState — compatibilidade com JSONs anteriores à D022 (sem impediments)', () => {

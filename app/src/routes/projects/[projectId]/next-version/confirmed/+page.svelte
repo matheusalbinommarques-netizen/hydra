@@ -1,8 +1,18 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+
 	let { data } = $props();
 	let view = $derived(data.view);
 
 	const effortLabel: Record<string, string> = { pequeno: 'Pequeno', medio: 'Médio', grande: 'Grande' };
+
+	type ExecutionStatus = 'a_fazer' | 'em_andamento' | 'concluido';
+	const EXECUTION_STATUSES: ExecutionStatus[] = ['a_fazer', 'em_andamento', 'concluido'];
+	const executionStatusLabel: Record<ExecutionStatus, string> = {
+		a_fazer: 'A fazer',
+		em_andamento: 'Em andamento',
+		concluido: 'Concluído'
+	};
 </script>
 
 <svelte:head>
@@ -32,6 +42,20 @@
 						<li>
 							<span class="item-text">{item.text}</span>
 							<span class="item-meta">Tamanho: {effortLabel[item.effort ?? '']}</span>
+							<form method="POST" action="?/setExecutionStatus" use:enhance class="execution-status-group">
+								<input type="hidden" name="itemId" value={item.id} />
+								{#each EXECUTION_STATUSES as status (status)}
+									<button
+										type="submit"
+										name="status"
+										value={status}
+										class="button-secondary"
+										class:selected={item.executionStatus === status}
+									>
+										{executionStatusLabel[status]}
+									</button>
+								{/each}
+							</form>
 						</li>
 					{/each}
 				</ul>
@@ -144,6 +168,23 @@
 	.item-meta {
 		font-size: 0.8rem;
 		color: var(--hydra-muted);
+	}
+
+	.execution-status-group {
+		display: flex;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+	}
+
+	.execution-status-group button {
+		padding: 0.35rem 0.7rem;
+		font-size: 0.8rem;
+	}
+
+	.execution-status-group button.selected {
+		background: var(--hydra-accent);
+		color: #f8f8f8;
+		border-color: var(--hydra-accent);
 	}
 
 	.empty {

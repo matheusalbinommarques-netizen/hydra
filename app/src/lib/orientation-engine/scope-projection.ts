@@ -5,12 +5,16 @@
 // esforço concentrado em "agora") mora aqui — não é motor configurável, é um
 // `if` simples, deliberadamente específico desta experiência.
 
-import type { ScopeEffort, ScopeItem, ScopeVersion } from '$lib/domain';
+import type { ScopeEffort, ScopeExecutionStatus, ScopeItem, ScopeVersion } from '$lib/domain';
 
 export interface ScopeProjectionItemView {
 	id: string;
 	text: string;
 	effort: ScopeEffort | null;
+	// Só populado com sentido para itens de 'agora' (D025, decision-log.md) —
+	// presente em todo item por simplicidade da projeção, a interface decide
+	// se exibe conforme o bucket.
+	executionStatus: ScopeExecutionStatus;
 }
 
 export interface ScopeAlert {
@@ -32,7 +36,7 @@ const AGORA_HEAVY_EFFORT_ALERT_THRESHOLD = 5;
 const HEAVY_EFFORTS: readonly ScopeEffort[] = ['medio', 'grande'];
 
 function toItemView(item: ScopeItem): ScopeProjectionItemView {
-	return { id: item.id, text: item.text, effort: item.effort };
+	return { id: item.id, text: item.text, effort: item.effort, executionStatus: item.executionStatus ?? 'a_fazer' };
 }
 
 export function computeScopeProjection(scopeItems: ScopeItem[], scopeVersion: ScopeVersion): ScopeProjectionView {

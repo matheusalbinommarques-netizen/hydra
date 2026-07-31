@@ -43,11 +43,24 @@ function ensureRouteStartPhaseColumn(db: Database.Database): void {
 	}
 }
 
+// Segunda evolução do schema desde 0001_init.sql (D025, decision-log.md) —
+// bancos criados antes dessa decisão não têm execution_status ainda. Mesmo
+// mecanismo idempotente de ensureRouteStartPhaseColumn/D023: PRAGMA +
+// ALTER TABLE só quando a coluna faltar, fora dos métodos CRUD.
+function ensureScopeItemExecutionStatusColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(scope_item)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'execution_status');
+	if (!hasColumn) {
+		db.exec("ALTER TABLE scope_item ADD COLUMN execution_status TEXT NOT NULL DEFAULT 'a_fazer'");
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
 	db.exec(initSql);
 	ensureRouteStartPhaseColumn(db);
+	ensureScopeItemExecutionStatusColumn(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(
@@ -84,11 +97,11 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 		const insertScopeItem = db.prepare(
 			`INSERT INTO scope_item
-			   (id, project_id, text, bucket, effort, item_order, source_suggestion_id, created_at, updated_at)
-			 VALUES (@id, @projectId, @text, @bucket, @effort, @order, @sourceSuggestionId, @createdAt, @updatedAt)`
+			   (id, project_id, text, bucket, effort, item_order, source_suggestion_id, execution_status, created_at, updated_at)
+			 VALUES (@id, @projectId, @text, @bucket, @effort, @order, @sourceSuggestionId, @executionStatus, @createdAt, @updatedAt)`
 		);
 		for (const item of state.scopeItems) {
-			insertScopeItem.run(item);
+			insertScopeItem.run({ ...item, executionStatus: item.executionStatus ?? 'a_fazer' });
 		}
 
 		db.prepare(
@@ -177,7 +190,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const scopeItemRows = db
 				.prepare(
-					`SELECT id, project_id, text, bucket, effort, item_order, source_suggestion_id, created_at, updated_at
+					`SELECT id, project_id, text, bucket, effort, item_order, source_suggestion_id, execution_status, created_at, updated_at
 					 FROM scope_item WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as ScopeItemRow[];

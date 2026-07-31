@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS pending_item (
 -- Escopo da "Escolha o próximo foco" (scope_confirmation) — ver
 -- app/src/lib/domain/state-types.ts. item_order (não "order", palavra
 -- reservada em SQL) só é preenchido para bucket = 'agora'.
+-- execution_status (D025, docs/07-management/decision-log.md): status de
+-- execução do primeiro backlog executável, só relevante para bucket =
+-- 'agora'. Bancos criados antes de D025 recebem esta coluna via ALTER
+-- TABLE idempotente em sqlite-project-repository.ts
+-- (createSqliteProjectRepository), não aqui.
 CREATE TABLE IF NOT EXISTS scope_item (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
@@ -58,6 +63,7 @@ CREATE TABLE IF NOT EXISTS scope_item (
 	-- Rastreia a sugestão estruturada aceita que originou este item (ver
 	-- orientation-engine/scope-suggestions.ts) — null para item manual.
 	source_suggestion_id TEXT,
+	execution_status TEXT NOT NULL DEFAULT 'a_fazer' CHECK (execution_status IN ('a_fazer', 'em_andamento', 'concluido')),
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	CHECK (

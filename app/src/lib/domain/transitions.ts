@@ -11,6 +11,7 @@ import type {
 	ProjectState,
 	ScopeBucket,
 	ScopeEffort,
+	ScopeExecutionStatus,
 	ScopeItem,
 	ScopeVersion
 } from './state-types';
@@ -37,6 +38,8 @@ export type DomainTransitionError =
 	| { kind: 'scope_item_not_found' }
 	| { kind: 'scope_reorder_mismatch' }
 	| { kind: 'scope_confirmation_invalid'; issues: ScopeConfirmationIssue[] }
+	| { kind: 'scope_item_not_agora' }
+	| { kind: 'scope_version_not_confirmed' }
 	| { kind: 'impediment_not_found' }
 	| { kind: 'impediment_id_already_exists' }
 	| { kind: 'phase_not_found' };
@@ -424,6 +427,7 @@ export function addScopeItem(
 		effort: null,
 		order,
 		sourceSuggestionId,
+		executionStatus: 'a_fazer',
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
@@ -500,6 +504,32 @@ export function setScopeItemEffort(
 	};
 	next = invalidateScopeConfirmation(catalog, next);
 	return { ok: true, value: next };
+}
+
+// Acompanhamento de execução (D025) — catalog recebido só por consistência
+// de assinatura com as demais transições de ScopeItem (mesmo padrão do
+// bloco Impediment); esta função não o consulta. Deliberadamente não chama
+// invalidateScopeConfirmation: status operacional não é mutação de
+// planejamento e não deve reabrir a confirmação do escopo.
+export function setScopeItemExecutionStatus(
+	catalog: Catalog,
+	state: ProjectState,
+	itemId: string,
+	status: ScopeExecutionStatus,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findScopeItem(state, itemId);
+	if (!item) return { ok: false, error: { kind: 'scope_item_not_found' } };
+	if (item.bucket !== 'agora') return { ok: false, error: { kind: 'scope_item_not_agora' } };
+	if (state.scopeVersion.confirmedAt === null) return { ok: false, error: { kind: 'scope_version_not_confirmed' } };
+
+	const currentStatus = item.executionStatus ?? 'a_fazer';
+	if (currentStatus === status) return { ok: true, value: state };
+
+	const scopeItems = state.scopeItems.map((i) =>
+		i.id === itemId ? { ...i, executionStatus: status, updatedAt: occurredAt } : i
+	);
+	return { ok: true, value: { ...state, scopeItems } };
 }
 
 /** orderedItemIds deve conter exatamente os ids atualmente em `agora`, na nova ordem desejada. */

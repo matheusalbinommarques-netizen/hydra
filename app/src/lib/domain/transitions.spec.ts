@@ -20,6 +20,7 @@ import {
 	setImpedimentType,
 	setRouteStartPhase,
 	setScopeItemEffort,
+	setScopeItemExecutionStatus,
 	setScopeItemText,
 	shouldInvalidateSummary,
 	skipActivity
@@ -417,6 +418,7 @@ describe('addScopeItem', () => {
 				effort: null,
 				order: 0,
 				sourceSuggestionId: null,
+				executionStatus: 'a_fazer',
 				createdAt: T1,
 				updatedAt: T1
 			}
@@ -526,6 +528,89 @@ describe('setScopeItemText / setScopeItemEffort', () => {
 		state = unwrap(moveScopeItem(catalog, state, 'item-1', 'depois', T2));
 		state = unwrap(moveScopeItem(catalog, state, 'item-1', 'agora', T2));
 		expect(state.scopeItems[0].effort).toBe('grande');
+	});
+});
+
+describe('setScopeItemExecutionStatus', () => {
+	function confirmedStateWithAgoraItem(): ProjectState {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+		return state;
+	}
+
+	it('erro scope_item_not_found para id inexistente', () => {
+		const state = confirmedStateWithAgoraItem();
+		expect(setScopeItemExecutionStatus(catalog, state, 'inexistente', 'em_andamento', T2)).toEqual({
+			ok: false,
+			error: { kind: 'scope_item_not_found' }
+		});
+	});
+
+	it('erro scope_item_not_agora para item em "depois" ou "fora"', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item agora', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Item depois', 'depois', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		expect(setScopeItemExecutionStatus(catalog, state, 'item-2', 'em_andamento', T2)).toEqual({
+			ok: false,
+			error: { kind: 'scope_item_not_agora' }
+		});
+	});
+
+	it('erro scope_version_not_confirmed quando a versão de escopo ainda não foi confirmada', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Item', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+
+		expect(setScopeItemExecutionStatus(catalog, state, 'item-1', 'em_andamento', T2)).toEqual({
+			ok: false,
+			error: { kind: 'scope_version_not_confirmed' }
+		});
+	});
+
+	it('transita entre os três estados', () => {
+		let state = confirmedStateWithAgoraItem();
+		state = unwrap(setScopeItemExecutionStatus(catalog, state, 'item-1', 'em_andamento', T2));
+		expect(state.scopeItems[0].executionStatus).toBe('em_andamento');
+
+		state = unwrap(setScopeItemExecutionStatus(catalog, state, 'item-1', 'concluido', T2));
+		expect(state.scopeItems[0].executionStatus).toBe('concluido');
+
+		state = unwrap(setScopeItemExecutionStatus(catalog, state, 'item-1', 'a_fazer', T2));
+		expect(state.scopeItems[0].executionStatus).toBe('a_fazer');
+	});
+
+	it('é idempotente quando o status já é o mesmo', () => {
+		const state = confirmedStateWithAgoraItem();
+		const result = setScopeItemExecutionStatus(catalog, state, 'item-1', 'a_fazer', T2);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('não altera confirmedAt', () => {
+		const state = confirmedStateWithAgoraItem();
+		const changed = unwrap(setScopeItemExecutionStatus(catalog, state, 'item-1', 'em_andamento', T2));
+		expect(changed.scopeVersion.confirmedAt).toBe(T1);
+	});
+
+	it('não altera texto, esforço, ordem, bucket ou outros itens', () => {
+		let state = unwrap(addScopeItem(catalog, freshState(), 'item-1', 'Um', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-1', 'pequeno', T1));
+		state = unwrap(addScopeItem(catalog, state, 'item-2', 'Dois', 'agora', T1));
+		state = unwrap(setScopeItemEffort(catalog, state, 'item-2', 'grande', T1));
+		state = unwrap(setHypothesis(catalog, state, 'Hipótese'));
+		state = unwrap(confirmScopeVersion(catalog, state, T1));
+
+		const changed = unwrap(setScopeItemExecutionStatus(catalog, state, 'item-1', 'em_andamento', T2));
+		const item1 = changed.scopeItems.find((i) => i.id === 'item-1')!;
+		const item2 = changed.scopeItems.find((i) => i.id === 'item-2')!;
+		expect(item1.text).toBe('Um');
+		expect(item1.effort).toBe('pequeno');
+		expect(item1.bucket).toBe('agora');
+		expect(item1.order).toBe(0);
+		expect(item2).toEqual(state.scopeItems.find((i) => i.id === 'item-2'));
 	});
 });
 

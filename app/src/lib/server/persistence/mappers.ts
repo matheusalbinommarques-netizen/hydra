@@ -12,6 +12,7 @@ import type {
 	Project,
 	ScopeBucket,
 	ScopeEffort,
+	ScopeExecutionStatus,
 	ScopeItem,
 	ScopeVersion
 } from '$lib/domain';
@@ -78,6 +79,7 @@ export interface ScopeItemRow {
 	effort: ScopeEffort | null;
 	item_order: number | null;
 	source_suggestion_id: string | null;
+	execution_status: ScopeExecutionStatus;
 	created_at: string;
 	updated_at: string;
 }
@@ -97,6 +99,7 @@ export function mapScopeItemRow(row: ScopeItemRow): ScopeItem {
 		effort: row.effort,
 		order: row.item_order,
 		sourceSuggestionId: row.source_suggestion_id,
+		executionStatus: row.execution_status,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

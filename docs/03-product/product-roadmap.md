@@ -103,11 +103,21 @@ necessários): classificação/tipos de projeto, aplicabilidade por
 atividade, status "não aplicável", diagnóstico automático derivado do
 estado persistido, IA.
 
-### 4. Entregas e backlog estruturados (próxima etapa)
+### 4. Entregas e backlog estruturados — concluído
 
 Resultado: transformar planejamento em trabalho executável e rastreável.
 
-### 5. Execução e acompanhamento
+Entregue: itens de escopo do bucket "agora" passam a formar o primeiro
+backlog executável, com acompanhamento de execução em três estados (`a
+fazer`/`em andamento`/`concluído`, `ScopeItem.executionStatus`), editável
+em `/next-version/confirmed` (superfície provisória, sem rota nova); o
+status é independente da confirmação do escopo — alterá-lo não invalida
+nem depende de uma nova confirmação, só exige que a versão já esteja
+confirmada (D025, `docs/07-management/decision-log.md`). Sem entidade de
+tarefa, subtarefas, responsáveis, prazos, dependências ou Kanban nesta
+primeira versão.
+
+### 5. Execução e acompanhamento (próxima etapa)
 
 Resultado: acompanhar trabalho real sem competir em profundidade com
 Jira, Trello ou Linear.

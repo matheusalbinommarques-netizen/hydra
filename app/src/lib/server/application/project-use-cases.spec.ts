@@ -596,7 +596,15 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.scopeItems).toEqual([
-			{ id: 'id-2', text: 'Criar projeto', bucket: 'agora', effort: null, order: 0, sourceSuggestionId: null }
+			{
+				id: 'id-2',
+				text: 'Criar projeto',
+				bucket: 'agora',
+				effort: null,
+				order: 0,
+				sourceSuggestionId: null,
+				executionStatus: 'a_fazer'
+			}
 		]);
 	});
 
@@ -710,8 +718,44 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 			bucket: 'agora',
 			effort: null,
 			order: 0,
-			sourceSuggestionId: null
+			sourceSuggestionId: null,
+			executionStatus: 'a_fazer'
 		});
+	});
+
+	it('setScopeItemExecutionStatus altera o status de um item "agora" confirmado, sem afetar confirmedAt', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const withItem = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
+		if (!withItem.ok) throw new Error('esperado ok');
+		const itemId = withItem.value.scopeItems[0].id;
+		await useCases.setScopeItemEffort({ projectId, itemId, effort: 'pequeno' });
+		await useCases.setHypothesis({ projectId, hypothesis: 'Hipótese' });
+		const confirmed = await useCases.confirmScopeVersion({ projectId });
+		if (!confirmed.ok) throw new Error('esperado ok');
+
+		const updated = await useCases.setScopeItemExecutionStatus({ projectId, itemId, status: 'em_andamento' });
+		expect(updated.ok).toBe(true);
+		if (!updated.ok) return;
+		expect(updated.value.scopeItems[0].executionStatus).toBe('em_andamento');
+		expect(updated.value.scopeVersion.confirmedAt).toBe(confirmed.value.scopeVersion.confirmedAt);
+	});
+
+	it('setScopeItemExecutionStatus falha quando a versão de escopo ainda não foi confirmada', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const withItem = await useCases.addScopeItem({ projectId, text: 'Item', bucket: 'agora' });
+		if (!withItem.ok) throw new Error('esperado ok');
+		const itemId = withItem.value.scopeItems[0].id;
+
+		const result = await useCases.setScopeItemExecutionStatus({ projectId, itemId, status: 'em_andamento' });
+		expect(result).toEqual({ ok: false, error: { kind: 'scope_version_not_confirmed' } });
 	});
 
 	it('erros de domínio (scope_item_not_found) são repassados sem persistir', async () => {

@@ -45,6 +45,12 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `docs/07-management/decision-log.md`); ausência de escolha preserva o
   comportamento anterior; percurso completo continua disponível; validada
   (`full` PASS).
+- **Entregas e backlog estruturados** (roadmap, etapa 4): concluída —
+  itens de escopo em "Agora" formam o primeiro backlog executável, com
+  status de execução em três estados (`ScopeItem.executionStatus`),
+  editável em `/next-version/confirmed` sem afetar a confirmação do
+  escopo (D025, `docs/07-management/decision-log.md`); validada (`full`
+  PASS).
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -77,10 +83,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Etapa 3 do roadmap ("Diagnóstico e rota recomendada",
+Etapa 4 do roadmap ("Entregas e backlog estruturados",
 `docs/03-product/product-roadmap.md`) está concluída. Próxima etapa da
-sequência: etapa 4, "Entregas e backlog estruturados" — escopo e menor
-fatia funcional ainda não definidos.
+sequência: etapa 5, "Execução e acompanhamento" — escopo e menor fatia
+funcional ainda não definidos.
 
 ## Não fazer agora
 

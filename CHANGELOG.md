@@ -76,7 +76,13 @@
   só a fase que o usuário decidir aplicar; aplicar a recomendação usa o
   mesmo mecanismo já existente de definir o ponto de partida da rota; o
   seletor manual de fase continua disponível e a recomendação pode ser
-  ignorada ou substituída (D024, `docs/07-management/decision-log.md`).
+  ignorada ou substituída (D024, `docs/07-management/decision-log.md`);
+- acompanhamento de execução do primeiro backlog executável: itens de
+  escopo em "Agora" (`/next-version/confirmed`, artefato confirmado) ganham
+  um controle de status — "A fazer", "Em andamento" ou "Concluído" —,
+  editável a qualquer momento após a confirmação do foco, sem afetar essa
+  confirmação; itens de "Depois" e "Fora" não exibem nem permitem alterar
+  o status de execução (D025, `docs/07-management/decision-log.md`).
 
 ### Alterado
 

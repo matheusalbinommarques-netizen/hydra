@@ -14,6 +14,7 @@ import type {
 	ProjectState,
 	ScopeBucket,
 	ScopeEffort,
+	ScopeExecutionStatus,
 	ScopeItem,
 	ScopeVersion
 } from './state-types';
@@ -215,6 +216,11 @@ function isScopeEffortOrNull(value: unknown): value is ScopeEffort | null {
 	return value === null || (typeof value === 'string' && SCOPE_EFFORTS.includes(value));
 }
 
+const SCOPE_EXECUTION_STATUSES: readonly string[] = ['a_fazer', 'em_andamento', 'concluido'];
+function isScopeExecutionStatus(value: unknown): value is ScopeExecutionStatus {
+	return typeof value === 'string' && SCOPE_EXECUTION_STATUSES.includes(value);
+}
+
 function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStateParseError> {
 	if (!Array.isArray(value)) return shapeError('scopeItems deve ser um array');
 	const result: ScopeItem[] = [];
@@ -233,6 +239,10 @@ function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStatePar
 		if (item.sourceSuggestionId !== null && !isString(item.sourceSuggestionId)) {
 			return shapeError('ScopeItem.sourceSuggestionId deve ser uma string ou null');
 		}
+		// Ausente em estados/JSON anteriores a D025 — equivale a 'a_fazer'.
+		if (item.executionStatus !== undefined && !isScopeExecutionStatus(item.executionStatus)) {
+			return shapeError('ScopeItem.executionStatus, quando presente, deve ser um dos literais aprovados');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('ScopeItem.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('ScopeItem.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -243,6 +253,7 @@ function parseScopeItemList(value: unknown): Result<ScopeItem[], ProjectStatePar
 			effort: item.effort,
 			order: item.order as number | null,
 			sourceSuggestionId: (item.sourceSuggestionId as string | null) ?? null,
+			executionStatus: (item.executionStatus as ScopeExecutionStatus | undefined) ?? 'a_fazer',
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});

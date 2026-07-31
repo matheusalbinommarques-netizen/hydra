@@ -27,6 +27,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'A nova ordem enviada não corresponde aos itens atuais de "Agora".';
 		case 'scope_confirmation_invalid':
 			return 'Ainda faltam critérios para confirmar esta versão.';
+		case 'scope_item_not_agora':
+			return 'Somente itens de "Agora" têm status de execução.';
+		case 'scope_version_not_confirmed':
+			return 'Confirme a versão do escopo antes de alterar o status de execução.';
 		case 'impediment_not_found':
 			return 'Impedimento não encontrado.';
 		case 'impediment_id_already_exists':

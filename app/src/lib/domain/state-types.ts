@@ -53,6 +53,14 @@ export type PendingItem =
 export type ScopeBucket = 'agora' | 'depois' | 'fora';
 export type ScopeEffort = 'pequeno' | 'medio' | 'grande';
 
+// Acompanhamento de execução do primeiro backlog executável (etapa 4 do
+// roadmap, D025, docs/07-management/decision-log.md) — relevante somente
+// para itens em bucket 'agora' e somente após a versão de escopo estar
+// confirmada. Independente de ScopeVersion.confirmedAt: alterar o status
+// não confirma nem invalida a confirmação. Ausente em itens antigos
+// (pré-D025) e tratado como 'a_fazer' pela serialização.
+export type ScopeExecutionStatus = 'a_fazer' | 'em_andamento' | 'concluido';
+
 export interface ScopeItem {
 	id: string;
 	projectId: string;
@@ -67,6 +75,7 @@ export interface ScopeItem {
 	// sugestão já aceita e deixá-la reaparecer se o item for excluído;
 	// editar o texto do item não afeta esta referência.
 	sourceSuggestionId: string | null;
+	executionStatus?: ScopeExecutionStatus;
 	createdAt: string;
 	updatedAt: string;
 }
