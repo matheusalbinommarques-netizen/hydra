@@ -1,6 +1,6 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 29/07/2026
+**Data de referência:** 31/07/2026
 
 **Versão da baseline:** 0.4.0
 
@@ -30,9 +30,13 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   25/07/2026 — C4-01 a C4-04, incluindo C4-03A.
 - **D022 — vertical Cockpit/Impedimentos**
   (`docs/07-management/decision-log.md`): concluída.
+- **Documento do Projeto e extensão da Bancada até Estruturação**
+  (roadmap `docs/03-product/product-roadmap.md`, etapa 1): concluída —
+  commits `5de3445`, `345239c`.
 
-Detalhamento de cada entrega (aceite, notas técnicas, evidências) fica no
-respectivo backlog de ciclo ou no decision-log.
+Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
+relevantes permanecem no decision-log e, quando houver ciclo formal, o
+detalhamento de aceite fica no respectivo backlog.
 
 ## Gate atual
 
@@ -61,11 +65,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Ciclo 4 concluído e baseline funcional do Release 0 validada de ponta a
-ponta, incluindo a interface de "Pular etapa" e a listagem/reabertura de
-projetos. Próxima decisão (não iniciada automaticamente): revisar riscos
-e roadmap, e decidir a continuidade para o Release 1. Somente após essa
-aprovação um novo ciclo é aberto, com meta, gate e backlog próprios.
+Etapa 1 do roadmap ("Documento do Projeto") concluída, incluindo a
+extensão da Bancada até Estruturação e a nova rota `/document`. Próxima
+decisão: escopo da menor fatia útil da etapa 2 do roadmap ("Revisão e
+confirmação", `docs/03-product/product-roadmap.md`).
 
 ## Não fazer agora
 

@@ -41,6 +41,18 @@
   colunas com painel lateral somente leitura que cresce conforme respostas
   canônicas são registradas; atividades decompostas campo a campo, com
   etapa opcional final agrupada e pulável;
+- Bancada estendida à Estruturação do projeto: painel "O que já sabemos"
+  (`/now`) passa a exibir também as seis atividades de Estruturação
+  (objetivo e entregáveis, partes interessadas, papéis e
+  responsabilidades, restrições e premissas, riscos do projeto,
+  comunicação e governança), com a mesma curadoria de campo canônico por
+  atividade já usada em Descoberta e Definição do produto;
+- tela dedicada "Documento do projeto" (`/document`): visão consolidada
+  somente leitura dos mesmos blocos curados da Bancada, agrupados por fase
+  (Descoberta, Definição do produto, Estruturação do projeto); blocos de
+  Descoberta têm ação de edição de volta à atividade correspondente,
+  Definição e Estruturação ainda não têm edição pós-conclusão; link
+  "Documento" adicionado à navegação secundária do workspace;
 - Cockpit/Impedimentos (D022, antecipada de Release 3): registrar,
   classificar, definir próxima ação, resolver e reabrir um impedimento;
   tela `/cockpit`; integração neutra ao `/now`.

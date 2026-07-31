@@ -50,32 +50,21 @@ posteriores já publicados:
 - Escolha do próximo foco (montagem de escopo Agora/Depois/Fora);
 - Cockpit de impedimentos;
 - documento crescente (painel "O que já sabemos") cobrindo Descoberta,
-  Definição do produto e Estruturação.
+  Definição do produto e Estruturação;
+- Documento do projeto (`/document`): visão consolidada somente leitura
+  dos mesmos blocos, agrupada por fase, com edição restrita a Descoberta.
 
 ## Sequência de evolução
 
-### 1. Documento do Projeto
+### 1. Documento do Projeto — concluído
 
-Resultado: transformar respostas já existentes em uma tela própria,
-organizada e legível — não mais só um painel lateral de acompanhamento,
-mas uma visão consolidada do projeto.
+Entregue: tela dedicada `/document`, consolidando os blocos já curados da
+Bancada em seções por fase (Descoberta, Definição do produto e
+Estruturação), com ação de edição disponível apenas para blocos de
+Descoberta — mesma limitação de `/now?activity=...&from=summary` já
+existente.
 
-Primeira versão:
-
-- Descoberta, Definição do produto e Estruturação;
-- projeção derivada das respostas já registradas, sem gerar prosa nova;
-- navegação de cada seção para a atividade correspondente, com edição
-  quando suportada pela jornada.
-
-Fora:
-
-- exportação em PDF;
-- versionamento próprio do documento;
-- tailoring;
-- novos artefatos formais;
-- persistência adicional.
-
-### 2. Revisão e confirmação
+### 2. Revisão e confirmação (próxima etapa)
 
 Resultado: permitir julgamento explícito do usuário antes de avançar de
 fase, com base em sinais que o produto já é capaz de calcular.
