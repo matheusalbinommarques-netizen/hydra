@@ -31,7 +31,7 @@ os mesmos comandos em prosa:
 | `/hydra-next` | — | Propõe a menor fatia funcional da próxima etapa do roadmap ainda não concluída | Não | Não | Não |
 | `/hydra-plan-item` | `<item-id>` | Produz o plano de implementação de um item, com nível preliminar | Não | Não | Não |
 | `/hydra-implement-item` | `<item-id> [continue]` | Implementa o item (ou corrige defeito de revisão em modo `continue`) | Sim (código/testes) | Não | Não |
-| `/hydra-prepare-delivery` | `<item-id>` | Atualiza backlog/`PROJECT_STATUS.md`/`CHANGELOG.md` a partir do diff não commitado, reavalia o nível | Sim (só documentação) | Não | Não |
+| `/hydra-prepare-delivery` | `[<item-id>]` | Prepara CHANGELOG/PROJECT_STATUS/roadmap a partir do diff e, quando há item formal, também sincroniza o backlog | Sim (só documentação) | Não | Não |
 | `/hydra-review-item` | `<item-id>` | Revisa código + documentação como um pacote, QA manual isolada, stage seletivo, sela a entrega | Não (só o índice do Git) | Sim | Não |
 | `/hydra-verify` | `<item-id> <fast\|full>` | Roda a bateria de verificação isoladamente | Não | Não | Não |
 | `/hydra-ship` | `"<mensagem>"` | Comita o stage selado (código + documentação) e envia `main` | Não | Não | Sim |

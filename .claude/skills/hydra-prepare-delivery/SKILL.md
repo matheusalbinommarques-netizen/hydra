@@ -1,22 +1,31 @@
 ---
 name: hydra-prepare-delivery
-description: Prepara a documentação de acompanhamento (backlog, PROJECT_STATUS.md, CHANGELOG.md, e o roadmap quando a entrega concluir uma etapa) de um item do Hydra já implementado mas ainda não commitado, sem aprovar, sem stage e sem commit. Uso explícito apenas via /hydra-prepare-delivery.
+description: Prepara a documentação de acompanhamento (backlog, PROJECT_STATUS.md, CHANGELOG.md, e o roadmap quando a entrega concluir uma etapa) de uma entrega do Hydra já implementada mas ainda não commitada — com item de backlog (/hydra-prepare-delivery <item-id>) ou como fatia direta do roadmap sem item formal (/hydra-prepare-delivery). Sem aprovar, sem stage e sem commit. Uso explícito apenas via /hydra-prepare-delivery.
 disable-model-invocation: true
-argument-hint: <item-id>
+argument-hint: [<item-id>]
 arguments:
   - item
 allowed-tools: Read, Grep, Glob, Edit, Bash(node .claude/scripts/hydra-state.mjs:*), Bash(git status:*), Bash(git diff:*), Bash(git diff --check)
 ---
 
-Prepara a documentação de acompanhamento do item `$item` (ex.: `C5-01`),
-já implementado mas ainda não commitado. Se `$item` não for informado,
-pare e peça o identificador — não adivinhe.
+Prepara a documentação de acompanhamento de uma entrega já implementada mas
+ainda não commitada. Tem dois modos, segundo `$item` foi informado ou não:
+
+- **Modo A** — `$item` informado (ex.: `C5-01`): entrega de um item formal
+  do backlog do ciclo vigente. Segue o fluxo completo abaixo.
+- **Modo B** — `$item` ausente: entrega de uma fatia direta do roadmap
+  (`docs/03-product/product-roadmap.md`), sem ciclo aberto nem item de
+  backlog. Segue "Modo B — sem item de backlog", ao final deste documento.
+
+Não adivinhe qual modo usar: a presença ou ausência de `$item` decide.
 
 Este comando não aprova nada, não faz stage, não comita e não corrige
-código. É a etapa que roda entre `/hydra-implement-item` e
+código. Em Modo A, é a etapa que roda entre `/hydra-implement-item` e
 `/hydra-review-item`.
 
-## 1. Pré-condições — pare e reporte se qualquer uma falhar
+## Modo A — com item de backlog (`/hydra-prepare-delivery <item-id>`)
+
+### 1. Pré-condições — pare e reporte se qualquer uma falhar
 
 ```
 node .claude/scripts/hydra-state.mjs --item $item --format json
@@ -43,7 +52,7 @@ Aceite que `item.status` já apareça como `"concluído"` no JSON se isso for
 consequência de uma execução anterior desta mesma skill ainda não
 commitada — isso não é bloqueio, é o caso idempotente (§7).
 
-## 2. Leitura do diff real, sem carregar tudo de uma vez
+### 2. Leitura do diff real, sem carregar tudo de uma vez
 
 ```
 git status --short
@@ -55,7 +64,7 @@ Abra o conteúdo de um arquivo ou trecho específico do diff só quando
 precisar confirmar um detalhe que a lista não responde. Não carregue o
 diff inteiro sem necessidade.
 
-## 3. Reclassificação de nível
+### 3. Reclassificação de nível
 
 A partir do diff real, determine o nível recomendado:
 
@@ -74,7 +83,7 @@ uma autorização explícita já exista (no item do backlog ou em decisão
 associada) — não invente nem presuma essa aprovação; se não existir, pare
 e reporte o bloqueio em vez de prosseguir com a documentação.
 
-## 4. Atualizações — somente os documentos autorizados
+### 4. Atualizações — somente os documentos autorizados
 
 1. **Backlog do ciclo vigente** (o arquivo em `cycle.file` do JSON):
    marque a entrada de `$item` com `**Status:** ✅ concluído` e liste
@@ -88,7 +97,7 @@ e reporte o bloqueio em vez de prosseguir com a documentação.
    `[Unreleased]`, descrevendo o efeito observável — não uma lista interna
    de arquivos. Não crie uma versão nova.
 
-## 5. Sincronização com o roadmap
+### 5. Sincronização com o roadmap
 
 Confronte a entrega preparada com a etapa atual de
 `docs/03-product/product-roadmap.md` ("próxima etapa" ou etapa em
@@ -116,14 +125,14 @@ Esta atualização do roadmap é parte da própria preparação da entrega —
 não depende de um prompt documental separado. Continua exigindo revisão e
 autorização explícita antes de stage, commit ou push.
 
-## 6. O que este comando nunca faz
+### 6. O que este comando nunca faz
 
 Não toca `domain/`, `catalog/`, `orientation-engine/` ou qualquer arquivo
 em `app/`. Não corrige nem reescreve código. Não faz `git add`, `git
 commit` ou `git push`. Não aprova nível 3 sem autorização já registrada.
 Não substitui `/hydra-review-item`.
 
-## 7. Idempotência
+### 7. Idempotência
 
 Se esta skill for executada de novo para o mesmo item (por exemplo, depois
 de uma correção via `/hydra-implement-item $item continue`), atualize os
@@ -131,7 +140,7 @@ registros já preparados em vez de duplicá-los — mesma entrada no backlog,
 mesmo bloco de `PROJECT_STATUS.md`, mesma linha de `[Unreleased]` no
 `CHANGELOG.md`.
 
-## 8. Relatório final compacto
+### 8. Relatório final compacto
 
 Apresente:
 
@@ -147,3 +156,61 @@ Apresente:
 
 Não reproduza o diff completo na resposta. Pare aqui — a revisão é
 `/hydra-review-item`.
+
+## Modo B — sem item de backlog (`/hydra-prepare-delivery`)
+
+Para uma entrega que é uma fatia direta do roadmap, sem ciclo aberto nem
+item de backlog — não crie item, ciclo ou entrada artificial só para
+encaixar a entrega no Modo A.
+
+### B.1. Fatos
+
+```
+node .claude/scripts/hydra-state.mjs --format json
+```
+
+Sem `--item`. Se o script sair com código diferente de zero, pare e mostre
+o erro. Use o diff não commitado (`git status --short`, `git diff --stat`,
+`git diff --name-status`) como fonte primária do que a entrega faz — não
+carregue o diff inteiro sem necessidade. Se a árvore estiver limpa, pare,
+não há o que preparar.
+
+### B.2. Atualizações — somente quando necessário
+
+- **`CHANGELOG.md`**: registre o comportamento entregue em `[Unreleased]`,
+  descrevendo o efeito observável — não uma lista interna de arquivos. Não
+  crie uma versão nova.
+- **`PROJECT_STATUS.md`**: atualize somente o resumo/progresso necessário
+  para refletir a entrega, preservando o histórico relevante já existente.
+- **`docs/03-product/product-roadmap.md`**: só quando o resultado funcional
+  ou a primeira versão da etapa atual tiver sido objetivamente concluído —
+  mesma regra do Modo A (§5):
+  - avanço parcial da etapa → mantenha CHANGELOG/PROJECT_STATUS
+    atualizados, mas a etapa do roadmap **permanece** em andamento;
+  - resultado/primeira versão da etapa objetivamente concluída → marque a
+    etapa como concluída, aponte qual etapa passa a ser a próxima (sem
+    reordenar nem detalhar sua implementação) e reflita a nova próxima
+    decisão em `PROJECT_STATUS.md`;
+  - dúvida real sobre se a etapa foi concluída → não marque nada
+    automaticamente; apresente a dúvida e pare para decisão de Matheus.
+- Nunca conclua uma etapa só porque houve commit ou teste passando — o
+  critério é o resultado funcional descrito no próprio roadmap.
+
+### B.3. O que este modo nunca faz
+
+Não cria ciclo, item de backlog nem identificador artificial. Não exige
+ciclo aberto. Não toca `domain/`, `catalog/`, `orientation-engine/` ou
+qualquer arquivo em `app/`. Não corrige nem reescreve código. Não faz
+`git add`, `git commit` ou `git push`. Não substitui a revisão humana do
+pacote. Quando houver item formal, essa revisão continua sendo feita por
+`/hydra-review-item`; sem item, o diff e a documentação preparados devem
+ser revisados antes de qualquer stage ou commit.
+
+### B.4. Relatório final compacto
+
+Apresente: documentos alterados (incluindo se o roadmap foi atualizado e
+por quê); resumo de cada atualização (uma ou duas frases por documento);
+`git diff --stat`; `git diff --name-status`; resultado de `git diff
+--check`; divergências ou dúvidas encontradas. Não reproduza o diff
+completo na resposta. Continua exigindo revisão e autorização explícita
+de Matheus antes de stage, commit ou push.
