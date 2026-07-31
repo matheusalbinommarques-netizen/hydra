@@ -57,6 +57,21 @@ repositório.
   partir do que a seção do roadmap descreve, pare e apresente a dúvida em
   vez de ampliar a exploração.
 
+Antes de propor qualquer campo, entidade, schema, persistência ou
+mecanismo novo:
+
+- verifique explicitamente se já existe uma capacidade equivalente no
+  domínio, catálogo, aplicação, projeções ou rotas já entregues;
+- quando existir algo relacionado, explique objetivamente por que não é
+  suficiente antes de propor estrutura nova;
+- antes de usar qualquer campo ou estado existente como sinal de decisão,
+  confirme sua semântica no código e nos testes diretamente relacionados —
+  não infira aplicabilidade, contexto do projeto ou comportamento do
+  usuário apenas pelo nome de um campo;
+- prefira composição e reutilização da infraestrutura existente;
+- se a semântica não puder ser confirmada com uma investigação delimitada,
+  apresente a dúvida e pare em vez de ampliar a solução.
+
 ## 4. Propor a menor fatia
 
 Só depois de confirmada como pendente: proponha somente a menor fatia
