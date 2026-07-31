@@ -159,6 +159,77 @@ describe('createProjectUseCases — renameProject', () => {
 	});
 });
 
+describe('createProjectUseCases — setRouteStartPhase', () => {
+	it('persiste a fase escolhida e reflete em ProjectView.routeStartPhaseId', async () => {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.setRouteStartPhase({
+			projectId: created.value.projectId,
+			phaseId: 'estruturacao'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.routeStartPhaseId).toBe('estruturacao');
+		// próxima ação passa a respeitar a rota — primeira atividade de Estruturação
+		expect(result.value.nextActivity).toEqual({
+			kind: 'recommendation',
+			activityDefinitionId: 'objetivo_entregaveis'
+		});
+
+		const stored = await repo.findById(created.value.projectId);
+		expect(stored?.project.routeStartPhaseId).toBe('estruturacao');
+	});
+
+	it('phaseId null remove a escolha e restaura o comportamento padrão', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		await useCases.setRouteStartPhase({ projectId: created.value.projectId, phaseId: 'estruturacao' });
+		const restored = await useCases.setRouteStartPhase({ projectId: created.value.projectId, phaseId: null });
+		expect(restored).toEqual({ ok: true, value: { ...created.value, routeStartPhaseId: null } });
+	});
+
+	it('rejeita um id de fase inexistente', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		await expect(
+			useCases.setRouteStartPhase({ projectId: created.value.projectId, phaseId: 'fase-inexistente' })
+		).resolves.toEqual({ ok: false, error: { kind: 'phase_not_found' } });
+	});
+
+	it('retorna project_not_found para um projeto inexistente', async () => {
+		const { useCases } = setup();
+		await expect(useCases.setRouteStartPhase({ projectId: 'nao-existe', phaseId: 'estruturacao' })).resolves.toEqual({
+			ok: false,
+			error: { kind: 'project_not_found' }
+		});
+	});
+
+	it('mesmo valor já definido preserva o comportamento do domínio (não persiste de novo)', async () => {
+		const inner = memoryRepo();
+		const { repository, counts } = countingRepository(inner);
+		const useCases = createProjectUseCases({
+			repository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		await useCases.setRouteStartPhase({ projectId: created.value.projectId, phaseId: 'estruturacao' });
+		expect(counts.save).toBe(1);
+
+		await useCases.setRouteStartPhase({ projectId: created.value.projectId, phaseId: 'estruturacao' });
+		expect(counts.save).toBe(1); // não incrementou — domínio retornou a mesma referência
+	});
+});
+
 describe('createProjectUseCases — answerActivity', () => {
 	it('grava um campo answer', async () => {
 		const { useCases, repo } = setup();
@@ -721,7 +792,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 18 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 19 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -730,6 +801,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 			[
 				'projectId',
 				'projectName',
+				'routeStartPhaseId',
 				'projectStatus',
 				'phaseStatuses',
 				'activityStatuses',

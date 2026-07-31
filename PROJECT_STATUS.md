@@ -37,6 +37,11 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   reúne checklist de completude, pendências abertas de Descoberta,
   `criteriaScopeConflict` e confirmação explícita persistida por
   `ActivityProgress`; validada (`full` PASS).
+- **Diagnóstico e rota recomendada — primeira fatia** (roadmap, etapa 3):
+  em andamento — ponto de partida explícito da rota em `/map` (D023,
+  `docs/07-management/decision-log.md`); ausência de escolha preserva o
+  comportamento anterior; percurso completo continua disponível; validada
+  (`full` PASS).
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -69,9 +74,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Etapa 2 do roadmap ("Revisão e confirmação") concluída. Próxima decisão:
-escopo da menor fatia funcional útil da etapa 3 do roadmap ("Diagnóstico e
-rota recomendada", `docs/03-product/product-roadmap.md`).
+Etapa 3 do roadmap ("Diagnóstico e rota recomendada",
+`docs/03-product/product-roadmap.md`) segue em andamento — primeira fatia
+entregue, resultado completo da etapa ainda não alcançado. Próxima
+decisão: escopo da menor fatia funcional restante da etapa 3.
 
 ## Não fazer agora
 

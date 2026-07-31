@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import {
 	resolveImpediment,
 	setHypothesis,
 	setImpedimentNextAction,
+	setRouteStartPhase,
 	setScopeItemEffort,
 	skipActivity
 } from '$lib/domain';
@@ -57,6 +59,7 @@ afterEach(() => {
 function nonTrivialState(): ProjectState {
 	let state = createInitialProjectState(catalog, 'proj-1', T1);
 	state = unwrap(renameProject(catalog, state, 'Portal de Solicitações'));
+	state = unwrap(setRouteStartPhase(catalog, state, 'estruturacao'));
 	state = unwrap(
 		answerActivity(
 			catalog,
@@ -112,6 +115,49 @@ describe('createSqliteProjectRepository — schema', () => {
 		openRepos.push(repo2);
 		const found = await repo2.findById('proj-1');
 		expect(found).toEqual(state);
+	});
+
+	it('abre um banco pré-D023 (sem route_start_phase_id) e adiciona a coluna de forma idempotente', async () => {
+		const filePath = tempFilePath();
+
+		// Simula um banco criado antes de D023: só as colunas de 0001_init.sql
+		// originais, sem route_start_phase_id.
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL)');
+		legacyDb.prepare('INSERT INTO project (id, name, created_at) VALUES (?, ?, ?)').run('legacy-1', null, T1);
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		// Projeto pré-existente (sem child rows) permanece legível; interpretado
+		// pelo domínio, mas findById exige child rows presentes — checamos
+		// diretamente via nova conexão que a coluna foi adicionada com NULL.
+		const verifyDb = new Database(filePath);
+		const row = verifyDb.prepare('SELECT route_start_phase_id FROM project WHERE id = ?').get('legacy-1') as {
+			route_start_phase_id: string | null;
+		};
+		expect(row.route_start_phase_id).toBeNull();
+		verifyDb.close();
+
+		// Novo projeto, inserido normalmente pelo repositório já migrado.
+		const state = unwrap(
+			setRouteStartPhase(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'estruturacao')
+		);
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('reabrir um banco já migrado não falha nem duplica a coluna', async () => {
+		const filePath = tempFilePath();
+		const repo1 = createSqliteProjectRepository(filePath);
+		await repo1.insert(createInitialProjectState(catalog, 'proj-1', T1));
+		repo1.close();
+
+		// já tem a coluna — ensureRouteStartPhaseColumn deve ser no-op
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
 	});
 });
 
@@ -283,8 +329,8 @@ describe('createSqliteProjectRepository — listRecent', () => {
 		await repo.insert(createInitialProjectState(catalog, 'proj-2', T2));
 
 		await expect(repo.listRecent()).resolves.toEqual([
-			{ id: 'proj-2', name: null, createdAt: T2 },
-			{ id: 'proj-1', name: null, createdAt: T1 }
+			{ id: 'proj-2', name: null, createdAt: T2, routeStartPhaseId: null },
+			{ id: 'proj-1', name: null, createdAt: T1, routeStartPhaseId: null }
 		]);
 	});
 
@@ -294,17 +340,17 @@ describe('createSqliteProjectRepository — listRecent', () => {
 		await repo.insert(createInitialProjectState(catalog, 'proj-b', T1));
 
 		await expect(repo.listRecent()).resolves.toEqual([
-			{ id: 'proj-b', name: null, createdAt: T1 },
-			{ id: 'proj-a', name: null, createdAt: T1 }
+			{ id: 'proj-b', name: null, createdAt: T1, routeStartPhaseId: null },
+			{ id: 'proj-a', name: null, createdAt: T1, routeStartPhaseId: null }
 		]);
 	});
 
-	it('retorna somente id/name/createdAt — nunca activityProgress, answers ou pendingItems', async () => {
+	it('retorna somente id/name/createdAt/routeStartPhaseId — nunca activityProgress, answers ou pendingItems', async () => {
 		const repo = memoryRepo();
 		await repo.insert(nonTrivialState());
 
 		const [project] = await repo.listRecent();
-		expect(Object.keys(project).sort()).toEqual(['id', 'name', 'createdAt'].sort());
+		expect(Object.keys(project).sort()).toEqual(['id', 'name', 'createdAt', 'routeStartPhaseId'].sort());
 	});
 
 	it('listRecent não modifica nenhum projeto existente', async () => {

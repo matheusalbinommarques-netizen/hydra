@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
-import { answerActivity, createInitialProjectState, encodeMultiSelectValue, skipActivity } from '$lib/domain';
+import {
+	answerActivity,
+	createInitialProjectState,
+	encodeMultiSelectValue,
+	setRouteStartPhase,
+	skipActivity
+} from '$lib/domain';
 import { computeSnapshot } from './snapshot';
 import { computePhaseStatus } from './phase-status';
 import { computeProjectStatus } from './project-status';
 import { computeNextActivity } from './next-activity';
 import { computeOpenPendingItems } from './pending-items';
 import { computeHypotheses } from './hypotheses';
+import { computeRecommendedRoute } from './route';
 
 const T1 = '2026-01-01T00:00:00.000Z';
 
@@ -55,5 +62,29 @@ describe('computeSnapshot', () => {
 		const state = createInitialProjectState(catalog, 'proj-1', T1);
 		const snapshot = computeSnapshot(catalog, state);
 		expect(snapshot.phaseStatuses.descoberta).toBe('não_iniciada');
+	});
+
+	it('sem routeStartPhaseId, nextActivity é idêntico ao catálogo completo (comportamento atual preservado)', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const snapshot = computeSnapshot(catalog, state);
+		expect(snapshot.nextActivity).toEqual(computeNextActivity(catalog, state.activityProgress));
+	});
+
+	it('com routeStartPhaseId definido, nextActivity respeita a rota recomendada', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(setRouteStartPhase(catalog, state, 'estruturacao'));
+
+		const snapshot = computeSnapshot(catalog, state);
+		const routeCatalog = computeRecommendedRoute(catalog, state.project.routeStartPhaseId);
+		expect(snapshot.nextActivity).toEqual(computeNextActivity(routeCatalog, state.activityProgress));
+		expect(snapshot.nextActivity).not.toEqual(computeNextActivity(catalog, state.activityProgress));
+	});
+
+	it('routeStartPhaseId não afeta phaseStatuses — todas as fases continuam presentes', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(setRouteStartPhase(catalog, state, 'estruturacao'));
+
+		const snapshot = computeSnapshot(catalog, state);
+		expect(Object.keys(snapshot.phaseStatuses).sort()).toEqual(catalog.phases.map((phase) => phase.id).sort());
 	});
 });

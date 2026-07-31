@@ -38,7 +38,8 @@ export type DomainTransitionError =
 	| { kind: 'scope_reorder_mismatch' }
 	| { kind: 'scope_confirmation_invalid'; issues: ScopeConfirmationIssue[] }
 	| { kind: 'impediment_not_found' }
-	| { kind: 'impediment_id_already_exists' };
+	| { kind: 'impediment_id_already_exists' }
+	| { kind: 'phase_not_found' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -352,6 +353,24 @@ export function renameProject(
 	}
 
 	return { ok: true, value: nextState };
+}
+
+// D023 (docs/07-management/decision-log.md) — ponto de partida da rota
+// recomendada. Não toca ActivityProgress: fases anteriores à escolhida não
+// são concluídas, puladas nem apagadas, só deixam de ser recomendadas (ver
+// orientation-engine/route.ts). `phaseId: null` restaura o percurso completo.
+export function setRouteStartPhase(
+	catalog: Catalog,
+	state: ProjectState,
+	phaseId: string | null
+): Result<ProjectState, DomainTransitionError> {
+	if (phaseId !== null && !catalog.phases.some((phase) => phase.id === phaseId)) {
+		return { ok: false, error: { kind: 'phase_not_found' } };
+	}
+	if ((state.project.routeStartPhaseId ?? null) === phaseId) {
+		return { ok: true, value: state };
+	}
+	return { ok: true, value: { ...state, project: { ...state.project, routeStartPhaseId: phaseId } } };
 }
 
 // --- Escolha o próximo foco (ScopeItem / ScopeVersion) --------------------

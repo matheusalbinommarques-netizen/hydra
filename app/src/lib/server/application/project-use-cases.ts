@@ -22,6 +22,7 @@ import {
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
+	setRouteStartPhase as setRouteStartPhaseInDomain,
 	setScopeItemEffort as setScopeItemEffortInDomain,
 	setScopeItemText as setScopeItemTextInDomain,
 	skipActivity as skipActivityInDomain
@@ -46,6 +47,7 @@ import type {
 	SetHypothesisInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
+	SetRouteStartPhaseInput,
 	SetScopeItemEffortInput,
 	SetScopeItemTextInput,
 	SkipActivityInput,
@@ -107,6 +109,19 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = renameProjectInDomain(catalog, state, input.name);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) {
+				await repository.save(result.value);
+			}
+			return viewOf(result.value);
+		},
+
+		async setRouteStartPhase(input: SetRouteStartPhaseInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setRouteStartPhaseInDomain(catalog, state, input.phaseId);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			if (result.value !== state) {

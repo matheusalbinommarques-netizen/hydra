@@ -18,6 +18,7 @@ import {
 	setHypothesis,
 	setImpedimentNextAction,
 	setImpedimentType,
+	setRouteStartPhase,
 	setScopeItemEffort,
 	setScopeItemText,
 	shouldInvalidateSummary,
@@ -329,6 +330,36 @@ describe('renameProject', () => {
 		const renamed = unwrap(renameProject(catalog, withSummary, 'Portal Novo'));
 		const resumo = renamed.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
+	});
+});
+
+describe('setRouteStartPhase', () => {
+	it('aceita null e define Project.routeStartPhaseId com o id de uma fase existente', () => {
+		const state = unwrap(setRouteStartPhase(catalog, freshState(), 'estruturacao'));
+		expect(state.project.routeStartPhaseId).toBe('estruturacao');
+	});
+
+	it('rejeita um id de fase inexistente no catálogo', () => {
+		const result = setRouteStartPhase(catalog, freshState(), 'fase-inexistente');
+		expect(result).toEqual({ ok: false, error: { kind: 'phase_not_found' } });
+	});
+
+	it('phaseId null restaura o percurso completo', () => {
+		const withRoute = unwrap(setRouteStartPhase(catalog, freshState(), 'estruturacao'));
+		const restored = unwrap(setRouteStartPhase(catalog, withRoute, null));
+		expect(restored.project.routeStartPhaseId).toBeNull();
+	});
+
+	it('não altera ActivityProgress de nenhuma atividade', () => {
+		const before = freshState();
+		const after = unwrap(setRouteStartPhase(catalog, before, 'estruturacao'));
+		expect(after.activityProgress).toEqual(before.activityProgress);
+	});
+
+	it('é idempotente quando o valor já está definido', () => {
+		const withRoute = unwrap(setRouteStartPhase(catalog, freshState(), 'estruturacao'));
+		const again = unwrap(setRouteStartPhase(catalog, withRoute, 'estruturacao'));
+		expect(again).toBe(withRoute);
 	});
 });
 

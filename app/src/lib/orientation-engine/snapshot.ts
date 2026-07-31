@@ -7,6 +7,7 @@ import { computeProjectStatus, type ProjectStatus } from './project-status';
 import { computeNextActivity, type NextActivityResult } from './next-activity';
 import { computeOpenPendingItems, type PendingItemView } from './pending-items';
 import { computeHypotheses, type HypothesisView } from './hypotheses';
+import { computeRecommendedRoute } from './route';
 
 export interface OrientationSnapshot {
 	projectStatus: ProjectStatus;
@@ -22,10 +23,15 @@ export function computeSnapshot(catalog: Catalog, state: ProjectState): Orientat
 		phaseStatuses[phase.id] = computePhaseStatus(phase, state.activityProgress, state.pendingItems);
 	}
 
+	// Só a próxima ação opera dentro da rota recomendada (D023) — phaseStatuses
+	// acima, openPendingItems e hypotheses abaixo continuam sobre o catálogo
+	// completo: nenhuma fase anterior é ocultada, concluída ou perdida.
+	const routeCatalog = computeRecommendedRoute(catalog, state.project.routeStartPhaseId);
+
 	return {
 		projectStatus: computeProjectStatus(state.project, catalog, state.activityProgress),
 		phaseStatuses,
-		nextActivity: computeNextActivity(catalog, state.activityProgress),
+		nextActivity: computeNextActivity(routeCatalog, state.activityProgress),
 		openPendingItems: computeOpenPendingItems(catalog, state.pendingItems),
 		hypotheses: computeHypotheses(catalog, state.answers, state.scopeVersion)
 	};

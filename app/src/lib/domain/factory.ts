@@ -21,7 +21,7 @@ export function createInitialProjectState(
 	}
 
 	return {
-		project: { id: projectId, name: null, createdAt },
+		project: { id: projectId, name: null, createdAt, routeStartPhaseId: null },
 		activityProgress,
 		answers: [],
 		pendingItems: [],

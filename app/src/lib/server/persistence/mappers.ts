@@ -20,6 +20,7 @@ export interface ProjectRow {
 	id: string;
 	name: string | null;
 	created_at: string;
+	route_start_phase_id: string | null;
 }
 
 export interface ActivityProgressRow {
@@ -47,7 +48,7 @@ export interface PendingItemRow {
 }
 
 export function mapProjectRow(row: ProjectRow): Project {
-	return { id: row.id, name: row.name, createdAt: row.created_at };
+	return { id: row.id, name: row.name, createdAt: row.created_at, routeStartPhaseId: row.route_start_phase_id };
 }
 
 export function mapActivityProgressRow(row: ActivityProgressRow): ActivityProgress {

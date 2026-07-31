@@ -89,6 +89,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 	return {
 		projectId: state.project.id,
 		projectName: state.project.name,
+		routeStartPhaseId: state.project.routeStartPhaseId ?? null,
 		projectStatus: snapshot.projectStatus,
 		phaseStatuses: snapshot.phaseStatuses,
 		activityStatuses,

@@ -27,10 +27,27 @@ export interface SqliteProjectRepository extends ProjectRepository {
 	close(): void;
 }
 
+interface TableInfoRow {
+	name: string;
+}
+
+// Primeira evolução do schema desde 0001_init.sql (D023, decision-log.md) —
+// bancos criados antes dessa decisão não têm route_start_phase_id ainda.
+// Idempotente e isolado da inicialização (nunca dentro dos métodos CRUD):
+// roda uma única vez por conexão, antes de qualquer insert/save/findById.
+function ensureRouteStartPhaseColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(project)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'route_start_phase_id');
+	if (!hasColumn) {
+		db.exec('ALTER TABLE project ADD COLUMN route_start_phase_id TEXT');
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
 	db.exec(initSql);
+	ensureRouteStartPhaseColumn(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(
@@ -90,18 +107,28 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
-		db.prepare('INSERT INTO project (id, name, created_at) VALUES (@id, @name, @createdAt)').run({
+		db.prepare(
+			'INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (@id, @name, @createdAt, @routeStartPhaseId)'
+		).run({
 			id: state.project.id,
 			name: state.project.name,
-			createdAt: state.project.createdAt
+			createdAt: state.project.createdAt,
+			routeStartPhaseId: state.project.routeStartPhaseId ?? null
 		});
 		insertChildren(state);
 	});
 
 	const saveTransaction = db.transaction((state: ProjectState) => {
 		const result = db
-			.prepare('UPDATE project SET name = @name, created_at = @createdAt WHERE id = @id')
-			.run({ id: state.project.id, name: state.project.name, createdAt: state.project.createdAt });
+			.prepare(
+				'UPDATE project SET name = @name, created_at = @createdAt, route_start_phase_id = @routeStartPhaseId WHERE id = @id'
+			)
+			.run({
+				id: state.project.id,
+				name: state.project.name,
+				createdAt: state.project.createdAt,
+				routeStartPhaseId: state.project.routeStartPhaseId ?? null
+			});
 		if (result.changes === 0) {
 			throw new Error(`Project "${state.project.id}" não existe — save() exige um projeto já inserido`);
 		}
@@ -121,7 +148,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 		async findById(projectId: string): Promise<ProjectState | null> {
 			const projectRow = db
-				.prepare('SELECT id, name, created_at FROM project WHERE id = ?')
+				.prepare('SELECT id, name, created_at, route_start_phase_id FROM project WHERE id = ?')
 				.get(projectId) as ProjectRow | undefined;
 			if (!projectRow) return null;
 
@@ -186,7 +213,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 		async listRecent(): Promise<Project[]> {
 			const rows = db
-				.prepare('SELECT id, name, created_at FROM project ORDER BY created_at DESC, id DESC')
+				.prepare(
+					'SELECT id, name, created_at, route_start_phase_id FROM project ORDER BY created_at DESC, id DESC'
+				)
 				.all() as ProjectRow[];
 			return rows.map(mapProjectRow);
 		},

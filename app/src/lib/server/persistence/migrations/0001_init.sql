@@ -2,10 +2,16 @@
 -- (app/src/lib/domain/state-types.ts). Nenhuma estratégia de migração além
 -- desta aplicação determinística está decidida nesta versão.
 
+-- route_start_phase_id (D023, docs/07-management/decision-log.md): fase do
+-- catálogo em que o projeto realmente começa; NULL = percurso completo.
+-- Bancos criados antes de D023 recebem esta coluna via ALTER TABLE
+-- idempotente em sqlite-project-repository.ts (createSqliteProjectRepository),
+-- não aqui — CREATE TABLE IF NOT EXISTS não afeta tabelas já existentes.
 CREATE TABLE IF NOT EXISTS project (
 	id TEXT PRIMARY KEY,
 	name TEXT,
-	created_at TEXT NOT NULL
+	created_at TEXT NOT NULL,
+	route_start_phase_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS activity_progress (

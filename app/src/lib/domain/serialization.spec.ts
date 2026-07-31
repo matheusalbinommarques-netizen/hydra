@@ -10,6 +10,7 @@ import {
 	resolveImpediment,
 	setHypothesis,
 	setImpedimentNextAction,
+	setRouteStartPhase,
 	setScopeItemEffort,
 	skipActivity
 } from './transitions';
@@ -407,6 +408,38 @@ describe('deserializeProjectState — compatibilidade com JSONs anteriores à D0
 	it('continua rejeitando state.impediments: null', () => {
 		const envelope = baseEnvelope() as { state: Record<string, unknown> };
 		envelope.state.impediments = null;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores à D023 (sem routeStartPhaseId)', () => {
+	it('trata project.routeStartPhaseId ausente como null (envelope válido pré-D023)', () => {
+		const envelope = baseEnvelope() as { state: { project: Record<string, unknown> } };
+		delete envelope.state.project.routeStartPhaseId;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.project.routeStartPhaseId).toBeNull();
+	});
+
+	it('preserva routeStartPhaseId definido num JSON novo', () => {
+		const withRoute = unwrap(
+			setRouteStartPhase(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'estruturacao')
+		);
+		const json = serializeProjectState(withRoute);
+		const result = deserializeProjectState(json, catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.project.routeStartPhaseId).toBe('estruturacao');
+	});
+
+	it('rejeita routeStartPhaseId referenciando uma fase que não existe no catálogo', () => {
+		const envelope = baseEnvelope() as { state: { project: Record<string, unknown> } };
+		envelope.state.project.routeStartPhaseId = 'fase-inexistente';
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('rejeita routeStartPhaseId de tipo inválido (nem string nem null)', () => {
+		const envelope = baseEnvelope() as { state: { project: Record<string, unknown> } };
+		envelope.state.project.routeStartPhaseId = 42;
 		expectError(JSON.stringify(envelope), 'invalid_shape');
 	});
 });

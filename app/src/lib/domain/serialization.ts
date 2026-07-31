@@ -100,7 +100,24 @@ function parseProject(value: unknown): Result<Project, ProjectStateParseError> {
 	if (!isIsoDateString(value.createdAt)) {
 		return shapeError('project.createdAt deve ser uma data ISO 8601 válida');
 	}
-	return { ok: true, value: { id: value.id, name: value.name, createdAt: value.createdAt } };
+	if (
+		value.routeStartPhaseId !== undefined &&
+		value.routeStartPhaseId !== null &&
+		!isString(value.routeStartPhaseId)
+	) {
+		return shapeError('project.routeStartPhaseId deve ser string, null ou ausente');
+	}
+	return {
+		ok: true,
+		value: {
+			id: value.id,
+			name: value.name,
+			createdAt: value.createdAt,
+			// ausente (JSON exportado antes de D023) equivale a null — mesma
+			// semântica de "percurso completo", sem exigir backfill.
+			routeStartPhaseId: (value.routeStartPhaseId as string | null | undefined) ?? null
+		}
+	};
 }
 
 function parseActivityProgressList(value: unknown): Result<ActivityProgress[], ProjectStateParseError> {
@@ -312,6 +329,15 @@ function assembleProjectState(
 	scopeVersion: ScopeVersion,
 	impediments: Impediment[]
 ): Result<ProjectState, ProjectStateParseError> {
+	// referência: Project.routeStartPhaseId (D023)
+	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
+		if (!catalog.phases.some((phase) => phase.id === project.routeStartPhaseId)) {
+			return referenceError(
+				`Project.routeStartPhaseId referencia a fase "${project.routeStartPhaseId}", que não existe no catálogo`
+			);
+		}
+	}
+
 	// referências: ActivityProgress
 	for (const progress of activityProgress) {
 		if (progress.projectId !== project.id) {

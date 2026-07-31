@@ -60,7 +60,15 @@
   da confirmação já existente, filtradas pelas atividades da própria fase
   — pendências de outras fases não aparecem; a confirmação continua não
   bloqueante; nenhuma persistência, domínio ou motor de orientação novo
-  foi criado.
+  foi criado;
+- em `/map`, o usuário pode definir explicitamente em qual fase o projeto
+  realmente começa; a partir dessa escolha, `/now` passa a calcular a
+  próxima ação dentro dessa rota recomendada; selecionar "Percurso
+  completo" restaura o comportamento padrão; fases anteriores à escolhida
+  continuam visíveis no Mapa e não recebem nenhuma alteração automática
+  de progresso; a escolha persiste em SQLite e é preservada na
+  exportação/importação do projeto (D023,
+  `docs/07-management/decision-log.md`).
 
 ### Alterado
 

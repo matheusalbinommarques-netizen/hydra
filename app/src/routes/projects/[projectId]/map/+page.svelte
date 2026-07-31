@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { ActivityStatus } from '$lib/domain';
 	import type { PhaseStatus } from '$lib/orientation-engine';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const activityStatusLabel: Record<ActivityStatus, string> = {
 		não_iniciada: 'Não iniciada',
@@ -32,6 +33,26 @@
 
 <h1>Mapa da jornada</h1>
 <p class="subtitle">Onde você está, o que já foi feito e o que vem a seguir.</p>
+
+<section class="route-start" aria-labelledby="route-start-heading">
+	<h2 id="route-start-heading">Onde este projeto realmente começa?</h2>
+	<p class="route-start-note">
+		O Mapa abaixo continua mostrando o percurso completo — esta escolha só muda a partir de onde a próxima ação é
+		recomendada.
+	</p>
+	<form method="POST" action="?/setRouteStart" use:enhance>
+		<select name="phaseId">
+			<option value="" selected={data.routeStartPhaseId === null}>Percurso completo</option>
+			{#each data.routeStartPhaseOptions as option (option.id)}
+				<option value={option.id} selected={data.routeStartPhaseId === option.id}>{option.label}</option>
+			{/each}
+		</select>
+		<button type="submit">Salvar</button>
+	</form>
+	{#if form?.message}
+		<p role="alert">{form.message}</p>
+	{/if}
+</section>
 
 <div class="phases">
 	{#each data.phases as phase (phase.id)}
@@ -68,6 +89,31 @@
 	.subtitle {
 		color: var(--hydra-muted);
 		margin-bottom: 1.5rem;
+	}
+
+	.route-start {
+		border: 1px solid var(--hydra-border);
+		border-radius: 10px;
+		padding: 1rem 1.25rem;
+		background: var(--hydra-surface);
+		margin-bottom: 1.5rem;
+	}
+
+	.route-start h2 {
+		margin: 0;
+		font-size: 1rem;
+	}
+
+	.route-start-note {
+		color: var(--hydra-muted);
+		font-size: 0.85rem;
+		margin: 0.4rem 0 0.85rem;
+	}
+
+	.route-start form {
+		display: flex;
+		gap: 0.6rem;
+		align-items: center;
 	}
 
 	.phases {

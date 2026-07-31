@@ -6,6 +6,12 @@ export interface Project {
 	id: string;
 	name: string | null;
 	createdAt: string; // ISO 8601
+	// Fase do catálogo em que o projeto realmente começa (D023,
+	// docs/07-management/decision-log.md) — null/ausente = percurso completo,
+	// comportamento idêntico ao anterior a esta decisão. Opcional para que
+	// estados antigos (já persistidos ou exportados antes de D023) continuem
+	// válidos com a mesma semântica de null, sem exigir backfill.
+	routeStartPhaseId?: string | null;
 }
 
 export interface ActivityProgress {

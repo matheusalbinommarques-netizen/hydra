@@ -112,6 +112,7 @@ export interface Project {
   id: string;
   name: string | null;
   createdAt: string; // ISO 8601
+  routeStartPhaseId?: string | null; // D023 — fase em que a rota recomendada começa; null/ausente = percurso completo
 }
 
 export interface ActivityProgress {
@@ -272,6 +273,17 @@ export declare function renameProject(
 // — renomear para o mesmo nome não invalida o Resumo. Nesta versão não
 // produz nenhum DomainTransitionError na prática, mas mantém o tipo Result
 // por consistência com as demais transições.
+
+export declare function setRouteStartPhase(
+  catalog: Catalog,
+  state: ProjectState,
+  phaseId: string | null
+): Result<ProjectState, DomainTransitionError>; // D023
+// atualiza Project.routeStartPhaseId. phaseId precisa existir em
+// catalog.phases (senão phase_not_found) ou ser null (restaura o percurso
+// completo). Idempotente: mesmo valor já definido retorna a mesma
+// referência de state. Nunca toca ActivityProgress — fases anteriores à
+// escolhida não são concluídas, puladas nem apagadas.
 ```
 
 ## 6. `domain/` — serialização JSON (exportação/importação do Walking Skeleton)
@@ -397,7 +409,13 @@ export declare function computeHypotheses(
 export declare function computeSnapshot(
   catalog: Catalog,
   state: ProjectState
-): OrientationSnapshot; // combina as funções acima
+): OrientationSnapshot; // combina as funções acima; nextActivity usa computeRecommendedRoute internamente (D023)
+
+export declare function computeRecommendedRoute(
+  catalog: Catalog,
+  routeStartPhaseId: string | null | undefined
+): Catalog; // D023 — recorta catalog.phases a partir da fase escolhida (slice por índice); null/undefined/id
+            // inexistente no catálogo atual retorna o catálogo completo. Não conhece ProjectState/ActivityProgress.
 ```
 
 Nenhuma dessas funções acessa `server/persistence/` — recebem estado e

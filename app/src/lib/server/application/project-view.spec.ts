@@ -166,6 +166,7 @@ describe('buildProjectView — pendingItemHistory', () => {
 			[
 				'projectId',
 				'projectName',
+				'routeStartPhaseId',
 				'projectStatus',
 				'phaseStatuses',
 				'activityStatuses',

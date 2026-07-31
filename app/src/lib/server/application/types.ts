@@ -91,6 +91,10 @@ export interface ImpedimentView {
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
+	// Ponto de partida da rota recomendada (D023, decision-log.md) — null =
+	// percurso completo. nextActivity abaixo já reflete essa escolha; este
+	// campo existe só para a interface (`/map`) saber o que exibir selecionado.
+	routeStartPhaseId: string | null;
 	projectStatus: ProjectStatus;
 	phaseStatuses: Record<string, PhaseStatus>;
 	activityStatuses: Record<string, ActivityStatus>;
@@ -154,6 +158,11 @@ export interface ConfirmSummaryInput {
 export interface RenameProjectInput {
 	projectId: string;
 	name: string;
+}
+
+export interface SetRouteStartPhaseInput {
+	projectId: string;
+	phaseId: string | null;
 }
 
 export interface AddScopeItemInput {
@@ -233,6 +242,7 @@ export interface ProjectUseCases {
 	listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>>;
 	loadProjectView(projectId: string): Promise<UseCaseOutcome<ProjectView>>;
 	renameProject(input: RenameProjectInput): Promise<UseCaseOutcome<ProjectView>>;
+	setRouteStartPhase(input: SetRouteStartPhaseInput): Promise<UseCaseOutcome<ProjectView>>;
 	answerActivity(input: AnswerActivityInput): Promise<UseCaseOutcome<ProjectView>>;
 	skipActivity(input: SkipActivityInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmSummary(input: ConfirmSummaryInput): Promise<UseCaseOutcome<ProjectView>>;
