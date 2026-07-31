@@ -64,26 +64,22 @@ Estruturação), com ação de edição disponível apenas para blocos de
 Descoberta — mesma limitação de `/now?activity=...&from=summary` já
 existente.
 
-### 2. Revisão e confirmação (próxima etapa)
+### 2. Revisão e confirmação — concluído
 
 Resultado: permitir julgamento explícito do usuário antes de avançar de
 fase, com base em sinais que o produto já é capaz de calcular.
 
-Primeira versão:
+Entregue: primeira versão em `/summary` reunindo checklist de completude,
+pendências abertas de Descoberta, `criteriaScopeConflict` já existente e
+confirmação explícita persistida por `ActivityProgress`.
 
-- checklist de completude;
-- pendências abertas;
-- `criteriaScopeConflict` já existente;
-- avisos objetivos, sem inferência aberta;
-- confirmação explícita do usuário.
-
-Fora:
+Fora (mantido fora nesta versão):
 
 - motor genérico de inconsistências;
 - impactos inferidos sem regra explícita;
 - IA.
 
-### 3. Diagnóstico e rota recomendada
+### 3. Diagnóstico e rota recomendada (próxima etapa)
 
 Resultado: adaptar a jornada ao estado e ao contexto real de cada projeto,
 em vez de aplicar sempre a mesma sequência fixa de atividades.

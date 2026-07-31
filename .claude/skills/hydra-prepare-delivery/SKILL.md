@@ -1,6 +1,6 @@
 ---
 name: hydra-prepare-delivery
-description: Prepara a documentação de acompanhamento (backlog, PROJECT_STATUS.md, CHANGELOG.md) de um item do Hydra já implementado mas ainda não commitado, sem aprovar, sem stage e sem commit. Uso explícito apenas via /hydra-prepare-delivery.
+description: Prepara a documentação de acompanhamento (backlog, PROJECT_STATUS.md, CHANGELOG.md, e o roadmap quando a entrega concluir uma etapa) de um item do Hydra já implementado mas ainda não commitado, sem aprovar, sem stage e sem commit. Uso explícito apenas via /hydra-prepare-delivery.
 disable-model-invocation: true
 argument-hint: <item-id>
 arguments:
@@ -41,7 +41,7 @@ node .claude/scripts/hydra-state.mjs --item $item --format json
 
 Aceite que `item.status` já apareça como `"concluído"` no JSON se isso for
 consequência de uma execução anterior desta mesma skill ainda não
-commitada — isso não é bloqueio, é o caso idempotente (§6).
+commitada — isso não é bloqueio, é o caso idempotente (§7).
 
 ## 2. Leitura do diff real, sem carregar tudo de uma vez
 
@@ -88,14 +88,42 @@ e reporte o bloqueio em vez de prosseguir com a documentação.
    `[Unreleased]`, descrevendo o efeito observável — não uma lista interna
    de arquivos. Não crie uma versão nova.
 
-## 5. O que este comando nunca faz
+## 5. Sincronização com o roadmap
+
+Confronte a entrega preparada com a etapa atual de
+`docs/03-product/product-roadmap.md` ("próxima etapa" ou etapa em
+andamento na "Sequência de evolução"):
+
+- se a entrega apenas avança a etapa (não entrega objetivamente o
+  resultado ou a primeira versão descrita para ela), atualize CHANGELOG e
+  `PROJECT_STATUS.md` normalmente, mas **mantenha** a etapa do roadmap
+  como está — não marque conclusão;
+- se a entrega completa objetivamente o resultado ou a primeira versão
+  definida no roadmap para a etapa, atualize no mesmo preparo:
+  - o roadmap, marcando a etapa como concluída, com um registro curto do
+    que foi entregue;
+  - a indicação de qual etapa passa a ser a próxima (sem alterar a ordem
+    da sequência nem detalhar antecipadamente sua implementação);
+  - `PROJECT_STATUS.md`, refletindo a nova próxima decisão;
+- se não houver evidência objetiva suficiente para afirmar a conclusão,
+  não marque a etapa automaticamente — apresente a dúvida e pare para
+  decisão de Matheus antes de seguir;
+- nunca conclua uma etapa só porque houve commit ou teste passando — o
+  critério é o resultado funcional descrito no próprio roadmap;
+- nunca reordene etapas nem detalhe a implementação da etapa seguinte.
+
+Esta atualização do roadmap é parte da própria preparação da entrega —
+não depende de um prompt documental separado. Continua exigindo revisão e
+autorização explícita antes de stage, commit ou push.
+
+## 6. O que este comando nunca faz
 
 Não toca `domain/`, `catalog/`, `orientation-engine/` ou qualquer arquivo
 em `app/`. Não corrige nem reescreve código. Não faz `git add`, `git
 commit` ou `git push`. Não aprova nível 3 sem autorização já registrada.
 Não substitui `/hydra-review-item`.
 
-## 6. Idempotência
+## 7. Idempotência
 
 Se esta skill for executada de novo para o mesmo item (por exemplo, depois
 de uma correção via `/hydra-implement-item $item continue`), atualize os
@@ -103,11 +131,11 @@ registros já preparados em vez de duplicá-los — mesma entrada no backlog,
 mesmo bloco de `PROJECT_STATUS.md`, mesma linha de `[Unreleased]` no
 `CHANGELOG.md`.
 
-## 7. Relatório final compacto
+## 8. Relatório final compacto
 
 Apresente:
 
-- documentos alterados;
+- documentos alterados, incluindo se o roadmap foi atualizado e por quê;
 - nível recomendado e justificativa em uma frase;
 - divergência em relação ao nível preliminar de `/hydra-plan-item`, se
   houver;
