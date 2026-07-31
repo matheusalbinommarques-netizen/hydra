@@ -32,6 +32,7 @@
 				<a href="/projects/{projectId}/map">Mapa</a>
 				<a href="/projects/{projectId}/records">Registros</a>
 				<a href="/projects/{projectId}/summary">Resumo</a>
+				<a href="/projects/{projectId}/document">Documento</a>
 				<a href="/projects/{projectId}/export">Exportar</a>
 			</div>
 		</nav>
