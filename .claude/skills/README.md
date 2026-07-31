@@ -1,9 +1,10 @@
 # Skills do Hydra
 
-Sete comandos (`/hydra-*`) que cobrem o ciclo de entrega de um item do
-backlog, do estado atual até o commit publicado com código e documentação
-juntos. Cada `SKILL.md` tem o detalhe do seu próprio passo — este arquivo
-é só o mapa, não repete o conteúdo de cada um.
+Oito comandos (`/hydra-*`) que cobrem a retomada do projeto, a escolha da
+próxima fatia do roadmap e o ciclo de entrega de um item até o commit
+publicado com código e documentação juntos. Cada `SKILL.md` tem o
+detalhe do seu próprio passo — este arquivo é só o mapa, não repete o
+conteúdo de cada um.
 
 Responsabilidades comuns a várias skills viraram scripts em
 `.claude/scripts/`, para não duplicar lógica nem gastar contexto repetindo
@@ -27,6 +28,7 @@ os mesmos comandos em prosa:
 | Comando | Argumento | Responsabilidade | Altera arquivos? | Faz stage? | Faz commit/push? |
 |---|---|---|---|---|---|
 | `/hydra-resume` | — | Resume o estado atual (branch, ciclo, itens, gate) | Não | Não | Não |
+| `/hydra-next` | — | Propõe a menor fatia funcional da próxima etapa do roadmap ainda não concluída | Não | Não | Não |
 | `/hydra-plan-item` | `<item-id>` | Produz o plano de implementação de um item, com nível preliminar | Não | Não | Não |
 | `/hydra-implement-item` | `<item-id> [continue]` | Implementa o item (ou corrige defeito de revisão em modo `continue`) | Sim (código/testes) | Não | Não |
 | `/hydra-prepare-delivery` | `<item-id>` | Atualiza backlog/`PROJECT_STATUS.md`/`CHANGELOG.md` a partir do diff não commitado, reavalia o nível | Sim (só documentação) | Não | Não |
