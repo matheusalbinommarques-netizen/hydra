@@ -7,10 +7,13 @@
 	let { data, form } = $props();
 	let view = $derived(data.view);
 	// Layout de duas colunas só quando a atividade atual pertence a
-	// Descoberta ou Definição do produto — as demais fases continuam de
-	// coluna única, revisadas só quando o Cockpit/Colheita chegarem lá.
+	// Descoberta, Definição do produto ou Estruturação — as demais fases
+	// continuam de coluna única, revisadas só quando o Cockpit/Colheita
+	// chegarem lá.
 	let isBancadaPhase = $derived(
-		data.activity?.phaseId === 'descoberta' || data.activity?.phaseId === 'definicao'
+		data.activity?.phaseId === 'descoberta' ||
+			data.activity?.phaseId === 'definicao' ||
+			data.activity?.phaseId === 'estruturacao'
 	);
 
 	// "Revisão recomendada" (Resumo) é só um card pequeno com um link de

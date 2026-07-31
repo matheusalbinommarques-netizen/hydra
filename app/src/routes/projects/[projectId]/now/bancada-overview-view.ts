@@ -19,7 +19,7 @@ export interface BancadaOverviewView {
 	blocks: BancadaOverviewBlock[];
 }
 
-const BANCADA_PHASE_IDS = ['descoberta', 'definicao'];
+const BANCADA_PHASE_IDS = ['descoberta', 'definicao', 'estruturacao'];
 
 // Um campo "manchete" por atividade — mesma curadoria de
 // discovery-summary-view.ts (problema/publico/estado_atual/resultado),
@@ -29,6 +29,12 @@ const BANCADA_PHASE_IDS = ['descoberta', 'definicao'];
 // as duas primeiras atividades da jornada, contradizendo o efeito de
 // "documento crescendo". Decisão de conteúdo, não regra mecânica — revisável
 // depois do dogfooding sem migrar dado nenhum.
+//
+// Estruturação (seis atividades) segue a mesma curadoria: quando uma
+// atividade tem mais de um campo obrigatório (objetivo_entregaveis,
+// restricoes_premissas), o campo escolhido é o que mais de perto responde
+// à mainQuestion da atividade — mesmo critério já usado em "resultado"
+// (mudanca, não beneficiario/percepcao).
 const BLOCK_SPECS: Record<string, { heading: string; valueFieldId: string; chipsFieldId?: string }> = {
 	origem: { heading: 'Origem do projeto', valueFieldId: 'origem' },
 	contexto: { heading: 'Contexto inicial', valueFieldId: 'breve_descricao' },
@@ -38,7 +44,13 @@ const BLOCK_SPECS: Record<string, { heading: string; valueFieldId: string; chips
 	resultado: { heading: 'Resultado desejado', valueFieldId: 'mudanca' },
 	usuario_principal: { heading: 'Usuário principal', valueFieldId: 'usuario_principal' },
 	visao_produto: { heading: 'Visão do produto', valueFieldId: 'necessidade_central' },
-	criterios_sucesso_produto: { heading: 'Critérios de sucesso do produto', valueFieldId: 'sinais_sucesso' }
+	criterios_sucesso_produto: { heading: 'Critérios de sucesso do produto', valueFieldId: 'sinais_sucesso' },
+	objetivo_entregaveis: { heading: 'Objetivo do projeto', valueFieldId: 'objetivo_projeto' },
+	partes_interessadas: { heading: 'Partes interessadas', valueFieldId: 'partes_interessadas' },
+	papeis_responsabilidades: { heading: 'Papéis e responsabilidades', valueFieldId: 'papeis_responsaveis' },
+	restricoes_premissas: { heading: 'Restrições do projeto', valueFieldId: 'restricoes_projeto' },
+	riscos_projeto: { heading: 'Riscos identificados', valueFieldId: 'riscos_identificados' },
+	comunicacao_governanca: { heading: 'Comunicação do projeto', valueFieldId: 'forma_comunicacao' }
 };
 
 function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: string, encodedValue: string): string[] {
