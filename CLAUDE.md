@@ -50,6 +50,9 @@ Não resolver conflitos silenciosamente. Pare e apresente o conflito.
 
 - Trabalhar em um item do backlog por vez.
 - Não ampliar escopo nem implementar itens vizinhos.
+- Se uma tarefa em andamento exigir tocar um diretório ou tipo de arquivo
+  que estava explicitamente listado como fora de escopo, pare e pergunte
+  antes de agir, mesmo que a mudança pareça pequena ou claramente correta.
 - Não alterar stack ou arquitetura sem decisão registrada.
 - Não adicionar dependência sem explicar necessidade, alternativa e impacto.
 - Pare e peça aprovação antes de alterar arquitetura, dependências, schema, migrations, dados persistidos ou escopo.
@@ -61,6 +64,12 @@ Não resolver conflitos silenciosamente. Pare e apresente o conflito.
 - Não ocultar erros, limitações ou testes falhando.
 - Não executar commit, push, merge, instalação global ou exclusão destrutiva
   sem autorização explícita.
+- Commit e stage exigem confirmação explícita e específica do usuário,
+  distinta de qualquer aprovação anterior sobre o conteúdo da entrega.
+  Responder a perguntas de elicitação sobre o que fazer não autoriza
+  commit. Antes de rodar `git add` ou `git commit`, pergunte diretamente:
+  "Posso commitar agora?" — e aguarde resposta, mesmo que o plano já tenha
+  sido aprovado passo a passo.
 - Não declarar uma entrega concluída apenas porque a tela renderiza.
 
 ## Fluxo operacional
