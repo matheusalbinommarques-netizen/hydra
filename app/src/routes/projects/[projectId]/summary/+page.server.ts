@@ -3,7 +3,7 @@ import { catalog } from '$lib/catalog';
 import { decodeMultiSelectValue } from '$lib/domain';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
-import { buildDiscoverySummaryView } from './discovery-summary-view';
+import { buildDiscoverySummaryView, filterDiscoveryOpenPendingItems } from './discovery-summary-view';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -36,7 +36,9 @@ export const load: PageServerLoad = async ({ parent }) => {
 		view.activityStatuses
 	);
 
-	return { blocks, overview, checklist, detailsOpenByDefault };
+	const discoveryOpenPendingItems = filterDiscoveryOpenPendingItems(catalog, view.openPendingItems);
+
+	return { blocks, overview, checklist, detailsOpenByDefault, discoveryOpenPendingItems };
 };
 
 export const actions: Actions = {

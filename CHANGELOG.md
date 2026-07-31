@@ -55,7 +55,12 @@
   "Documento" adicionado à navegação secundária do workspace;
 - Cockpit/Impedimentos (D022, antecipada de Release 3): registrar,
   classificar, definir próxima ação, resolver e reabrir um impedimento;
-  tela `/cockpit`; integração neutra ao `/now`.
+  tela `/cockpit`; integração neutra ao `/now`;
+- `/summary` passa a apresentar as pendências abertas de Descoberta antes
+  da confirmação já existente, filtradas pelas atividades da própria fase
+  — pendências de outras fases não aparecem; a confirmação continua não
+  bloqueante; nenhuma persistência, domínio ou motor de orientação novo
+  foi criado.
 
 ### Alterado
 

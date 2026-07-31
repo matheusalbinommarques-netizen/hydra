@@ -6,6 +6,7 @@
 
 import { decodeMultiSelectValue } from '$lib/domain';
 import type { ActivityStatus, Catalog } from '$lib/domain';
+import type { PendingItemView } from '$lib/orientation-engine';
 
 export interface DiscoveryOverviewBlock {
 	activityId: string;
@@ -112,4 +113,16 @@ export function buildDiscoverySummaryView(
 	);
 
 	return { overview, checklist, detailsOpenByDefault };
+}
+
+// Filtra as pendências abertas do projeto para as que pertencem às
+// atividades da fase Descoberta — sem entidade nova, só cruza
+// openPendingItems (já computado por ProjectView) com o catálogo estático.
+export function filterDiscoveryOpenPendingItems(
+	catalog: Catalog,
+	openPendingItems: PendingItemView[]
+): PendingItemView[] {
+	const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
+	const discoveryActivityIds = new Set((descoberta?.activities ?? []).map((activity) => activity.id));
+	return openPendingItems.filter((item) => discoveryActivityIds.has(item.activityDefinitionId));
 }

@@ -33,6 +33,10 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
 - **Documento do Projeto e extensão da Bancada até Estruturação**
   (roadmap `docs/03-product/product-roadmap.md`, etapa 1): concluída —
   commits `5de3445`, `345239c`.
+- **Revisão e confirmação — primeira fatia** (roadmap, etapa 2): `/summary`
+  passa a exibir as pendências abertas de Descoberta junto do checklist e
+  do `criteriaScopeConflict`, antes da confirmação já existente;
+  implementada e validada (`full` PASS).
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -65,10 +69,12 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Etapa 1 do roadmap ("Documento do Projeto") concluída, incluindo a
-extensão da Bancada até Estruturação e a nova rota `/document`. Próxima
-decisão: escopo da menor fatia útil da etapa 2 do roadmap ("Revisão e
-confirmação", `docs/03-product/product-roadmap.md`).
+Etapa 2 do roadmap ("Revisão e confirmação") teve sua primeira fatia
+implementada (pendências de Descoberta em `/summary`), mas segue em
+andamento — não marcada como concluída. Próxima decisão: avaliar no
+dogfooding se a composição já existente em `/summary` (checklist,
+pendências, `criteriaScopeConflict` e confirmação) já satisfaz a primeira
+versão da etapa, ou se ainda exige outra fatia mínima.
 
 ## Não fazer agora
 

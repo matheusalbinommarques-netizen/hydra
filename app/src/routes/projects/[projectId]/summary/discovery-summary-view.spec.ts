@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
 import { encodeMultiSelectValue } from '$lib/domain';
 import type { ActivityStatus } from '$lib/domain';
-import { buildDiscoverySummaryView } from './discovery-summary-view';
+import type { PendingItemView } from '$lib/orientation-engine';
+import { buildDiscoverySummaryView, filterDiscoveryOpenPendingItems } from './discovery-summary-view';
 
 const ALL_NAO_INICIADA: Record<string, ActivityStatus> = {
 	origem: 'não_iniciada',
@@ -126,6 +127,41 @@ describe('buildDiscoverySummaryView — conferência (checklist)', () => {
 			'Estado atual definido',
 			'Resultado definido'
 		]);
+	});
+});
+
+describe('filterDiscoveryOpenPendingItems', () => {
+	const discoveryPending: PendingItemView = {
+		id: 'p1',
+		activityDefinitionId: 'problema',
+		label: 'Problema pendente',
+		detail: 'Detalhe do problema'
+	};
+	const otherPhasePending: PendingItemView = {
+		id: 'p2',
+		activityDefinitionId: 'riscos_projeto',
+		label: 'Risco pendente',
+		detail: 'Detalhe do risco'
+	};
+
+	it('inclui pendência aberta de atividade da fase Descoberta', () => {
+		const result = filterDiscoveryOpenPendingItems(catalog, [discoveryPending]);
+		expect(result).toEqual([discoveryPending]);
+	});
+
+	it('exclui pendência de atividade de outra fase', () => {
+		const result = filterDiscoveryOpenPendingItems(catalog, [otherPhasePending]);
+		expect(result).toEqual([]);
+	});
+
+	it('sem pendências: retorna lista vazia', () => {
+		expect(filterDiscoveryOpenPendingItems(catalog, [])).toEqual([]);
+	});
+
+	it('preserva a ordem original recebida', () => {
+		const second: PendingItemView = { ...discoveryPending, id: 'p3', activityDefinitionId: 'publico' };
+		const result = filterDiscoveryOpenPendingItems(catalog, [second, discoveryPending, otherPhasePending]);
+		expect(result.map((item) => item.id)).toEqual(['p3', 'p1']);
 	});
 });
 

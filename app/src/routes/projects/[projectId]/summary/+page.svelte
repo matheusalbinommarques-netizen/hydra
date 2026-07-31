@@ -72,6 +72,22 @@
 	{/each}
 </ul>
 
+{#if data.discoveryOpenPendingItems.length > 0}
+	<section class="pendencias" aria-label="Pendências abertas">
+		<h2>Pendências abertas</h2>
+		<ul>
+			{#each data.discoveryOpenPendingItems as item (item.id)}
+				<li>
+					<strong>{item.label}</strong>
+					{#if item.detail}
+						<p>{item.detail}</p>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
+
 <form method="POST" action="?/confirm" use:enhance>
 	<button type="submit">Confirmar resumo</button>
 </form>
@@ -219,5 +235,34 @@
 
 	.checklist li.complete {
 		color: var(--hydra-text);
+	}
+
+	.pendencias {
+		border: 1px solid var(--hydra-warning);
+		border-radius: 10px;
+		padding: 1rem 1.25rem;
+		background: var(--hydra-surface);
+		margin: 1.5rem 0;
+	}
+
+	.pendencias h2 {
+		margin: 0 0 0.5rem;
+		font-size: 0.95rem;
+		color: var(--hydra-warning);
+	}
+
+	.pendencias ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.pendencias li p {
+		margin: 0.15rem 0 0;
+		color: var(--hydra-muted);
+		font-size: 0.9rem;
 	}
 </style>
