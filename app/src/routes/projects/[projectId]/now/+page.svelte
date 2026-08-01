@@ -56,6 +56,19 @@
 		</p>
 	{/if}
 
+	{#if data.journeyContext}
+		<section class="journey-context" aria-label="Onde estamos">
+			<p class="journey-label">Onde estamos</p>
+			{#if data.journeyContext.kind === 'in_progress'}
+				<p class="journey-phase">{data.journeyContext.phaseLabel}</p>
+				<p class="journey-position">Fase {data.journeyContext.position} de {data.journeyContext.total}</p>
+			{:else}
+				<p class="journey-phase">Jornada concluída</p>
+				<p class="journey-position">{data.journeyContext.total} de {data.journeyContext.total} fases percorridas</p>
+			{/if}
+		</section>
+	{/if}
+
 	{#if data.activity?.completionMode === 'explicit_confirmation'}
 		<section class="next-action">
 			<p class="eyebrow">Revisão recomendada</p>
@@ -223,6 +236,31 @@
 	.impediments-indicator {
 		margin: 0 0 1.5rem;
 		font-size: 0.9rem;
+		color: var(--hydra-muted);
+	}
+
+	.journey-context {
+		margin: 0 0 1rem;
+	}
+
+	.journey-label {
+		margin: 0;
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--hydra-muted);
+	}
+
+	.journey-phase {
+		margin: 0.25rem 0 0;
+		font-size: 0.95rem;
+		font-weight: 600;
+	}
+
+	.journey-position {
+		margin: 0.1rem 0 0;
+		font-size: 0.8rem;
 		color: var(--hydra-muted);
 	}
 

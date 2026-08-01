@@ -6,6 +6,7 @@ import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
 import type { ProjectView } from '$lib/server/application/types';
 import { buildBancadaOverviewView } from './bancada-overview-view';
+import { buildJourneyContext } from './journey-context';
 import type { Actions, PageServerLoad } from './$types';
 
 const DESCOBERTA_PHASE_ID = 'descoberta';
@@ -79,6 +80,7 @@ function resolveOptionalFields(activity: RequiredFieldsActivity, view: ProjectVi
 export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const { view } = await parent();
 	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers);
+	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 
 	// Retomada de atividade pulada: só aceita um id que já corresponda a uma
 	// pendência aberta do próprio projeto (view.openPendingItems), nunca um
@@ -103,7 +105,14 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		// Edição a partir do Resumo sempre mostra o formulário inteiro, nunca
 		// campo a campo — quem chega aqui já concluiu a atividade e quer
 		// corrigir algo pontual, não ser levado pela sequência de novo.
-		return { activity: editActivity, isResuming: false, isEditingFromSummary: true, stepKind: 'full' as const, bancadaOverview };
+		return {
+			activity: editActivity,
+			isResuming: false,
+			isEditingFromSummary: true,
+			stepKind: 'full' as const,
+			bancadaOverview,
+			journeyContext
+		};
 	}
 
 	// Etapa opcional agrupada de uma atividade decomposta já concluída
@@ -131,7 +140,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 					isResuming: false,
 					isEditingFromSummary: false,
 					stepKind: 'optional' as const,
-					bancadaOverview
+					bancadaOverview,
+					journeyContext
 				};
 			}
 		}
@@ -164,7 +174,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 				isResuming: false,
 				isEditingFromSummary: false,
 				stepKind: 'required' as const,
-				bancadaOverview
+				bancadaOverview,
+				journeyContext
 			};
 		}
 		// Todos os campos obrigatórios já respondidos mas chegamos aqui sem
@@ -177,7 +188,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		isResuming: Boolean(resumingPendingItem),
 		isEditingFromSummary: false,
 		stepKind: 'full' as const,
-		bancadaOverview
+		bancadaOverview,
+		journeyContext
 	};
 };
 

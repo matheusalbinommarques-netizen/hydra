@@ -106,7 +106,14 @@
   Registros, Entregas, Resumo, Documento, Exportar) passam a indicar a
   rota atual de forma visual e semântica (`aria-current="page"`); antes,
   só Agora/Cockpit tinham indicação de rota ativa — primeira fatia da
-  etapa 7 do roadmap ("Convergência da experiência e das telas").
+  etapa 7 do roadmap ("Convergência da experiência e das telas");
+- Agora (`/now`) passa a exibir um bloco "Onde estamos" acima do card de
+  próxima ação, com o nome da fase atual e sua posição na jornada ("Fase X
+  de Y"); ao concluir a jornada completa, o bloco mostra "Jornada
+  concluída" e "Y de Y fases percorridas" — segunda fatia da etapa 7 do
+  roadmap ("Convergência da experiência e das telas"); reaproveita
+  integralmente `nextActivity` e a ordem oficial das fases do catálogo,
+  sem nova regra de progresso.
 
 ### Reconciliado
 
