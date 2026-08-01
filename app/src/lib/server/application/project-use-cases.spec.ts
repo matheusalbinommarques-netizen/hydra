@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { encodeMultiSelectValue } from '$lib/domain';
+import { createInitialProjectState, encodeMultiSelectValue } from '$lib/domain';
+import { completePhase } from '$lib/domain/test-support';
 import { catalog } from '../../catalog';
 import { createSqliteProjectRepository, type ProjectRepository, type SqliteProjectRepository } from '../persistence';
 import { createProjectUseCases } from './project-use-cases';
@@ -531,6 +532,8 @@ describe('createProjectUseCases — listRecentProjects', () => {
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
 
+		const firstActivity = catalog.phases[0].activities[0];
+
 		const result = await useCases.listRecentProjects();
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
@@ -539,7 +542,12 @@ describe('createProjectUseCases — listRecentProjects', () => {
 				projectId: created.value.projectId,
 				projectName: null,
 				createdAt: expect.any(String),
-				projectStatus: 'rascunho'
+				projectStatus: 'rascunho',
+				nextAction: {
+					kind: 'activity',
+					activityDefinitionId: firstActivity.id,
+					label: firstActivity.title
+				}
 			}
 		]);
 	});
@@ -561,6 +569,67 @@ describe('createProjectUseCases — listRecentProjects', () => {
 		const byId = new Map(result.value.map((item) => [item.projectId, item.projectStatus]));
 		expect(byId.get(draft.value.projectId)).toBe('rascunho');
 		expect(byId.get(started.value.projectId)).toBe('em_andamento');
+	});
+
+	it('nextAction é completed quando o catálogo inteiro já foi percorrido', async () => {
+		const { repo } = setup();
+		let state = createInitialProjectState(catalog, 'proj-concluido', '2026-01-01T00:00:00.000Z');
+		await repo.insert(state);
+		for (const phase of catalog.phases) {
+			state = completePhase(catalog, state, phase.id, '2026-01-01T00:00:00.000Z');
+		}
+		await repo.save(state);
+
+		const useCases = createProjectUseCases({
+			repository: repo,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual([
+			expect.objectContaining({
+				projectId: 'proj-concluido',
+				projectStatus: 'concluído',
+				nextAction: { kind: 'completed' }
+			})
+		]);
+	});
+
+	it('nextAction respeita routeStartPhaseId, igual a /now e /map (D023)', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const estruturacaoPhase = catalog.phases.find((phase) => phase.id === 'estruturacao');
+		if (!estruturacaoPhase) throw new Error('fase "estruturacao" não encontrada no catálogo');
+
+		const routed = await useCases.setRouteStartPhase({
+			projectId: created.value.projectId,
+			phaseId: 'estruturacao'
+		});
+		if (!routed.ok) throw new Error('esperado ok');
+		// a própria fonte canônica (ProjectView.nextActivity) já reflete a rota
+		expect(routed.value.nextActivity).toEqual({
+			kind: 'recommendation',
+			activityDefinitionId: estruturacaoPhase.activities[0].id
+		});
+
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value).toEqual([
+			expect.objectContaining({
+				projectId: created.value.projectId,
+				nextAction: {
+					kind: 'activity',
+					activityDefinitionId: estruturacaoPhase.activities[0].id,
+					label: estruturacaoPhase.activities[0].title
+				}
+			})
+		]);
 	});
 
 	it('não executa insert nem save ao listar', async () => {

@@ -2,8 +2,8 @@
 // ProjectRepository, domain/, catalog/ (via dependência) e orientation-engine/.
 // Nenhum SQL, nenhuma rota, nenhum HTML — só orquestração.
 
-import type { Catalog, ProjectState } from '$lib/domain';
-import { computeProjectStatus } from '$lib/orientation-engine';
+import type { ActivityDefinition, Catalog, ProjectState } from '$lib/domain';
+import { computeNextActivity, computeProjectStatus, computeSnapshot } from '$lib/orientation-engine';
 import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
@@ -64,6 +64,28 @@ export interface ProjectUseCasesDependencies {
 	idGenerator: IdGenerator;
 }
 
+// Mesmo padrão já usado em domain/transitions.ts, server/application/project-view.ts,
+// domain/serialization.ts, records/records-view.ts e now/+page.server.ts — o
+// helper de orientation-engine/catalog-lookup.ts é interno àquele módulo.
+function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
+	for (const phase of catalog.phases) {
+		const found = phase.activities.find((activity) => activity.id === activityId);
+		if (found) return found;
+	}
+	return undefined;
+}
+
+// nextActivityResult.activityDefinitionId sempre vem do próprio catalog (via
+// computeNextActivity/computeSnapshot) — não encontrar a definição é catálogo
+// inconsistente, não um caso de UI a tratar com texto de reserva.
+function requireActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition {
+	const found = findActivityDefinition(catalog, activityId);
+	if (!found) {
+		throw new Error(`Catálogo inconsistente: atividade "${activityId}" recomendada mas não encontrada.`);
+	}
+	return found;
+}
+
 export function createProjectUseCases(deps: ProjectUseCasesDependencies): ProjectUseCases {
 	const { repository, catalog, clock, idGenerator } = deps;
 
@@ -87,14 +109,30 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				// completo aqui. Reaproveita computeProjectStatus (mesma função pura
 				// usada por buildProjectView), sem nenhum cálculo novo.
 				const state = await repository.findById(project.id);
-				const projectStatus = state
-					? computeProjectStatus(state.project, catalog, state.activityProgress)
-					: 'rascunho';
+				const activityProgress = state?.activityProgress ?? [];
+				const projectStatus = state ? computeProjectStatus(state.project, catalog, activityProgress) : 'rascunho';
+				// nextActivity precisa respeitar routeStartPhaseId (D023) como em
+				// /now e /map — computeSnapshot já aplica computeRecommendedRoute
+				// antes de computeNextActivity (ver orientation-engine/snapshot.ts).
+				// Sem state (projeto órfão em listRecent sem linha em findById), cai
+				// no catálogo completo: não há rota persistida para aplicar.
+				const nextActivityResult = state
+					? computeSnapshot(catalog, state).nextActivity
+					: computeNextActivity(catalog, activityProgress);
+				const nextAction: ProjectListItem['nextAction'] =
+					nextActivityResult.kind === 'recommendation'
+						? {
+								kind: 'activity',
+								activityDefinitionId: nextActivityResult.activityDefinitionId,
+								label: requireActivityDefinition(catalog, nextActivityResult.activityDefinitionId).title
+							}
+						: { kind: 'completed' };
 				items.push({
 					projectId: project.id,
 					projectName: project.name,
 					createdAt: project.createdAt,
-					projectStatus
+					projectStatus,
+					nextAction
 				});
 			}
 			return { ok: true, value: items };

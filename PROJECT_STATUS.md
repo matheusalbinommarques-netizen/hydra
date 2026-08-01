@@ -70,7 +70,7 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `/map`; mensagem final de conclusão em `/now`; nenhuma mudança de
   código foi necessária.
 - **Convergência da experiência e das telas** (roadmap, etapa 7): em
-  andamento — três fatias entregues: (1) estado ativo visual e semântico
+  andamento — quatro fatias entregues: (1) estado ativo visual e semântico
   (`aria-current="page"`) unificado nos oito links de navegação do
   workspace (Agora, Cockpit, Mapa, Registros, Entregas, Resumo,
   Documento, Exportar), `app/src/routes/projects/[projectId]/+layout.svelte`;
@@ -80,7 +80,12 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `app/src/routes/projects/[projectId]/now/`; (3) continuidade do Mapa
   para a próxima ação — na atividade recomendada (`activity.isCurrent`)
   em `/map`, link "Continuar em Agora" para `/now`,
-  `app/src/routes/projects/[projectId]/map/+page.svelte`; etapa segue em
+  `app/src/routes/projects/[projectId]/map/+page.svelte`; (4) orientação
+  de retomada por projeto na Home (`/`) — cada projeto listado mostra sua
+  próxima ação real (respeitando `routeStartPhaseId` quando definido) e um
+  CTA para `/now` ("Começar projeto"/"Continuar projeto"/"Ver projeto"),
+  sem linguagem de recência, `app/src/routes/+page.svelte`,
+  `app/src/lib/server/application/project-use-cases.ts`; etapa segue em
   andamento, sem resultado completo ainda.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões

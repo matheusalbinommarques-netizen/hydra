@@ -52,11 +52,28 @@ export type PendingItemHistoryView =
 // activityProgress/answers/pendingItems brutos. projectStatus (adicionado
 // depois, ver project-use-cases.ts) reaproveita computeProjectStatus por
 // projeto — não é um cálculo novo, só passou a ser lido também aqui.
+// nextAction (etapa 7 do roadmap, "Convergência da experiência e das
+// telas") reaproveita o mesmo estado completo já carregado para
+// projectStatus — nenhuma consulta nova. Deriva de computeSnapshot(...)
+// .nextActivity (orientation-engine/snapshot.ts), a mesma fonte
+// route-aware (respeita routeStartPhaseId, D023) que ProjectView.nextActivity
+// usa em /now e /map — não de computeNextActivity direto sobre o catálogo
+// completo. Estado explícito em vez de null/string mágica: 'completed' é o
+// único caso sem atividade recomendada (kind === 'catalog_limit_reached').
 export interface ProjectListItem {
 	projectId: string;
 	projectName: string | null;
 	createdAt: string;
 	projectStatus: ProjectStatus;
+	nextAction:
+		| {
+				kind: 'activity';
+				activityDefinitionId: string;
+				label: string;
+			}
+		| {
+				kind: 'completed';
+			};
 }
 
 // "Escolha o próximo foco" (C5) — view leve de ScopeItem/ScopeVersion, sem

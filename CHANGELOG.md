@@ -118,7 +118,19 @@
   passa a exibir o link "Continuar em Agora", levando a `/now` — terceira
   fatia da etapa 7 do roadmap ("Convergência da experiência e das
   telas"); reaproveita integralmente o cálculo de atividade recomendada
-  já existente, sem nova regra de progresso.
+  já existente, sem nova regra de progresso;
+- Home (`/`) passa a mostrar, para cada projeto listado, sua próxima ação
+  real (rótulo da atividade recomendada, respeitando a rota do projeto
+  quando definida) e um CTA para retomar o trabalho em `/now` — "Começar
+  projeto" (rascunho), "Continuar projeto" (em andamento) ou "Ver
+  projeto"/"Jornada concluída" (concluído); sem linguagem de recência
+  ("mais recente"/"de onde parou"), pois o produto não tem sinal
+  persistido que sustente essa afirmação — quarta fatia da etapa 7 do
+  roadmap ("Convergência da experiência e das telas"); reaproveita
+  integralmente o estado já carregado por `listRecentProjects()` para
+  `projectStatus` e a mesma fonte route-aware de próxima atividade usada
+  em `/now` e `/map` (`computeSnapshot(...).nextActivity`, D023); nenhuma
+  consulta nova, nenhuma regra de progresso nova.
 
 ### Reconciliado
 

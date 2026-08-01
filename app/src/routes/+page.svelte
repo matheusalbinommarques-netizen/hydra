@@ -47,9 +47,28 @@
 			<ul>
 				{#each data.projects as project (project.projectId)}
 					<li>
-						<a href="/projects/{project.projectId}/now">{project.projectName ?? 'Projeto sem nome'}</a>
-						<span class="status-tag">{projectStatusLabel[project.projectStatus]}</span>
-						<span class="created-at">Criado em {formatDate(project.createdAt)}</span>
+						<div class="project-info">
+							<a href="/projects/{project.projectId}/now">{project.projectName ?? 'Projeto sem nome'}</a>
+							<span class="status-tag">{projectStatusLabel[project.projectStatus]}</span>
+							<span class="created-at">Criado em {formatDate(project.createdAt)}</span>
+							{#if project.nextAction.kind === 'activity'}
+								<p class="next-action">
+									<span class="next-action-label">Próxima ação</span>
+									{project.nextAction.label}
+								</p>
+							{:else}
+								<p class="next-action">Jornada concluída</p>
+							{/if}
+						</div>
+						<a class="button-secondary continue-link" href="/projects/{project.projectId}/now">
+							{#if project.nextAction.kind === 'completed'}
+								Ver projeto
+							{:else if project.projectStatus === 'rascunho'}
+								Começar projeto
+							{:else}
+								Continuar projeto
+							{/if}
+						</a>
 					</li>
 				{/each}
 			</ul>
@@ -143,8 +162,31 @@
 
 	.projects li {
 		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.project-info {
+		display: flex;
 		align-items: baseline;
+		flex-wrap: wrap;
 		gap: 0.75rem;
+	}
+
+	.next-action {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--hydra-text);
+	}
+
+	.next-action-label {
+		color: var(--hydra-muted);
+		margin-right: 0.35rem;
+	}
+
+	.continue-link {
+		flex-shrink: 0;
 	}
 
 	/* mesma convenção de link textual já usada em projects/[projectId]/+layout.svelte (nav a). */
