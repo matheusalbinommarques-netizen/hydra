@@ -70,15 +70,18 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `/map`; mensagem final de conclusão em `/now`; nenhuma mudança de
   código foi necessária.
 - **Convergência da experiência e das telas** (roadmap, etapa 7): em
-  andamento — duas fatias entregues: (1) estado ativo visual e semântico
+  andamento — três fatias entregues: (1) estado ativo visual e semântico
   (`aria-current="page"`) unificado nos oito links de navegação do
   workspace (Agora, Cockpit, Mapa, Registros, Entregas, Resumo,
   Documento, Exportar), `app/src/routes/projects/[projectId]/+layout.svelte`;
   (2) bloco "Onde estamos" em Agora (`/now`), acima do card de próxima
   ação, mostrando fase atual e posição na jornada ("Fase X de Y") ou
   jornada concluída ("Y de Y fases percorridas"),
-  `app/src/routes/projects/[projectId]/now/`; etapa segue em andamento,
-  sem resultado completo ainda.
+  `app/src/routes/projects/[projectId]/now/`; (3) continuidade do Mapa
+  para a próxima ação — na atividade recomendada (`activity.isCurrent`)
+  em `/map`, link "Continuar em Agora" para `/now`,
+  `app/src/routes/projects/[projectId]/map/+page.svelte`; etapa segue em
+  andamento, sem resultado completo ainda.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -113,9 +116,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
 espinha mecânica do produto — estão concluídas. A etapa 7,
-"Convergência da experiência e das telas", está em andamento: duas
-fatias (estado ativo de navegação; bloco "Onde estamos" em Agora) foram
-entregues; integrar as demais superfícies mecânicas e aproximar
+"Convergência da experiência e das telas", está em andamento: três
+fatias (estado ativo de navegação; bloco "Onde estamos" em Agora;
+continuidade do Mapa para a próxima ação) foram entregues; integrar as
+demais superfícies mecânicas e aproximar
 progressivamente as telas das referências aprovadas em
 `design/approved/` segue pendente, sem reabrir desnecessariamente o
 domínio nem substituir mecânicas funcionais. A próxima fatia dessa etapa

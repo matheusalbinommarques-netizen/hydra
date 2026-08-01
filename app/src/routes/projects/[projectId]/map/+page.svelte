@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import type { ActivityStatus } from '$lib/domain';
 	import type { PhaseStatus } from '$lib/orientation-engine';
 	import { ROUTE_DIAGNOSTIC_QUESTIONS } from './route-diagnostic-questions';
 
 	let { data, form } = $props();
+	let projectId = $derived(page.params.projectId);
 
 	const activityStatusLabel: Record<ActivityStatus, string> = {
 		não_iniciada: 'Não iniciada',
@@ -130,6 +132,7 @@
 							<span class="status-label">{activityStatusLabel[activity.status]}</span>
 							{#if activity.isCurrent}
 								<span class="current-badge">Próxima atividade recomendada</span>
+								<a class="continue-link" href="/projects/{projectId}/now">Continuar em Agora</a>
 							{/if}
 						</li>
 					{/each}
@@ -300,5 +303,16 @@
 		letter-spacing: 0.03em;
 		text-transform: uppercase;
 		color: var(--hydra-accent);
+	}
+
+	.continue-link {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--hydra-muted);
+		text-decoration: underline;
+	}
+
+	.continue-link:hover {
+		color: var(--hydra-text);
 	}
 </style>

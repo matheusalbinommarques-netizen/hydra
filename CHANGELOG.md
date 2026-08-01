@@ -113,7 +113,12 @@
   concluída" e "Y de Y fases percorridas" — segunda fatia da etapa 7 do
   roadmap ("Convergência da experiência e das telas"); reaproveita
   integralmente `nextActivity` e a ordem oficial das fases do catálogo,
-  sem nova regra de progresso.
+  sem nova regra de progresso;
+- em `/map`, a atividade marcada como recomendada (`activity.isCurrent`)
+  passa a exibir o link "Continuar em Agora", levando a `/now` — terceira
+  fatia da etapa 7 do roadmap ("Convergência da experiência e das
+  telas"); reaproveita integralmente o cálculo de atividade recomendada
+  já existente, sem nova regra de progresso.
 
 ### Reconciliado
 
