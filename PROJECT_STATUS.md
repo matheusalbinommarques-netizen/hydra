@@ -84,8 +84,14 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   ordem Home → Biblioteca de projetos → Nova iniciativa → decisão sobre
   Modelos. Home (`/`) está `convergida` — aprovada visualmente por
   Matheus (desktop e mobile) contra o artefato individual do Claude
-  Design ("Home Seus Projetos"). Próximo alvo de 7.2: Biblioteca de
-  projetos. Quatro fatias preparatórias seguem publicadas
+  Design ("Home Seus Projetos"); a seção antes "Todos os projetos" agora
+  lista só os cinco mais recentes, com link "Ver todos os projetos" para
+  a Biblioteca. Biblioteca de projetos (`/projects`) está `convergida` —
+  busca, filtro por estado com contagem, lista completa reaproveitando
+  `listRecentProjects()`, com navegação global explícita entre as três
+  superfícies: símbolo/wordmark Hydra → Home, item "Projetos" → Biblioteca,
+  `← Projetos` do workspace → Biblioteca. Próximo alvo de 7.2: Nova
+  iniciativa. Quatro fatias preparatórias seguem publicadas
   (estado ativo de navegação; bloco "Onde estamos" em Agora; continuidade
   Mapa → Agora; orientação por projeto na Home), mas nenhuma tela é declarada
   `convergida` apenas por elas — a ordem operacional passa a ser conduzida

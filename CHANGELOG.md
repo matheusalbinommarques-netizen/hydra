@@ -93,7 +93,20 @@
   (D025); quando não há versão de escopo confirmada ou não há itens em
   "Agora", mostra estado vazio orientando o usuário sem criar item
   automaticamente; `/next-version/confirmed` continua funcionando sem
-  alteração.
+  alteração;
+- "Biblioteca de projetos" (`/projects`, segunda tela da subetapa 7.2 do
+  roadmap "Entrada e organização global"): tela dedicada com busca por
+  nome, abas de filtro por estado (Todos/Rascunho/Em andamento/Concluído)
+  com contagem por aba, e lista completa de projetos (tabela no desktop,
+  cartões no mobile) com estado, data de criação, próxima ação real e
+  ação de retomada — mesmos dados e mesma ação `create` já usados na
+  Home; nenhum campo, entidade ou consulta nova; busca e filtro são
+  puramente client-side sobre `listRecentProjects()`; navegação global
+  integrada entre as três superfícies — símbolo/wordmark Hydra vira link
+  para a Home em toda tela, o item "Projetos" do cabeçalho leva à
+  Biblioteca (marcado `aria-current="page"` quando já está nela), e
+  `← Projetos` no cabeçalho do workspace passa a levar à Biblioteca em
+  vez da Home.
 
 ### Alterado
 
@@ -153,7 +166,11 @@
   comportamento novo — reaproveita integralmente `listRecentProjects()` e
   as ações `create`/`import` já existentes. Aprovada visualmente por
   Matheus (desktop e mobile) contra o artefato individual do Claude
-  Design — tela marcada `convergida` no inventário da etapa 7.
+  Design — tela marcada `convergida` no inventário da etapa 7;
+- Home (`/`) passa a listar só os cinco projetos mais recentes na seção
+  "Projetos" (antes "Todos os projetos"), com link "Ver todos os
+  projetos" para a nova Biblioteca (`/projects`); nenhuma outra parte da
+  Home foi alterada.
 
 ### Reconciliado
 

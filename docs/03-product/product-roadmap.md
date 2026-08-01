@@ -224,7 +224,7 @@ critério de convergência.
 | Bloco | Tela-alvo | Referência visual | Superfície atual | Situação | Decisão |
 | --- | --- | --- | --- | --- | --- |
 | 7.2 | 1. Home — Seus projetos | `design/approved/screens/01-home-seus-projetos.png` | `/` | convergida | aprovada visualmente (desktop e mobile) contra o artefato individual do Claude Design; sem usuário/avatar, Configurações, progresso, data de atualização ou painel de tipos fictícios (diferenças intencionais aprovadas) |
-| 7.2 | 2. Biblioteca de projetos | `design/approved/screens/02-biblioteca-de-projetos.png` | inexistente ou composta na Home, confirmar | não auditada | auditar antes de criar rota |
+| 7.2 | 2. Biblioteca de projetos | `design/approved/screens/02-biblioteca-de-projetos.png` | `/projects` | convergida | implementada como rota própria (busca, filtro por estado com contagem, lista completa); continuidade resolvida por navegação global explícita: símbolo/wordmark Hydra → Home (`/`), item "Projetos" → Biblioteca (`/projects`), `← Projetos` do workspace → Biblioteca |
 | 7.2 | 3. Nova iniciativa | `design/approved/screens/03-nova-iniciativa.png` | criação embutida na Home | não auditada | decidir se permanece composta ou vira superfície própria |
 | 7.2 | 4. Modelos de jornada | `design/approved/screens/04-modelos-de-jornada.png` | inexistente | adiada | horizonte posterior de Tailoring metodológico |
 | 7.3 | 5. Agora | `design/approved/screens/06-agora.png` | `/projects/[projectId]/now` | em convergência | — |

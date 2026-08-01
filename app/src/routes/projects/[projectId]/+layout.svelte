@@ -17,9 +17,11 @@
 <div class="project-shell">
 	<header class="project-header">
 		<div class="identity">
-			<a class="projects-link" href="/">← Projetos</a>
+			<a class="projects-link" href="/projects">← Projetos</a>
 			<span class="identity-divider" aria-hidden="true"></span>
-			<img class="symbol" src="/brand/hydra-symbol-primary-transparent.png" alt="" />
+			<a class="symbol-link" href="/">
+				<img class="symbol" src="/brand/hydra-symbol-primary-transparent.png" alt="" />
+			</a>
 			<div>
 				<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
 				<p class="status">Status: {projectStatusLabel[data.view.projectStatus]}</p>
@@ -122,6 +124,11 @@
 		height: 1.75rem;
 		background: var(--hydra-border);
 		flex-shrink: 0;
+	}
+
+	.symbol-link {
+		display: block;
+		line-height: 0;
 	}
 
 	.symbol {

@@ -38,12 +38,14 @@
 <div class="home-page">
 	<header class="home-header">
 		<div class="identity">
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-				<path d="M6 2v9c0 3 2.5 5 6 5s6-2 6-5V2M12 16v6" />
-			</svg>
-			<span class="wordmark-text">Hydra</span>
+			<a class="wordmark-link" href="/">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+					<path d="M6 2v9c0 3 2.5 5 6 5s6-2 6-5V2M12 16v6" />
+				</svg>
+				<span class="wordmark-text">Hydra</span>
+			</a>
 			<span class="identity-divider" aria-hidden="true"></span>
-			<span class="eyebrow">Projetos</span>
+			<a class="eyebrow" href="/projects">Projetos</a>
 		</div>
 		<form method="POST" action="?/create" use:enhance>
 			<button type="submit" class="cta-accent">Criar nova iniciativa</button>
@@ -185,9 +187,12 @@
 			</div>
 
 			<section class="project-list-section">
-				<h3>Todos os projetos</h3>
+				<div class="project-list-heading">
+					<h3>Projetos</h3>
+					<a class="view-all-link" href="/projects">Ver todos os projetos</a>
+				</div>
 				<div class="project-list-box">
-					{#each data.projects as project (project.projectId)}
+					{#each data.projects.slice(0, 5) as project (project.projectId)}
 						<div class="project-row">
 							<div class="col-name">{project.projectName ?? 'Projeto sem nome'}</div>
 							<div class="col-status"><span class={badgeClass(project.projectStatus)}>{projectStatusLabel[project.projectStatus]}</span></div>
@@ -258,6 +263,14 @@
 		gap: 0.75rem;
 	}
 
+	.wordmark-link {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		color: inherit;
+		text-decoration: none;
+	}
+
 	.wordmark-text {
 		font-family:
 			'Source Serif 4',
@@ -279,6 +292,11 @@
 		font-weight: 400;
 		color: var(--hp-muted-soft);
 		margin: 0;
+		text-decoration: none;
+	}
+
+	.home-header .eyebrow:hover {
+		text-decoration: underline;
 	}
 
 	.cta-accent {
@@ -608,6 +626,14 @@
 		margin-top: 2.25rem;
 	}
 
+	.project-list-heading {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 0.875rem;
+	}
+
 	.project-list-section h3 {
 		font-family:
 			'Source Serif 4',
@@ -615,7 +641,20 @@
 			serif;
 		font-size: 1.1875rem;
 		font-weight: 600;
-		margin: 0 0 0.875rem;
+		margin: 0;
+	}
+
+	.view-all-link {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--hp-accent);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.view-all-link:hover {
+		color: var(--hp-accent-hover);
+		text-decoration: underline;
 	}
 
 	.project-list-box {
