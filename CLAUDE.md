@@ -64,12 +64,26 @@ Não resolver conflitos silenciosamente. Pare e apresente o conflito.
 - Não ocultar erros, limitações ou testes falhando.
 - Não executar commit, push, merge, instalação global ou exclusão destrutiva
   sem autorização explícita.
-- Commit e stage exigem confirmação explícita e específica do usuário,
+- Commit e stage exigem autorização explícita e específica do usuário,
   distinta de qualquer aprovação anterior sobre o conteúdo da entrega.
-  Responder a perguntas de elicitação sobre o que fazer não autoriza
-  commit. Antes de rodar `git add` ou `git commit`, pergunte diretamente:
-  "Posso commitar agora?" — e aguarde resposta, mesmo que o plano já tenha
-  sido aprovado passo a passo.
+  Aprovação técnica do diff, dos critérios de aceite ou da documentação,
+  pedido para preparar a entrega, pedido para mostrar um comando de
+  commit, ou aprovação genérica sem referência a commit não autorizam
+  stage nem commit — nesses casos, pare antes do stage e do commit e peça
+  autorização.
+  Uma autorização explícita já fornecida pelo usuário (ex.: "pode
+  commitar", "commite agora", "faça o commit com a mensagem X", "pode
+  fazer stage e commit", uma instrução direta para executar `git commit`,
+  ou o fornecimento de um comando de commit acompanhado da instrução para
+  executá-lo) é suficiente e não deve ser reconfirmada — faça stage
+  somente dos arquivos especificamente aprovados, execute o commit, e não
+  pergunte novamente "Posso commitar agora?". Se o pacote autorizado não
+  estiver claro, pare e peça esclarecimento.
+  Commit e push continuam sendo autorizações distintas. Faça push somente
+  quando o usuário autorizar explicitamente o push, ou quando a mesma
+  instrução autorizar explicitamente "commit e push"; nesse caso, não
+  peça uma nova confirmação — execute o push depois de conferir que o
+  commit e a árvore estão corretos.
 - Não declarar uma entrega concluída apenas porque a tela renderiza.
 
 ## Fluxo operacional
