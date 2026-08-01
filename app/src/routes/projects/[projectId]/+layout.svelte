@@ -31,6 +31,7 @@
 			<div class="nav-secondary" aria-label="Consulta">
 				<a href="/projects/{projectId}/map">Mapa</a>
 				<a href="/projects/{projectId}/records">Registros</a>
+				<a href="/projects/{projectId}/deliveries">Entregas</a>
 				<a href="/projects/{projectId}/summary">Resumo</a>
 				<a href="/projects/{projectId}/document">Documento</a>
 				<a href="/projects/{projectId}/export">Exportar</a>

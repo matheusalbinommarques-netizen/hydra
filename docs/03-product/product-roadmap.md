@@ -117,12 +117,20 @@ confirmada (D025, `docs/07-management/decision-log.md`). Sem entidade de
 tarefa, subtarefas, responsáveis, prazos, dependências ou Kanban nesta
 primeira versão.
 
-### 5. Execução e acompanhamento (próxima etapa)
+### 5. Execução e acompanhamento — concluído
 
 Resultado: acompanhar trabalho real sem competir em profundidade com
 Jira, Trello ou Linear.
 
-### 6. Resultados, adaptação e encerramento
+Entregue: superfície operacional dedicada "Entregas" (`/deliveries`),
+acessível pela navegação do workspace, agrupando os itens confirmados em
+"Agora" pelos três estados de execução já existentes
+(`ScopeItem.executionStatus`, D025), com contagem por grupo e a mesma
+ação de mudança de status já usada em `/next-version/confirmed`, que
+continua funcionando sem alteração; nenhum campo, entidade ou schema
+novo.
+
+### 6. Resultados, adaptação e encerramento (próxima etapa)
 
 Resultado: medir, adaptar, aceitar e encerrar com evidências.
 

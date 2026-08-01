@@ -51,6 +51,13 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   editável em `/next-version/confirmed` sem afetar a confirmação do
   escopo (D025, `docs/07-management/decision-log.md`); validada (`full`
   PASS).
+- **Execução e acompanhamento** (roadmap, etapa 5): concluída — superfície
+  "Entregas" (`/deliveries`), acessível pela navegação do workspace,
+  agrupando os itens confirmados em "Agora" pelos três estados de
+  execução já existentes, com contagem por grupo, reaproveitando
+  integralmente `ScopeItem.executionStatus` e `setScopeItemExecutionStatus`
+  (D025); `/next-version/confirmed` mantida sem alteração; validada
+  (`full` PASS).
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -83,10 +90,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Etapa 4 do roadmap ("Entregas e backlog estruturados",
+Etapa 5 do roadmap ("Execução e acompanhamento",
 `docs/03-product/product-roadmap.md`) está concluída. Próxima etapa da
-sequência: etapa 5, "Execução e acompanhamento" — escopo e menor fatia
-funcional ainda não definidos.
+sequência: etapa 6, "Resultados, adaptação e encerramento" — escopo e
+menor fatia funcional ainda não definidos.
 
 ## Não fazer agora
 

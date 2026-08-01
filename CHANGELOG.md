@@ -82,7 +82,18 @@
   um controle de status — "A fazer", "Em andamento" ou "Concluído" —,
   editável a qualquer momento após a confirmação do foco, sem afetar essa
   confirmação; itens de "Depois" e "Fora" não exibem nem permitem alterar
-  o status de execução (D025, `docs/07-management/decision-log.md`).
+  o status de execução (D025, `docs/07-management/decision-log.md`);
+- "Entregas" (`/deliveries`, etapa 5 do roadmap "Execução e acompanhamento"):
+  superfície operacional dedicada, acessível pela navegação do workspace,
+  que agrupa os itens confirmados em "Agora" pelos três estados de
+  execução já existentes (A fazer/Em andamento/Concluído), com contagem
+  por grupo e a mesma ação de mudança de status já usada em
+  `/next-version/confirmed`; sem estado, entidade ou campo novo — reaproveita
+  integralmente `ScopeItem.executionStatus` e `setScopeItemExecutionStatus`
+  (D025); quando não há versão de escopo confirmada ou não há itens em
+  "Agora", mostra estado vazio orientando o usuário sem criar item
+  automaticamente; `/next-version/confirmed` continua funcionando sem
+  alteração.
 
 ### Alterado
 
