@@ -101,7 +101,12 @@
   obrigatório só para itens em "Agora");
 - navegação do workspace reagrupada em abas primárias (Agora/Cockpit) e
   links utilitários discretos (Mapa/Registros/Resumo/Exportar); "Projetos"
-  move para o cabeçalho de identidade.
+  move para o cabeçalho de identidade;
+- todos os links de navegação do workspace (Agora, Cockpit, Mapa,
+  Registros, Entregas, Resumo, Documento, Exportar) passam a indicar a
+  rota atual de forma visual e semântica (`aria-current="page"`); antes,
+  só Agora/Cockpit tinham indicação de rota ativa — primeira fatia da
+  etapa 7 do roadmap ("Convergência da experiência e das telas").
 
 ### Reconciliado
 

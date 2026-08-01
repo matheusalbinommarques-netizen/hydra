@@ -5,6 +5,13 @@
 	let { data, children } = $props();
 	let projectId = $derived(page.params.projectId);
 	let pathname = $derived(page.url.pathname);
+
+	// Ativo tanto na rota exata quanto em subrotas (ex.: /deliveries/x),
+	// com limite de segmento para não casar caminhos apenas parecidos
+	// (ex.: /deliveries-archive).
+	function isCurrentRoute(target: string): boolean {
+		return pathname === target || pathname.startsWith(`${target}/`);
+	}
 </script>
 
 <div class="project-shell">
@@ -20,21 +27,57 @@
 		</div>
 		<nav>
 			<div class="nav-primary" aria-label="Modos de trabalho">
-				<a href="/projects/{projectId}/now" class:active={pathname === `/projects/${projectId}/now`}>
+				<a
+					href="/projects/{projectId}/now"
+					aria-current={isCurrentRoute(`/projects/${projectId}/now`) ? 'page' : undefined}
+				>
 					Agora
 				</a>
-				<a href="/projects/{projectId}/cockpit" class:active={pathname === `/projects/${projectId}/cockpit`}>
+				<a
+					href="/projects/{projectId}/cockpit"
+					aria-current={isCurrentRoute(`/projects/${projectId}/cockpit`) ? 'page' : undefined}
+				>
 					Cockpit
 				</a>
 			</div>
 			<span class="nav-divider" aria-hidden="true"></span>
 			<div class="nav-secondary" aria-label="Consulta">
-				<a href="/projects/{projectId}/map">Mapa</a>
-				<a href="/projects/{projectId}/records">Registros</a>
-				<a href="/projects/{projectId}/deliveries">Entregas</a>
-				<a href="/projects/{projectId}/summary">Resumo</a>
-				<a href="/projects/{projectId}/document">Documento</a>
-				<a href="/projects/{projectId}/export">Exportar</a>
+				<a
+					href="/projects/{projectId}/map"
+					aria-current={isCurrentRoute(`/projects/${projectId}/map`) ? 'page' : undefined}
+				>
+					Mapa
+				</a>
+				<a
+					href="/projects/{projectId}/records"
+					aria-current={isCurrentRoute(`/projects/${projectId}/records`) ? 'page' : undefined}
+				>
+					Registros
+				</a>
+				<a
+					href="/projects/{projectId}/deliveries"
+					aria-current={isCurrentRoute(`/projects/${projectId}/deliveries`) ? 'page' : undefined}
+				>
+					Entregas
+				</a>
+				<a
+					href="/projects/{projectId}/summary"
+					aria-current={isCurrentRoute(`/projects/${projectId}/summary`) ? 'page' : undefined}
+				>
+					Resumo
+				</a>
+				<a
+					href="/projects/{projectId}/document"
+					aria-current={isCurrentRoute(`/projects/${projectId}/document`) ? 'page' : undefined}
+				>
+					Documento
+				</a>
+				<a
+					href="/projects/{projectId}/export"
+					aria-current={isCurrentRoute(`/projects/${projectId}/export`) ? 'page' : undefined}
+				>
+					Exportar
+				</a>
 			</div>
 		</nav>
 	</header>
@@ -124,7 +167,7 @@
 		color: var(--hydra-text);
 	}
 
-	.nav-primary a.active {
+	.nav-primary a[aria-current='page'] {
 		color: var(--hydra-text);
 		background: var(--hydra-surface-raised);
 		border-bottom-color: var(--hydra-accent);
@@ -153,6 +196,12 @@
 
 	.nav-secondary a:hover {
 		color: var(--hydra-text);
+		text-decoration: underline;
+	}
+
+	.nav-secondary a[aria-current='page'] {
+		color: var(--hydra-text);
+		font-weight: 700;
 		text-decoration: underline;
 	}
 </style>

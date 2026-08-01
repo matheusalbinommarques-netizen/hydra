@@ -69,6 +69,12 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   consultáveis em `/records`; status das seis atividades consultável em
   `/map`; mensagem final de conclusão em `/now`; nenhuma mudança de
   código foi necessária.
+- **Convergência da experiência e das telas** (roadmap, etapa 7): em
+  andamento — primeira fatia entregue: estado ativo visual e semântico
+  (`aria-current="page"`) unificado nos oito links de navegação do
+  workspace (Agora, Cockpit, Mapa, Registros, Entregas, Resumo,
+  Documento, Exportar); `app/src/routes/projects/[projectId]/+layout.svelte`;
+  etapa segue em andamento, sem resultado completo ainda.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -102,12 +108,13 @@ Histórico completo em `docs/07-management/decision-log.md`.
 ## Próxima decisão relevante
 
 As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
-espinha mecânica do produto — estão concluídas. A etapa 7 passa a ser
-"Convergência da experiência e das telas": integrar as superfícies
-mecânicas já entregues e aproximar progressivamente as telas das
-referências aprovadas em `design/approved/`, sem reabrir
-desnecessariamente o domínio nem substituir mecânicas funcionais. Seu
-escopo e sua menor fatia funcional ainda não estão definidos.
+espinha mecânica do produto — estão concluídas. A etapa 7,
+"Convergência da experiência e das telas", está em andamento: a primeira
+fatia (estado ativo de navegação) foi entregue; integrar as demais
+superfícies mecânicas e aproximar progressivamente as telas das
+referências aprovadas em `design/approved/` segue pendente, sem reabrir
+desnecessariamente o domínio nem substituir mecânicas funcionais. A
+próxima fatia dessa etapa ainda não está definida.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
