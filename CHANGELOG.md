@@ -138,7 +138,22 @@
   cabeçalho da Home; o cabeçalho do workspace passa a ter elevação real
   (superfície clara com sombra sutil), antes idêntico visualmente ao fundo
   da página; nenhuma tela teve conteúdo, estrutura ou mecânica alterada —
-  só valores de espaçamento/tipografia/cor normalizados.
+  só valores de espaçamento/tipografia/cor normalizados;
+- Home (`/`) reestruturada visualmente a partir do artefato aprovado no
+  Claude Design ("Home Seus Projetos") — primeira tela da subetapa 7.2 do
+  roadmap ("Entrada e organização global"): cabeçalho compacto com ação
+  principal "Criar nova iniciativa" em destaque; projeto em destaque (o
+  primeiro projeto não concluído) com status, próxima ação real e link
+  "Ver visão geral" para o Cockpit; painel lateral com as duas capacidades
+  reais do produto — criar e importar projeto, a importação revelada sob
+  demanda (`<details>`) em vez do campo de arquivo permanentemente
+  exposto; lista "Todos os projetos" mais compacta, com badges por status;
+  paleta, tipografia, densidade e comportamento responsivo (desktop e
+  ~390px) aproximados do artefato; nenhum dado, rota, consulta ou
+  comportamento novo — reaproveita integralmente `listRecentProjects()` e
+  as ações `create`/`import` já existentes. Aprovada visualmente por
+  Matheus (desktop e mobile) contra o artefato individual do Claude
+  Design — tela marcada `convergida` no inventário da etapa 7.
 
 ### Reconciliado
 

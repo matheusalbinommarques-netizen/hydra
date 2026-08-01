@@ -80,10 +80,14 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   cabeçalho da Home; `UX_DESIGN_SPEC.md` reconciliado com a paleta papel/
   tinta/grafite (removida a direção anterior navy/ciano/tema escuro).
   Padrão de campo de formulário e de card ficam para as telas que os
-  usarem, em 7.2+. Próxima subetapa: 7.2 — Entrada e organização global.
-  Quatro fatias preparatórias seguem publicadas (estado ativo de
-  navegação; bloco "Onde estamos" em Agora; continuidade Mapa → Agora;
-  orientação por projeto na Home), mas nenhuma tela é declarada
+  usarem, em 7.2+. Subetapa atual: 7.2 — Entrada e organização global,
+  ordem Home → Biblioteca de projetos → Nova iniciativa → decisão sobre
+  Modelos. Home (`/`) está `convergida` — aprovada visualmente por
+  Matheus (desktop e mobile) contra o artefato individual do Claude
+  Design ("Home Seus Projetos"). Próximo alvo de 7.2: Biblioteca de
+  projetos. Quatro fatias preparatórias seguem publicadas
+  (estado ativo de navegação; bloco "Onde estamos" em Agora; continuidade
+  Mapa → Agora; orientação por projeto na Home), mas nenhuma tela é declarada
   `convergida` apenas por elas — a ordem operacional passa a ser conduzida
   pelo roadmap.
 
