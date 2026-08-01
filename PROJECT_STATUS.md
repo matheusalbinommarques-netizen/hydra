@@ -58,6 +58,17 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   integralmente `ScopeItem.executionStatus` e `setScopeItemExecutionStatus`
   (D025); `/next-version/confirmed` mantida sem alteração; validada
   (`full` PASS).
+- **Resultados, adaptação e encerramento** (roadmap, etapa 6): concluída
+  por reconciliação com a capacidade funcional já existente no código —
+  seis atividades de validação e encerramento (validar entregas e
+  critérios de aceitação, coletar feedback, resolver pendências finais,
+  registrar lições aprendidas, definir transição e próximos passos,
+  confirmar encerramento do projeto) acessíveis pela jornada normal, com
+  respostas persistidas; confirmação final obrigatória, não pulável;
+  estado final do projeto computado como `concluído`; evidências
+  consultáveis em `/records`; status das seis atividades consultável em
+  `/map`; mensagem final de conclusão em `/now`; nenhuma mudança de
+  código foi necessária.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -90,10 +101,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Etapa 5 do roadmap ("Execução e acompanhamento",
-`docs/03-product/product-roadmap.md`) está concluída. Próxima etapa da
-sequência: etapa 6, "Resultados, adaptação e encerramento" — escopo e
-menor fatia funcional ainda não definidos.
+Etapa 6 do roadmap ("Resultados, adaptação e encerramento",
+`docs/03-product/product-roadmap.md`) está concluída por reconciliação
+documental. Próxima etapa da sequência: etapa 7, "Tailoring metodológico
+e modelos" — escopo e menor fatia funcional ainda não definidos.
 
 ## Não fazer agora
 

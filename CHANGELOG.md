@@ -103,6 +103,24 @@
   links utilitários discretos (Mapa/Registros/Resumo/Exportar); "Projetos"
   move para o cabeçalho de identidade.
 
+### Reconciliado
+
+- confrontada a etapa 6 do roadmap ("Resultados, adaptação e
+  encerramento") com o código existente: a fase "Validação e encerramento"
+  já possui seis atividades completas no catálogo (validar entregas e
+  critérios de aceitação, coletar feedback, resolver pendências finais,
+  registrar lições aprendidas, definir transição e próximos passos,
+  confirmar encerramento do projeto), acessíveis pela jornada guiada
+  normal, com persistência e motor de orientação genéricos — sem código
+  dedicado de fase; a confirmação final exige campo obrigatório e não pode
+  ser pulada; ao concluí-la, `computeProjectStatus` resulta em `concluído`
+  e `/now` comunica explicitamente o fim da jornada; evidências
+  permanecem acessíveis em `/records` e o estado das seis atividades é
+  consultável em `/map`; essa capacidade já estava presente no código,
+  incluindo o suporte introduzido em `41617f3`; nenhuma mudança funcional
+  foi necessária nesta entrega — só reconciliação documental de
+  roadmap/`PROJECT_STATUS.md`.
+
 ## [0.4.0] — 25/07/2026
 
 ### Adicionado

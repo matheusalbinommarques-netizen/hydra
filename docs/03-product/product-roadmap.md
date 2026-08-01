@@ -130,11 +130,22 @@ ação de mudança de status já usada em `/next-version/confirmed`, que
 continua funcionando sem alteração; nenhum campo, entidade ou schema
 novo.
 
-### 6. Resultados, adaptação e encerramento (próxima etapa)
+### 6. Resultados, adaptação e encerramento — concluído
 
 Resultado: medir, adaptar, aceitar e encerrar com evidências.
 
-### 7. Tailoring metodológico e modelos
+Concluída por reconciliação: o resultado já é atendido pela fase
+`validacao` do catálogo (`app/src/lib/catalog/closure.ts`) e pela
+infraestrutura genérica existente — seis atividades (validar entregas e
+critérios de aceitação, coletar feedback, resolver pendências finais,
+registrar lições aprendidas, definir transição e próximos passos,
+confirmar encerramento do projeto) acessíveis pela jornada normal, com
+confirmação final obrigatória e não pulável; `computeProjectStatus`
+resulta em `concluído`; evidências consultáveis em `/records`, estado das
+atividades consultável em `/map`, mensagem final de conclusão em `/now`.
+Nenhuma mudança de código foi necessária.
+
+### 7. Tailoring metodológico e modelos (próxima etapa)
 
 Resultado: ativar profundidade e artefatos proporcionais a cada projeto.
 
