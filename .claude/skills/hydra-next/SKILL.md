@@ -34,6 +34,137 @@ isso como sinal a confirmar no código (§3), não como conclusão definitiva.
 
 Leia só a seção dessa etapa. Não leia nem planeje etapas posteriores.
 
+Se a etapa candidata for "7. Convergência da experiência e das telas" e
+`PROJECT_STATUS.md` indicar essa etapa como em andamento, siga
+exclusivamente o §2A a partir daqui — não execute §3, §4 nem o formato de
+saída do §5 para esta etapa.
+
+## 2A. Modo etapa 7 — telas e superfícies
+
+Enquanto a etapa 7 estiver em andamento, este comando trabalha somente
+dentro da estrutura operacional já publicada na própria seção "### 7.
+Convergência da experiência e das telas" do roadmap — nunca procurando
+microfatias oportunistas fora dela.
+
+### Leitura obrigatória
+
+- `PROJECT_STATUS.md`;
+- a seção 7 completa de `docs/03-product/product-roadmap.md` (objetivo,
+  regras de interpretação, inventário operacional, critério de tela
+  convergida, sequência 7.0–7.7).
+
+### Identificar
+
+- a subetapa atual (dentro de "Sequência da etapa 7");
+- seu resultado esperado e seu gate, conforme descritos na subetapa;
+- a ordem interna que essa subetapa define (ex.: ordem de telas em
+  7.2–7.6).
+
+Selecione o próximo trabalho somente dentro dessa subetapa. Não procure
+outra microfatia fora da sequência, exceto diante de bloqueio explícito,
+divergência documental ou impossibilidade técnica demonstrada.
+
+### Parar e relatar divergência quando
+
+- `PROJECT_STATUS.md` apontar uma subetapa diferente da indicada pelo
+  roadmap;
+- a situação de uma tela não permitir determinar o próximo alvo;
+- uma referência visual esperada estiver ausente;
+- a superfície atual não puder ser confirmada sem ampliar o escopo.
+
+### Tratamento por subetapa
+
+- **7.0 — Estruturar a convergência**: se ainda não concluída, priorize a
+  organização documental e das referências. Se já concluída, não volte a
+  ela sem divergência concreta.
+- **7.1 — Fundação visual e shell**: não é uma tela individual. Identifique
+  o primeiro resultado ainda não atendido do gate de 7.1, considerando de
+  forma focada tokens e estilos globais, tipografia, espaçamento,
+  largura, shell global, shell do workspace, navegação, cabeçalhos,
+  cards, botões, campos, estados compartilhados e a linguagem
+  papel/tinta/grafite. Não tente redesenhar todas as telas de uma vez.
+  Proponha uma fatia coerente e compartilhada que reduza retrabalho nas
+  telas posteriores — não escolha um detalhe isolado só porque é pequeno;
+  a fatia precisa produzir avanço material no gate de 7.1.
+- **7.2 a 7.6 — Telas e superfícies ordenadas**: use a ordem registrada na
+  respectiva subetapa; localize a primeira tela que não esteja
+  `convergida`, `adiada` nem `não aplicável`; use a imagem individual
+  indicada no inventário; compare apenas essa referência com a superfície
+  atual correspondente; distinga diferença visual/estrutural, capacidade
+  funcional já existente, capacidade de domínio inexistente e conteúdo
+  meramente ilustrativo do mockup; não crie automaticamente nova rota,
+  campo, entidade ou regra de domínio só porque aparece na imagem;
+  proponha uma fatia suficientemente completa para aproximar
+  materialmente a tela do critério de convergência. Quando a situação for
+  `não auditada`, a primeira ação pode ser uma auditoria focada da
+  superfície para decidir entre convergir, combinar com outra superfície,
+  criar, preservar, adiar ou declarar não aplicável — não invente essa
+  decisão antes de ler o código relevante.
+- **7.7 — Revisão final**: use os critérios e o gate registrados no
+  roadmap para selecionar divergências restantes, sem reabrir
+  funcionalidades já aprovadas sem evidência concreta.
+
+### Uso das imagens
+
+Para uma tela com referência individual: abra somente a imagem indicada
+no inventário; não reanalise a montagem completa sem necessidade; não use
+imagens de outras telas como requisitos; trate a imagem como alvo
+verificável, não pixel-perfect; não transforme textos, nomes, números ou
+dados fictícios do mockup em requisitos.
+
+Para Documento do projeto e Exportar, que não possuem imagem individual:
+use somente as referências complementares indicadas no roadmap, deixe
+explícita a ausência de referência individual e não invente um mockup.
+
+### Tamanho da fatia
+
+A próxima fatia deve ter um resultado observável, aproximar
+materialmente o gate atual, ter escopo limitado, evitar misturar várias
+telas, evitar alterações de domínio sem necessidade, e ser implementável
+e revisável em uma entrega. Indique se, após a entrega, o alvo continua
+`em convergência`, pode ser considerado `convergida`, ou exige uma
+decisão antes de prosseguir.
+
+### Inspeção focada
+
+Não leia o repositório inteiro. Comece pelos documentos canônicos; abra
+apenas a imagem do alvo; inspecione somente a rota, componentes e estilos
+diretamente relacionados; amplie a leitura apenas diante de dependência
+concreta. Não execute testes, build ou smoke durante a escolha da próxima
+fatia.
+
+### Formato obrigatório da resposta no modo etapa 7
+
+Use este formato em vez do §5 enquanto estiver no modo etapa 7:
+
+```
+# Estado atual
+Etapa, subetapa, resultado e gate relevantes.
+
+# Próximo alvo
+Tela, superfície compartilhada ou decisão; situação atual no roadmap;
+referência visual usada; superfície AS-IS correspondente.
+
+# Evidência
+O que foi confirmado nos documentos; o que foi confirmado no código;
+principal diferença observada.
+
+# Próxima fatia proposta
+Resultado concreto; escopo; arquivos ou áreas provavelmente envolvidos;
+áreas protegidas; critério de aceite; validação proporcional recomendada.
+
+# Efeito esperado no roadmap
+Se a entrega poderá avançar o gate da subetapa, manter a tela
+`em convergência`, marcar a tela como `convergida`, ou exigir uma decisão
+documental.
+
+# Bloqueios ou incertezas
+Somente divergências reais.
+```
+
+Fora da etapa 7, ou quando a etapa 7 não estiver em andamento, ignore o
+§2A inteiro e siga normalmente a partir do §3.
+
 ## 3. Confirmar contra o código antes de declarar pendente
 
 Antes de tratar a etapa candidata como pendente, inspecione apenas a
