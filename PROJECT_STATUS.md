@@ -70,23 +70,15 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `/map`; mensagem final de conclusão em `/now`; nenhuma mudança de
   código foi necessária.
 - **Convergência da experiência e das telas** (roadmap, etapa 7): em
-  andamento — quatro fatias entregues: (1) estado ativo visual e semântico
-  (`aria-current="page"`) unificado nos oito links de navegação do
-  workspace (Agora, Cockpit, Mapa, Registros, Entregas, Resumo,
-  Documento, Exportar), `app/src/routes/projects/[projectId]/+layout.svelte`;
-  (2) bloco "Onde estamos" em Agora (`/now`), acima do card de próxima
-  ação, mostrando fase atual e posição na jornada ("Fase X de Y") ou
-  jornada concluída ("Y de Y fases percorridas"),
-  `app/src/routes/projects/[projectId]/now/`; (3) continuidade do Mapa
-  para a próxima ação — na atividade recomendada (`activity.isCurrent`)
-  em `/map`, link "Continuar em Agora" para `/now`,
-  `app/src/routes/projects/[projectId]/map/+page.svelte`; (4) orientação
-  de retomada por projeto na Home (`/`) — cada projeto listado mostra sua
-  próxima ação real (respeitando `routeStartPhaseId` quando definido) e um
-  CTA para `/now` ("Começar projeto"/"Continuar projeto"/"Ver projeto"),
-  sem linguagem de recência, `app/src/routes/+page.svelte`,
-  `app/src/lib/server/application/project-use-cases.ts`; etapa segue em
-  andamento, sem resultado completo ainda.
+  andamento. Subetapa 7.0 (estruturar a convergência) concluída — o
+  roadmap passou a ser também o backlog operacional desta etapa, com
+  inventário de 18 telas-alvo, 16 imagens individuais aprovadas em
+  `design/approved/screens/`, situação por tela e sequência 7.0–7.7 com
+  gates. Próxima subetapa: 7.1 — Fundação visual e shell. Quatro fatias
+  preparatórias seguem publicadas (estado ativo de navegação; bloco "Onde
+  estamos" em Agora; continuidade Mapa → Agora; orientação por projeto na
+  Home), mas nenhuma tela é declarada `convergida` apenas por elas — a
+  ordem operacional passa a ser conduzida pelo roadmap.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -121,14 +113,11 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
 espinha mecânica do produto — estão concluídas. A etapa 7,
-"Convergência da experiência e das telas", está em andamento: três
-fatias (estado ativo de navegação; bloco "Onde estamos" em Agora;
-continuidade do Mapa para a próxima ação) foram entregues; integrar as
-demais superfícies mecânicas e aproximar
-progressivamente as telas das referências aprovadas em
-`design/approved/` segue pendente, sem reabrir desnecessariamente o
-domínio nem substituir mecânicas funcionais. A próxima fatia dessa etapa
-ainda não está definida.
+"Convergência da experiência e das telas", está em andamento, agora com
+backlog operacional próprio no roadmap (inventário de telas, situação,
+sequência 7.0–7.7 e gates). A subetapa 7.0 está concluída; a próxima é
+7.1 — Fundação visual e shell, sem reabrir desnecessariamente o domínio
+nem substituir mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

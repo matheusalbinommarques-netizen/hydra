@@ -155,7 +155,17 @@
   passa para "Convergência da experiência e das telas" (etapa 7); o
   antigo conteúdo de Tailoring foi movido para uma seção de horizonte
   posterior, fora da sequência numerada; nenhuma mudança funcional foi
-  realizada.
+  realizada;
+- a etapa 7 do roadmap ("Convergência da experiência e das telas") passa
+  a funcionar também como backlog operacional: as 16 telas da montagem
+  `hydra-target-screens.png` foram separadas em imagens individuais
+  aprovadas (`design/approved/screens/`), deixando de ser referência
+  genérica para se tornarem alvo verificável por tela; o roadmap ganhou
+  inventário de 18 telas-alvo com referência visual, superfície atual,
+  situação e decisão, além da sequência 7.0–7.7 com gates; as quatro
+  microfatias já publicadas nesta etapa foram reclassificadas como
+  preparatórias, sem que nenhuma tela seja considerada convergida por
+  causa delas; nenhuma mudança funcional foi realizada nesta entrega.
 
 ## [0.4.0] — 25/07/2026
 

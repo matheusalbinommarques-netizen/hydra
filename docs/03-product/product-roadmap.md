@@ -31,6 +31,12 @@ especificação literal a implementar tela por tela:
 - `hydra-target-screens.png` — inventário visual da experiência-alvo; não
   é especificação pixel a pixel.
 
+`design/approved/screens/` contém as 16 imagens individuais recortadas
+dessa montagem, uma por tela-alvo, usadas como referência de trabalho
+pela etapa 7 (ver inventário operacional abaixo). São alvos verificáveis
+de estrutura, hierarquia, continuidade, propósito e linguagem visual —
+não são especificação pixel-perfect nem inspiração genérica.
+
 Em conflito entre uma dessas referências e a especificação funcional
 (`docs/core/`), a especificação prevalece até nova decisão explícita.
 
@@ -145,19 +151,210 @@ resulta em `concluído`; evidências consultáveis em `/records`, estado das
 atividades consultável em `/map`, mensagem final de conclusão em `/now`.
 Nenhuma mudança de código foi necessária.
 
-### 7. Convergência da experiência e das telas (próxima etapa)
+### 7. Convergência da experiência e das telas — em andamento
 
-Resultado:
+Durante esta etapa, este roadmap é também o backlog operacional da
+convergência visual e de experiência. Ele define quais telas precisam ser
+convergidas, em qual ordem, qual imagem individual representa cada uma,
+qual superfície atual corresponde ao alvo, quando uma tela pode ser
+considerada convergida e quando a etapa inteira pode ser encerrada.
 
-- integrar as superfícies mecânicas já entregues;
-- aproximar progressivamente as telas das referências aprovadas;
-- melhorar hierarquia, navegação, continuidade da jornada e clareza da
-  próxima ação;
-- preservar as regras e fontes de verdade existentes;
-- executar a convergência em fatias pequenas por superfície ou jornada;
-- não exigir reprodução pixel-perfect dos mockups;
-- não usar essa etapa para criar novas capacidades de domínio sem uma
-  necessidade funcional concreta.
+#### 7 — Objetivo
+
+Convergência significa equivalência substancial entre a superfície atual
+e a referência aprovada em:
+
+- estrutura da tela;
+- hierarquia da informação;
+- clareza da ação principal;
+- continuidade da jornada;
+- linguagem visual;
+- estados relevantes;
+- propósito da superfície;
+- acessibilidade básica;
+- preservação das mecânicas existentes.
+
+Não significa reprodução pixel-perfect dos mockups.
+
+#### Regras de interpretação
+
+- cada mockup em `design/approved/screens/` é um alvo verificável de
+  estrutura, hierarquia, continuidade, propósito e linguagem visual — não
+  é inspiração genérica nem especificação pixel a pixel;
+- não se cria capacidade de domínio apenas porque ela aparece ilustrada
+  em um mockup;
+- não se cria rota separada quando uma rota atual já comporta o estado
+  ilustrado;
+- nomes, métricas, datas, textos e projetos ilustrativos dos mockups não
+  viram requisitos funcionais;
+- capacidades atuais não são removidas apenas por não aparecerem em um
+  mockup;
+- telas podem ser combinadas, adiadas ou declaradas não aplicáveis,
+  quando justificado;
+- duplicações ou lacunas na numeração da montagem original
+  (`hydra-target-screens.png`) não representam telas escondidas — a
+  segunda tela numerada como 16 na montagem foi registrada como 17
+  (`17-transicao-e-adocao.png`) apenas para manter nomes de arquivo
+  únicos;
+- Documento do projeto não possui painel individual nessa montagem; até
+  existir uma imagem individual específica, usa como referência a
+  montagem geral e a visão aprovada do produto
+  (`hydra-target-screens.png`, `hydra-product-promise.png`).
+
+#### Situações permitidas
+
+Cada tela do inventário abaixo usa exatamente uma destas situações:
+
+- `não auditada` — ainda não comparada com a referência;
+- `em convergência` — comparação e ajustes em andamento ou parcialmente
+  entregues;
+- `convergida` — atende ao critério de tela convergida (ver abaixo);
+- `combinada com outra superfície` — o alvo é atendido por uma superfície
+  que também cobre outra tela do inventário;
+- `adiada` — fora do escopo imediato da etapa 7, por decisão registrada;
+- `não aplicável` — o alvo não corresponde a uma capacidade que o produto
+  deva ter.
+
+Uma tela não é declarada `convergida` apenas porque uma microfatia
+relacionada já foi entregue — a fatia precisa atender integralmente ao
+critério de convergência.
+
+#### Inventário operacional
+
+| Bloco | Tela-alvo | Referência visual | Superfície atual | Situação | Decisão |
+| --- | --- | --- | --- | --- | --- |
+| 7.2 | 1. Home — Seus projetos | `design/approved/screens/01-home-seus-projetos.png` | `/` | em convergência | convergir |
+| 7.2 | 2. Biblioteca de projetos | `design/approved/screens/02-biblioteca-de-projetos.png` | inexistente ou composta na Home, confirmar | não auditada | auditar antes de criar rota |
+| 7.2 | 3. Nova iniciativa | `design/approved/screens/03-nova-iniciativa.png` | criação embutida na Home | não auditada | decidir se permanece composta ou vira superfície própria |
+| 7.2 | 4. Modelos de jornada | `design/approved/screens/04-modelos-de-jornada.png` | inexistente | adiada | horizonte posterior de Tailoring metodológico |
+| 7.3 | 5. Agora | `design/approved/screens/06-agora.png` | `/projects/[projectId]/now` | em convergência | — |
+| 7.3 | 6. Atividade guiada | `design/approved/screens/07-atividade-guiada.png` | estado da rota `/now` | em convergência | preservar rota compartilhada, salvo necessidade concreta |
+| 7.3 | 7. Jornada | `design/approved/screens/08-jornada.png` | `/projects/[projectId]/map` | em convergência | — |
+| 7.3 | 8. Documento do projeto | ausente na montagem; usar montagem geral e visão aprovada do produto | `/projects/[projectId]/document` | não auditada | convergir sem inventar uma imagem inexistente |
+| 7.3 | 9. Revisão e confirmação | `design/approved/screens/10-revisao-e-confirmacao.png` | `/projects/[projectId]/summary` | não auditada | — |
+| 7.4 | 10. Entregas | `design/approved/screens/11-entregas.png` | `/projects/[projectId]/deliveries` | não auditada | — |
+| 7.4 | 11. Cockpit | `design/approved/screens/12-cockpit.png` | `/projects/[projectId]/cockpit` | não auditada | — |
+| 7.4 | 12. Detalhe de item de atenção | `design/approved/screens/13-detalhe-item-atencao.png` | inexistente ou parcial, confirmar | não auditada | criar somente se sustentado pela mecânica existente |
+| 7.4 | 13. Registros | `design/approved/screens/14-registros.png` | `/projects/[projectId]/records` | não auditada | — |
+| 7.5 | 14. Resultados e benefícios | `design/approved/screens/16-resultados-e-beneficios.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
+| 7.5 | 15. Transição e adoção | `design/approved/screens/17-transicao-e-adocao.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
+| 7.5 | 16. Encerramento e aprendizado | `design/approved/screens/18-encerramento-e-aprendizado.png` | `/now`, `/map` e `/records` | não auditada | decidir se será superfície própria ou composição existente |
+| 7.6 | 17. Configurações do projeto | `design/approved/screens/19-configuracoes-do-projeto.png` | inexistente ou parcial | não auditada | implementar somente capacidades sustentadas pelo domínio |
+| 7.6 | 18. Exportar | ausente na montagem | `/projects/[projectId]/export` | não auditada | preservar capacidade e convergir visualmente |
+
+#### Critério de tela convergida
+
+Uma tela só recebe a situação `convergida` quando atender a todos os
+pontos abaixo:
+
+1. estrutura substancialmente equivalente à referência;
+2. hierarquia da informação correta;
+3. ação principal clara;
+4. continuidade de entrada e saída preservada;
+5. linguagem visual coerente com a identidade papel/tinta/grafite;
+6. estados relevantes tratados (vazio, erro, carregando, concluído,
+   quando aplicável);
+7. acessibilidade básica preservada;
+8. mecânicas funcionais preservadas.
+
+#### Sequência da etapa 7
+
+##### 7.0 — Estruturar a convergência
+
+Resultado: roadmap operacional; imagens individuais aprovadas;
+inventário; ordem; critérios; gates.
+
+Gate: todas as telas inventariadas; referências associadas; sequência
+definida; próxima subetapa clara.
+
+Esta entrega conclui 7.0.
+
+##### 7.1 — Fundação visual e shell
+
+Resultado: definir e aplicar base compartilhada de tipografia,
+espaçamento, largura, navegação, cabeçalhos, cards, botões, campos,
+estados e linguagem papel/tinta/grafite. Não redesenhar todas as telas
+dentro desta subetapa.
+
+Gate: base compartilhada explícita; componentes e tokens atuais
+auditados; divergências estruturais do shell resolvidas; telas
+posteriores podem convergir sem repetir estilos localmente.
+
+##### 7.2 — Entrada e organização global
+
+Ordem: 1. Home; 2. Biblioteca; 3. Nova iniciativa; 4. decisão sobre
+Modelos.
+
+Gate: entrada e retomada coerentes; organização de projetos definida;
+criação de iniciativa resolvida; Modelos explicitamente implementado ou
+adiado.
+
+##### 7.3 — Jornada guiada
+
+Ordem: 1. Agora; 2. Atividade guiada; 3. Jornada; 4. Documento; 5.
+Revisão e confirmação.
+
+Gate: usuário entende onde está; sabe a próxima ação; responde
+atividades; acompanha a jornada; consulta o artefato crescente; revisa e
+confirma decisões.
+
+##### 7.4 — Execução e controle
+
+Ordem: 1. Entregas; 2. Cockpit; 3. decisão sobre Detalhe de item; 4.
+Registros.
+
+Gate: trabalho real acompanhável; atenções e impedimentos claros;
+histórico compreensível; sem competir em profundidade com Jira ou
+Linear.
+
+##### 7.5 — Resultados e encerramento
+
+Ordem: 1. Resultados e benefícios; 2. Transição e adoção; 3. Encerramento
+e aprendizado.
+
+Antes de implementar, decidir se serão rotas próprias, seções de uma
+experiência final, extensões do Documento do projeto, ou composição de
+superfícies existentes.
+
+Gate: resultados e benefícios visíveis; transição e próximos passos
+claros; encerramento coerente e consultável.
+
+##### 7.6 — Complementos
+
+Inclui: Configurações do projeto; Exportar; estados vazios; erros
+relevantes; projeto concluído; largura reduzida.
+
+Gate: superfícies complementares coerentes; nenhuma configuração
+fictícia; estados principais tratados; exportação preservada.
+
+##### 7.7 — Revisão final
+
+Resultado: comparação integral AS-IS × TO-BE; correções de consistência;
+jornada ponta a ponta; aceite final da etapa.
+
+Gate: todas as telas com decisão explícita; telas do escopo imediato
+convergidas; telas adiadas justificadas; jornada principal funcional;
+referências e produto comparados; roadmap, PROJECT_STATUS e código
+coerentes.
+
+#### Fatias preparatórias já entregues
+
+Estas entregas ajudaram a etapa 7, mas não convergiram nenhuma tela
+completa segundo o critério acima:
+
+1. estado ativo da navegação;
+2. bloco "Onde estamos" em Agora;
+3. continuidade Mapa → Agora;
+4. orientação por projeto na Home.
+
+#### Roadmap como backlog
+
+Durante a etapa 7, este roadmap é também o backlog operacional. O
+`/hydra-next` deverá futuramente: localizar a subetapa atual; escolher a
+primeira tela não convergida da ordem; comparar somente sua imagem
+individual com a superfície atual; não procurar aleatoriamente outra
+microfatia fora da sequência; parar em caso de bloqueio ou divergência.
+Esta entrega não altera a skill.
 
 ## Horizonte posterior — Tailoring metodológico e modelos
 
