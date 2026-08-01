@@ -269,7 +269,7 @@ definida; próxima subetapa clara.
 
 Esta entrega conclui 7.0.
 
-##### 7.1 — Fundação visual e shell
+##### 7.1 — Fundação visual e shell — concluído
 
 Resultado: definir e aplicar base compartilhada de tipografia,
 espaçamento, largura, navegação, cabeçalhos, cards, botões, campos,
@@ -279,6 +279,15 @@ dentro desta subetapa.
 Gate: base compartilhada explícita; componentes e tokens atuais
 auditados; divergências estruturais do shell resolvidas; telas
 posteriores podem convergir sem repetir estilos localmente.
+
+Esta entrega conclui 7.1: tokens de cor, espaçamento, tipografia, raio e
+elevação definidos em `app.css`; shell do workspace (cabeçalho/navegação,
+compartilhado por toda tela de projeto) e cabeçalho da Home usando essa
+fundação; `UX_DESIGN_SPEC.md` reconciliado com a paleta papel/tinta/
+grafite. Padrão visual de campo de formulário e de superfície agrupadora
+(card) ficam para quando as telas que os usam forem convergidas em 7.2 e
+seguintes, por decisão explícita de não manter 7.1 aberta por
+refinamentos tratáveis durante a convergência das telas.
 
 ##### 7.2 — Entrada e organização global
 

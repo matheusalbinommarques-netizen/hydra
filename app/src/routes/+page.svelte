@@ -91,14 +91,14 @@
 	.actions {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
-		margin-top: 2rem;
+		gap: var(--space-5);
+		margin-top: var(--space-6);
 	}
 
 	.actions form {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: var(--space-3);
 	}
 
 	label {
@@ -126,9 +126,9 @@
 		background: transparent;
 		color: var(--hydra-text);
 		border: 1px solid var(--hydra-border);
-		border-radius: 8px;
-		padding: 0.55rem 1rem;
-		margin-right: 0.75rem;
+		border-radius: var(--hydra-radius);
+		padding: var(--space-2) var(--space-4);
+		margin-right: var(--space-3);
 		cursor: pointer;
 	}
 
@@ -137,17 +137,17 @@
 	}
 
 	.projects {
-		margin-top: 2.5rem;
+		margin-top: var(--space-7);
 	}
 
 	.projects h2 {
-		font-size: 1rem;
-		margin: 0 0 0.75rem;
+		font-size: var(--font-size-subtitle);
+		margin: 0 0 var(--space-3);
 	}
 
 	.projects .empty {
 		color: var(--hydra-muted);
-		font-size: 0.9rem;
+		font-size: var(--font-size-meta);
 		margin: 0;
 	}
 
@@ -157,32 +157,32 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--space-2);
 	}
 
 	.projects li {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 1rem;
+		gap: var(--space-4);
 	}
 
 	.project-info {
 		display: flex;
 		align-items: baseline;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: var(--space-3);
 	}
 
 	.next-action {
 		margin: 0;
-		font-size: 0.85rem;
+		font-size: var(--font-size-meta);
 		color: var(--hydra-text);
 	}
 
 	.next-action-label {
 		color: var(--hydra-muted);
-		margin-right: 0.35rem;
+		margin-right: var(--space-1);
 	}
 
 	.continue-link {
@@ -201,16 +201,16 @@
 	}
 
 	.status-tag {
-		font-size: 0.75rem;
+		font-size: var(--font-size-caption);
 		font-weight: 600;
 		color: var(--hydra-muted);
 		border: 1px solid var(--hydra-border);
-		border-radius: 999px;
-		padding: 0.1rem 0.55rem;
+		border-radius: var(--hydra-radius-pill);
+		padding: var(--space-1) var(--space-3);
 	}
 
 	.created-at {
 		color: var(--hydra-muted);
-		font-size: 0.8rem;
+		font-size: var(--font-size-meta);
 	}
 </style>

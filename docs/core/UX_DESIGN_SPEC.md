@@ -205,15 +205,16 @@ O sistema não deve usar vermelho para qualquer pendência. Vermelho deve ser re
 
 ## 12. Cores
 
-A paleta final ainda não está aprovada.
+Paleta aprovada: papel/tinta/grafite (`app/src/app.css`).
 
-Direção inicial:
-
-- base escura ou neutra sofisticada;
-- acento inspirado na identidade Hydra;
-- cores de estado acessíveis;
-- contraste forte;
-- ausência de gradientes excessivos;
+- fundo e superfícies em tons neutros claros (papel), sem base escura;
+- texto principal em tinta escura sobre papel — sem cor de destaque
+  separada: ações primárias, links e foco usam a própria tinta;
+- vermelho de lápis (`--hydra-warning`) é o único ponto de cor fora do
+  neutro, reservado a conteúdo gerado/derivado pelo sistema (sugestões,
+  alertas, conflitos) — nunca a ações do usuário ou decoração;
+- contraste forte entre texto e papel;
+- ausência de gradientes, brilho, cromado ou efeitos metálicos;
 - não depender somente de verde e vermelho.
 
 Como o usuário possui daltonismo para alguns tons de verde claro/verde-água, estados importantes devem combinar:
@@ -238,9 +239,10 @@ A fonte final será definida posteriormente. Não depender de fonte paga.
 
 ## 14. Tema
 
-A direção inicial pode privilegiar tema escuro, coerente com a identidade já explorada para o Hydra, mas a escolha deverá ser validada pelas imagens de referência.
+Tema claro (papel), coerente com a paleta papel/tinta/grafite adotada.
 
-O design deve funcionar sem parecer uma interface de videogame.
+O design deve funcionar sem parecer uma interface de videogame, nem
+sci-fi, brilhante, cromada ou metálica.
 
 ## 15. Responsividade
 
@@ -368,19 +370,23 @@ Estados importantes devem combinar:
 
 ### Identidade visual
 
-- fundo navy;
-- texto prata ou branco;
-- ciano como acento;
-- ciano forte apenas em CTA, foco, etapa ativa e próxima ação;
-- superfícies predominantemente planas;
-- geometria angular discreta;
+- paleta papel/tinta/grafite (ver §12) — interface predominantemente
+  clara, sem base navy nem acento colorido próprio;
+- ações primárias, foco e etapa ativa usam a própria tinta sobre papel,
+  não uma cor de destaque separada;
+- superfícies predominantemente planas, com elevação sutil (sombra
+  discreta) só para diferenciar camadas do shell, não para efeito
+  decorativo;
 - iconografia linear consistente;
-- círculos reservados a nós de jornada.
+- ausência de geometria futurista, brilho, cromado, metálico ou
+  gradientes decorativos.
 
 ### Tipografia
 
-- Manrope para interface;
-- JetBrains Mono para metadados e informações técnicas;
+- Manrope como fonte operacional — interface, formulários, listas,
+  navegação, corpo e metadados;
+- Source Serif 4 reservada ao nome "Hydra" e a títulos de destaque de
+  página (`<h1>`), nunca à interface operacional;
 - textos secundários não devem comprometer a legibilidade.
 
 ### Regra de precedência

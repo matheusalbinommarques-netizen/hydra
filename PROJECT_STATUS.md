@@ -1,6 +1,6 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 31/07/2026
+**Data de referência:** 01/08/2026
 
 **Versão da baseline:** 0.4.0
 
@@ -74,11 +74,18 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   roadmap passou a ser também o backlog operacional desta etapa, com
   inventário de 18 telas-alvo, 16 imagens individuais aprovadas em
   `design/approved/screens/`, situação por tela e sequência 7.0–7.7 com
-  gates. Próxima subetapa: 7.1 — Fundação visual e shell. Quatro fatias
-  preparatórias seguem publicadas (estado ativo de navegação; bloco "Onde
-  estamos" em Agora; continuidade Mapa → Agora; orientação por projeto na
-  Home), mas nenhuma tela é declarada `convergida` apenas por elas — a
-  ordem operacional passa a ser conduzida pelo roadmap.
+  gates. Subetapa 7.1 (fundação visual e shell) concluída — tokens de
+  espaçamento, tipografia, raio e elevação definidos em `app.css` e
+  aplicados ao shell compartilhado do workspace (cabeçalho/navegação) e ao
+  cabeçalho da Home; `UX_DESIGN_SPEC.md` reconciliado com a paleta papel/
+  tinta/grafite (removida a direção anterior navy/ciano/tema escuro).
+  Padrão de campo de formulário e de card ficam para as telas que os
+  usarem, em 7.2+. Próxima subetapa: 7.2 — Entrada e organização global.
+  Quatro fatias preparatórias seguem publicadas (estado ativo de
+  navegação; bloco "Onde estamos" em Agora; continuidade Mapa → Agora;
+  orientação por projeto na Home), mas nenhuma tela é declarada
+  `convergida` apenas por elas — a ordem operacional passa a ser conduzida
+  pelo roadmap.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -115,9 +122,10 @@ As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
 espinha mecânica do produto — estão concluídas. A etapa 7,
 "Convergência da experiência e das telas", está em andamento, agora com
 backlog operacional próprio no roadmap (inventário de telas, situação,
-sequência 7.0–7.7 e gates). A subetapa 7.0 está concluída; a próxima é
-7.1 — Fundação visual e shell, sem reabrir desnecessariamente o domínio
-nem substituir mecânicas funcionais.
+sequência 7.0–7.7 e gates). As subetapas 7.0 e 7.1 estão concluídas; a
+próxima é 7.2 — Entrada e organização global (ordem: Home; Biblioteca de
+projetos; Nova iniciativa; decisão sobre Modelos), sem reabrir
+desnecessariamente o domínio nem substituir mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

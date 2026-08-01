@@ -130,7 +130,15 @@
   integralmente o estado já carregado por `listRecentProjects()` para
   `projectStatus` e a mesma fonte route-aware de próxima atividade usada
   em `/now` e `/map` (`computeSnapshot(...).nextActivity`, D023); nenhuma
-  consulta nova, nenhuma regra de progresso nova.
+  consulta nova, nenhuma regra de progresso nova;
+- fundação visual compartilhada do shell (subetapa 7.1 do roadmap,
+  "Convergência da experiência e das telas"): tokens de espaçamento,
+  tipografia, raio e elevação definidos em `app.css` e aplicados ao
+  cabeçalho/navegação do workspace (presente em toda tela de projeto) e ao
+  cabeçalho da Home; o cabeçalho do workspace passa a ter elevação real
+  (superfície clara com sombra sutil), antes idêntico visualmente ao fundo
+  da página; nenhuma tela teve conteúdo, estrutura ou mecânica alterada —
+  só valores de espaçamento/tipografia/cor normalizados.
 
 ### Reconciliado
 
@@ -165,7 +173,13 @@
   situação e decisão, além da sequência 7.0–7.7 com gates; as quatro
   microfatias já publicadas nesta etapa foram reclassificadas como
   preparatórias, sem que nenhuma tela seja considerada convergida por
-  causa delas; nenhuma mudança funcional foi realizada nesta entrega.
+  causa delas; nenhuma mudança funcional foi realizada nesta entrega;
+- `docs/core/UX_DESIGN_SPEC.md` reconciliado com a identidade papel/tinta/
+  grafite já em produção: removidas as referências à direção visual
+  anterior (fundo navy, acento ciano, tema escuro, JetBrains Mono),
+  substituídas pela paleta e tipografia (Manrope operacional, serifada
+  reservada a identidade/título) já implementadas em `app.css`; navegação,
+  hierarquia funcional e demais seções do documento não foram alteradas.
 
 ## [0.4.0] — 25/07/2026
 

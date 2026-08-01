@@ -92,19 +92,20 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 1rem 1.5rem;
+		padding: var(--space-4) var(--space-5);
 		border-bottom: 1px solid var(--hydra-border);
-		background: var(--hydra-surface);
+		background: var(--hydra-surface-raised);
+		box-shadow: var(--hydra-shadow-raised);
 	}
 
 	.identity {
 		display: flex;
 		align-items: center;
-		gap: 0.85rem;
+		gap: var(--space-3);
 	}
 
 	.projects-link {
-		font-size: 0.85rem;
+		font-size: var(--font-size-meta);
 		font-weight: 600;
 		color: var(--hydra-muted);
 		text-decoration: none;
@@ -132,33 +133,33 @@
 	.eyebrow {
 		margin: 0;
 		font-weight: 700;
-		font-size: 1.1rem;
+		font-size: var(--font-size-subtitle);
 	}
 
 	.status {
-		margin: 0.15rem 0 0;
-		font-size: 0.85rem;
+		margin: var(--space-1) 0 0;
+		font-size: var(--font-size-meta);
 		color: var(--hydra-muted);
 	}
 
 	nav {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: var(--space-4);
 	}
 
 	/* Destaque: os dois modos de trabalho (Agora/Cockpit) — estilo de aba,
 	   mais peso visual, com o ativo marcado por fundo + sublinhado forte. */
 	.nav-primary {
 		display: flex;
-		gap: 0.25rem;
+		gap: var(--space-1);
 	}
 
 	.nav-primary a {
 		font-weight: 700;
 		text-decoration: none;
-		padding: 0.4rem 0.9rem;
-		border-radius: 8px 8px 0 0;
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--hydra-radius) var(--hydra-radius) 0 0;
 		border-bottom: 2px solid transparent;
 		color: var(--hydra-muted);
 	}
@@ -184,11 +185,11 @@
 	   deliberadamente mais discreto, sem competir com Agora/Cockpit. */
 	.nav-secondary {
 		display: flex;
-		gap: 0.9rem;
+		gap: var(--space-3);
 	}
 
 	.nav-secondary a {
-		font-size: 0.8rem;
+		font-size: var(--font-size-caption);
 		font-weight: 500;
 		color: var(--hydra-muted);
 		text-decoration: none;

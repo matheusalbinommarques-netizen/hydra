@@ -9,14 +9,42 @@
    ações do usuário ou decoração. */
 
 :root {
+	/* Cores semânticas — papel/tinta/grafite. --hydra-surface-raised é
+	   sempre cor: elevação (sombra) e forma (raio) têm tokens próprios,
+	   nunca embutidos numa variável de cor. */
 	--hydra-bg: #e8e9e3;
 	--hydra-surface: #f8f8f8;
-	--hydra-surface-raised: #f8f8f8;
+	--hydra-surface-raised: #ffffff;
 	--hydra-border: #65686c;
 	--hydra-text: #151918;
 	--hydra-muted: #65686c;
 	--hydra-accent: #151918;
 	--hydra-warning: #8b3227;
+
+	/* Espaçamento — escala curta reaproveitando os valores já em uso no
+	   shell, para parar de repetir rem soltos por arquivo. */
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+	--space-7: 2.5rem;
+
+	/* Tipografia — escala compartilhada de título a texto auxiliar.
+	   Sans-serif (Manrope, via body) continua sendo a fonte operacional;
+	   serifada é só para --font-title (ver regra de h1 abaixo). */
+	--font-size-title: 1.75rem;
+	--font-size-section: 1.25rem;
+	--font-size-subtitle: 1rem;
+	--font-size-body: 1rem;
+	--font-size-meta: 0.85rem;
+	--font-size-caption: 0.75rem;
+
+	/* Geometria e elevação — separadas da cor de superfície. */
+	--hydra-radius: 8px;
+	--hydra-radius-pill: 999px;
+	--hydra-shadow-raised: 0 1px 2px rgba(21, 25, 24, 0.08);
 }
 
 * {
@@ -32,6 +60,7 @@ body {
 		system-ui,
 		-apple-system,
 		sans-serif;
+	font-size: var(--font-size-body);
 	line-height: 1.5;
 }
 
@@ -45,6 +74,33 @@ h1 {
 		'Source Serif 4',
 		Georgia,
 		serif;
+	font-size: var(--font-size-title);
+	margin: 0 0 var(--space-4);
+}
+
+/* h2/h3 seguem a mesma lógica: uma regra base aqui cobre título de seção
+   e subtítulo em toda tela; telas com necessidade própria continuam livres
+   para sobrepor com um seletor mais específico, como já faziam. */
+h2 {
+	font-size: var(--font-size-section);
+	margin: 0 0 var(--space-3);
+}
+
+h3 {
+	font-size: var(--font-size-subtitle);
+	margin: 0 0 var(--space-2);
+}
+
+/* Texto secundário e auxiliar — reaproveitado por metadados (datas,
+   status, rótulos discretos) e por texto de apoio menor (badges, legendas). */
+.meta {
+	font-size: var(--font-size-meta);
+	color: var(--hydra-muted);
+}
+
+.caption {
+	font-size: var(--font-size-caption);
+	color: var(--hydra-muted);
 }
 
 a {
@@ -62,8 +118,8 @@ button,
 	background: var(--hydra-accent);
 	color: #f8f8f8;
 	border: none;
-	border-radius: 8px;
-	padding: 0.7rem 1.4rem;
+	border-radius: var(--hydra-radius);
+	padding: var(--space-3) var(--space-5);
 	cursor: pointer;
 }
 
@@ -82,7 +138,7 @@ a:focus-visible {
 .container {
 	max-width: 960px;
 	margin: 0 auto;
-	padding: 2rem 1.5rem;
+	padding: var(--space-6) var(--space-5);
 }
 
 [role='alert'] {
