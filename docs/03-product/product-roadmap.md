@@ -145,7 +145,21 @@ resulta em `concluído`; evidências consultáveis em `/records`, estado das
 atividades consultável em `/map`, mensagem final de conclusão em `/now`.
 Nenhuma mudança de código foi necessária.
 
-### 7. Tailoring metodológico e modelos (próxima etapa)
+### 7. Convergência da experiência e das telas (próxima etapa)
+
+Resultado:
+
+- integrar as superfícies mecânicas já entregues;
+- aproximar progressivamente as telas das referências aprovadas;
+- melhorar hierarquia, navegação, continuidade da jornada e clareza da
+  próxima ação;
+- preservar as regras e fontes de verdade existentes;
+- executar a convergência em fatias pequenas por superfície ou jornada;
+- não exigir reprodução pixel-perfect dos mockups;
+- não usar essa etapa para criar novas capacidades de domínio sem uma
+  necessidade funcional concreta.
+
+## Horizonte posterior — Tailoring metodológico e modelos
 
 Resultado: ativar profundidade e artefatos proporcionais a cada projeto.
 

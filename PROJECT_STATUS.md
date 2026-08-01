@@ -101,10 +101,18 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-Etapa 6 do roadmap ("Resultados, adaptação e encerramento",
-`docs/03-product/product-roadmap.md`) está concluída por reconciliação
-documental. Próxima etapa da sequência: etapa 7, "Tailoring metodológico
-e modelos" — escopo e menor fatia funcional ainda não definidos.
+As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
+espinha mecânica do produto — estão concluídas. A etapa 7 passa a ser
+"Convergência da experiência e das telas": integrar as superfícies
+mecânicas já entregues e aproximar progressivamente as telas das
+referências aprovadas em `design/approved/`, sem reabrir
+desnecessariamente o domínio nem substituir mecânicas funcionais. Seu
+escopo e sua menor fatia funcional ainda não estão definidos.
+
+"Tailoring metodológico e modelos" deixa de ser tratado como próxima
+etapa imediata e passa a constar no roadmap como horizonte posterior,
+dependente de sinais de contexto, aplicabilidade e profundidade ainda não
+especificados.
 
 ## Não fazer agora
 

@@ -119,7 +119,14 @@
   consultável em `/map`; essa capacidade já estava presente no código,
   incluindo o suporte introduzido em `41617f3`; nenhuma mudança funcional
   foi necessária nesta entrega — só reconciliação documental de
-  roadmap/`PROJECT_STATUS.md`.
+  roadmap/`PROJECT_STATUS.md`;
+- removida a contradição do roadmap que apresentava "Tailoring
+  metodológico e modelos" como próxima etapa apesar de classificá-lo, no
+  próprio texto, como horizonte de longo prazo; a sequência imediata
+  passa para "Convergência da experiência e das telas" (etapa 7); o
+  antigo conteúdo de Tailoring foi movido para uma seção de horizonte
+  posterior, fora da sequência numerada; nenhuma mudança funcional foi
+  realizada.
 
 ## [0.4.0] — 25/07/2026
 
