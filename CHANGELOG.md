@@ -212,7 +212,23 @@
   continua integrada à própria tela Agora, sem rota separada de execução;
   aprovada funcional e visualmente por Matheus contra o artefato
   individual do Claude Design — tela marcada `convergida` no inventário
-  da etapa 7.
+  da etapa 7;
+- Mapa (`/projects/[projectId]/map`) passa a apresentar a Jornada do
+  projeto como conteúdo principal, a partir do artefato aprovado no
+  Claude Design ("Jornada — Hydra"): fases numeradas pela posição real do
+  catálogo, com a fase e a atividade atuais destacadas visualmente;
+  atividades apresentadas só pelos quatro estados reais — Concluída,
+  Atual, Pendente e Pulada — com legenda própria; um único acesso
+  "Continuar em Agora" para retomar o trabalho; Diagnóstico da rota e
+  "Onde este projeto realmente começa?" continuam disponíveis, agora
+  agrupados em "Diagnóstico e ponto de partida", uma área recolhível que
+  inicia fechada, sem qualquer alteração nos formulários, submissões ou
+  mensagens existentes; composição responsiva em desktop (colunas para
+  jornada e legenda) e mobile (uma coluna, sem rolagem horizontal);
+  nenhuma rota nova foi criada, nenhum status novo foi introduzido, e
+  nenhuma regra de domínio ou persistência foi alterada — a execução das
+  atividades continua acontecendo em Agora; tela marcada `convergida` no
+  inventário da etapa 7.
 
 ### Reconciliado
 

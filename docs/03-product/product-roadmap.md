@@ -229,7 +229,7 @@ critério de convergência.
 | 7.2 | 4. Modelos de jornada | `design/approved/screens/04-modelos-de-jornada.png` | inexistente | adiada | horizonte posterior de Tailoring metodológico |
 | 7.3 | 5. Agora | `design/approved/screens/06-agora.png` | `/projects/[projectId]/now` | convergida | painel "Progresso da fase" (contagem de resolvidas, agrupamento concluídas/atual/pendentes/puladas) reaproveitando `buildPhaseActivities`/`buildPhaseProgress`, compartilhados com o Mapa; layout de duas colunas passa a valer em todas as fases (Bancada some do lado abaixo, só quando aplicável); navegação mobile do shell (menu com os 8 destinos) resolvida como parte desta entrega, por afetar todas as rotas; aprovada funcional e visualmente por Matheus |
 | 7.3 | 6. Atividade guiada | `design/approved/screens/07-atividade-guiada.png` | estado da rota `/now` | combinada com outra superfície | Combinada com Agora: a atividade atual permanece apresentada e respondida em `/projects/[projectId]/now`, com pergunta, explicação, exemplo, campos, salvamento e opção de pular, sem rota própria. |
-| 7.3 | 7. Jornada | `design/approved/screens/08-jornada.png` | `/projects/[projectId]/map` | em convergência | — |
+| 7.3 | 7. Jornada | `design/approved/screens/08-jornada.png` | `/projects/[projectId]/map` | convergida | implementada a partir do componente final aprovado no Claude Design ("Jornada — Hydra"); a Jornada passa a ser o conteúdo dominante de `/map` (rota e destino do shell continuam chamados Mapa); fases numeradas pela posição real do catálogo, fase e atividade atuais com destaque visual; atividades usam só os quatro estados reais (Concluída/Atual/Pendente/Pulada), com legenda coerente; único CTA "Continuar em Agora"; Diagnóstico da rota e "Onde este projeto começa" preservados dentro do bloco recolhível "Diagnóstico e ponto de partida" (inicia fechado, sem alterar formulários, ações ou mensagens); nenhuma mecânica, estado ou regra de domínio alterada; aprovada em desktop e mobile |
 | 7.3 | 8. Documento do projeto | ausente na montagem; usar montagem geral e visão aprovada do produto | `/projects/[projectId]/document` | não auditada | convergir sem inventar uma imagem inexistente |
 | 7.3 | 9. Revisão e confirmação | `design/approved/screens/10-revisao-e-confirmacao.png` | `/projects/[projectId]/summary` | não auditada | — |
 | 7.4 | 10. Entregas | `design/approved/screens/11-entregas.png` | `/projects/[projectId]/deliveries` | não auditada | — |
@@ -311,6 +311,14 @@ Revisão e confirmação.
 Gate: usuário entende onde está; sabe a próxima ação; responde
 atividades; acompanha a jornada; consulta o artefato crescente; revisa e
 confirma decisões.
+
+Em andamento. Agora `convergida`; Atividade guiada `combinada com outra
+superfície` (Agora), sem rota própria de execução; Jornada `convergida`
+— `/projects/[projectId]/map` passa a apresentar a Jornada do artefato
+aprovado como conteúdo dominante, preservando integralmente Diagnóstico
+da rota e ponto de partida (agora recolhidos) e a mecânica de
+fases/atividades já existente. Próximo alvo da subetapa: Documento do
+projeto.
 
 ##### 7.4 — Execução e controle
 

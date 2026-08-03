@@ -115,11 +115,22 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `/projects/[projectId]/now` (pergunta, explicação, exemplo, campos,
   salvamento e opção de pular), sem rota própria de execução; a
   combinação preserva integralmente a mecânica funcional já existente.
-  Próximo alvo da subetapa: Jornada. Quatro fatias preparatórias seguem
+  Jornada está `convergida` — a rota `/projects/[projectId]/map` (o
+  destino "Mapa" no shell continua com esse nome) passa a apresentar a
+  Jornada do artefato aprovado no Claude Design como conteúdo principal:
+  fases numeradas pela posição real do catálogo, fase e atividade atuais
+  com destaque visual, atividades restritas aos quatro estados reais
+  (Concluída/Atual/Pendente/Pulada) com legenda coerente, um único CTA
+  "Continuar em Agora", e Diagnóstico da rota/seleção de ponto de partida
+  preservados sem alteração de mecânica dentro do bloco recolhível
+  "Diagnóstico e ponto de partida" (inicia fechado); execução das
+  atividades continua em Agora; nenhuma mecânica, estado ou regra de
+  domínio foi alterada; aprovada em desktop e mobile. Próximo alvo da
+  subetapa: Documento do projeto. Quatro fatias preparatórias seguem
   publicadas (estado ativo de navegação; bloco "Onde estamos" em Agora;
   continuidade Mapa → Agora; orientação por projeto na Home), mas nenhuma
-  tela além de Agora é declarada `convergida` apenas por elas — a ordem
-  operacional continua conduzida pelo roadmap.
+  tela além de Agora e Jornada é declarada `convergida` apenas por elas —
+  a ordem operacional continua conduzida pelo roadmap.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -158,10 +169,11 @@ espinha mecânica do produto — estão concluídas. A etapa 7,
 backlog operacional próprio no roadmap (inventário de telas, situação,
 sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1 e 7.2 estão concluídas;
 a subetapa 7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada;
-Documento; Revisão e confirmação) está em andamento, com Agora já
-`convergida` e Atividade guiada `combinada com Agora` (sem rota própria de
-execução); o próximo alvo da subetapa é Jornada, sem reabrir
-desnecessariamente o domínio nem substituir mecânicas funcionais.
+Documento; Revisão e confirmação) está em andamento, com Agora e Jornada
+já `convergidas` e Atividade guiada `combinada com Agora` (sem rota
+própria de execução); o próximo alvo da subetapa é Documento do projeto,
+sem reabrir desnecessariamente o domínio nem substituir mecânicas
+funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
