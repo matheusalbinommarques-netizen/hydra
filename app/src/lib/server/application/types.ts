@@ -187,6 +187,16 @@ export interface SetRouteStartPhaseInput {
 	phaseId: string | null;
 }
 
+// Nova iniciativa (`/projects/new`, etapa 7.2 do roadmap) — criação atômica:
+// nome e fase inicial são aplicados ao estado em memória antes do único
+// `repository.insert()` (ver project-use-cases.ts), nunca em gravações
+// separadas. Reaproveita as mesmas transições/validações de renameProject e
+// setRouteStartPhase — nenhuma regra nova.
+export interface CreateConfiguredProjectInput {
+	name?: string | null;
+	routeStartPhaseId: string;
+}
+
 export interface AddScopeItemInput {
 	projectId: string;
 	text: string;
@@ -267,6 +277,7 @@ export interface ReopenImpedimentInput {
 
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
+	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
 	listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>>;
 	loadProjectView(projectId: string): Promise<UseCaseOutcome<ProjectView>>;
 	renameProject(input: RenameProjectInput): Promise<UseCaseOutcome<ProjectView>>;

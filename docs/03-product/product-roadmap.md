@@ -225,7 +225,7 @@ critério de convergência.
 | --- | --- | --- | --- | --- | --- |
 | 7.2 | 1. Home — Seus projetos | `design/approved/screens/01-home-seus-projetos.png` | `/` | convergida | aprovada visualmente (desktop e mobile) contra o artefato individual do Claude Design; sem usuário/avatar, Configurações, progresso, data de atualização ou painel de tipos fictícios (diferenças intencionais aprovadas) |
 | 7.2 | 2. Biblioteca de projetos | `design/approved/screens/02-biblioteca-de-projetos.png` | `/projects` | convergida | implementada como rota própria (busca, filtro por estado com contagem, lista completa); continuidade resolvida por navegação global explícita: símbolo/wordmark Hydra → Home (`/`), item "Projetos" → Biblioteca (`/projects`), `← Projetos` do workspace → Biblioteca |
-| 7.2 | 3. Nova iniciativa | `design/approved/screens/03-nova-iniciativa.png` | criação embutida na Home | não auditada | decidir se permanece composta ou vira superfície própria |
+| 7.2 | 3. Nova iniciativa | `design/approved/screens/03-nova-iniciativa.png` | `/projects/new` | convergida | virou superfície própria: wizard de 4 passos (ponto de partida, rota recomendada, nome provisório, revisão) reaproveitando o diagnóstico assistido e `routeStartPhaseId` já existentes; criação atômica via `createConfiguredProject`; tipos de iniciativa do mockup ficam fora do Release 0 (sem efeito ou persistência real); aprovada visualmente por Matheus (desktop e ~390px) contra o artefato individual do Claude Design |
 | 7.2 | 4. Modelos de jornada | `design/approved/screens/04-modelos-de-jornada.png` | inexistente | adiada | horizonte posterior de Tailoring metodológico |
 | 7.3 | 5. Agora | `design/approved/screens/06-agora.png` | `/projects/[projectId]/now` | em convergência | — |
 | 7.3 | 6. Atividade guiada | `design/approved/screens/07-atividade-guiada.png` | estado da rota `/now` | em convergência | preservar rota compartilhada, salvo necessidade concreta |
@@ -289,7 +289,7 @@ grafite. Padrão visual de campo de formulário e de superfície agrupadora
 seguintes, por decisão explícita de não manter 7.1 aberta por
 refinamentos tratáveis durante a convergência das telas.
 
-##### 7.2 — Entrada e organização global
+##### 7.2 — Entrada e organização global — concluído
 
 Ordem: 1. Home; 2. Biblioteca; 3. Nova iniciativa; 4. decisão sobre
 Modelos.
@@ -297,6 +297,11 @@ Modelos.
 Gate: entrada e retomada coerentes; organização de projetos definida;
 criação de iniciativa resolvida; Modelos explicitamente implementado ou
 adiado.
+
+Gate atendido: Home e Biblioteca de projetos `convergida`; Nova
+iniciativa `convergida` como superfície própria (`/projects/new`); Modelos
+de jornada `adiada` para o horizonte posterior de Tailoring metodológico.
+As quatro telas do bloco 7.2 têm decisão explícita — subetapa concluída.
 
 ##### 7.3 — Jornada guiada
 

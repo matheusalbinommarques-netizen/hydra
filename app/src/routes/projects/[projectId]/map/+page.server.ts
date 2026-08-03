@@ -4,7 +4,7 @@ import { computeRouteStartRecommendation } from '$lib/orientation-engine';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
 import { buildMapView } from './map-view';
-import { ROUTE_DIAGNOSTIC_FALLBACK, ROUTE_DIAGNOSTIC_QUESTIONS } from './route-diagnostic-questions';
+import { ROUTE_DIAGNOSTIC_FALLBACK, ROUTE_DIAGNOSTIC_QUESTIONS } from '$lib/route-diagnostic-questions';
 import type { Actions, PageServerLoad } from './$types';
 
 function parseDiagnosticAnswer(raw: FormDataEntryValue | null): boolean | null {

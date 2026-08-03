@@ -35,6 +35,8 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Impedimento não encontrado.';
 		case 'impediment_id_already_exists':
 			return 'Já existe um impedimento com este identificador.';
+		case 'phase_not_found':
+			return 'A fase escolhida não existe mais no catálogo.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

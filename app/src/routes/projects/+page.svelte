@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { projectStatusLabel } from '$lib/project-status-label';
 	import type { ProjectListItem } from '$lib/server/application/types';
 	import type { ProjectStatus } from '$lib/orientation-engine';
 
-	let { data, form } = $props();
+	let { data } = $props();
 
 	const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -79,16 +78,10 @@
 			<span class="identity-divider" aria-hidden="true"></span>
 			<a class="eyebrow" href="/projects" aria-current="page">Projetos</a>
 		</div>
-		<form method="POST" action="?/create" use:enhance>
-			<button type="submit" class="cta-accent">Criar nova iniciativa</button>
-		</form>
+		<a class="cta-accent" href="/projects/new">Criar nova iniciativa</a>
 	</header>
 
 	<main class="library-main">
-		{#if form?.message}
-			<p role="alert">{form.message}</p>
-		{/if}
-
 		<div class="page-heading">
 			<h1>Biblioteca de projetos</h1>
 			<p class="subtitle">Encontre qualquer projeto em um só lugar.</p>
@@ -261,6 +254,8 @@
 	}
 
 	.cta-accent {
+		display: inline-flex;
+		align-items: center;
 		background: var(--lp-accent);
 		color: var(--lp-surface);
 		border: none;
@@ -268,6 +263,7 @@
 		padding: 0.5625rem 1.125rem;
 		font-size: 0.84375rem;
 		font-weight: 600;
+		text-decoration: none;
 		cursor: pointer;
 		font-family: inherit;
 	}
@@ -572,11 +568,6 @@
 
 	.link-button:hover {
 		color: var(--lp-accent-hover);
-	}
-
-	[role='alert'] {
-		margin-bottom: 1rem;
-		color: var(--lp-accent);
 	}
 
 	@media (max-width: 860px) {

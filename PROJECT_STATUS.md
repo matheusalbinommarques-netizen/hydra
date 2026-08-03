@@ -80,9 +80,8 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   cabeçalho da Home; `UX_DESIGN_SPEC.md` reconciliado com a paleta papel/
   tinta/grafite (removida a direção anterior navy/ciano/tema escuro).
   Padrão de campo de formulário e de card ficam para as telas que os
-  usarem, em 7.2+. Subetapa atual: 7.2 — Entrada e organização global,
-  ordem Home → Biblioteca de projetos → Nova iniciativa → decisão sobre
-  Modelos. Home (`/`) está `convergida` — aprovada visualmente por
+  usarem, em 7.2+. Subetapa 7.2 — Entrada e organização global —
+  concluída. Home (`/`) está `convergida` — aprovada visualmente por
   Matheus (desktop e mobile) contra o artefato individual do Claude
   Design ("Home Seus Projetos"); a seção antes "Todos os projetos" agora
   lista só os cinco mais recentes, com link "Ver todos os projetos" para
@@ -90,12 +89,23 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   busca, filtro por estado com contagem, lista completa reaproveitando
   `listRecentProjects()`, com navegação global explícita entre as três
   superfícies: símbolo/wordmark Hydra → Home, item "Projetos" → Biblioteca,
-  `← Projetos` do workspace → Biblioteca. Próximo alvo de 7.2: Nova
-  iniciativa. Quatro fatias preparatórias seguem publicadas
-  (estado ativo de navegação; bloco "Onde estamos" em Agora; continuidade
-  Mapa → Agora; orientação por projeto na Home), mas nenhuma tela é declarada
-  `convergida` apenas por elas — a ordem operacional passa a ser conduzida
-  pelo roadmap.
+  `← Projetos` do workspace → Biblioteca. Nova iniciativa (`/projects/new`)
+  está `convergida` — virou superfície própria: wizard de 4 passos (ponto
+  de partida, rota recomendada, nome provisório, revisão) reaproveitando o
+  diagnóstico assistido e `routeStartPhaseId` já existentes (D023/D024);
+  criação passa a ser atômica via `createConfiguredProject` (nome e fase
+  inicial aplicados ao estado em memória antes de um único insert); Home e
+  Biblioteca passam a abrir `/projects/new` em vez de criar o projeto
+  imediatamente; tipos de iniciativa do mockup ficam fora do Release 0;
+  aprovada visualmente por Matheus (desktop e ~390px). Modelos de jornada
+  segue `adiada` (horizonte posterior de Tailoring metodológico) — com as
+  quatro telas do bloco 7.2 decididas, a subetapa está concluída. Próxima
+  subetapa: 7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada;
+  Documento; Revisão e confirmação). Quatro fatias preparatórias seguem
+  publicadas (estado ativo de navegação; bloco "Onde estamos" em Agora;
+  continuidade Mapa → Agora; orientação por projeto na Home), mas nenhuma
+  tela é declarada `convergida` apenas por elas — a ordem operacional
+  passa a ser conduzida pelo roadmap.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -132,10 +142,10 @@ As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
 espinha mecânica do produto — estão concluídas. A etapa 7,
 "Convergência da experiência e das telas", está em andamento, agora com
 backlog operacional próprio no roadmap (inventário de telas, situação,
-sequência 7.0–7.7 e gates). As subetapas 7.0 e 7.1 estão concluídas; a
-próxima é 7.2 — Entrada e organização global (ordem: Home; Biblioteca de
-projetos; Nova iniciativa; decisão sobre Modelos), sem reabrir
-desnecessariamente o domínio nem substituir mecânicas funcionais.
+sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1 e 7.2 estão concluídas;
+a próxima é 7.3 — Jornada guiada (ordem: Agora; Atividade guiada;
+Jornada; Documento; Revisão e confirmação), sem reabrir desnecessariamente
+o domínio nem substituir mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

@@ -12,14 +12,6 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	create: async () => {
-		const result = await getProjectUseCases().createProject();
-		if (!result.ok) {
-			return fail(500, { message: mapUseCaseError(result.error) });
-		}
-		redirect(303, `/projects/${result.value.projectId}/now`);
-	},
-
 	import: async ({ request }) => {
 		const formData = await request.formData();
 		const file = formData.get('file');

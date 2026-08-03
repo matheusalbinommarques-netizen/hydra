@@ -47,9 +47,7 @@
 			<span class="identity-divider" aria-hidden="true"></span>
 			<a class="eyebrow" href="/projects">Projetos</a>
 		</div>
-		<form method="POST" action="?/create" use:enhance>
-			<button type="submit" class="cta-accent">Criar nova iniciativa</button>
-		</form>
+		<a class="cta-accent" href="/projects/new">Criar nova iniciativa</a>
 	</header>
 
 	<main class="home-main">
@@ -74,9 +72,7 @@
 						<h2>Nenhum projeto ainda</h2>
 						<p>Crie sua primeira iniciativa ou importe um projeto existente para começar.</p>
 					</div>
-					<form method="POST" action="?/create" use:enhance>
-						<button type="submit" class="button">Criar nova iniciativa</button>
-					</form>
+					<a class="button" href="/projects/new">Criar nova iniciativa</a>
 				</section>
 
 				<aside class="sidebar">
@@ -300,6 +296,8 @@
 	}
 
 	.cta-accent {
+		display: inline-flex;
+		align-items: center;
 		background: var(--hp-accent);
 		color: var(--hp-surface);
 		border: none;
@@ -307,6 +305,7 @@
 		padding: 0.5625rem 1.125rem;
 		font-size: 0.84375rem;
 		font-weight: 600;
+		text-decoration: none;
 		cursor: pointer;
 		font-family: inherit;
 	}

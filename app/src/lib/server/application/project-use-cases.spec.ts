@@ -88,6 +88,100 @@ describe('createProjectUseCases — createProject', () => {
 	});
 });
 
+describe('createProjectUseCases — createConfiguredProject', () => {
+	it('executa um único insert, sem save (criação atômica)', async () => {
+		const inner = memoryRepo();
+		const { repository, counts } = countingRepository(inner);
+		const useCases = createProjectUseCases({
+			repository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		const result = await useCases.createConfiguredProject({ name: 'Portal', routeStartPhaseId: 'planejamento' });
+		expect(result.ok).toBe(true);
+		expect(counts.insert).toBe(1);
+		expect(counts.save).toBe(0);
+	});
+
+	it('aplica o nome informado antes do insert', async () => {
+		const { useCases, repo } = setup();
+		const result = await useCases.createConfiguredProject({
+			name: 'Consolidação diária',
+			routeStartPhaseId: 'descoberta'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.projectName).toBe('Consolidação diária');
+		const stored = await repo.findById(result.value.projectId);
+		expect(stored?.project.name).toBe('Consolidação diária');
+	});
+
+	it('nome vazio mantém o comportamento atual (projeto sem nome, null)', async () => {
+		const { useCases, repo } = setup();
+		const result = await useCases.createConfiguredProject({ name: '', routeStartPhaseId: 'descoberta' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.projectName).toBeNull();
+		const stored = await repo.findById(result.value.projectId);
+		expect(stored?.project.name).toBeNull();
+	});
+
+	it('aplica uma fase inicial válida antes do insert', async () => {
+		const { useCases, repo } = setup();
+		const result = await useCases.createConfiguredProject({ name: null, routeStartPhaseId: 'planejamento' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.routeStartPhaseId).toBe('planejamento');
+		const stored = await repo.findById(result.value.projectId);
+		expect(stored?.project.routeStartPhaseId).toBe('planejamento');
+	});
+
+	// routeStartPhaseId é obrigatório no tipo (CreateConfiguredProjectInput);
+	// este teste simula um chamador que viola o contrato em runtime (ex.: um
+	// formulário sem fase selecionada chegando direto ao caso de uso, sem
+	// passar pela validação de +page.server.ts) — confirma que o domínio
+	// continua sendo a última linha de defesa, sem insert nem save.
+	it('fase ausente é rejeitada antes de qualquer insert ou save', async () => {
+		const inner = memoryRepo();
+		const { repository, counts } = countingRepository(inner);
+		const useCases = createProjectUseCases({
+			repository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		const result = await useCases.createConfiguredProject({
+			name: 'Portal',
+			routeStartPhaseId: '' as unknown as string
+		});
+		expect(result).toEqual({ ok: false, error: { kind: 'phase_not_found' } });
+		expect(counts.insert).toBe(0);
+		expect(counts.save).toBe(0);
+	});
+
+	it('fase inválida é rejeitada antes de qualquer insert ou save', async () => {
+		const inner = memoryRepo();
+		const { repository, counts } = countingRepository(inner);
+		const useCases = createProjectUseCases({
+			repository,
+			catalog,
+			clock: fakeClock('2026-01-01T00:00:00.000Z'),
+			idGenerator: fakeIdGenerator('id')
+		});
+
+		const result = await useCases.createConfiguredProject({ name: 'Portal', routeStartPhaseId: 'fase-inexistente' });
+		expect(result).toEqual({ ok: false, error: { kind: 'phase_not_found' } });
+		expect(counts.insert).toBe(0);
+		expect(counts.save).toBe(0);
+	});
+});
+
 describe('createProjectUseCases — loadProjectView', () => {
 	it('retorna o mesmo projeto após fechar e reabrir o banco', async () => {
 		const filePath = tempFilePath();

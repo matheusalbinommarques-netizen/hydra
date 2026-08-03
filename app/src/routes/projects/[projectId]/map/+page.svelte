@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import type { ActivityStatus } from '$lib/domain';
 	import type { PhaseStatus } from '$lib/orientation-engine';
-	import { ROUTE_DIAGNOSTIC_QUESTIONS } from './route-diagnostic-questions';
+	import { ROUTE_DIAGNOSTIC_QUESTIONS } from '$lib/route-diagnostic-questions';
 
 	let { data, form } = $props();
 	let projectId = $derived(page.params.projectId);

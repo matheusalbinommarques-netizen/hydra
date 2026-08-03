@@ -106,7 +106,19 @@
   para a Home em toda tela, o item "Projetos" do cabeçalho leva à
   Biblioteca (marcado `aria-current="page"` quando já está nela), e
   `← Projetos` no cabeçalho do workspace passa a levar à Biblioteca em
-  vez da Home.
+  vez da Home;
+- "Nova iniciativa" (`/projects/new`, terceira tela da subetapa 7.2 do
+  roadmap "Entrada e organização global"): superfície própria com wizard
+  de 4 passos — ponto de partida (as mesmas cinco perguntas reais do
+  diagnóstico de rota do Mapa), rota recomendada (aceitar a recomendação
+  ou escolher outra fase do catálogo manualmente), nome provisório
+  (opcional) e revisão; estado do wizard fica somente no cliente até a
+  confirmação final — atualizar ou abandonar a página descarta o
+  preenchimento, e nenhum projeto é criado antes de "Confirmar e criar";
+  em caso de falha na confirmação, nome, fase e progresso do wizard são
+  preservados para nova tentativa; tipos de iniciativa ilustrados no
+  mockup ficam fora do Release 0, por não terem efeito ou persistência
+  real hoje.
 
 ### Alterado
 
@@ -170,7 +182,13 @@
 - Home (`/`) passa a listar só os cinco projetos mais recentes na seção
   "Projetos" (antes "Todos os projetos"), com link "Ver todos os
   projetos" para a nova Biblioteca (`/projects`); nenhuma outra parte da
-  Home foi alterada.
+  Home foi alterada;
+- os botões "Criar nova iniciativa" da Home e da Biblioteca (cabeçalho e
+  estado vazio) passam a levar a `/projects/new` em vez de criar o
+  projeto imediatamente; a criação passa a ser atômica — nome e fase
+  inicial (quando informados no wizard) são aplicados ao estado do
+  projeto antes de uma única gravação, nunca em criação seguida de
+  gravações separadas de nome e rota.
 
 ### Reconciliado
 

@@ -1,8 +1,10 @@
 // Perguntas fixas do diagnóstico de rota (D024, docs/07-management/decision-log.md).
 // Única fonte de phaseId, rótulo de fase, descrição da estrutura e pergunta
 // usados pelo diagnóstico — route-recommendation.ts não conhece este
-// conteúdo, e a action nunca aceita phaseId/rótulo/justificativa vindos do
-// formulário.
+// conteúdo, e nenhuma action aceita phaseId/rótulo/justificativa vindos do
+// formulário. Compartilhado pelo Mapa (`/projects/[projectId]/map`) e pela
+// Nova iniciativa (`/projects/new`, etapa 7.2 do roadmap) — mesmo padrão de
+// módulo solto sob $lib já usado por `project-status-label.ts`.
 
 export interface RouteDiagnosticQuestion {
 	phaseId: string;

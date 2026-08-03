@@ -37,6 +37,7 @@ import type {
 	AnswerActivityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
+	CreateConfiguredProjectInput,
 	MoveScopeItemInput,
 	ProjectListItem,
 	ProjectUseCases,
@@ -96,6 +97,29 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 	return {
 		async createProject() {
 			const state = createInitialProjectState(catalog, idGenerator.generate(), clock.now());
+			await repository.insert(state);
+			return viewOf(state);
+		},
+
+		// Nova iniciativa (`/projects/new`) — nome e fase inicial são aplicados
+		// ao estado em memória, antes de qualquer persistência: um único
+		// `repository.insert()` no final, nunca createProject + renameProject +
+		// setRouteStartPhase como gravações separadas. Reaproveita as mesmas
+		// transições de domínio usadas por renameProject/setRouteStartPhase.
+		async createConfiguredProject(input: CreateConfiguredProjectInput) {
+			let state = createInitialProjectState(catalog, idGenerator.generate(), clock.now());
+
+			const name = input.name?.trim();
+			if (name) {
+				const renamed = renameProjectInDomain(catalog, state, name);
+				if (!renamed.ok) return { ok: false, error: renamed.error };
+				state = renamed.value;
+			}
+
+			const routed = setRouteStartPhaseInDomain(catalog, state, input.routeStartPhaseId);
+			if (!routed.ok) return { ok: false, error: routed.error };
+			state = routed.value;
+
 			await repository.insert(state);
 			return viewOf(state);
 		},
