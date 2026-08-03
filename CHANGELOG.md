@@ -118,7 +118,21 @@
   em caso de falha na confirmação, nome, fase e progresso do wizard são
   preservados para nova tentativa; tipos de iniciativa ilustrados no
   mockup ficam fora do Release 0, por não terem efeito ou persistência
-  real hoje.
+  real hoje;
+- Agora (`/now`, primeira tela da subetapa 7.3 do roadmap "Convergência da
+  experiência e das telas") ganha o painel "Progresso da fase": fração de
+  atividades resolvidas da fase atual (concluídas + puladas) e as
+  atividades agrupadas em Concluídas/Atual/Pendentes/Puladas — reaproveita
+  integralmente `activityStatuses`/`nextActivity` já existentes, sem novo
+  percentual persistido nem estado de domínio; a mesma classificação passa
+  a ser compartilhada com o Mapa (`buildPhaseActivities`), evitando
+  duplicar a lógica de status/atividade atual entre as duas telas;
+- navegação mobile do workspace (~390px): o cabeçalho comprimido passa a
+  mostrar a área atual e um botão "Menu" que expõe os oito destinos reais
+  do projeto (Agora, Cockpit, Mapa, Registros, Entregas, Resumo,
+  Documento, Exportar), com a rota atual destacada; vale para todas as
+  rotas do workspace, não só Agora — parte do shell compartilhado
+  (`+layout.svelte`).
 
 ### Alterado
 
@@ -188,7 +202,17 @@
   projeto imediatamente; a criação passa a ser atômica — nome e fase
   inicial (quando informados no wizard) são aplicados ao estado do
   projeto antes de uma única gravação, nunca em criação seguida de
-  gravações separadas de nome e rota.
+  gravações separadas de nome e rota;
+- Agora (`/now`) passa a usar layout de duas colunas em toda fase, não só
+  nas de Bancada — a coluna lateral sempre mostra "Progresso da fase"; a
+  Bancada ("O que já sabemos") continua abaixo dela, só nas fases já
+  suportadas (Descoberta, Definição do produto, Estruturação); mecânica da
+  próxima ação (pergunta, campos, Salvar e continuar, Pular etapa, revisão
+  recomendada) preservada sem alteração de rota — a atividade guiada
+  continua integrada à própria tela Agora, sem rota separada de execução;
+  aprovada funcional e visualmente por Matheus contra o artefato
+  individual do Claude Design — tela marcada `convergida` no inventário
+  da etapa 7.
 
 ### Reconciliado
 

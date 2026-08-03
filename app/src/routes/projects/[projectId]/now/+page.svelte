@@ -3,13 +3,15 @@
 	import { goto } from '$app/navigation';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
 	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
+	import type { PhaseProgressGroupKey } from '$lib/phase-progress';
 
 	let { data, form } = $props();
 	let view = $derived(data.view);
 	// Layout de duas colunas só quando a atividade atual pertence a
 	// Descoberta, Definição do produto ou Estruturação — as demais fases
-	// continuam de coluna única, revisadas só quando o Cockpit/Colheita
-	// chegarem lá.
+	// continuam sem Bancada, revisadas só quando o Cockpit/Colheita
+	// chegarem lá. A coluna lateral em si (Progresso da fase) aparece em
+	// todas as fases — ver workspace-layout abaixo.
 	let isBancadaPhase = $derived(
 		data.activity?.phaseId === 'descoberta' ||
 			data.activity?.phaseId === 'definicao' ||
@@ -22,6 +24,27 @@
 	// só deste caso específico, sem alterar o layout geral de duas colunas.
 	let isReviewRecommendation = $derived(data.activity?.completionMode === 'explicit_confirmation');
 	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
+
+	// Mesmo vocabulário de ícone já usado pelo Mapa (Concluída/Atual ~
+	// em_andamento/Pendente/Pulada) — coerência de linguagem visual entre as
+	// duas telas que compartilham a mesma projeção (phase-activities.ts).
+	const PHASE_PROGRESS_GROUP_LABEL: Record<PhaseProgressGroupKey, string> = {
+		concluidas: 'Concluídas',
+		atual: 'Atual',
+		pendentes: 'Pendentes',
+		puladas: 'Puladas'
+	};
+	const PHASE_PROGRESS_GROUP_ICON: Record<PhaseProgressGroupKey, string> = {
+		concluidas: '●',
+		atual: '◐',
+		pendentes: '○',
+		puladas: '↷'
+	};
+	let phaseProgressPercent = $derived(
+		data.phaseProgress && data.phaseProgress.totalActivities > 0
+			? Math.round((data.phaseProgress.resolvedActivities / data.phaseProgress.totalActivities) * 100)
+			: 0
+	);
 </script>
 
 <svelte:head>
@@ -166,37 +189,65 @@
 	{/if}
 {/snippet}
 
-{#if isBancadaPhase}
-	<div class="bancada-layout">
-		<div class="bancada-main" class:center-single-card={isReviewRecommendation}>
-			{@render mainContent()}
-		</div>
-		<aside class="bancada-panel" aria-label="O que já sabemos até aqui">
-			<h2>O que já sabemos</h2>
-			{#if data.bancadaOverview.blocks.length > 0}
-				<div class="panel-blocks">
-					{#each data.bancadaOverview.blocks as block (block.activityId)}
-						<section class="panel-block">
-							<h3>{block.heading}</h3>
-							<p>{block.value}</p>
-							{#if block.chips && block.chips.length > 0}
-								<ul class="chip-list">
-									{#each block.chips as chip (chip)}
-										<li class="chip">{chip}</li>
-									{/each}
-								</ul>
-							{/if}
-						</section>
-					{/each}
-				</div>
-			{:else}
-				<p class="panel-empty">Ainda não há respostas suficientes para mostrar aqui.</p>
-			{/if}
-		</aside>
+<div class="workspace-layout">
+	<div class="workspace-main" class:center-single-card={isReviewRecommendation}>
+		{@render mainContent()}
 	</div>
-{:else}
-	{@render mainContent()}
-{/if}
+	<aside class="workspace-sidebar" aria-label="Progresso e contexto">
+		{#if data.phaseProgress}
+			<section class="sidebar-card" aria-label="Progresso da fase">
+				<p class="sidebar-card-eyebrow">Progresso da fase</p>
+				<p class="phase-progress-label">{data.phaseProgress.phaseLabel}</p>
+				<p class="phase-progress-resolved">
+					{data.phaseProgress.resolvedActivities} de {data.phaseProgress.totalActivities} atividades resolvidas
+				</p>
+				<div class="phase-progress-bar" role="presentation">
+					<div class="phase-progress-bar-fill" style="width: {phaseProgressPercent}%"></div>
+				</div>
+				{#each data.phaseProgress.groups as group (group.key)}
+					{#if group.activities.length > 0}
+						<div class="phase-progress-group">
+							<p class="phase-progress-group-label">{PHASE_PROGRESS_GROUP_LABEL[group.key]}</p>
+							<ul>
+								{#each group.activities as activity (activity.id)}
+									<li class="phase-progress-group-item" class:is-current={group.key === 'atual'}>
+										<span class="phase-progress-icon" aria-hidden="true">{PHASE_PROGRESS_GROUP_ICON[group.key]}</span>
+										<span>{activity.title}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+				{/each}
+			</section>
+		{/if}
+
+		{#if isBancadaPhase}
+			<section class="sidebar-card bancada-panel" aria-label="O que já sabemos até aqui">
+				<p class="sidebar-card-eyebrow">O que já sabemos</p>
+				{#if data.bancadaOverview.blocks.length > 0}
+					<div class="panel-blocks">
+						{#each data.bancadaOverview.blocks as block (block.activityId)}
+							<section class="panel-block">
+								<h3>{block.heading}</h3>
+								<p>{block.value}</p>
+								{#if block.chips && block.chips.length > 0}
+									<ul class="chip-list">
+										{#each block.chips as chip (chip)}
+											<li class="chip">{chip}</li>
+										{/each}
+									</ul>
+								{/if}
+							</section>
+						{/each}
+					</div>
+				{:else}
+					<p class="panel-empty">Ainda não há respostas suficientes para mostrar aqui.</p>
+				{/if}
+			</section>
+		{/if}
+	</aside>
+</div>
 
 <style>
 	.pendencias {
@@ -302,7 +353,7 @@
 		font-size: 0.9rem;
 	}
 
-	.bancada-layout {
+	.workspace-layout {
 		display: grid;
 		grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
 		gap: 2rem;
@@ -313,7 +364,7 @@
 	   coluna principal até a altura do painel lateral (a mais alta das duas
 	   nesse ponto da jornada) e centraliza o card pequeno no espaço sobrando,
 	   sem tocar no h1/pendências acima dele nem no restante do layout. */
-	.bancada-main.center-single-card {
+	.workspace-main.center-single-card {
 		display: flex;
 		flex-direction: column;
 		align-self: stretch;
@@ -325,22 +376,98 @@
 		padding: 2.5rem;
 	}
 
-	.bancada-panel {
+	.workspace-sidebar {
 		position: sticky;
 		top: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.sidebar-card {
 		border: 1px solid var(--hydra-border);
 		border-radius: 12px;
 		padding: 1.25rem;
 		background: var(--hydra-surface);
 	}
 
-	.bancada-panel h2 {
+	.sidebar-card-eyebrow {
 		margin: 0 0 1rem;
 		font-size: 0.8rem;
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: var(--hydra-muted);
+	}
+
+	.phase-progress-label {
+		margin: -0.5rem 0 0.4rem;
+		font-size: 0.95rem;
+		font-weight: 700;
+	}
+
+	.phase-progress-resolved {
+		margin: 0 0 0.5rem;
+		font-size: 0.85rem;
+		color: var(--hydra-muted);
+	}
+
+	.phase-progress-bar {
+		height: 6px;
+		border-radius: 999px;
+		background: var(--hydra-bg);
+		overflow: hidden;
+		margin-bottom: 1rem;
+	}
+
+	.phase-progress-bar-fill {
+		height: 100%;
+		border-radius: 999px;
+		background: var(--hydra-accent);
+	}
+
+	.phase-progress-group {
+		margin-bottom: 1.1rem;
+	}
+
+	.phase-progress-group:last-child {
+		margin-bottom: 0;
+	}
+
+	.phase-progress-group-label {
+		margin: 0 0 0.5rem;
+		font-size: 0.7rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--hydra-muted);
+	}
+
+	.phase-progress-group ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.phase-progress-group-item {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		font-size: 0.85rem;
+		color: var(--hydra-muted);
+	}
+
+	.phase-progress-group-item.is-current {
+		font-weight: 700;
+		color: var(--hydra-text);
+	}
+
+	.phase-progress-icon {
+		flex-shrink: 0;
+		line-height: 1.4;
 	}
 
 	.panel-blocks {
@@ -395,12 +522,16 @@
 	}
 
 	@media (max-width: 860px) {
-		.bancada-layout {
+		.workspace-layout {
 			grid-template-columns: 1fr;
 		}
 
-		.bancada-panel {
+		.workspace-sidebar {
 			position: static;
+		}
+
+		.next-action form button[type='submit'] {
+			width: 100%;
 		}
 	}
 </style>

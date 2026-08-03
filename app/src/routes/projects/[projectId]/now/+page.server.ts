@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { catalog } from '$lib/catalog';
 import { decodeMultiSelectValue, encodeMultiSelectValue } from '$lib/domain';
 import type { ActivityDefinition, FieldDefinition, RequiredFieldsActivity } from '$lib/domain';
+import { buildPhaseProgress } from '$lib/phase-progress';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
 import type { ProjectView } from '$lib/server/application/types';
@@ -81,6 +82,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const { view } = await parent();
 	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
+	const phaseProgress = buildPhaseProgress(catalog, view);
 
 	// Retomada de atividade pulada: só aceita um id que já corresponda a uma
 	// pendência aberta do próprio projeto (view.openPendingItems), nunca um
@@ -175,7 +177,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 				isEditingFromSummary: false,
 				stepKind: 'required' as const,
 				bancadaOverview,
-				journeyContext
+				journeyContext,
+				phaseProgress
 			};
 		}
 		// Todos os campos obrigatórios já respondidos mas chegamos aqui sem
@@ -189,7 +192,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		isEditingFromSummary: false,
 		stepKind: 'full' as const,
 		bancadaOverview,
-		journeyContext
+		journeyContext,
+		phaseProgress
 	};
 };
 

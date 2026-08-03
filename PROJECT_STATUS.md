@@ -1,6 +1,6 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 01/08/2026
+**Data de referência:** 03/08/2026
 
 **Versão da baseline:** 0.4.0
 
@@ -99,13 +99,27 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   imediatamente; tipos de iniciativa do mockup ficam fora do Release 0;
   aprovada visualmente por Matheus (desktop e ~390px). Modelos de jornada
   segue `adiada` (horizonte posterior de Tailoring metodológico) — com as
-  quatro telas do bloco 7.2 decididas, a subetapa está concluída. Próxima
-  subetapa: 7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada;
-  Documento; Revisão e confirmação). Quatro fatias preparatórias seguem
+  quatro telas do bloco 7.2 decididas, a subetapa está concluída. Subetapa
+  7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada; Documento;
+  Revisão e confirmação) — em andamento. Agora (`/now`) está `convergida`:
+  painel "Progresso da fase" (fração de atividades resolvidas — concluídas
+  + puladas — e agrupamento Concluídas/Atual/Pendentes/Puladas) na coluna
+  lateral em toda fase, reaproveitando a mesma classificação de status/
+  atividade atual do Mapa (`buildPhaseActivities`, compartilhado entre as
+  duas telas, sem duplicação); Bancada preservada, só nas fases já
+  suportadas; mecânica da próxima ação inalterada; navegação mobile do
+  shell (menu com os oito destinos do workspace) resolvida junto, por
+  afetar todas as rotas do projeto, não só Agora; aprovada funcional e
+  visualmente por Matheus. Atividade guiada está `combinada com Agora` — a
+  atividade atual continua apresentada e respondida dentro de
+  `/projects/[projectId]/now` (pergunta, explicação, exemplo, campos,
+  salvamento e opção de pular), sem rota própria de execução; a
+  combinação preserva integralmente a mecânica funcional já existente.
+  Próximo alvo da subetapa: Jornada. Quatro fatias preparatórias seguem
   publicadas (estado ativo de navegação; bloco "Onde estamos" em Agora;
   continuidade Mapa → Agora; orientação por projeto na Home), mas nenhuma
-  tela é declarada `convergida` apenas por elas — a ordem operacional
-  passa a ser conduzida pelo roadmap.
+  tela além de Agora é declarada `convergida` apenas por elas — a ordem
+  operacional continua conduzida pelo roadmap.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -143,9 +157,11 @@ espinha mecânica do produto — estão concluídas. A etapa 7,
 "Convergência da experiência e das telas", está em andamento, agora com
 backlog operacional próprio no roadmap (inventário de telas, situação,
 sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1 e 7.2 estão concluídas;
-a próxima é 7.3 — Jornada guiada (ordem: Agora; Atividade guiada;
-Jornada; Documento; Revisão e confirmação), sem reabrir desnecessariamente
-o domínio nem substituir mecânicas funcionais.
+a subetapa 7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada;
+Documento; Revisão e confirmação) está em andamento, com Agora já
+`convergida` e Atividade guiada `combinada com Agora` (sem rota própria de
+execução); o próximo alvo da subetapa é Jornada, sem reabrir
+desnecessariamente o domínio nem substituir mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
 import { fabricatedPartialPhase, fabricatedUnavailablePhase } from '$lib/domain/test-support';
-import { buildMapView } from './map-view';
+import { buildPhaseActivities } from './phase-activities';
 
 const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta')!;
 
-describe('buildMapView', () => {
+describe('buildPhaseActivities', () => {
 	it('mapeia a fase complete (Descoberta) com todas as atividades não iniciadas no início do projeto', () => {
-		const result = buildMapView(catalog, {
+		const result = buildPhaseActivities(catalog, {
 			activityStatuses: {},
 			phaseStatuses: { descoberta: 'não_iniciada' },
 			nextActivity: { kind: 'recommendation', activityDefinitionId: 'origem' }
@@ -21,7 +21,7 @@ describe('buildMapView', () => {
 	});
 
 	it('nenhuma fase do catálogo real está marcada como unavailable (jornada linear completa, fases 1–6)', () => {
-		const result = buildMapView(catalog, {
+		const result = buildPhaseActivities(catalog, {
 			activityStatuses: {},
 			phaseStatuses: {},
 			nextActivity: { kind: 'recommendation', activityDefinitionId: 'origem' }
@@ -35,7 +35,7 @@ describe('buildMapView', () => {
 	});
 
 	it('marca a atividade recomendada pela Trilha A como isCurrent, e nenhuma outra', () => {
-		const result = buildMapView(catalog, {
+		const result = buildPhaseActivities(catalog, {
 			activityStatuses: { origem: 'concluída', contexto: 'em_andamento' },
 			phaseStatuses: { descoberta: 'em_andamento' },
 			nextActivity: { kind: 'recommendation', activityDefinitionId: 'contexto' }
@@ -59,7 +59,7 @@ describe('buildMapView', () => {
 		}
 		const phaseStatuses = Object.fromEntries(catalog.phases.map((phase) => [phase.id, 'concluída' as const]));
 
-		const result = buildMapView(catalog, {
+		const result = buildPhaseActivities(catalog, {
 			activityStatuses,
 			phaseStatuses,
 			nextActivity: { kind: 'catalog_limit_reached' }
@@ -72,7 +72,7 @@ describe('buildMapView', () => {
 	});
 
 	it('reflete os quatro status de atividade aplicáveis, incluindo pulada', () => {
-		const result = buildMapView(catalog, {
+		const result = buildPhaseActivities(catalog, {
 			activityStatuses: {
 				origem: 'concluída',
 				contexto: 'em_andamento',
@@ -92,11 +92,11 @@ describe('buildMapView', () => {
 	});
 
 	// A capacidade genérica de mapear fases 'partial'/'unavailable' continua
-	// fazendo parte do contrato de buildMapView mesmo que o catálogo real não
-	// tenha mais nenhuma fase nesses estados (ver domain/test-support.ts).
+	// fazendo parte do contrato de buildPhaseActivities mesmo que o catálogo
+	// real não tenha mais nenhuma fase nesses estados (ver domain/test-support.ts).
 	it('mapeia uma fase partial fabricada sem tratá-la como concluída', () => {
 		const fabricatedCatalog = { phases: [fabricatedPartialPhase] };
-		const result = buildMapView(fabricatedCatalog, {
+		const result = buildPhaseActivities(fabricatedCatalog, {
 			activityStatuses: { fixture_atividade: 'concluída' },
 			phaseStatuses: { [fabricatedPartialPhase.id]: 'em_andamento' },
 			nextActivity: { kind: 'catalog_limit_reached' }
@@ -110,7 +110,7 @@ describe('buildMapView', () => {
 
 	it('mapeia uma fase unavailable fabricada sem atividades e nunca como concluída', () => {
 		const fabricatedCatalog = { phases: [fabricatedUnavailablePhase] };
-		const result = buildMapView(fabricatedCatalog, {
+		const result = buildPhaseActivities(fabricatedCatalog, {
 			activityStatuses: {},
 			phaseStatuses: {},
 			nextActivity: { kind: 'catalog_limit_reached' }

@@ -1,17 +1,20 @@
-// Projeção pura de leitura para a Tela Mapa — cruza catalog/ (estático) com
-// os campos de ProjectView já expostos pela camada de aplicação. Não lê nem
-// grava persistência, não conhece ProjectState bruto.
+// Projeção pura, compartilhada, de apresentação — cruza catalog/ (estático)
+// com o estado já exposto por ProjectView (activityStatuses/phaseStatuses/
+// nextActivity) — mesma fonte usada pelo Mapa (`/map`) e pelo painel
+// "Progresso da fase" de Agora (`/now`, ver phase-progress.ts). Não decide
+// nada (isso é orientation-engine/) — só agrupa e formata um resultado já
+// calculado, por isso vive fora do motor de orientação.
 
 import type { ActivityStatus, Catalog } from '$lib/domain';
 import type { NextActivityResult, PhaseStatus } from '$lib/orientation-engine';
 
-export interface MapViewInput {
+export interface PhaseActivitiesInput {
 	activityStatuses: Record<string, ActivityStatus>;
 	phaseStatuses: Record<string, PhaseStatus>;
 	nextActivity: NextActivityResult;
 }
 
-export interface MapActivityView {
+export interface PhaseActivityView {
 	id: string;
 	title: string;
 	order: number;
@@ -19,22 +22,22 @@ export interface MapActivityView {
 	isCurrent: boolean;
 }
 
-export interface MapPhaseView {
+export interface PhaseActivitiesView {
 	id: string;
 	label: string;
 	order: number;
 	catalogStatus: Catalog['phases'][number]['catalogStatus'];
 	phaseStatus: PhaseStatus;
 	isCurrent: boolean;
-	activities: MapActivityView[];
+	activities: PhaseActivityView[];
 }
 
-export function buildMapView(catalog: Catalog, input: MapViewInput): MapPhaseView[] {
+export function buildPhaseActivities(catalog: Catalog, input: PhaseActivitiesInput): PhaseActivitiesView[] {
 	const currentActivityId =
 		input.nextActivity.kind === 'recommendation' ? input.nextActivity.activityDefinitionId : undefined;
 
 	return catalog.phases.map((phase) => {
-		const activities: MapActivityView[] = phase.activities.map((activity) => ({
+		const activities: PhaseActivityView[] = phase.activities.map((activity) => ({
 			id: activity.id,
 			title: activity.title,
 			order: activity.order,

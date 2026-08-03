@@ -12,10 +12,43 @@
 	function isCurrentRoute(target: string): boolean {
 		return pathname === target || pathname.startsWith(`${target}/`);
 	}
+
+	// Lista única dos oito destinos reais do workspace — reaproveitada pelo
+	// menu mobile e pelo rótulo "área atual" do cabeçalho compacto. A
+	// navegação desktop abaixo continua com sua própria marcação (dois
+	// grupos com pesos visuais diferentes) e não usa esta lista, para não
+	// mudar nada do que já está aprovado nela.
+	const NAV_ITEMS = [
+		{ key: 'now', label: 'Agora' },
+		{ key: 'cockpit', label: 'Cockpit' },
+		{ key: 'map', label: 'Mapa' },
+		{ key: 'records', label: 'Registros' },
+		{ key: 'deliveries', label: 'Entregas' },
+		{ key: 'summary', label: 'Resumo' },
+		{ key: 'document', label: 'Documento' },
+		{ key: 'export', label: 'Exportar' }
+	] as const;
+
+	let currentAreaLabel = $derived(
+		NAV_ITEMS.find((item) => isCurrentRoute(`/projects/${projectId}/${item.key}`))?.label ?? ''
+	);
+
+	let mobileMenuOpen = $state(false);
+
+	function toggleMobileMenu() {
+		mobileMenuOpen = !mobileMenuOpen;
+	}
+
+	// Fecha o menu mobile sempre que a rota muda — sem isto, navegar por um
+	// link do próprio menu deixaria o painel aberto sobre a tela seguinte.
+	$effect(() => {
+		pathname;
+		mobileMenuOpen = false;
+	});
 </script>
 
 <div class="project-shell">
-	<header class="project-header">
+	<header class="project-header header-desktop">
 		<div class="identity">
 			<a class="projects-link" href="/projects">← Projetos</a>
 			<span class="identity-divider" aria-hidden="true"></span>
@@ -82,6 +115,44 @@
 				</a>
 			</div>
 		</nav>
+	</header>
+
+	<header class="project-header header-mobile">
+		<div class="mobile-header-top">
+			<a class="projects-link" href="/projects">← Projetos</a>
+			<span class="identity-divider" aria-hidden="true"></span>
+			<a class="symbol-link" href="/">
+				<img class="symbol" src="/brand/hydra-symbol-primary-transparent.png" alt="" />
+			</a>
+		</div>
+		<div class="mobile-header-identity">
+			<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
+			<p class="status">Status: {projectStatusLabel[data.view.projectStatus]}</p>
+		</div>
+		<div class="mobile-header-area">
+			<span class="mobile-area-badge">{currentAreaLabel}</span>
+			<button
+				type="button"
+				class="mobile-menu-toggle"
+				aria-expanded={mobileMenuOpen}
+				aria-controls="mobile-nav-menu"
+				onclick={toggleMobileMenu}
+			>
+				{mobileMenuOpen ? 'Fechar' : 'Menu'}
+			</button>
+		</div>
+		{#if mobileMenuOpen}
+			<nav id="mobile-nav-menu" class="mobile-nav-menu" aria-label="Navegação do projeto">
+				{#each NAV_ITEMS as item (item.key)}
+					<a
+						href="/projects/{projectId}/{item.key}"
+						aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}
+					>
+						{item.label}
+					</a>
+				{/each}
+			</nav>
+		{/if}
 	</header>
 
 	<main class="container">
@@ -211,5 +282,90 @@
 		color: var(--hydra-text);
 		font-weight: 700;
 		text-decoration: underline;
+	}
+
+	/* Cabeçalho compacto (mobile) — escondido acima do breakpoint; o
+	   cabeçalho desktop acima faz o inverso. Os dois ficam sempre no
+	   markup — só a mídia decide qual aparece — para não depender de JS
+	   para detectar viewport. */
+	.header-mobile {
+		display: none;
+	}
+
+	.mobile-header-top {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.mobile-header-identity {
+		margin-top: var(--space-3);
+	}
+
+	.mobile-header-area {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		margin-top: var(--space-3);
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--hydra-border);
+	}
+
+	.mobile-area-badge {
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		padding: var(--space-1) var(--space-3);
+		border-radius: var(--hydra-radius-pill);
+		background: var(--hydra-bg);
+		color: var(--hydra-text);
+	}
+
+	.mobile-menu-toggle {
+		font-size: var(--font-size-caption);
+		padding: var(--space-2) var(--space-4);
+		min-height: 2.5rem;
+	}
+
+	.mobile-nav-menu {
+		display: flex;
+		flex-direction: column;
+		margin-top: var(--space-3);
+		border-top: 1px solid var(--hydra-border);
+	}
+
+	.mobile-nav-menu a {
+		padding: var(--space-3) var(--space-2);
+		font-size: var(--font-size-body);
+		font-weight: 500;
+		color: var(--hydra-text);
+		text-decoration: none;
+		border-bottom: 1px solid var(--hydra-border);
+		min-height: 2.75rem;
+		display: flex;
+		align-items: center;
+	}
+
+	.mobile-nav-menu a:last-child {
+		border-bottom: none;
+	}
+
+	.mobile-nav-menu a[aria-current='page'] {
+		font-weight: 700;
+	}
+
+	@media (max-width: 860px) {
+		.header-desktop {
+			display: none;
+		}
+
+		.header-mobile {
+			display: block;
+			padding: var(--space-4);
+		}
+
+		.container {
+			padding: var(--space-4);
+		}
 	}
 </style>
