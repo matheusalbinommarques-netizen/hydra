@@ -228,7 +228,33 @@
   nenhuma rota nova foi criada, nenhum status novo foi introduzido, e
   nenhuma regra de domínio ou persistência foi alterada — a execução das
   atividades continua acontecendo em Agora; tela marcada `convergida` no
-  inventário da etapa 7.
+  inventário da etapa 7;
+- Documento do projeto (`/projects/[projectId]/document`) deixa de ser uma
+  sequência de cartões independentes e passa a se apresentar como uma
+  única superfície documental contínua, a partir do componente final
+  aprovado no Claude Design: fases como seções numeradas ("1 —
+  Descoberta"), atividades como subseções separadas por divisores
+  discretos, respostas apresentadas como conteúdo documental (parágrafos
+  completos, sem truncamento) e tags reais preservadas como metadado
+  secundário, sem aparência de botão; ações "Editar" tornam-se links
+  discretos com rótulo acessível descritivo, preservando integralmente os
+  destinos já existentes; um único CTA "Continuar em Agora" no cabeçalho
+  da página; estado vazio convergido ("Ainda não há conteúdo consolidado")
+  mantendo o mesmo comportamento funcional; layout responsivo aprovado em
+  desktop (superfície com largura máxima de 800px, alinhada ao contêiner
+  já usado pelas demais telas convergidas) e mobile (~390px, sem coluna
+  lateral, sem rolagem horizontal); nenhuma rota, consulta, entidade,
+  campo ou regra de domínio nova — reaproveita integralmente
+  `document-view.ts` e os dados já existentes; o Documento permanece
+  somente leitura, com preenchimento e execução continuando em `/now`;
+  tela marcada `convergida` no inventário da etapa 7;
+- token semântico `--hydra-editorial-accent` adicionado à fundação visual
+  (`app.css`), para o vermelho queimado usado como destaque puramente
+  decorativo/editorial (títulos, números de fase); `--hydra-warning`
+  permanece reservado ao seu significado semântico original (conteúdo
+  gerado/derivado pelo sistema — sugestões, alertas, conflitos), agora sem
+  nenhum uso decorativo no Documento do projeto; nenhuma mudança visual
+  perceptível foi introduzida por essa separação.
 
 ### Reconciliado
 

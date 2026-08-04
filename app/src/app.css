@@ -3,10 +3,12 @@
 
    Paleta "papel/tinta/grafite": sem cor de destaque colorida — ações
    primárias, links e foco usam a própria tinta (--hydra-text) sobre papel,
-   não uma cor de acento separada. --hydra-warning é o único ponto de cor
-   fora do neutro (o vermelho de lápis), e é reservado a conteúdo
-   gerado/derivado pelo sistema (sugestões, alertas, conflitos) — nunca a
-   ações do usuário ou decoração. */
+   não uma cor de acento separada. Dois pontos de cor fora do neutro (o
+   vermelho de lápis) existem, com papéis distintos e não intercambiáveis:
+   --hydra-warning é reservado a conteúdo gerado/derivado pelo sistema
+   (sugestões, alertas, conflitos) — nunca a ações do usuário ou decoração;
+   --hydra-editorial-accent é reservado a destaque editorial puramente
+   decorativo (títulos, marcadores de seção) — nunca a alertas ou estado. */
 
 :root {
 	/* Cores semânticas — papel/tinta/grafite. --hydra-surface-raised é
@@ -20,6 +22,7 @@
 	--hydra-muted: #65686c;
 	--hydra-accent: #151918;
 	--hydra-warning: #8b3227;
+	--hydra-editorial-accent: #8b3227;
 
 	/* Espaçamento — escala curta reaproveitando os valores já em uso no
 	   shell, para parar de repetir rem soltos por arquivo. */

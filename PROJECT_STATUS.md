@@ -125,12 +125,26 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   preservados sem alteração de mecânica dentro do bloco recolhível
   "Diagnóstico e ponto de partida" (inicia fechado); execução das
   atividades continua em Agora; nenhuma mecânica, estado ou regra de
-  domínio foi alterada; aprovada em desktop e mobile. Próximo alvo da
-  subetapa: Documento do projeto. Quatro fatias preparatórias seguem
+  domínio foi alterada; aprovada em desktop e mobile. Documento do projeto
+  (`/projects/[projectId]/document`) está `convergida` — passa a
+  funcionar como artefato documental contínuo e crescente: fases
+  apresentadas como seções, atividades como subseções, respostas em fluxo
+  documental (parágrafos completos, sem truncamento) e tags reais
+  preservadas como metadados secundários; ações "Editar" discretas, com
+  os destinos já existentes preservados; um único CTA "Continuar em
+  Agora"; estado vazio convergido; aprovada em desktop e mobile; nenhuma
+  edição inline, nova rota, consulta, entidade ou regra de domínio criada
+  — reaproveita integralmente `document-view.ts` já existente; a
+  Bancada continua sendo o único ponto de preenchimento e execução, em
+  `/now`. Fundação visual ganhou o token `--hydra-editorial-accent`
+  (vermelho queimado decorativo/editorial), separado de `--hydra-warning`
+  (que permanece exclusivo a conteúdo gerado/derivado pelo sistema), sem
+  nenhuma mudança visual perceptível. Subetapa 7.3 segue em andamento;
+  próximo alvo: Revisão e confirmação. Quatro fatias preparatórias seguem
   publicadas (estado ativo de navegação; bloco "Onde estamos" em Agora;
   continuidade Mapa → Agora; orientação por projeto na Home), mas nenhuma
-  tela além de Agora e Jornada é declarada `convergida` apenas por elas —
-  a ordem operacional continua conduzida pelo roadmap.
+  tela além de Agora, Jornada e Documento é declarada `convergida` apenas
+  por elas — a ordem operacional continua conduzida pelo roadmap.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -169,11 +183,11 @@ espinha mecânica do produto — estão concluídas. A etapa 7,
 backlog operacional próprio no roadmap (inventário de telas, situação,
 sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1 e 7.2 estão concluídas;
 a subetapa 7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada;
-Documento; Revisão e confirmação) está em andamento, com Agora e Jornada
-já `convergidas` e Atividade guiada `combinada com Agora` (sem rota
-própria de execução); o próximo alvo da subetapa é Documento do projeto,
-sem reabrir desnecessariamente o domínio nem substituir mecânicas
-funcionais.
+Documento; Revisão e confirmação) está em andamento, com Agora, Jornada e
+Documento do projeto já `convergidas` e Atividade guiada `combinada com
+Agora` (sem rota própria de execução); o próximo alvo da subetapa é
+Revisão e confirmação, sem reabrir desnecessariamente o domínio nem
+substituir mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
