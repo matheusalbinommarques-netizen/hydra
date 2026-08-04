@@ -277,7 +277,28 @@
   genérica por fase, novo `completionMode`, impacto ou hipótese fictícia,
   nova rota, consulta, entidade, persistência ou regra de domínio foi
   introduzida — tela marcada `convergida` no inventário da etapa 7, que
-  conclui a subetapa 7.3 (etapa 7 permanece em andamento).
+  conclui a subetapa 7.3 (etapa 7 permanece em andamento);
+- Entregas (`/projects/[projectId]/deliveries`), primeira tela da subetapa
+  7.4 do roadmap ("Execução e controle"), converge visualmente a partir das
+  propostas desktop e mobile aprovadas no Claude Design: título e descrição
+  da superfície; três grupos (A fazer/Em andamento/Concluído) com cabeçalho
+  por símbolo monocromático (mesmo vocabulário de Mapa e Agora), nome e
+  contagem; card como principal elemento delimitado (borda leve + sombra),
+  coluna como superfície agrupadora discreta; bordas em geral suavizadas
+  (cinza translúcido, não preto) mantendo contraste acessível; estado vazio
+  "Nenhum item neste estado." por grupo; rótulo do campo de esforço
+  renomeado de "Tamanho" para "Esforço"; estado de execução atual do item
+  passa a usar `--hydra-editorial-accent` (vermelho queimado) para se
+  destacar dos demais, com `aria-pressed` preservando a distinção para
+  leitores de tela; empilhamento vertical no mobile reaproveitando
+  integralmente a navegação mobile já compartilhada do shell, sem menu
+  próprio; nenhuma mudança de domínio, projeção (`deliveries-view.ts`),
+  action ou mecânica — `executionStatus`, agrupamento, contagem e a action
+  `?/setExecutionStatus` preservados integralmente; tela marcada
+  `convergida` no inventário da etapa 7; subetapa 7.4 permanece em
+  andamento, com Acompanhamento como próximo alvo — nome que substitui
+  "Cockpit" na linguagem do produto (decisão já tomada), renomeação ainda
+  não implementada nesta entrega.
 
 ### Reconciliado
 

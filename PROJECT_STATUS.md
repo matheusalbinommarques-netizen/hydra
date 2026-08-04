@@ -160,8 +160,19 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   concluída**. Quatro fatias preparatórias seguem publicadas (estado ativo
   de navegação; bloco "Onde estamos" em Agora; continuidade Mapa → Agora;
   orientação por projeto na Home), reclassificadas como parte do que
-  sustentou a convergência das telas da subetapa. Próxima subetapa: 7.4 —
-  Execução e controle; próximo alvo operacional: Entregas.
+  sustentou a convergência das telas da subetapa. Subetapa 7.4 — Execução
+  e controle — em andamento. Entregas (`/deliveries`) está `convergida`: a
+  referência `11-entregas.png` tinha conteúdo funcional incompatível com o
+  domínio (sprints, tempo de ciclo, erros de produção) e foi tratada como
+  não vinculante, usada só como linguagem visual; a convergência seguiu
+  proposta própria aprovada no Claude Design (desktop e mobile), mantendo
+  a estrutura de três grupos por estado de execução, card como elemento
+  visual principal e coluna como superfície agrupadora discreta, com
+  bordas suavizadas; nenhuma mudança de domínio, projeção
+  (`deliveries-view.ts`) ou action. Próximo alvo operacional:
+  Acompanhamento — nome que substitui "Cockpit" na linguagem do produto
+  (decisão já tomada); a renomeação completa (rota, domínio, documentação)
+  ainda não foi implementada.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -204,9 +215,11 @@ concluídas — Agora, Jornada, Documento do projeto e Revisão e confirmação
 execução); o gate da subetapa (usuário entende onde está, sabe a próxima
 ação, responde atividades, acompanha a jornada, consulta o artefato
 crescente, revisa e confirma as decisões da Descoberta) está atendido. A
-próxima subetapa é 7.4 — Execução e controle, com Entregas como próximo
-alvo operacional, sem reabrir desnecessariamente o domínio nem substituir
-mecânicas funcionais.
+subetapa 7.4 — Execução e controle — está em andamento: Entregas
+`convergida`; próximo alvo operacional Acompanhamento — nome que
+substitui "Cockpit" na linguagem do produto (decisão já tomada), ainda
+não implementado — sem reabrir desnecessariamente o domínio nem
+substituir mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
