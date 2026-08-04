@@ -1,5 +1,5 @@
 // Teste Playwright dedicado do banner de conflito critério × escopo na
-// tela "Resumo da descoberta".
+// tela "Revisão e confirmação" (/summary).
 // Cobre: tela sem conflito (nenhum critério respondido ainda; critério
 // respondido mas ainda sustentado por um item em "Agora") e tela com
 // conflito (critério respondido, item de escopo movido para fora de
@@ -98,10 +98,10 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 	await test.step('sem nenhum critério respondido: Resumo não mostra o banner', async () => {
 		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
 		await expect(page.getByText(CONFLICT_MESSAGE)).toHaveCount(0);
 
-		await page.getByRole('button', { name: 'Confirmar resumo' }).click();
+		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 	});
 
@@ -132,7 +132,7 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 		await answerCurrentActivityGenerically(page); // criterios_sucesso_produto
 
 		await page.goto(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
 		await expect(page.getByText(CONFLICT_MESSAGE)).toHaveCount(0);
 	});
 
@@ -144,7 +144,7 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 		]);
 
 		await page.goto(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
 		await expect(page.getByText(CONFLICT_MESSAGE)).toBeVisible();
 	});
 });

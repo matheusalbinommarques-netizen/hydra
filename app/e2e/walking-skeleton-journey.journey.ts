@@ -152,7 +152,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	});
 
 	await test.step('verificar respostas no Resumo', async () => {
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta', level: 1 })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação', level: 1 })).toBeVisible();
 
 		// nome do projeto (cabeçalho persistente do layout do projeto)
 		await expect(page.getByText('Portal de Solicitações E2E')).toBeVisible();
@@ -196,7 +196,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	});
 
 	await test.step('confirmar o Resumo', async () => {
-		await page.getByRole('button', { name: 'Confirmar resumo' }).click();
+		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
 	});
 

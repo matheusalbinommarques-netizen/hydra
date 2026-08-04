@@ -84,7 +84,7 @@ async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
 	await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
 	await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-	await page.getByRole('button', { name: 'Confirmar resumo' }).click();
+	await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
 	await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
 	return projectId;
@@ -139,13 +139,13 @@ test('edição a partir do Resumo rejeita atividade de outra fase e ID inexisten
 	await test.step('activity de outra fase (usuario_principal, Definição) com from=summary é rejeitado', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now?activity=usuario_principal&from=summary`);
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
 	});
 
 	await test.step('activity inexistente com from=summary é rejeitado', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now?activity=nao_existe&from=summary`);
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
 	});
 
 	await test.step('fluxo normal sem o parâmetro continua inalterado', async () => {

@@ -231,7 +231,7 @@ critério de convergência.
 | 7.3 | 6. Atividade guiada | `design/approved/screens/07-atividade-guiada.png` | estado da rota `/now` | combinada com outra superfície | Combinada com Agora: a atividade atual permanece apresentada e respondida em `/projects/[projectId]/now`, com pergunta, explicação, exemplo, campos, salvamento e opção de pular, sem rota própria. |
 | 7.3 | 7. Jornada | `design/approved/screens/08-jornada.png` | `/projects/[projectId]/map` | convergida | implementada a partir do componente final aprovado no Claude Design ("Jornada — Hydra"); a Jornada passa a ser o conteúdo dominante de `/map` (rota e destino do shell continuam chamados Mapa); fases numeradas pela posição real do catálogo, fase e atividade atuais com destaque visual; atividades usam só os quatro estados reais (Concluída/Atual/Pendente/Pulada), com legenda coerente; único CTA "Continuar em Agora"; Diagnóstico da rota e "Onde este projeto começa" preservados dentro do bloco recolhível "Diagnóstico e ponto de partida" (inicia fechado, sem alterar formulários, ações ou mensagens); nenhuma mecânica, estado ou regra de domínio alterada; aprovada em desktop e mobile |
 | 7.3 | 8. Documento do projeto | ausente na montagem; usada a montagem geral e a visão aprovada do produto, mais o componente final aprovado no Claude Design | `/projects/[projectId]/document` | convergida | passa a funcionar como artefato documental contínuo e crescente: uma única superfície documental (não mais cartões independentes), fases como seções numeradas, atividades como subseções separadas por divisores discretos, respostas em fluxo documental sem truncamento, tags reais preservadas como metadados; ações "Editar" discretas com destinos já existentes preservados; único CTA "Continuar em Agora"; estado vazio convergido; nenhuma edição inline, nova rota, consulta, entidade ou regra de domínio criada — reaproveita integralmente `document-view.ts`; aprovada em desktop e mobile |
-| 7.3 | 9. Revisão e confirmação | `design/approved/screens/10-revisao-e-confirmacao.png` | `/projects/[projectId]/summary` | não auditada | — |
+| 7.3 | 9. Revisão e confirmação | `design/approved/screens/10-revisao-e-confirmacao.png` | `/projects/[projectId]/summary` | convergida | permanece exclusiva da Descoberta no Release 0 (sem generalização por fase, sem novo `completionMode`); passa a funcionar como checkpoint formal em uma única superfície, com contexto explícito "Fase 1 — Descoberta"; decisões principais (Problema, Público afetado, Estado atual, Resultado desejado) reunidas no "Resumo da fase" numa grade explícita (marcador/conteúdo/ação) com eixo de alinhamento consistente entre marcador, título, resposta, tags e link "Editar"; respostas completas continuam recolhíveis; "Pontos de atenção" usa somente `criteriaScopeConflict` e `discoveryOpenPendingItems`, com estado vazio explícito quando nenhum sinal existe; "Conferência" usa somente o checklist real já existente; links `Editar` preservam destino e rótulo acessível; "Voltar para edição" leva a `/now`; ação principal "Confirmar e avançar" usa a action `?/confirm` já existente, sem etapa nova; destino do shell continua chamado "Resumo"; aprovada em desktop e mobile por Matheus contra o artefato individual do Claude Design |
 | 7.4 | 10. Entregas | `design/approved/screens/11-entregas.png` | `/projects/[projectId]/deliveries` | não auditada | — |
 | 7.4 | 11. Cockpit | `design/approved/screens/12-cockpit.png` | `/projects/[projectId]/cockpit` | não auditada | — |
 | 7.4 | 12. Detalhe de item de atenção | `design/approved/screens/13-detalhe-item-atencao.png` | inexistente ou parcial, confirmar | não auditada | criar somente se sustentado pela mecânica existente |
@@ -312,7 +312,7 @@ Gate: usuário entende onde está; sabe a próxima ação; responde
 atividades; acompanha a jornada; consulta o artefato crescente; revisa e
 confirma decisões.
 
-Em andamento. Agora `convergida`; Atividade guiada `combinada com outra
+Concluída. Agora `convergida`; Atividade guiada `combinada com outra
 superfície` (Agora), sem rota própria de execução; Jornada `convergida`
 — `/projects/[projectId]/map` passa a apresentar a Jornada do artefato
 aprovado como conteúdo dominante, preservando integralmente Diagnóstico
@@ -324,8 +324,26 @@ Claude Design: superfície documental única (fases como seções, atividades
 como subseções, respostas em fluxo documental, tags como metadados),
 ações "Editar" discretas com destinos preservados, único CTA "Continuar
 em Agora", estado vazio convergido; nenhuma edição inline, nova rota,
-consulta, entidade ou regra de domínio criada. Próximo alvo da subetapa:
-Revisão e confirmação.
+consulta, entidade ou regra de domínio criada. Revisão e confirmação
+`convergida` — `/projects/[projectId]/summary` permanece exclusiva da
+Descoberta no Release 0 (sem generalização por fase, sem novo
+`completionMode`), agora como checkpoint formal em uma única superfície,
+com contexto explícito "Fase 1 — Descoberta"; decisões principais no
+"Resumo da fase" com alinhamento consistente entre marcador, título,
+resposta, tags e ação "Editar" (grade explícita marcador/conteúdo/ação);
+respostas completas continuam recolhíveis; "Pontos de atenção" usa
+somente `criteriaScopeConflict` e `discoveryOpenPendingItems`, com estado
+vazio quando nenhum sinal existe; "Conferência" usa somente o checklist
+real; "Voltar para edição" leva a `/now`; ação principal "Confirmar e
+avançar" usa a action `?/confirm` já existente; destino do shell continua
+chamado "Resumo"; aprovada em desktop e mobile.
+
+Gate atendido: usuário entende onde está (bloco "Onde estamos" em Agora e
+no Mapa); sabe a próxima ação (Agora); responde atividades (Agora,
+combinando Atividade guiada); acompanha a jornada (Mapa); consulta o
+artefato crescente (Documento do projeto); revisa e confirma as decisões
+da Descoberta (Revisão e confirmação). Todos os cinco alvos da ordem
+1–5 têm decisão explícita — **subetapa 7.3 concluída.**
 
 ##### 7.4 — Execução e controle
 

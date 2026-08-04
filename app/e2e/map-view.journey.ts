@@ -102,7 +102,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 
 		await page.getByRole('link', { name: 'Resumo' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
 
 		await page.getByRole('link', { name: 'Mapa' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/map`);
@@ -164,7 +164,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 
 		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await page.getByRole('button', { name: 'Confirmar resumo' }).click();
+		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
 		await answerAndContinue(page, {

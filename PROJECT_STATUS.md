@@ -139,12 +139,29 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   `/now`. Fundação visual ganhou o token `--hydra-editorial-accent`
   (vermelho queimado decorativo/editorial), separado de `--hydra-warning`
   (que permanece exclusivo a conteúdo gerado/derivado pelo sistema), sem
-  nenhuma mudança visual perceptível. Subetapa 7.3 segue em andamento;
-  próximo alvo: Revisão e confirmação. Quatro fatias preparatórias seguem
-  publicadas (estado ativo de navegação; bloco "Onde estamos" em Agora;
-  continuidade Mapa → Agora; orientação por projeto na Home), mas nenhuma
-  tela além de Agora, Jornada e Documento é declarada `convergida` apenas
-  por elas — a ordem operacional continua conduzida pelo roadmap.
+  nenhuma mudança visual perceptível. Revisão e confirmação está
+  `convergida` — `/projects/[projectId]/summary` permanece exclusiva da
+  Descoberta no Release 0 (sem generalização por fase, sem novo
+  `completionMode`), agora como checkpoint formal em uma única superfície,
+  com contexto explícito "Fase 1 — Descoberta"; decisões reais (Problema,
+  Público afetado, Estado atual, Resultado desejado) reunidas no "Resumo
+  da fase", com alinhamento consistente entre marcador, título, resposta,
+  tags e link de edição (grade explícita marcador/conteúdo/ação);
+  respostas completas continuam preservadas em área recolhível; "Pontos de atenção" usa
+  somente `criteriaScopeConflict` e `discoveryOpenPendingItems`, com
+  estado vazio explícito quando nenhum sinal existe; "Conferência" usa
+  somente o checklist real já existente; links individuais de edição
+  preservados; "Voltar para edição" leva a `/now`; ação principal
+  "Confirmar e avançar" preserva a action já existente; destino do shell
+  continua chamado "Resumo"; nenhuma mudança de domínio, catálogo,
+  transições ou persistência; aprovada em desktop e mobile. Com os cinco
+  alvos da ordem 1–5 decididos (Agora, Atividade guiada, Jornada,
+  Documento do projeto e Revisão e confirmação), a **subetapa 7.3 está
+  concluída**. Quatro fatias preparatórias seguem publicadas (estado ativo
+  de navegação; bloco "Onde estamos" em Agora; continuidade Mapa → Agora;
+  orientação por projeto na Home), reclassificadas como parte do que
+  sustentou a convergência das telas da subetapa. Próxima subetapa: 7.4 —
+  Execução e controle; próximo alvo operacional: Entregas.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -181,13 +198,15 @@ As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
 espinha mecânica do produto — estão concluídas. A etapa 7,
 "Convergência da experiência e das telas", está em andamento, agora com
 backlog operacional próprio no roadmap (inventário de telas, situação,
-sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1 e 7.2 estão concluídas;
-a subetapa 7.3 — Jornada guiada (ordem: Agora; Atividade guiada; Jornada;
-Documento; Revisão e confirmação) está em andamento, com Agora, Jornada e
-Documento do projeto já `convergidas` e Atividade guiada `combinada com
-Agora` (sem rota própria de execução); o próximo alvo da subetapa é
-Revisão e confirmação, sem reabrir desnecessariamente o domínio nem
-substituir mecânicas funcionais.
+sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1, 7.2 e 7.3 estão
+concluídas — Agora, Jornada, Documento do projeto e Revisão e confirmação
+`convergidas`, Atividade guiada `combinada com Agora` (sem rota própria de
+execução); o gate da subetapa (usuário entende onde está, sabe a próxima
+ação, responde atividades, acompanha a jornada, consulta o artefato
+crescente, revisa e confirma as decisões da Descoberta) está atendido. A
+próxima subetapa é 7.4 — Execução e controle, com Entregas como próximo
+alvo operacional, sem reabrir desnecessariamente o domínio nem substituir
+mecânicas funcionais.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

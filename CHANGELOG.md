@@ -254,7 +254,30 @@
   permanece reservado ao seu significado semântico original (conteúdo
   gerado/derivado pelo sistema — sugestões, alertas, conflitos), agora sem
   nenhum uso decorativo no Documento do projeto; nenhuma mudança visual
-  perceptível foi introduzida por essa separação.
+  perceptível foi introduzida por essa separação;
+- Resumo da descoberta (`/projects/[projectId]/summary`) converge para
+  "Revisão e confirmação": passa a se apresentar como um checkpoint formal
+  em uma única superfície, com contexto explícito "Fase 1 — Descoberta" —
+  permanece exclusiva da Descoberta no Release 0, sem generalizar o
+  mecanismo de confirmação para outras fases; as decisões principais
+  (Problema, Público afetado, Estado atual, Resultado desejado) passam a
+  aparecer no "Resumo da fase" com alinhamento consistente entre
+  marcador, título, resposta, tags e o link "Editar" (grade explícita
+  marcador/conteúdo/ação); as respostas detalhadas continuam preservadas
+  em área recolhível; "Pontos de atenção" consolida os sinais reais já existentes
+  (`criteriaScopeConflict` e `discoveryOpenPendingItems`, com estado vazio
+  explícito quando nenhum se aplica); o checklist existente passa a ser
+  apresentado como "Conferência"; os links "Editar" tornam-se discretos e
+  acessíveis, com rótulo descritivo e destino preservado, e podem quebrar
+  para uma segunda linha no mobile sem deslocar o marcador; a ação
+  "Voltar para edição" leva a `/now`; a ação principal, renomeada para
+  "Confirmar e avançar", preserva integralmente o comportamento de
+  confirmação já existente; destino do shell continua chamado "Resumo";
+  composição responsiva aprovada em desktop e mobile; nenhuma revisão
+  genérica por fase, novo `completionMode`, impacto ou hipótese fictícia,
+  nova rota, consulta, entidade, persistência ou regra de domínio foi
+  introduzida — tela marcada `convergida` no inventário da etapa 7, que
+  conclui a subetapa 7.3 (etapa 7 permanece em andamento).
 
 ### Reconciliado
 
