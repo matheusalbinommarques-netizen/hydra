@@ -88,10 +88,11 @@ export interface ScopeVersion {
 	confirmedAt: string | null;
 }
 
-// Cockpit — vertical 2, fatia "Impedimentos". Coleção independente do
-// catálogo metodológico: não referencia nenhuma ActivityDefinition, não
-// nasce de uma atividade guiada, não gera PendingItem — é manipulada
-// diretamente na tela própria (/cockpit). Mesmo molde de ScopeItem (id
+// Acompanhamento — vertical 2, fatia "Impedimentos". Coleção
+// independente do catálogo metodológico: não referencia nenhuma
+// ActivityDefinition, não nasce de uma atividade guiada, não gera
+// PendingItem — é manipulada diretamente na tela própria (/tracking). Mesmo
+// molde de ScopeItem (id
 // próprio, projectId, texto livre, createdAt/updatedAt), mas sem
 // bucket/order/effort/sourceSuggestionId: não se aplicam aqui (não há
 // "momento" agora/depois/fora, nem estimativa de tamanho, nem sugestão

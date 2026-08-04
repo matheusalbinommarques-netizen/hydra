@@ -137,7 +137,7 @@
 						</div>
 						<div class="featured-cta-row">
 							<a class="button" href="/projects/{featuredProject.projectId}/now">{ctaLabel(featuredProject)}</a>
-							<a class="overview-link" href="/projects/{featuredProject.projectId}/cockpit">Ver visão geral</a>
+							<a class="overview-link" href="/projects/{featuredProject.projectId}/tracking">Ver visão geral</a>
 						</div>
 					</section>
 				{/if}

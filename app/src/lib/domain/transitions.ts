@@ -620,7 +620,7 @@ export function confirmScopeVersion(
 	return { ok: true, value: next };
 }
 
-// --- Impediment (Cockpit, vertical 2) -------------------------------------
+// --- Impediment (Acompanhamento, vertical 2) ------------------------------
 // Coleção independente do catálogo — `catalog` é recebido por consistência
 // de assinatura com as demais transições (ScopeItem inclusive), mas nenhuma
 // destas funções o consulta: Impediment não referencia ActivityDefinition

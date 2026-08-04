@@ -96,7 +96,7 @@ export interface ScopeVersionView {
 	confirmedAt: string | null;
 }
 
-// Cockpit (vertical 2, "Impedimentos") — view leve de Impediment, sem
+// Acompanhamento (vertical 2, "Impedimentos") — view leve de Impediment, sem
 // projectId/updatedAt, que a interface não precisa. createdAt/resolvedAt
 // são exibidos como fato simples (mesmo padrão de PendingItemHistoryView),
 // nunca usados para calcular "há quanto tempo está aberto" nesta rodada.
@@ -147,8 +147,8 @@ export interface ProjectView {
 	// critério individual (ver orientation-engine/criteria-scope-conflict.ts).
 	// Sempre computado, nunca persistido.
 	criteriaScopeConflict: CriteriaScopeConflict;
-	// Cockpit (vertical 2, "Impedimentos") — todos os impedimentos (abertos e
-	// resolvidos); a tela /cockpit e a contagem em /now filtram por status
+	// Acompanhamento (vertical 2, "Impedimentos") — todos os impedimentos
+	// (abertos e resolvidos); a tela /tracking e a contagem em /now filtram por status
 	// diretamente, sem campo derivado extra aqui (mesmo padrão de
 	// openPendingItems.length usado direto no template).
 	impediments: ImpedimentView[];

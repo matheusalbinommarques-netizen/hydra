@@ -54,7 +54,7 @@ posteriores já publicados:
 - Resumo da descoberta;
 - Registros;
 - Escolha do próximo foco (montagem de escopo Agora/Depois/Fora);
-- Cockpit de impedimentos;
+- Acompanhamento de impedimentos;
 - documento crescente (painel "O que já sabemos") cobrindo Descoberta,
   Definição do produto e Estruturação;
 - Documento do projeto (`/document`): visão consolidada somente leitura
@@ -233,7 +233,7 @@ critério de convergência.
 | 7.3 | 8. Documento do projeto | ausente na montagem; usada a montagem geral e a visão aprovada do produto, mais o componente final aprovado no Claude Design | `/projects/[projectId]/document` | convergida | passa a funcionar como artefato documental contínuo e crescente: uma única superfície documental (não mais cartões independentes), fases como seções numeradas, atividades como subseções separadas por divisores discretos, respostas em fluxo documental sem truncamento, tags reais preservadas como metadados; ações "Editar" discretas com destinos já existentes preservados; único CTA "Continuar em Agora"; estado vazio convergido; nenhuma edição inline, nova rota, consulta, entidade ou regra de domínio criada — reaproveita integralmente `document-view.ts`; aprovada em desktop e mobile |
 | 7.3 | 9. Revisão e confirmação | `design/approved/screens/10-revisao-e-confirmacao.png` | `/projects/[projectId]/summary` | convergida | permanece exclusiva da Descoberta no Release 0 (sem generalização por fase, sem novo `completionMode`); passa a funcionar como checkpoint formal em uma única superfície, com contexto explícito "Fase 1 — Descoberta"; decisões principais (Problema, Público afetado, Estado atual, Resultado desejado) reunidas no "Resumo da fase" numa grade explícita (marcador/conteúdo/ação) com eixo de alinhamento consistente entre marcador, título, resposta, tags e link "Editar"; respostas completas continuam recolhíveis; "Pontos de atenção" usa somente `criteriaScopeConflict` e `discoveryOpenPendingItems`, com estado vazio explícito quando nenhum sinal existe; "Conferência" usa somente o checklist real já existente; links `Editar` preservam destino e rótulo acessível; "Voltar para edição" leva a `/now`; ação principal "Confirmar e avançar" usa a action `?/confirm` já existente, sem etapa nova; destino do shell continua chamado "Resumo"; aprovada em desktop e mobile por Matheus contra o artefato individual do Claude Design |
 | 7.4 | 10. Entregas | `design/approved/screens/11-entregas.png` | `/projects/[projectId]/deliveries` | convergida | referência de `11-entregas.png` tratada como não vinculante no conteúdo funcional (sprints/tempo de ciclo/erros de produção sem sustentação no domínio) — usada só como linguagem visual/composição, validada via proposta própria no Claude Design (desktop e mobile); estrutura de três grupos (A fazer/Em andamento/Concluído) mantida; card como elemento delimitado principal, coluna como superfície agrupadora discreta, bordas suavizadas; nenhuma mudança de domínio, projeção ou action |
-| 7.4 | 11. Cockpit | `design/approved/screens/12-cockpit.png` | `/projects/[projectId]/cockpit` | não auditada | — |
+| 7.4 | 11. Acompanhamento (ex-Cockpit) | `design/approved/screens/12-cockpit.png` | `/projects/[projectId]/tracking` | convergida | referência tratada como não vinculante na maior parte dos tiles (riscos ativos, mudanças em análise, decisões pendentes, marcos do projeto, pessoas envolvidas não têm sustentação no domínio) — usada só como hierarquia e composição; convergência consolida, com dados já existentes, situação atual (fase/atividade/progresso), síntese de Entregas e atenções reais (impedimentos e pendências abertas), preservando integralmente a gestão de impedimentos; rota migrada de `/cockpit` para `/tracking`, sem redirect (D026, `docs/07-management/decision-log.md`) |
 | 7.4 | 12. Detalhe de item de atenção | `design/approved/screens/13-detalhe-item-atencao.png` | inexistente ou parcial, confirmar | não auditada | criar somente se sustentado pela mecânica existente |
 | 7.4 | 13. Registros | `design/approved/screens/14-registros.png` | `/projects/[projectId]/records` | não auditada | — |
 | 7.5 | 14. Resultados e benefícios | `design/approved/screens/16-resultados-e-beneficios.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
@@ -347,7 +347,7 @@ da Descoberta (Revisão e confirmação). Todos os cinco alvos da ordem
 
 ##### 7.4 — Execução e controle
 
-Ordem: 1. Entregas; 2. Cockpit; 3. decisão sobre Detalhe de item; 4.
+Ordem: 1. Entregas; 2. Acompanhamento; 3. decisão sobre Detalhe de item; 4.
 Registros.
 
 Gate: trabalho real acompanhável; atenções e impedimentos claros;
@@ -355,10 +355,15 @@ histórico compreensível; sem competir em profundidade com Jira ou
 Linear.
 
 Em andamento. Entregas `convergida` — primeiro alvo da ordem, concluído.
-Próximo alvo: Acompanhamento — nome que substitui "Cockpit" na linguagem
-do produto (decisão já tomada); a implementação dessa renomeação (rota,
-domínio, documentação completa) ainda não pertence a esta entrega e
-continua usando "Cockpit" até ser feita.
+Acompanhamento (`/tracking`) `convergida` — segundo alvo da ordem,
+concluído: nome "Cockpit" abandonado definitivamente (título
+"Acompanhamento do projeto", slug `tracking`), rota migrada de `/cockpit`
+sem redirect (D026, `docs/07-management/decision-log.md`); superfície
+consolida situação atual, síntese de Entregas e atenções reais
+(impedimentos e pendências abertas) com dados já existentes, preservando
+integralmente a gestão de impedimentos. Próximo ponto da sequência:
+decisão sobre Detalhe de item de atenção; Registros permanece posterior a
+essa decisão — subetapa 7.4 permanece em andamento.
 
 ##### 7.5 — Resultados e encerramento
 

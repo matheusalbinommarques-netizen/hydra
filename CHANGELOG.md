@@ -298,7 +298,20 @@
   `convergida` no inventário da etapa 7; subetapa 7.4 permanece em
   andamento, com Acompanhamento como próximo alvo — nome que substitui
   "Cockpit" na linguagem do produto (decisão já tomada), renomeação ainda
-  não implementada nesta entrega.
+  não implementada nesta entrega;
+- Acompanhamento (`/projects/[projectId]/tracking`, segunda tela da
+  subetapa 7.4 do roadmap "Execução e controle") substitui definitivamente
+  o nome "Cockpit"; rota migrada de `/projects/[projectId]/cockpit`, sem
+  redirect (D026, `docs/07-management/decision-log.md`); passa a
+  consolidar, somente com dados já existentes, a situação atual do
+  projeto (fase, atividade e progresso da fase), a síntese de Entregas
+  (contagens por estado e itens realmente em andamento, sem promover
+  automaticamente o primeiro item de "A fazer" a "próxima entrega") e as
+  atenções reais (impedimentos abertos e pendências abertas); a gestão de
+  impedimentos (registrar, tipar, definir próxima ação, resolver, reabrir)
+  é preservada integralmente como parte desta superfície; um único acesso
+  "Continuar em Agora" fecha a página; tela marcada `convergida` no
+  inventário da etapa 7.
 
 ### Reconciliado
 

@@ -9,7 +9,7 @@
 	let view = $derived(data.view);
 	// Layout de duas colunas só quando a atividade atual pertence a
 	// Descoberta, Definição do produto ou Estruturação — as demais fases
-	// continuam sem Bancada, revisadas só quando o Cockpit/Colheita
+	// continuam sem Bancada, revisadas só quando Acompanhamento/Colheita
 	// chegarem lá. A coluna lateral em si (Progresso da fase) aparece em
 	// todas as fases — ver workspace-layout abaixo.
 	let isBancadaPhase = $derived(
@@ -75,7 +75,7 @@
 		<p class="impediments-indicator">
 			{openImpedimentsCount}
 			{openImpedimentsCount === 1 ? 'impedimento aberto' : 'impedimentos abertos'} —
-			<a href="/projects/{view.projectId}/cockpit">ver no Cockpit</a>
+			<a href="/projects/{view.projectId}/tracking">ver em Acompanhamento</a>
 		</p>
 	{/if}
 

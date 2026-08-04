@@ -169,10 +169,18 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   a estrutura de três grupos por estado de execução, card como elemento
   visual principal e coluna como superfície agrupadora discreta, com
   bordas suavizadas; nenhuma mudança de domínio, projeção
-  (`deliveries-view.ts`) ou action. Próximo alvo operacional:
-  Acompanhamento — nome que substitui "Cockpit" na linguagem do produto
-  (decisão já tomada); a renomeação completa (rota, domínio, documentação)
-  ainda não foi implementada.
+  (`deliveries-view.ts`) ou action. Acompanhamento (`/tracking`) está
+  `convergida` — substitui definitivamente "Cockpit" (título
+  "Acompanhamento do projeto", slug `tracking`), com a rota antiga
+  `/cockpit` migrada sem redirect (D026, `docs/07-management/decision-log.md`);
+  consolida, somente com dados já existentes, a situação atual do projeto
+  (fase, atividade e progresso da fase), a síntese de Entregas (contagens
+  por estado e itens realmente em andamento) e as atenções reais
+  (impedimentos abertos e pendências abertas), preservando integralmente a
+  gestão de impedimentos; aprovada em desktop e mobile. Subetapa 7.4
+  permanece em andamento — próximo ponto da sequência é a decisão sobre
+  Detalhe de item de atenção; Registros permanece posterior a essa
+  decisão.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -215,11 +223,12 @@ concluídas — Agora, Jornada, Documento do projeto e Revisão e confirmação
 execução); o gate da subetapa (usuário entende onde está, sabe a próxima
 ação, responde atividades, acompanha a jornada, consulta o artefato
 crescente, revisa e confirma as decisões da Descoberta) está atendido. A
-subetapa 7.4 — Execução e controle — está em andamento: Entregas
-`convergida`; próximo alvo operacional Acompanhamento — nome que
-substitui "Cockpit" na linguagem do produto (decisão já tomada), ainda
-não implementado — sem reabrir desnecessariamente o domínio nem
-substituir mecânicas funcionais.
+subetapa 7.4 — Execução e controle — está em andamento: Entregas e
+Acompanhamento (`/tracking`, nome que substitui definitivamente
+"Cockpit") `convergidas`; próximo ponto da sequência é a decisão sobre
+Detalhe de item de atenção — sem reabrir desnecessariamente o domínio
+nem substituir mecânicas funcionais; Registros permanece posterior a
+essa decisão.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

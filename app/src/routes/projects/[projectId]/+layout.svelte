@@ -20,7 +20,7 @@
 	// mudar nada do que já está aprovado nela.
 	const NAV_ITEMS = [
 		{ key: 'now', label: 'Agora' },
-		{ key: 'cockpit', label: 'Cockpit' },
+		{ key: 'tracking', label: 'Acompanhamento' },
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
 		{ key: 'deliveries', label: 'Entregas' },
@@ -69,10 +69,10 @@
 					Agora
 				</a>
 				<a
-					href="/projects/{projectId}/cockpit"
-					aria-current={isCurrentRoute(`/projects/${projectId}/cockpit`) ? 'page' : undefined}
+					href="/projects/{projectId}/tracking"
+					aria-current={isCurrentRoute(`/projects/${projectId}/tracking`) ? 'page' : undefined}
 				>
-					Cockpit
+					Acompanhamento
 				</a>
 			</div>
 			<span class="nav-divider" aria-hidden="true"></span>
@@ -226,7 +226,7 @@
 		gap: var(--space-4);
 	}
 
-	/* Destaque: os dois modos de trabalho (Agora/Cockpit) — estilo de aba,
+	/* Destaque: os dois modos de trabalho (Agora/Acompanhamento) — estilo de aba,
 	   mais peso visual, com o ativo marcado por fundo + sublinhado forte. */
 	.nav-primary {
 		display: flex;
@@ -260,7 +260,7 @@
 	}
 
 	/* Utilitário: telas de consulta (Mapa/Registros/Resumo/Exportar) —
-	   deliberadamente mais discreto, sem competir com Agora/Cockpit. */
+	   deliberadamente mais discreto, sem competir com Agora/Acompanhamento. */
 	.nav-secondary {
 		display: flex;
 		gap: var(--space-3);

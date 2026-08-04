@@ -238,7 +238,7 @@ Catálogo completo nesta versão: as seis fases têm `catalogStatus: complete`. 
 ### Impedimentos: atividade e entidade são complementares, não concorrentes
 
 A atividade `impedimentos_execucao` (Fase 5, acima) e a entidade operacional
-`Impediment` (Cockpit, `/cockpit`; antecipada de Release 3 por decisão
+`Impediment` (Acompanhamento, `/tracking`; antecipada de Release 3 por decisão
 explícita — ver D022 em `docs/07-management/decision-log.md`) tratam de
 impedimentos em níveis diferentes e não competem pelo mesmo dado.
 `impedimentos_execucao` é um retrato pontual em texto livre, sem
@@ -248,5 +248,5 @@ metodológico (sem `activityDefinitionId`, sem `PendingItem` associado):
 cada impedimento é um registro individual, classificado por tipo, com
 próxima ação e ciclo aberto/resolvido/reaberto próprio. Nenhum dos dois
 deriva ou sobrescreve o outro; a atividade é o registro periódico que
-entra no documento de acompanhamento do projeto, o Cockpit é o
+entra no documento de acompanhamento do projeto, Acompanhamento é o
 acompanhamento operacional contínuo.

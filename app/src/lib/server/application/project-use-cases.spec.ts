@@ -1033,7 +1033,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 	});
 });
 
-describe('createProjectUseCases — impedimentos (Cockpit)', () => {
+describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 	it('addImpediment cria o item e reflete em ProjectView.impediments', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();

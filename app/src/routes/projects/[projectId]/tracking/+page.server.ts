@@ -1,8 +1,12 @@
 import { fail } from '@sveltejs/kit';
+import { catalog } from '$lib/catalog';
 import type { ImpedimentType } from '$lib/domain';
+import { buildPhaseProgress } from '$lib/phase-progress';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
-import type { Actions } from './$types';
+import { buildJourneyContext } from '../now/journey-context';
+import { buildTrackingView } from './tracking-view';
+import type { Actions, PageServerLoad } from './$types';
 
 const IMPEDIMENT_TYPES: readonly ImpedimentType[] = [
 	'dependencia_externa',
@@ -23,6 +27,24 @@ function readTipo(formData: FormData, key: string): ImpedimentType | null {
 	const value = readString(formData, key);
 	return value && (IMPEDIMENT_TYPES as readonly string[]).includes(value) ? (value as ImpedimentType) : null;
 }
+
+export const load: PageServerLoad = async ({ parent }) => {
+	const { view } = await parent();
+	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
+	const phaseProgress = buildPhaseProgress(catalog, view);
+
+	const tracking = buildTrackingView({
+		journeyContext,
+		phaseProgress,
+		nextActivity: view.nextActivity,
+		scopeItems: view.scopeItems,
+		scopeVersion: view.scopeVersion,
+		impediments: view.impediments,
+		openPendingItems: view.openPendingItems
+	});
+
+	return { tracking };
+};
 
 export const actions: Actions = {
 	addImpediment: async ({ request, params }) => {

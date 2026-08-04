@@ -81,7 +81,7 @@ const impedimentosExecucao: ActivityDefinition = {
 			activityId: 'impedimentos_execucao',
 			label: 'Quais impedimentos existem agora?',
 			required: true,
-			help: 'Se não houver nenhum, registre isso mesmo. Este é um retrato pontual, sem histórico — para acompanhar cada impedimento individualmente até resolver, use o Cockpit.',
+			help: 'Se não houver nenhum, registre isso mesmo. Este é um retrato pontual, sem histórico — para acompanhar cada impedimento individualmente até resolver, use o Acompanhamento.',
 			placeholder: "Ex.: falta de acesso ao ambiente de testes; ou 'nenhum impedimento no momento'",
 			dataTarget: 'answer',
 			type: 'texto_longo'
