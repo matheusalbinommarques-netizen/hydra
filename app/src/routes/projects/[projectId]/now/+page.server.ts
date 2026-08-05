@@ -12,6 +12,27 @@ import type { Actions, PageServerLoad } from './$types';
 
 const DESCOBERTA_PHASE_ID = 'descoberta';
 
+// Conjunto fechado de origens de revisão reconhecidas (?from=<origem> na
+// carga, returnTo=<origem> na action `answer`) — Resumo e Registros, os dois
+// únicos lugares que hoje linkam para cá pedindo revisão de uma atividade já
+// concluída. Qualquer outro valor (string arbitrária, ausência do parâmetro)
+// vira `null` e cai no fluxo normal de Agora — nunca é usado para montar um
+// redirect diretamente.
+export type ReviewOrigin = 'summary' | 'records';
+
+function parseReviewOrigin(value: unknown): ReviewOrigin | null {
+	return value === 'summary' || value === 'records' ? value : null;
+}
+
+function reviewOriginRoute(projectId: string, origin: ReviewOrigin): string {
+	switch (origin) {
+		case 'summary':
+			return `/projects/${projectId}/summary`;
+		case 'records':
+			return `/projects/${projectId}/records`;
+	}
+}
+
 // Só estas três atividades ganham a apresentação "um campo por vez" nesta
 // rodada (Bancada, Descoberta + Definição do produto) — as demais 33
 // continuam mostrando todos os campos de uma vez, como hoje.
@@ -25,8 +46,8 @@ function findActivityDefinition(activityId: string): ActivityDefinition | undefi
 	return undefined;
 }
 
-// Edição a partir do Resumo da descoberta (?activity=<id>&from=summary): só
-// atividades required_fields da própria Descoberta, e só quando já
+// Edição a partir de Resumo ou Registros (?activity=<id>&from=summary|records):
+// só atividades required_fields da própria Descoberta, e só quando já
 // concluída — nunca uma atividade de outra fase, nem uma ainda não alcançada
 // pela Trilha A (não_iniciada/em_andamento nunca passa aqui), nem uma pulada
 // (essa continua exclusiva do fluxo de retomada de pendência, acima).
@@ -93,24 +114,28 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		? view.openPendingItems.find((item) => item.activityDefinitionId === resumeActivityId)
 		: undefined;
 
-	// Edição a partir do Resumo: parâmetro adicional e explícito
-	// (from=summary), só resolvido quando não é um caso de retomada de
-	// pendência. Parâmetro presente mas inválido (id de outra fase, id
-	// inexistente, ou atividade ainda não concluída) falha de forma segura —
-	// redireciona ao Resumo em vez de renderizar qualquer atividade.
-	const fromSummary = url.searchParams.get('from') === 'summary';
-	if (resumeActivityId && fromSummary && !resumingPendingItem) {
+	// Edição a partir de Resumo ou Registros: parâmetro adicional e explícito
+	// (from=summary | from=records), só resolvido quando não é um caso de
+	// retomada de pendência. Mesma regra de elegibilidade para as duas origens
+	// (findDescobertaConcluidaActivity: só atividade required_fields da
+	// própria Descoberta, já concluída). Parâmetro presente mas inválido (id
+	// de outra fase, id inexistente, ou atividade ainda não concluída) falha
+	// de forma segura — redireciona à própria origem em vez de renderizar
+	// qualquer atividade.
+	const reviewOrigin = parseReviewOrigin(url.searchParams.get('from'));
+	if (resumeActivityId && reviewOrigin && !resumingPendingItem) {
 		const editActivity = findDescobertaConcluidaActivity(view, resumeActivityId);
 		if (!editActivity) {
-			redirect(303, `/projects/${params.projectId}/summary`);
+			redirect(303, reviewOriginRoute(params.projectId, reviewOrigin));
 		}
-		// Edição a partir do Resumo sempre mostra o formulário inteiro, nunca
-		// campo a campo — quem chega aqui já concluiu a atividade e quer
-		// corrigir algo pontual, não ser levado pela sequência de novo.
+		// Edição a partir de Resumo/Registros sempre mostra o formulário
+		// inteiro, nunca campo a campo — quem chega aqui já concluiu a
+		// atividade e quer corrigir algo pontual, não ser levado pela
+		// sequência de novo.
 		return {
 			activity: editActivity,
 			isResuming: false,
-			isEditingFromSummary: true,
+			reviewOrigin,
 			stepKind: 'full' as const,
 			bancadaOverview,
 			journeyContext
@@ -125,7 +150,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	// ponto, então esse parâmetro é o único jeito de "segurar" a tela nesta
 	// mesma atividade só para os campos opcionais restantes.
 	const requestedField = url.searchParams.get('field');
-	if (resumeActivityId && requestedField === 'optional' && !resumingPendingItem && !fromSummary) {
+	if (resumeActivityId && requestedField === 'optional' && !resumingPendingItem && !reviewOrigin) {
 		const stepActivity = findActivityDefinition(resumeActivityId);
 		if (
 			stepActivity &&
@@ -140,7 +165,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 				return {
 					activity: { ...stepActivity, fields: unanswered },
 					isResuming: false,
-					isEditingFromSummary: false,
+					reviewOrigin: null,
 					stepKind: 'optional' as const,
 					bancadaOverview,
 					journeyContext
@@ -174,7 +199,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 			return {
 				activity: { ...activity, fields: [firstUnanswered] },
 				isResuming: false,
-				isEditingFromSummary: false,
+				reviewOrigin: null,
 				stepKind: 'required' as const,
 				bancadaOverview,
 				journeyContext,
@@ -189,7 +214,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	return {
 		activity,
 		isResuming: Boolean(resumingPendingItem),
-		isEditingFromSummary: false,
+		reviewOrigin: null,
 		stepKind: 'full' as const,
 		bancadaOverview,
 		journeyContext,
@@ -204,16 +229,17 @@ export const actions: Actions = {
 		if (typeof activityDefinitionId !== 'string' || !activityDefinitionId) {
 			return fail(400, { message: 'Atividade inválida.' });
 		}
-		// Marca a origem "edição a partir do Resumo" (ActivityForm/+page.svelte
-		// só a inclui quando data.isEditingFromSummary é true) — decide para
-		// onde ir após salvar, sem afetar em nada a validação/persistência.
-		const returnTo = formData.get('returnTo');
-		const returnToSummary = returnTo === 'summary';
+		// Marca a origem de revisão (+page.svelte só inclui este campo quando
+		// data.reviewOrigin não é null) — decide para onde voltar após salvar,
+		// sem afetar em nada a validação/persistência. Validado contra o mesmo
+		// conjunto fechado do loader — nunca usado para montar um redirect
+		// diretamente a partir do valor recebido no formulário.
+		const returnTarget = parseReviewOrigin(formData.get('returnTo'));
 
 		// Presentes só quando o formulário renderizado é uma etapa da
 		// progressão campo a campo (ver now/+page.svelte) — ausentes em
 		// qualquer submissão de formulário inteiro (as 33 atividades comuns,
-		// retomada de pulada, edição a partir do Resumo).
+		// retomada de pulada, edição a partir de Resumo/Registros).
 		const stepKindRaw = formData.get('_stepKind');
 		const stepKind = stepKindRaw === 'required' || stepKindRaw === 'optional' ? stepKindRaw : null;
 		const stepFieldIdsRaw = formData.get('_stepFieldIds');
@@ -277,12 +303,12 @@ export const actions: Actions = {
 			return fail(400, { message: mapUseCaseError(result.error), values });
 		}
 
-		if (returnToSummary) {
-			// Edição a partir do Resumo nunca avança para a próxima atividade da
-			// jornada — sempre volta ao Resumo, sucesso ou não a atividade
-			// editada permanecer concluída (a invalidação, se aplicável, já
-			// aconteceu dentro de answerActivity).
-			redirect(303, `/projects/${params.projectId}/summary`);
+		if (returnTarget) {
+			// Edição a partir de Resumo/Registros nunca avança para a próxima
+			// atividade da jornada — sempre volta à própria origem, sucesso ou
+			// não a atividade editada permanecer concluída (a invalidação, se
+			// aplicável, já aconteceu dentro de answerActivity).
+			redirect(303, reviewOriginRoute(params.projectId, returnTarget));
 		}
 
 		if (stepKind && activity && activity.completionMode === 'required_fields') {

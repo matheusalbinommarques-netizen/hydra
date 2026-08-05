@@ -126,7 +126,7 @@ Não existe uma entidade `Context` persistida separadamente do Projeto. `Project
 
 ## 5. Hipóteses — projeção, não entidade
 
-Não existe `Hypothesis` persistida nesta versão. Hipóteses exibidas (ex.: em Registros) são **derivadas** em tempo de leitura, de duas fontes combinadas (deduplicadas por texto):
+Não existe `Hypothesis` persistida nesta versão. Hipóteses derivadas permanecem disponíveis como projeção para consumo pelas superfícies que suportem esse conteúdo, calculadas em tempo de leitura a partir de duas fontes combinadas (deduplicadas por texto):
 
 1. toda `Answer` cujo `FieldDefinition.semanticRole == hypothesis` e valor não vazio — nesta versão do catálogo, o único campo com esse papel é o campo opcional "hipótese" da atividade "Problema ou oportunidade";
 2. `ScopeVersion.hypothesis`, apenas quando `ScopeVersion.confirmedAt` não é nulo (versão de escopo confirmada) — ver §7A.

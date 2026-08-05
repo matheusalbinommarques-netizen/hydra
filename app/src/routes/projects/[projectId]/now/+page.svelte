@@ -109,8 +109,10 @@
 	{:else if data.activity}
 		<section class="next-action">
 			<p class="eyebrow">
-				{#if data.isEditingFromSummary}
+				{#if data.reviewOrigin === 'summary'}
 					Editando a partir do Resumo da descoberta
+				{:else if data.reviewOrigin === 'records'}
+					Revisando a partir de Registros
 				{:else if data.isResuming}
 					Retomando etapa pulada
 				{:else if data.stepKind === 'optional'}
@@ -137,19 +139,20 @@
 							await goto(`/projects/${view.projectId}/now`, { invalidateAll: true });
 							return;
 						}
-						// Edição a partir do Resumo: em sucesso a própria action
-						// redireciona (303) para /summary — update() já segue esse
-						// redirect. Progressão campo a campo: em sucesso a própria
-						// action redireciona (303) para o próximo campo/etapa/atividade
-						// — update() também já segue esses redirects normalmente. Em
-						// erro, permanece nesta tela normalmente em ambos os casos.
+						// Edição a partir de Resumo/Registros: em sucesso a própria
+						// action redireciona (303) para a origem (/summary ou
+						// /records) — update() já segue esse redirect. Progressão
+						// campo a campo: em sucesso a própria action redireciona (303)
+						// para o próximo campo/etapa/atividade — update() também já
+						// segue esses redirects normalmente. Em erro, permanece nesta
+						// tela normalmente em ambos os casos.
 						await update();
 					};
 				}}
 			>
 				<input type="hidden" name="activityDefinitionId" value={data.activity.id} />
-				{#if data.isEditingFromSummary}
-					<input type="hidden" name="returnTo" value="summary" />
+				{#if data.reviewOrigin}
+					<input type="hidden" name="returnTo" value={data.reviewOrigin} />
 				{/if}
 				{#if data.stepKind !== 'full'}
 					<input type="hidden" name="_stepKind" value={data.stepKind} />
@@ -160,7 +163,12 @@
 					values={form?.values ?? view.answers}
 					fieldSuggestions={view.fieldSuggestions}
 				/>
-				<button type="submit">{data.isEditingFromSummary ? 'Salvar e voltar ao Resumo' : 'Salvar e continuar'}</button
+				<button type="submit"
+					>{data.reviewOrigin === 'summary'
+						? 'Salvar e voltar ao Resumo'
+						: data.reviewOrigin === 'records'
+							? 'Salvar e voltar a Registros'
+							: 'Salvar e continuar'}</button
 				>
 			</form>
 
@@ -174,7 +182,7 @@
 				</p>
 			{/if}
 
-			{#if data.activity.allowsSkip && !data.isResuming && !data.isEditingFromSummary}
+			{#if data.activity.allowsSkip && !data.isResuming && !data.reviewOrigin}
 				<SkipActivityConfirm activity={data.activity} />
 			{/if}
 		</section>

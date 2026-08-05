@@ -1,186 +1,346 @@
 <script lang="ts">
 	let { data } = $props();
-
-	const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
-		dateStyle: 'short',
-		timeStyle: 'short'
-	});
-
-	function formatDate(iso: string): string {
-		const parsed = new Date(iso);
-		return Number.isNaN(parsed.getTime()) ? iso : dateFormatter.format(parsed);
-	}
+	let projectId = $derived(data.view.projectId);
 </script>
 
 <svelte:head>
-	<title>Registros</title>
+	<title>Registros do projeto — {data.view.projectName ?? 'Hydra'}</title>
 </svelte:head>
 
-<h1>Registros</h1>
-<p class="subtitle">Respostas registradas e pendências do projeto.</p>
+<h1>Registros do projeto</h1>
+<p class="subtitle">Respostas registradas e pendências resolvidas ao longo de todo o projeto.</p>
 
-<section aria-labelledby="respostas-heading">
-	<h2 id="respostas-heading">Respostas</h2>
+{#snippet resolvedSection()}
+	<section class="card resolved" aria-labelledby="resolved-heading">
+		<h2 id="resolved-heading">Pendências resolvidas</h2>
+		{#if data.resolvedPendingItems.length === 0}
+			<p class="empty">Nenhuma pendência resolvida ainda.</p>
+		{:else}
+			<ul class="resolved-list">
+				{#each data.resolvedPendingItems as item (item.id)}
+					<li>
+						<p class="resolved-label">{item.label}</p>
+						<p class="resolved-detail">{item.detail}</p>
+						<p class="resolved-meta">Atividade: {item.activityTitle} · Resolvida</p>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+{/snippet}
 
-	{#if data.phases.length === 0}
-		<p class="empty">Nenhuma resposta registrada ainda.</p>
-	{:else}
-		<div class="phases">
-			{#each data.phases as phase (phase.phaseId)}
-				<div class="phase-group">
-					<h3>{phase.phaseLabel}</h3>
-					{#each phase.activities as activity (activity.activityId)}
-						<div class="activity-group">
-							<h4>{activity.title}</h4>
-							<dl>
-								{#each activity.fields as field (field.id)}
+{#snippet continuitySection()}
+	<section class="card continuity" aria-labelledby="continuity-heading">
+		<p class="eyebrow" id="continuity-heading">Continuidade</p>
+		<a class="continuity-cta" href="/projects/{projectId}/now">Continuar em Agora →</a>
+	</section>
+{/snippet}
+
+{#if data.phases.length === 0}
+	<div class="empty-state card">
+		<p class="empty-title">Nenhuma resposta registrada ainda</p>
+		<p class="empty-description">
+			Conforme as fases forem respondidas em Agora, seus registros passarão a aparecer aqui.
+		</p>
+	</div>
+
+	{@render resolvedSection()}
+	{@render continuitySection()}
+{:else}
+	<div class="layout">
+		<nav class="index" aria-label="Índice de fases">
+			<p class="eyebrow">Índice</p>
+			<div class="index-list">
+				{#each data.phases as phase (phase.phaseId)}
+					<a class="index-item" href="#fase-{phase.phaseId}">
+						<span>{phase.phaseLabel}</span>
+						<span class="index-count">{phase.answerCount}</span>
+					</a>
+				{/each}
+			</div>
+		</nav>
+
+		<div class="content">
+			{#each data.phases as phase, phaseIndex (phase.phaseId)}
+				<section class="card phase-card" id="fase-{phase.phaseId}" aria-labelledby="fase-{phase.phaseId}-heading">
+					<h2 id="fase-{phase.phaseId}-heading"><span class="phase-number">{phaseIndex + 1}</span> — {phase.phaseLabel}</h2>
+					{#each phase.activities as activity, activityIndex (activity.activityId)}
+						{#if activityIndex > 0}
+							<div class="activity-divider" aria-hidden="true"></div>
+						{/if}
+						<div class="activity">
+							<h3>{activity.title}</h3>
+							{#each activity.fields as field (field.id)}
+								<dl>
 									<dt>{field.label}</dt>
 									<dd>{field.value}</dd>
-								{/each}
-							</dl>
+								</dl>
+							{/each}
+							{#if activity.editHref !== null}
+								<a class="edit-link" aria-label={`Revisar ${activity.title} na atividade`} href={activity.editHref}>
+									Revisar na atividade →
+								</a>
+							{/if}
 						</div>
 					{/each}
-				</div>
+				</section>
 			{/each}
+
+			{@render resolvedSection()}
+			{@render continuitySection()}
 		</div>
-	{/if}
-</section>
-
-<section aria-labelledby="pendencias-abertas-heading">
-	<h2 id="pendencias-abertas-heading">Pendências abertas</h2>
-
-	{#if data.openPendingItems.length === 0}
-		<p class="empty">Nenhuma pendência aberta.</p>
-	{:else}
-		<ul class="pending-list">
-			{#each data.openPendingItems as item (item.id)}
-				<li>
-					<strong>{item.label}</strong>
-					<p class="detail">{item.detail}</p>
-					<p class="meta">
-						Atividade: {item.activityTitle} · Status: Aberta · Criada em {formatDate(item.createdAt)}
-					</p>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</section>
-
-<section aria-labelledby="pendencias-resolvidas-heading">
-	<h2 id="pendencias-resolvidas-heading">Pendências resolvidas</h2>
-
-	{#if data.resolvedPendingItems.length === 0}
-		<p class="empty">Nenhuma pendência resolvida.</p>
-	{:else}
-		<ul class="pending-list">
-			{#each data.resolvedPendingItems as item (item.id)}
-				<li>
-					<strong>{item.label}</strong>
-					<p class="detail">{item.detail}</p>
-					<p class="meta">
-						Atividade: {item.activityTitle} · Status: Resolvida · Criada em {formatDate(item.createdAt)}
-						{#if item.resolvedAt}
-							· Resolvida em {formatDate(item.resolvedAt)}
-						{/if}
-					</p>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</section>
+	</div>
+{/if}
 
 <style>
 	.subtitle {
 		color: var(--hydra-muted);
-		margin-bottom: 1.5rem;
+		max-width: 44rem;
+		line-height: 1.55;
+		margin: 0 0 var(--space-5);
 	}
 
-	section {
-		margin-bottom: 2rem;
+	.card {
+		border: 1px solid rgba(101, 104, 108, 0.25);
+		border-radius: var(--hydra-radius);
+		background: var(--hydra-surface-raised);
+		padding: var(--space-5);
+		margin-bottom: var(--space-4);
 	}
 
-	section h2 {
-		font-size: 1rem;
-		margin: 0 0 0.75rem;
+	.eyebrow {
+		margin: 0 0 var(--space-4);
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--hydra-muted);
 	}
 
 	.empty {
 		color: var(--hydra-muted);
-		font-size: 0.9rem;
+		font-size: var(--font-size-meta);
+		font-style: italic;
 		margin: 0;
 	}
 
-	.phases {
+	.empty-state {
+		text-align: center;
+		padding: var(--space-6) var(--space-5);
+	}
+
+	.empty-title {
+		margin: 0 0 var(--space-2);
+		font-weight: 700;
+		font-size: 1.05rem;
+	}
+
+	.empty-description {
+		margin: 0 auto;
+		max-width: 32rem;
+		font-size: 0.95rem;
+		color: var(--hydra-muted);
+		line-height: 1.55;
+	}
+
+	/* Layout principal — índice à esquerda (consulta rápida, sem depender de
+	   rolagem cega), conteúdo à direita. Sticky simples (sem scroll interno
+	   próprio, sem JS): o índice acompanha o scroll da página, nunca cria uma
+	   segunda área rolável. */
+	.layout {
+		display: grid;
+		grid-template-columns: 240px 1fr;
+		gap: var(--space-6);
+		align-items: start;
+	}
+
+	.index {
+		position: sticky;
+		top: var(--space-5);
+	}
+
+	.index-list {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
 	}
 
-	.phase-group {
-		border: 1px solid var(--hydra-border);
-		border-radius: 10px;
-		padding: 1rem 1.25rem;
-		background: var(--hydra-surface);
+	.index-item {
+		display: flex;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: var(--space-3) 0;
+		border-bottom: 1px solid rgba(101, 104, 108, 0.2);
+		text-decoration: none;
+		color: var(--hydra-text);
+		font-size: var(--font-size-meta);
+		font-weight: 600;
 	}
 
-	.phase-group h3 {
-		margin: 0 0 0.75rem;
-		font-size: 0.95rem;
+	.index-item:hover {
+		color: var(--hydra-editorial-accent);
 	}
 
-	.activity-group + .activity-group {
-		margin-top: 1rem;
-		padding-top: 1rem;
-		border-top: 1px solid var(--hydra-border);
+	.index-item:last-child {
+		border-bottom: none;
 	}
 
-	.activity-group h4 {
-		margin: 0 0 0.5rem;
-		font-size: 0.85rem;
+	.index-count {
+		color: var(--hydra-muted);
+		font-weight: 500;
+	}
+
+	.content {
+		min-width: 0;
+	}
+
+	.phase-card h2 {
+		margin: 0 0 var(--space-4);
+		font-size: var(--font-size-subtitle);
+	}
+
+	.phase-number {
+		color: var(--hydra-editorial-accent);
+	}
+
+	.activity-divider {
+		border-top: 1px solid rgba(101, 104, 108, 0.15);
+		margin: var(--space-4) 0;
+	}
+
+	.activity h3 {
+		margin: 0 0 var(--space-2);
+		font-size: var(--font-size-caption);
+		font-weight: 700;
 		color: var(--hydra-muted);
 	}
 
-	dl {
+	.activity dl {
 		margin: 0;
 	}
 
-	dt {
-		font-size: 0.8rem;
-		color: var(--hydra-muted);
-		margin-top: 0.5rem;
+	.activity dl + dl {
+		margin-top: var(--space-3);
 	}
 
-	dd {
-		margin: 0.15rem 0 0;
+	.activity dt {
+		font-size: var(--font-size-meta);
+		color: var(--hydra-muted);
+		margin: 0;
+	}
+
+	.activity dd {
+		margin: var(--space-1) 0 0;
 		overflow-wrap: break-word;
 		white-space: pre-wrap;
+		line-height: 1.55;
 	}
 
-	.pending-list {
+	.edit-link {
+		display: flex;
+		align-items: center;
+		margin-top: var(--space-3);
+		min-height: 44px;
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		width: fit-content;
+	}
+
+	.resolved-list {
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: var(--space-3);
 	}
 
-	.pending-list li {
-		border: 1px solid var(--hydra-border);
-		border-radius: 10px;
-		padding: 0.85rem 1.1rem;
-		background: var(--hydra-surface);
+	.resolved-list li {
+		border: 1px dashed rgba(101, 104, 108, 0.35);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-4);
 	}
 
-	.pending-list .detail {
-		margin: 0.35rem 0 0;
+	.resolved-label {
+		margin: 0;
+		font-weight: 600;
+		font-size: var(--font-size-meta);
+	}
+
+	.resolved-detail {
+		margin: var(--space-1) 0 0;
 		color: var(--hydra-muted);
+		font-size: var(--font-size-meta);
 		overflow-wrap: break-word;
 	}
 
-	.pending-list .meta {
-		margin: 0.5rem 0 0;
-		font-size: 0.8rem;
+	.resolved-meta {
+		margin: var(--space-2) 0 0;
+		font-size: var(--font-size-caption);
 		color: var(--hydra-muted);
+	}
+
+	/* Continuidade — ponte discreta de volta a Agora, mesmo padrão de
+	   /tracking: não deve competir visualmente com o CTA de próxima ação que
+	   já vive lá. */
+	.continuity {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-5);
+		background: var(--hydra-surface);
+		margin-bottom: 0;
+	}
+
+	.continuity .eyebrow {
+		margin: 0;
+		font-weight: 700;
+		font-size: var(--font-size-body);
+		text-transform: none;
+		letter-spacing: normal;
+		color: var(--hydra-text);
+	}
+
+	.continuity-cta {
+		font-size: var(--font-size-meta);
+		font-weight: 700;
+		padding: var(--space-3) var(--space-5);
+		border-radius: var(--hydra-radius);
+		background: var(--hydra-accent);
+		color: var(--hydra-surface);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.continuity-cta:hover {
+		text-decoration: underline;
+	}
+
+	@media (max-width: 860px) {
+		.layout {
+			grid-template-columns: 1fr;
+		}
+
+		.index {
+			position: static;
+		}
+
+		.index-item {
+			padding: var(--space-3) var(--space-4);
+			min-height: 44px;
+		}
+
+		.continuity {
+			flex-direction: column;
+			align-items: stretch;
+			text-align: left;
+		}
+
+		.continuity-cta {
+			text-align: center;
+			min-height: 44px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
 	}
 </style>

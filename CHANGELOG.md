@@ -311,7 +311,25 @@
   impedimentos (registrar, tipar, definir próxima ação, resolver, reabrir)
   é preservada integralmente como parte desta superfície; um único acesso
   "Continuar em Agora" fecha a página; tela marcada `convergida` no
-  inventário da etapa 7.
+  inventário da etapa 7;
+- Registros (`/projects/[projectId]/records`, quarto e último alvo da
+  ordem da subetapa 7.4 do roadmap "Execução e controle") converge como a
+  memória consultável do projeto: um índice lista somente as fases com
+  respostas registradas, com contagem determinística por fase; respostas
+  de todas as fases do catálogo continuam apresentadas por fase,
+  atividade e campo; pendências abertas deixam de aparecer nesta
+  superfície — já cobertas por Acompanhamento e pelo próprio ponto de
+  resolução em Agora —, e pendências resolvidas permanecem como
+  histórico; revisar uma atividade concluída da Descoberta a partir de
+  Registros passa a ter texto, ação e retorno próprios — ao salvar, volta
+  a Registros, não mais ao Resumo; o fluxo equivalente de revisão
+  iniciado a partir do Resumo continua preservado, com seu próprio
+  retorno; as seis categorias ilustrativas do mockup de referência
+  (Escopo confirmado, Em construção, Hipóteses, Lacunas, Ambiguidade,
+  Entrega) não têm sustentação no domínio atual e não se tornaram
+  requisitos (D028, `docs/07-management/decision-log.md`); tela marcada
+  `convergida` no inventário da etapa 7 — com os quatro alvos da ordem
+  decididos, subetapa 7.4 concluída.
 
 ### Reconciliado
 

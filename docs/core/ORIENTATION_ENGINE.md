@@ -88,7 +88,7 @@ Mecanismo irmão do Resumo (§7), mas disparado por edição na própria tela em
 
 ## 8. Projeção de hipóteses
 
-Hipóteses exibidas (ex.: Registros) combinam duas fontes, deduplicadas por texto:
+A projeção de hipóteses, disponível para consumo pelas superfícies que suportem esse conteúdo, combina duas fontes, deduplicadas por texto:
 1. toda `Answer` cujo `FieldDefinition.semanticRole == hypothesis` e valor não vazio, no momento da leitura;
 2. `ScopeVersion.hypothesis`, apenas quando `ScopeVersion.confirmedAt` não é nulo.
 

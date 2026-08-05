@@ -1,9 +1,15 @@
 // Projeção pura de leitura para a Tela Registros — cruza catalog/ (estático)
-// com os campos já expostos por ProjectView (respostas e histórico de
-// pendências). Não lê nem grava persistência, não conhece ProjectState bruto.
+// com os campos já expostos por ProjectView (respostas, histórico de
+// pendências resolvidas e status de atividade). Não lê nem grava
+// persistência, não conhece ProjectState bruto.
+//
+// Pendências abertas não fazem parte deste contrato: já pertencem a
+// Acompanhamento (síntese de atenções, tracking-view.ts) e a Agora (ponto de
+// resolução) — mostrá-las aqui duplicaria o mesmo dado sob outro nome
+// (auditoria de sustentação semântica das categorias do mockup, etapa 7.4).
 
 import { decodeMultiSelectValue } from '$lib/domain';
-import type { ActivityDefinition, Catalog } from '$lib/domain';
+import type { ActivityDefinition, ActivityStatus, Catalog } from '$lib/domain';
 
 export interface RecordsPendingItemInput {
 	id: string;
@@ -16,8 +22,10 @@ export interface RecordsPendingItemInput {
 }
 
 export interface RecordsViewInput {
+	projectId: string;
 	answers: Record<string, string>;
 	pendingItemHistory: RecordsPendingItemInput[];
+	activityStatuses: Record<string, ActivityStatus>;
 }
 
 export interface RecordsAnswerFieldView {
@@ -30,29 +38,33 @@ export interface RecordsActivityAnswersView {
 	activityId: string;
 	title: string;
 	fields: RecordsAnswerFieldView[];
+	// Destino completo de edição, ou null quando não há um real. A
+	// apresentação só decide se renderiza o link — não monta rota, não conhece
+	// a regra de editabilidade. Ver buildEditHref() para a regra e a
+	// justificativa do parâmetro `from`.
+	editHref: string | null;
 }
 
 export interface RecordsPhaseAnswersView {
 	phaseId: string;
 	phaseLabel: string;
+	answerCount: number;
 	activities: RecordsActivityAnswersView[];
 }
 
-export interface RecordsPendingItemView {
+export interface RecordsResolvedPendingItemView {
 	id: string;
 	activityTitle: string;
 	label: string;
 	detail: string;
-	status: 'aberta' | 'resolvida';
-	createdAt: string;
-	resolvedAt?: string;
 }
 
 export interface RecordsView {
 	phases: RecordsPhaseAnswersView[];
-	openPendingItems: RecordsPendingItemView[];
-	resolvedPendingItems: RecordsPendingItemView[];
+	resolvedPendingItems: RecordsResolvedPendingItemView[];
 }
+
+const EDITABLE_PHASE_ID = 'descoberta';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -62,17 +74,27 @@ function findActivityDefinition(catalog: Catalog, activityDefinitionId: string):
 	return undefined;
 }
 
-function buildPendingItemView(catalog: Catalog, item: RecordsPendingItemInput): RecordsPendingItemView {
-	const activity = findActivityDefinition(catalog, item.activityDefinitionId);
-	return {
-		id: item.id,
-		activityTitle: activity?.title ?? item.activityDefinitionId,
-		label: item.label,
-		detail: item.detail,
-		status: item.status,
-		createdAt: item.createdAt,
-		resolvedAt: item.resolvedAt
-	};
+// Único mecanismo de edição pós-conclusão que existe hoje é
+// now/+page.server.ts (findDescobertaConcluidaActivity), restrito a
+// atividades required_fields já concluídas da própria Descoberta — mesma
+// restrição que document-view.ts já aplica (EDITABLE_PHASE_ID). Não amplia
+// para outras fases: fora da Descoberta não existe destino real.
+//
+// `from=records` é reconhecido por now/+page.server.ts (ReviewOrigin =
+// 'summary' | 'records') como origem de revisão própria de Registros — texto,
+// botão e retorno pós-salvamento específicos de Registros, distintos dos de
+// `from=summary` (usado pelo Resumo). Não é o mesmo mecanismo do Documento
+// (que usa `from=summary`, sem retorno próprio): Registros tem sua própria
+// origem, com seu próprio destino de retorno.
+function buildEditHref(
+	projectId: string,
+	phaseId: string,
+	activityId: string,
+	activityStatuses: Record<string, ActivityStatus>
+): string | null {
+	if (phaseId !== EDITABLE_PHASE_ID) return null;
+	if (activityStatuses[activityId] !== 'concluída') return null;
+	return `/projects/${projectId}/now?activity=${activityId}&from=records`;
 }
 
 export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): RecordsView {
@@ -100,22 +122,32 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 				});
 
 			if (fields.length > 0) {
-				activities.push({ activityId: activity.id, title: activity.title, fields });
+				activities.push({
+					activityId: activity.id,
+					title: activity.title,
+					fields,
+					editHref: buildEditHref(input.projectId, phase.id, activity.id, input.activityStatuses)
+				});
 			}
 		}
 
 		if (activities.length > 0) {
-			phases.push({ phaseId: phase.id, phaseLabel: phase.label, activities });
+			const answerCount = activities.reduce((total, activity) => total + activity.fields.length, 0);
+			phases.push({ phaseId: phase.id, phaseLabel: phase.label, answerCount, activities });
 		}
 	}
 
-	const openPendingItems = input.pendingItemHistory
-		.filter((item) => item.status === 'aberta')
-		.map((item) => buildPendingItemView(catalog, item));
-
-	const resolvedPendingItems = input.pendingItemHistory
+	const resolvedPendingItems: RecordsResolvedPendingItemView[] = input.pendingItemHistory
 		.filter((item) => item.status === 'resolvida')
-		.map((item) => buildPendingItemView(catalog, item));
+		.map((item) => {
+			const activity = findActivityDefinition(catalog, item.activityDefinitionId);
+			return {
+				id: item.id,
+				activityTitle: activity?.title ?? item.activityDefinitionId,
+				label: item.label,
+				detail: item.detail
+			};
+		});
 
-	return { phases, openPendingItems, resolvedPendingItems };
+	return { phases, resolvedPendingItems };
 }

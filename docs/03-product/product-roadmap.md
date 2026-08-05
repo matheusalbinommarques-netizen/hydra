@@ -235,7 +235,7 @@ critério de convergência.
 | 7.4 | 10. Entregas | `design/approved/screens/11-entregas.png` | `/projects/[projectId]/deliveries` | convergida | referência de `11-entregas.png` tratada como não vinculante no conteúdo funcional (sprints/tempo de ciclo/erros de produção sem sustentação no domínio) — usada só como linguagem visual/composição, validada via proposta própria no Claude Design (desktop e mobile); estrutura de três grupos (A fazer/Em andamento/Concluído) mantida; card como elemento delimitado principal, coluna como superfície agrupadora discreta, bordas suavizadas; nenhuma mudança de domínio, projeção ou action |
 | 7.4 | 11. Acompanhamento (ex-Cockpit) | `design/approved/screens/12-cockpit.png` | `/projects/[projectId]/tracking` | convergida | referência tratada como não vinculante na maior parte dos tiles (riscos ativos, mudanças em análise, decisões pendentes, marcos do projeto, pessoas envolvidas não têm sustentação no domínio) — usada só como hierarquia e composição; convergência consolida, com dados já existentes, situação atual (fase/atividade/progresso), síntese de Entregas e atenções reais (impedimentos e pendências abertas), preservando integralmente a gestão de impedimentos; rota migrada de `/cockpit` para `/tracking`, sem redirect (D026, `docs/07-management/decision-log.md`) |
 | 7.4 | 12. Detalhe de item de atenção | `design/approved/screens/13-detalhe-item-atencao.png` | Acompanhamento (`/tracking`, impedimentos) e Agora (`/now`, pendências) | combinada com outra superfície | decisão documental (D027, `docs/07-management/decision-log.md`): sem rota dedicada — impedimentos já têm gestão completa em Acompanhamento, pendências já encaminham para Agora; campos do mockup (responsável, evidência, estado de validação, beneficiário) não têm sustentação no domínio atual |
-| 7.4 | 13. Registros | `design/approved/screens/14-registros.png` | `/projects/[projectId]/records` | não auditada | — |
+| 7.4 | 13. Registros | `design/approved/screens/14-registros.png` | `/projects/[projectId]/records` | convergida | classificada como superfície própria reduzida (D028, `docs/07-management/decision-log.md`) — a redução é nos tipos de conteúdo, não nas fases: índice determinístico das fases com resposta, respostas de todas as fases por fase/atividade/campo, pendências resolvidas como histórico exclusivo; pendências abertas removidas (já cobertas por Acompanhamento e Agora); as seis categorias ilustrativas do mockup (Escopo confirmado, Em construção, Hipóteses, Lacunas, Ambiguidade, Entrega) não têm sustentação no domínio e não viraram requisitos; revisão de atividade concluída da Descoberta a partir de Registros usa origem própria (`from=records`), com retorno correto a Registros, preservando integralmente a origem equivalente do Resumo (`from=summary`) |
 | 7.5 | 14. Resultados e benefícios | `design/approved/screens/16-resultados-e-beneficios.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
 | 7.5 | 15. Transição e adoção | `design/approved/screens/17-transicao-e-adocao.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
 | 7.5 | 16. Encerramento e aprendizado | `design/approved/screens/18-encerramento-e-aprendizado.png` | `/now`, `/map` e `/records` | não auditada | decidir se será superfície própria ou composição existente |
@@ -354,7 +354,7 @@ Gate: trabalho real acompanhável; atenções e impedimentos claros;
 histórico compreensível; sem competir em profundidade com Jira ou
 Linear.
 
-Em andamento. Entregas `convergida` — primeiro alvo da ordem, concluído.
+Entregas `convergida` — primeiro alvo da ordem, concluído.
 Acompanhamento (`/tracking`) `convergida` — segundo alvo da ordem,
 concluído: nome "Cockpit" abandonado definitivamente (título
 "Acompanhamento do projeto", slug `tracking`), rota migrada de `/cockpit`
@@ -366,8 +366,27 @@ atenção concluída — terceiro alvo da ordem: classificada como `combinada
 com outra superfície` (D027, `docs/07-management/decision-log.md`), sem
 rota dedicada; impedimentos permanecem geridos em Acompanhamento,
 pendências em Agora; decisão exclusivamente documental, sem mudança de
-domínio, rota ou superfície. Próximo ponto da sequência: Registros —
-subetapa 7.4 permanece em andamento.
+domínio, rota ou superfície. Registros (`/records`) `convergida` — quarto
+e último alvo da ordem, concluído: classificada como superfície própria
+reduzida (D028, `docs/07-management/decision-log.md`) — a redução ocorre
+nos tipos de conteúdo, não nas fases; índice determinístico das fases com
+resposta, respostas de todas as fases por fase/atividade/campo, e
+pendências resolvidas como histórico exclusivo; pendências abertas
+removidas desta superfície, já cobertas por Acompanhamento e por Agora;
+as seis categorias ilustrativas do mockup (Escopo confirmado, Em
+construção, Hipóteses, Lacunas, Ambiguidade, Entrega) não têm sustentação
+no domínio e não viraram requisitos; revisão de atividade concluída da
+Descoberta a partir de Registros usa origem própria (`from=records`), com
+retorno correto a Registros ao salvar; a origem equivalente já existente
+a partir do Resumo (`from=summary`) permanece integralmente preservada.
+
+Gate atendido: trabalho real acompanhável (Entregas, Acompanhamento);
+atenções e impedimentos claros (Acompanhamento, Agora); histórico
+compreensível (Registros); sem competir em profundidade com Jira ou
+Linear — nenhuma das quatro posições da ordem introduziu gestão de
+tarefas, dependências, métricas ou dashboards. Com os quatro alvos da
+ordem 1–4 decididos (Entregas, Acompanhamento, decisão sobre Detalhe de
+item, Registros), **subetapa 7.4 concluída.**
 
 ##### 7.5 — Resultados e encerramento
 

@@ -1,6 +1,6 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 03/08/2026
+**Data de referência:** 04/08/2026
 
 **Versão da baseline:** 0.4.0
 
@@ -161,7 +161,7 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   de navegação; bloco "Onde estamos" em Agora; continuidade Mapa → Agora;
   orientação por projeto na Home), reclassificadas como parte do que
   sustentou a convergência das telas da subetapa. Subetapa 7.4 — Execução
-  e controle — em andamento. Entregas (`/deliveries`) está `convergida`: a
+  e controle. Entregas (`/deliveries`) está `convergida`: a
   referência `11-entregas.png` tinha conteúdo funcional incompatível com o
   domínio (sprints, tempo de ciclo, erros de produção) e foi tratada como
   não vinculante, usada só como linguagem visual; a convergência seguiu
@@ -183,8 +183,23 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   exclusivamente documental: sem rota dedicada; impedimentos permanecem
   geridos em Acompanhamento, pendências em Agora; campos do mockup sem
   sustentação no domínio (responsável, evidência, estado de validação)
-  não viram requisitos. Subetapa 7.4 permanece em andamento — próximo
-  ponto da sequência é Registros.
+  não viram requisitos. Registros (`/records`) está `convergida` — quarto
+  e último alvo da ordem, classificado como superfície própria reduzida
+  (D028, `docs/07-management/decision-log.md`): a redução ocorre nos
+  tipos de conteúdo, não nas fases — índice determinístico das fases com
+  resposta, respostas de todas as fases por fase/atividade/campo, e
+  pendências resolvidas como histórico exclusivo; pendências abertas
+  removidas desta superfície, já cobertas por Acompanhamento e por Agora;
+  as seis categorias ilustrativas do mockup (Escopo confirmado, Em
+  construção, Hipóteses, Lacunas, Ambiguidade, Entrega) não têm
+  sustentação no domínio e não viraram requisitos; revisão de atividade
+  concluída da Descoberta a partir de Registros usa origem própria
+  (`from=records`), com retorno correto a Registros ao salvar, sem
+  alterar a origem equivalente já existente a partir do Resumo
+  (`from=summary`). Com os quatro alvos da ordem decididos (Entregas,
+  Acompanhamento, decisão sobre Detalhe de item, Registros), **subetapa
+  7.4 está concluída** — próxima subetapa é 7.5 (Resultados e
+  encerramento), ainda não iniciada.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -227,12 +242,15 @@ concluídas — Agora, Jornada, Documento do projeto e Revisão e confirmação
 execução); o gate da subetapa (usuário entende onde está, sabe a próxima
 ação, responde atividades, acompanha a jornada, consulta o artefato
 crescente, revisa e confirma as decisões da Descoberta) está atendido. A
-subetapa 7.4 — Execução e controle — está em andamento: Entregas e
+subetapa 7.4 — Execução e controle — está concluída: Entregas,
 Acompanhamento (`/tracking`, nome que substitui definitivamente
-"Cockpit") `convergidas`; a decisão sobre Detalhe de item de atenção está
-concluída — classificada como `combinada com outra superfície` (D027,
-`docs/07-management/decision-log.md`), sem rota dedicada; próximo ponto
-da sequência é Registros.
+"Cockpit") e Registros `convergidas`; a decisão sobre Detalhe de item de
+atenção está concluída — classificada como `combinada com outra
+superfície` (D027, `docs/07-management/decision-log.md`), sem rota
+dedicada. Registros converge como superfície própria reduzida (D028,
+`docs/07-management/decision-log.md`). Próxima subetapa: 7.5 —
+Resultados e encerramento (ordem: Resultados e benefícios; Transição e
+adoção; Encerramento e aprendizado), ainda não iniciada.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
