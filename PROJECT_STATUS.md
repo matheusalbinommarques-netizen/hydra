@@ -177,10 +177,14 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   (fase, atividade e progresso da fase), a síntese de Entregas (contagens
   por estado e itens realmente em andamento) e as atenções reais
   (impedimentos abertos e pendências abertas), preservando integralmente a
-  gestão de impedimentos; aprovada em desktop e mobile. Subetapa 7.4
-  permanece em andamento — próximo ponto da sequência é a decisão sobre
-  Detalhe de item de atenção; Registros permanece posterior a essa
-  decisão.
+  gestão de impedimentos; aprovada em desktop e mobile. Decisão sobre
+  Detalhe de item de atenção concluída — classificada como `combinada com
+  outra superfície` (D027, `docs/07-management/decision-log.md`), decisão
+  exclusivamente documental: sem rota dedicada; impedimentos permanecem
+  geridos em Acompanhamento, pendências em Agora; campos do mockup sem
+  sustentação no domínio (responsável, evidência, estado de validação)
+  não viram requisitos. Subetapa 7.4 permanece em andamento — próximo
+  ponto da sequência é Registros.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -225,10 +229,10 @@ ação, responde atividades, acompanha a jornada, consulta o artefato
 crescente, revisa e confirma as decisões da Descoberta) está atendido. A
 subetapa 7.4 — Execução e controle — está em andamento: Entregas e
 Acompanhamento (`/tracking`, nome que substitui definitivamente
-"Cockpit") `convergidas`; próximo ponto da sequência é a decisão sobre
-Detalhe de item de atenção — sem reabrir desnecessariamente o domínio
-nem substituir mecânicas funcionais; Registros permanece posterior a
-essa decisão.
+"Cockpit") `convergidas`; a decisão sobre Detalhe de item de atenção está
+concluída — classificada como `combinada com outra superfície` (D027,
+`docs/07-management/decision-log.md`), sem rota dedicada; próximo ponto
+da sequência é Registros.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
