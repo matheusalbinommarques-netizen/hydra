@@ -26,6 +26,7 @@
 		{ key: 'deliveries', label: 'Entregas' },
 		{ key: 'summary', label: 'Resumo' },
 		{ key: 'document', label: 'Documento' },
+		{ key: 'closure', label: 'Encerramento' },
 		{ key: 'export', label: 'Exportar' }
 	] as const;
 
@@ -106,6 +107,12 @@
 					aria-current={isCurrentRoute(`/projects/${projectId}/document`) ? 'page' : undefined}
 				>
 					Documento
+				</a>
+				<a
+					href="/projects/{projectId}/closure"
+					aria-current={isCurrentRoute(`/projects/${projectId}/closure`) ? 'page' : undefined}
+				>
+					Encerramento
 				</a>
 				<a
 					href="/projects/{projectId}/export"

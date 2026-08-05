@@ -132,7 +132,23 @@
   do projeto (Agora, Cockpit, Mapa, Registros, Entregas, Resumo,
   Documento, Exportar), com a rota atual destacada; vale para todas as
   rotas do workspace, não só Agora — parte do shell compartilhado
-  (`+layout.svelte`).
+  (`+layout.svelte`);
+- "Resultados e encerramento" (`/projects/[projectId]/closure`, subetapa 7.5
+  do roadmap "Resultados e encerramento"): nova superfície própria,
+  acessível pela navegação do workspace ("Encerramento", entre Documento e
+  Exportar), que combina Resultados e benefícios, Transição e adoção e
+  Encerramento e aprendizado em uma única página com três seções, em vez
+  de três telas separadas; cada seção mostra as atividades reais da fase
+  de validação e encerramento com seu estado (Ainda não iniciada/Em
+  andamento/Concluída/Atividade pulada) e as respostas já registradas,
+  incluindo "Ainda não registrado" para campos ainda vazios; um bloco de
+  continuidade orienta para Agora de forma contextual — apontando para a
+  própria etapa de encerramento quando ela é a próxima ação real, ou para
+  as etapas anteriores quando ainda não foram concluídas; quando todas as
+  atividades da etapa estão em estado terminal, o bloco de continuidade dá
+  lugar a uma mensagem de conclusão da etapa, sem criar nenhum status
+  formal novo de projeto; um link secundário leva à consulta completa em
+  Registros.
 
 ### Alterado
 

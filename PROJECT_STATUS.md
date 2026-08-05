@@ -198,8 +198,25 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   alterar a origem equivalente já existente a partir do Resumo
   (`from=summary`). Com os quatro alvos da ordem decididos (Entregas,
   Acompanhamento, decisão sobre Detalhe de item, Registros), **subetapa
-  7.4 está concluída** — próxima subetapa é 7.5 (Resultados e
-  encerramento), ainda não iniciada.
+  7.4 está concluída**. Subetapa 7.5 — Resultados e encerramento — está
+  concluída: as três posições da ordem (Resultados e benefícios, Transição
+  e adoção, Encerramento e aprendizado) convergem como uma única
+  superfície própria, `/projects/[projectId]/closure` ("Resultados e
+  encerramento", D029, `docs/07-management/decision-log.md`), acessível
+  pela navegação do workspace ("Encerramento", entre Documento e
+  Exportar); três seções mostram as seis atividades reais da fase de
+  validação e encerramento com estado e respostas já registradas;
+  continuidade contextual orienta para Agora (etapa atual ou etapas
+  anteriores, conforme a próxima ação real); ao ficarem todas as
+  atividades em estado terminal, uma mensagem de conclusão da etapa
+  substitui a continuidade, sem novo status formal de projeto; link
+  secundário para Registros; estado "Indisponível" do mockup de
+  referência não foi implementado, por não haver hoje um ponto de falha
+  isolado e real para esta rota. Etapa 7 (Convergência da experiência e
+  das telas) permanece em andamento — próxima subetapa é 7.6
+  (Complementos: Configurações do projeto, Exportar, estados vazios,
+  erros relevantes, projeto concluído, largura reduzida), ainda não
+  iniciada.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -248,9 +265,16 @@ Acompanhamento (`/tracking`, nome que substitui definitivamente
 atenção está concluída — classificada como `combinada com outra
 superfície` (D027, `docs/07-management/decision-log.md`), sem rota
 dedicada. Registros converge como superfície própria reduzida (D028,
-`docs/07-management/decision-log.md`). Próxima subetapa: 7.5 —
-Resultados e encerramento (ordem: Resultados e benefícios; Transição e
-adoção; Encerramento e aprendizado), ainda não iniciada.
+`docs/07-management/decision-log.md`). A subetapa 7.5 — Resultados e
+encerramento (ordem: Resultados e benefícios; Transição e adoção;
+Encerramento e aprendizado) — está concluída: as três posições convergem
+como a superfície própria `/projects/[projectId]/closure` ("Resultados e
+encerramento", D029, `docs/07-management/decision-log.md`), com
+navegação "Encerramento" no shell do workspace. A etapa 7 permanece em
+andamento. O próximo ponto real da etapa 7 deve ser obtido em
+`docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7"
+(subetapa 7.6 — Complementos, ainda não iniciada, no momento em que este
+documento foi escrito).
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

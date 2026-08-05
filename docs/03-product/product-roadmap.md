@@ -236,9 +236,9 @@ critério de convergência.
 | 7.4 | 11. Acompanhamento (ex-Cockpit) | `design/approved/screens/12-cockpit.png` | `/projects/[projectId]/tracking` | convergida | referência tratada como não vinculante na maior parte dos tiles (riscos ativos, mudanças em análise, decisões pendentes, marcos do projeto, pessoas envolvidas não têm sustentação no domínio) — usada só como hierarquia e composição; convergência consolida, com dados já existentes, situação atual (fase/atividade/progresso), síntese de Entregas e atenções reais (impedimentos e pendências abertas), preservando integralmente a gestão de impedimentos; rota migrada de `/cockpit` para `/tracking`, sem redirect (D026, `docs/07-management/decision-log.md`) |
 | 7.4 | 12. Detalhe de item de atenção | `design/approved/screens/13-detalhe-item-atencao.png` | Acompanhamento (`/tracking`, impedimentos) e Agora (`/now`, pendências) | combinada com outra superfície | decisão documental (D027, `docs/07-management/decision-log.md`): sem rota dedicada — impedimentos já têm gestão completa em Acompanhamento, pendências já encaminham para Agora; campos do mockup (responsável, evidência, estado de validação, beneficiário) não têm sustentação no domínio atual |
 | 7.4 | 13. Registros | `design/approved/screens/14-registros.png` | `/projects/[projectId]/records` | convergida | classificada como superfície própria reduzida (D028, `docs/07-management/decision-log.md`) — a redução é nos tipos de conteúdo, não nas fases: índice determinístico das fases com resposta, respostas de todas as fases por fase/atividade/campo, pendências resolvidas como histórico exclusivo; pendências abertas removidas (já cobertas por Acompanhamento e Agora); as seis categorias ilustrativas do mockup (Escopo confirmado, Em construção, Hipóteses, Lacunas, Ambiguidade, Entrega) não têm sustentação no domínio e não viraram requisitos; revisão de atividade concluída da Descoberta a partir de Registros usa origem própria (`from=records`), com retorno correto a Registros, preservando integralmente a origem equivalente do Resumo (`from=summary`) |
-| 7.5 | 14. Resultados e benefícios | `design/approved/screens/16-resultados-e-beneficios.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
-| 7.5 | 15. Transição e adoção | `design/approved/screens/17-transicao-e-adocao.png` | respostas persistidas de encerramento | não auditada | decidir composição antes de criar rota |
-| 7.5 | 16. Encerramento e aprendizado | `design/approved/screens/18-encerramento-e-aprendizado.png` | `/now`, `/map` e `/records` | não auditada | decidir se será superfície própria ou composição existente |
+| 7.5 | 14. Resultados e benefícios | `design/approved/screens/16-resultados-e-beneficios.png` | `/projects/[projectId]/closure` | combinada com outra superfície | implementada como a primeira seção da superfície própria "Resultados e encerramento" (D029, `docs/07-management/decision-log.md`), usando `validar_entregas_criterios` e `coletar_feedback`; tabela Antes/Meta/Atual e métricas quantitativas do mockup sem sustentação no domínio, não implementadas |
+| 7.5 | 15. Transição e adoção | `design/approved/screens/17-transicao-e-adocao.png` | `/projects/[projectId]/closure` | combinada com outra superfície | implementada como a segunda seção da mesma superfície própria (D029, `docs/07-management/decision-log.md`), usando `transicao_proximos_passos`; checklist de adoção com status, datas e "Marcar como iniciada" do mockup sem sustentação no domínio, não implementados |
+| 7.5 | 16. Encerramento e aprendizado | `design/approved/screens/18-encerramento-e-aprendizado.png` | `/projects/[projectId]/closure` | convergida | superfície própria resultante do bloco — "Resultados e encerramento" (D029, `docs/07-management/decision-log.md`) —, com três seções (Resultados e benefícios, Transição e adoção, Encerramento e aprendizado como terceira seção), usando `resolver_pendencias_finais`, `licoes_aprendidas` e `confirmar_encerramento`; continuidade contextual para Agora (etapa atual ou etapas anteriores, conforme a próxima ação real) e mensagem de conclusão da etapa sem novo status formal de projeto; contadores estruturados e subdivisão de lições do mockup sem sustentação no domínio, não implementados; estado "Indisponível" não implementado por não haver, na arquitetura atual, um ponto de falha isolado e real para uma rota que só recombina dados já carregados pelo layout do workspace |
 | 7.6 | 17. Configurações do projeto | `design/approved/screens/19-configuracoes-do-projeto.png` | inexistente ou parcial | não auditada | implementar somente capacidades sustentadas pelo domínio |
 | 7.6 | 18. Exportar | ausente na montagem | `/projects/[projectId]/export` | não auditada | preservar capacidade e convergir visualmente |
 
@@ -393,12 +393,44 @@ item, Registros), **subetapa 7.4 concluída.**
 Ordem: 1. Resultados e benefícios; 2. Transição e adoção; 3. Encerramento
 e aprendizado.
 
-Antes de implementar, decidir se serão rotas próprias, seções de uma
-experiência final, extensões do Documento do projeto, ou composição de
-superfícies existentes.
+Composição aprovada (D029, `docs/07-management/decision-log.md`): as três
+posições da ordem convergem como uma única superfície própria,
+`/projects/[projectId]/closure` ("Resultados e encerramento"), com três
+seções internas na mesma ordem — não três rotas distintas. Resultados e
+benefícios e Transição e adoção são `combinada com outra superfície` (a
+própria superfície resultante); Encerramento e aprendizado converge como
+a superfície própria. Sustentação exclusiva nas seis atividades já
+existentes da fase `validacao` (`app/src/lib/catalog/closure.ts`); sem
+campo, entidade, contador, checklist, percentual, data ou responsável
+novo; Documento do projeto não foi estendido nesta subetapa.
+
+Implementada: navegação "Encerramento" adicionada ao shell do workspace,
+entre Documento e Exportar; cada seção mostra as atividades reais
+correspondentes com estado (Ainda não iniciada/Em andamento/Concluída/
+Atividade pulada) e respostas já registradas, com "Ainda não registrado"
+para campo vazio; bloco de continuidade contextual — aponta para a
+própria etapa de encerramento quando ela é a próxima ação real, ou para
+etapas anteriores quando ainda não concluídas; ao ficarem todas as seis
+atividades em estado terminal, o bloco de continuidade dá lugar a uma
+mensagem de conclusão da etapa, sem novo status formal de projeto; link
+secundário para Registros. Estado "Indisponível" não implementado — sem
+sustentação: nenhuma rota do workspace, incluindo esta, tem hoje um ponto
+de falha isolado e independente do carregamento já resolvido pelo layout
+do projeto; tratado como não vinculante nesta fatia, no mesmo espírito já
+aplicado a métricas/checklists/contadores dos mockups de referência.
 
 Gate: resultados e benefícios visíveis; transição e próximos passos
 claros; encerramento coerente e consultável.
+
+Gate atendido: resultados e benefícios visíveis (seção "Resultados e
+benefícios", `validar_entregas_criterios`/`coletar_feedback`); transição e
+próximos passos claros (seção "Transição e adoção",
+`transicao_proximos_passos`); encerramento coerente e consultável (seção
+"Encerramento e aprendizado", continuidade contextual e mensagem de
+conclusão da etapa). Com os três alvos da ordem decididos e implementados,
+**subetapa 7.5 concluída** — próxima subetapa é 7.6 (Complementos:
+Configurações do projeto, Exportar, estados vazios, erros relevantes,
+projeto concluído, largura reduzida), ainda não iniciada.
 
 ##### 7.6 — Complementos
 
