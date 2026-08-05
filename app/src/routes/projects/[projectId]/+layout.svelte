@@ -27,7 +27,8 @@
 		{ key: 'summary', label: 'Resumo' },
 		{ key: 'document', label: 'Documento' },
 		{ key: 'closure', label: 'Encerramento' },
-		{ key: 'export', label: 'Exportar' }
+		{ key: 'export', label: 'Exportar' },
+		{ key: 'settings', label: 'Configurações' }
 	] as const;
 
 	let currentAreaLabel = $derived(
@@ -119,6 +120,12 @@
 					aria-current={isCurrentRoute(`/projects/${projectId}/export`) ? 'page' : undefined}
 				>
 					Exportar
+				</a>
+				<a
+					href="/projects/{projectId}/settings"
+					aria-current={isCurrentRoute(`/projects/${projectId}/settings`) ? 'page' : undefined}
+				>
+					Configurações
 				</a>
 			</div>
 		</nav>

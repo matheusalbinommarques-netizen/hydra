@@ -212,11 +212,19 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   substitui a continuidade, sem novo status formal de projeto; link
   secundário para Registros; estado "Indisponível" do mockup de
   referência não foi implementado, por não haver hoje um ponto de falha
-  isolado e real para esta rota. Etapa 7 (Convergência da experiência e
-  das telas) permanece em andamento — próxima subetapa é 7.6
-  (Complementos: Configurações do projeto, Exportar, estados vazios,
-  erros relevantes, projeto concluído, largura reduzida), ainda não
-  iniciada.
+  isolado e real para esta rota. Subetapa 7.6 — Complementos (Configurações
+  do projeto, Exportar, estados vazios, erros relevantes, projeto
+  concluído, largura reduzida) — em andamento. Configurações do projeto
+  (`/projects/[projectId]/settings`), primeiro alvo da subetapa, está
+  `convergida` (D030, `docs/07-management/decision-log.md`): superfície
+  própria reduzida, sustentada só pelo domínio já existente — renomear o
+  projeto (`renameProject`, já implementado e sem interface própria antes
+  desta entrega) e exibir a data de criação, somente leitura; nenhuma
+  configuração fictícia foi criada — descrição, responsável, estado
+  editável, classificação e tipo, regras de orientação, duplicar, arquivar
+  e excluir permanecem fora do Release 0. Etapa 7 (Convergência da
+  experiência e das telas) permanece em andamento — subetapa 7.6 permanece
+  em andamento, com Exportar como próximo alvo real do inventário.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -270,11 +278,16 @@ encerramento (ordem: Resultados e benefícios; Transição e adoção;
 Encerramento e aprendizado) — está concluída: as três posições convergem
 como a superfície própria `/projects/[projectId]/closure` ("Resultados e
 encerramento", D029, `docs/07-management/decision-log.md`), com
-navegação "Encerramento" no shell do workspace. A etapa 7 permanece em
-andamento. O próximo ponto real da etapa 7 deve ser obtido em
-`docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7"
-(subetapa 7.6 — Complementos, ainda não iniciada, no momento em que este
-documento foi escrito).
+navegação "Encerramento" no shell do workspace. A subetapa 7.6 —
+Complementos — está em andamento: Configurações do projeto
+(`/projects/[projectId]/settings`), primeiro alvo do inventário, está
+`convergida` (D030, `docs/07-management/decision-log.md`) — superfície
+própria reduzida, sustentada só pelo domínio já existente (renomear o
+projeto e exibir a data de criação), sem nenhuma configuração fictícia. A
+etapa 7 permanece em andamento; o próximo ponto real da etapa 7 deve ser
+obtido em `docs/03-product/product-roadmap.md`, seção "Sequência da etapa
+7" (subetapa 7.6 — Complementos, com Exportar como próximo alvo do
+inventário, no momento em que este documento foi escrito).
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

@@ -148,7 +148,19 @@
   atividades da etapa estão em estado terminal, o bloco de continuidade dá
   lugar a uma mensagem de conclusão da etapa, sem criar nenhum status
   formal novo de projeto; um link secundário leva à consulta completa em
-  Registros.
+  Registros;
+- "Configurações" (`/projects/[projectId]/settings`, primeiro alvo da
+  subetapa 7.6 do roadmap "Complementos"): nova superfície própria,
+  acessível pela navegação do workspace como último destino, depois de
+  Exportar, permitindo renomear o projeto diretamente pela interface; exibe
+  também a data de criação do projeto, somente leitura; o formulário
+  distingue estado inicial (ações desabilitadas), alteração pendente
+  ("Alterações não salvas.", ações habilitadas), salvamento bem-sucedido
+  ("Alterações salvas.") e nome vazio (mensagem de validação, sem
+  persistir); a ação Cancelar descarta a edição em andamento sem gerar
+  nenhuma chamada ao servidor; um link secundário leva a Exportar; ao
+  salvar, o novo nome do projeto passa a aparecer imediatamente no
+  cabeçalho do workspace, na Home e na Biblioteca de projetos.
 
 ### Alterado
 

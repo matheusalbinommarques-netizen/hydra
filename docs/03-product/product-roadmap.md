@@ -239,7 +239,7 @@ critério de convergência.
 | 7.5 | 14. Resultados e benefícios | `design/approved/screens/16-resultados-e-beneficios.png` | `/projects/[projectId]/closure` | combinada com outra superfície | implementada como a primeira seção da superfície própria "Resultados e encerramento" (D029, `docs/07-management/decision-log.md`), usando `validar_entregas_criterios` e `coletar_feedback`; tabela Antes/Meta/Atual e métricas quantitativas do mockup sem sustentação no domínio, não implementadas |
 | 7.5 | 15. Transição e adoção | `design/approved/screens/17-transicao-e-adocao.png` | `/projects/[projectId]/closure` | combinada com outra superfície | implementada como a segunda seção da mesma superfície própria (D029, `docs/07-management/decision-log.md`), usando `transicao_proximos_passos`; checklist de adoção com status, datas e "Marcar como iniciada" do mockup sem sustentação no domínio, não implementados |
 | 7.5 | 16. Encerramento e aprendizado | `design/approved/screens/18-encerramento-e-aprendizado.png` | `/projects/[projectId]/closure` | convergida | superfície própria resultante do bloco — "Resultados e encerramento" (D029, `docs/07-management/decision-log.md`) —, com três seções (Resultados e benefícios, Transição e adoção, Encerramento e aprendizado como terceira seção), usando `resolver_pendencias_finais`, `licoes_aprendidas` e `confirmar_encerramento`; continuidade contextual para Agora (etapa atual ou etapas anteriores, conforme a próxima ação real) e mensagem de conclusão da etapa sem novo status formal de projeto; contadores estruturados e subdivisão de lições do mockup sem sustentação no domínio, não implementados; estado "Indisponível" não implementado por não haver, na arquitetura atual, um ponto de falha isolado e real para uma rota que só recombina dados já carregados pelo layout do workspace |
-| 7.6 | 17. Configurações do projeto | `design/approved/screens/19-configuracoes-do-projeto.png` | inexistente ou parcial | não auditada | implementar somente capacidades sustentadas pelo domínio |
+| 7.6 | 17. Configurações do projeto | `design/approved/screens/19-configuracoes-do-projeto.png` | `/projects/[projectId]/settings` | convergida | composição aprovada e implementada (D030, `docs/07-management/decision-log.md`): superfície própria reduzida `/projects/[projectId]/settings` ("Configurações"), última posição da navegação do workspace, depois de Exportar; escopo entregue — nome do projeto editável, renomeação via `renameProject` já existente, data de criação somente leitura, "Salvar alterações", "Cancelar" (sem chamada ao servidor) e link secundário para Exportar; nenhuma expansão de domínio ou persistência foi necessária; descrição, responsável, estado editável, classificação e tipo, regras de orientação, duplicar/arquivar/excluir permanecem adiados ou não aplicáveis ao Release 0, por falta de sustentação no domínio atual |
 | 7.6 | 18. Exportar | ausente na montagem | `/projects/[projectId]/export` | não auditada | preservar capacidade e convergir visualmente |
 
 #### Critério de tela convergida
@@ -439,6 +439,14 @@ relevantes; projeto concluído; largura reduzida.
 
 Gate: superfícies complementares coerentes; nenhuma configuração
 fictícia; estados principais tratados; exportação preservada.
+
+Configurações do projeto (item 17) está `convergida` (D030,
+`docs/07-management/decision-log.md`): superfície própria reduzida,
+`/projects/[projectId]/settings`, limitada a renomear o projeto
+(`renameProject`), exibir a data de criação e um link para Exportar —
+implementada, testada e validada. Subetapa 7.6 permanece em andamento;
+próximo alvo do inventário é Exportar (item 18), ainda `não auditada`. O
+gate completo da subetapa ainda não foi avaliado.
 
 ##### 7.7 — Revisão final
 

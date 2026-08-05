@@ -113,6 +113,7 @@ export interface ImpedimentView {
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
+	createdAt: string;
 	// Ponto de partida da rota recomendada (D023, decision-log.md) — null =
 	// percurso completo. nextActivity abaixo já reflete essa escolha; este
 	// campo existe só para a interface (`/map`) saber o que exibir selecionado.
