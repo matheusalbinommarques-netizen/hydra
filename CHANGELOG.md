@@ -160,7 +160,19 @@
   persistir); a ação Cancelar descarta a edição em andamento sem gerar
   nenhuma chamada ao servidor; um link secundário leva a Exportar; ao
   salvar, o novo nome do projeto passa a aparecer imediatamente no
-  cabeçalho do workspace, na Home e na Biblioteca de projetos.
+  cabeçalho do workspace, na Home e na Biblioteca de projetos;
+- "Exportar projeto" (`/projects/[projectId]/export`, segundo alvo da
+  subetapa 7.6 do roadmap "Complementos"): nova superfície visual própria,
+  acessível pela mesma posição já usada na navegação do workspace e pelo
+  link existente em Configurações, explicando em uma frase que os dados
+  do projeto serão baixados como um arquivo JSON e apresentando uma única
+  ação principal, "Baixar exportação", com o nome real do arquivo exibido
+  na página; o download passa a ter um endpoint explícito,
+  `/projects/[projectId]/export/download`, que preserva integralmente o
+  conteúdo, a serialização, o nome de arquivo e os cabeçalhos já em uso; o
+  endpoint legado em `/projects/[projectId]/export` continua funcionando
+  sem alteração de contrato para requisições que não navegam para a
+  página; experiência convergida em desktop e em mobile (~390px).
 
 ### Alterado
 

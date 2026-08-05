@@ -240,7 +240,7 @@ critério de convergência.
 | 7.5 | 15. Transição e adoção | `design/approved/screens/17-transicao-e-adocao.png` | `/projects/[projectId]/closure` | combinada com outra superfície | implementada como a segunda seção da mesma superfície própria (D029, `docs/07-management/decision-log.md`), usando `transicao_proximos_passos`; checklist de adoção com status, datas e "Marcar como iniciada" do mockup sem sustentação no domínio, não implementados |
 | 7.5 | 16. Encerramento e aprendizado | `design/approved/screens/18-encerramento-e-aprendizado.png` | `/projects/[projectId]/closure` | convergida | superfície própria resultante do bloco — "Resultados e encerramento" (D029, `docs/07-management/decision-log.md`) —, com três seções (Resultados e benefícios, Transição e adoção, Encerramento e aprendizado como terceira seção), usando `resolver_pendencias_finais`, `licoes_aprendidas` e `confirmar_encerramento`; continuidade contextual para Agora (etapa atual ou etapas anteriores, conforme a próxima ação real) e mensagem de conclusão da etapa sem novo status formal de projeto; contadores estruturados e subdivisão de lições do mockup sem sustentação no domínio, não implementados; estado "Indisponível" não implementado por não haver, na arquitetura atual, um ponto de falha isolado e real para uma rota que só recombina dados já carregados pelo layout do workspace |
 | 7.6 | 17. Configurações do projeto | `design/approved/screens/19-configuracoes-do-projeto.png` | `/projects/[projectId]/settings` | convergida | composição aprovada e implementada (D030, `docs/07-management/decision-log.md`): superfície própria reduzida `/projects/[projectId]/settings` ("Configurações"), última posição da navegação do workspace, depois de Exportar; escopo entregue — nome do projeto editável, renomeação via `renameProject` já existente, data de criação somente leitura, "Salvar alterações", "Cancelar" (sem chamada ao servidor) e link secundário para Exportar; nenhuma expansão de domínio ou persistência foi necessária; descrição, responsável, estado editável, classificação e tipo, regras de orientação, duplicar/arquivar/excluir permanecem adiados ou não aplicáveis ao Release 0, por falta de sustentação no domínio atual |
-| 7.6 | 18. Exportar | ausente na montagem | `/projects/[projectId]/export` | não auditada | preservar capacidade e convergir visualmente |
+| 7.6 | 18. Exportar | ausente na montagem | `/projects/[projectId]/export` | convergida | composição aprovada e implementada (D031, `docs/07-management/decision-log.md`): superfície própria em `/projects/[projectId]/export` ("Exportar projeto"), mesma posição já usada no shell e no link de Configurações, com explicação breve do conteúdo exportado e ação principal única "Baixar exportação"; download efetivo movido para um endpoint próprio `/projects/[projectId]/export/download`, coexistindo com a página na mesma rota por negociação de conteúdo do SvelteKit; `+server.ts` legado em `/export` (`GET`) preservado sem alteração de contrato, para compatibilidade com requisições não HTML; construção da resposta compartilhada entre os dois endpoints por um helper local único, sem duplicar a regra de nome de arquivo, headers ou conteúdo; nenhuma mudança no use case `exportProject` nem no formato/conteúdo do JSON; nome real do arquivo exibido na página, calculado pela mesma regra do endpoint; sem importação, escolha de formato, opções avançadas, histórico, agendamento, compartilhamento ou métricas; sem estado visual próprio de "Projeto não encontrado" nesta fatia — tratamento de erro permanece no layout pai e no `+server.ts` já existentes |
 
 #### Critério de tela convergida
 
@@ -444,9 +444,17 @@ Configurações do projeto (item 17) está `convergida` (D030,
 `docs/07-management/decision-log.md`): superfície própria reduzida,
 `/projects/[projectId]/settings`, limitada a renomear o projeto
 (`renameProject`), exibir a data de criação e um link para Exportar —
-implementada, testada e validada. Subetapa 7.6 permanece em andamento;
-próximo alvo do inventário é Exportar (item 18), ainda `não auditada`. O
-gate completo da subetapa ainda não foi avaliado.
+implementada, testada e validada. Exportar (item 18) está `convergida`
+(D031, `docs/07-management/decision-log.md`): superfície própria em
+`/projects/[projectId]/export`, download movido para
+`/projects/[projectId]/export/download`, handler legado em `/export`
+preservado para requisições não HTML, use case e formato de exportação
+preservados sem alteração — implementada, testada e validada. Com os
+dois itens do inventário de 7.6 convergidos, o próximo ponto real é
+avaliar o restante do gate da subetapa — estados vazios, erros
+relevantes, projeto concluído e largura reduzida nas duas superfícies —,
+ainda não avaliado; nenhum desses quatro comportamentos foi comprovado
+tratado até aqui, então a subetapa 7.6 permanece em andamento.
 
 ##### 7.7 — Revisão final
 

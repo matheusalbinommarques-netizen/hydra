@@ -222,9 +222,19 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   desta entrega) e exibir a data de criação, somente leitura; nenhuma
   configuração fictícia foi criada — descrição, responsável, estado
   editável, classificação e tipo, regras de orientação, duplicar, arquivar
-  e excluir permanecem fora do Release 0. Etapa 7 (Convergência da
-  experiência e das telas) permanece em andamento — subetapa 7.6 permanece
-  em andamento, com Exportar como próximo alvo real do inventário.
+  e excluir permanecem fora do Release 0. Exportar (`/projects/[projectId]/export`),
+  segundo alvo da subetapa, está `convergida` (D031,
+  `docs/07-management/decision-log.md`): página visual própria com ação
+  explícita "Baixar exportação", download movido para um endpoint
+  dedicado (`/export/download`) que preserva integralmente o contrato do
+  handler legado (nome real do arquivo, headers, formato JSON), handler
+  legado em `/export` preservado para requisições não HTML, sem nenhuma
+  configuração fictícia (importação, escolha de formato, histórico,
+  agendamento ou compartilhamento). Etapa 7 (Convergência da experiência e
+  das telas) permanece em andamento — com os dois itens do inventário de
+  7.6 convergidos, a subetapa permanece em andamento até o restante do
+  gate (estados vazios, erros relevantes, projeto concluído, largura
+  reduzida) ser avaliado.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -283,11 +293,20 @@ Complementos — está em andamento: Configurações do projeto
 (`/projects/[projectId]/settings`), primeiro alvo do inventário, está
 `convergida` (D030, `docs/07-management/decision-log.md`) — superfície
 própria reduzida, sustentada só pelo domínio já existente (renomear o
-projeto e exibir a data de criação), sem nenhuma configuração fictícia. A
-etapa 7 permanece em andamento; o próximo ponto real da etapa 7 deve ser
-obtido em `docs/03-product/product-roadmap.md`, seção "Sequência da etapa
-7" (subetapa 7.6 — Complementos, com Exportar como próximo alvo do
-inventário, no momento em que este documento foi escrito).
+projeto e exibir a data de criação), sem nenhuma configuração fictícia.
+Exportar (`/projects/[projectId]/export`), segundo alvo do inventário,
+também está `convergida` (D031, `docs/07-management/decision-log.md`) —
+página visual própria com ação explícita "Baixar exportação", download
+movido para `/projects/[projectId]/export/download` preservando
+integralmente o contrato do handler legado (nome real do arquivo,
+headers, formato JSON), handler legado em `/export` preservado para
+requisições não HTML, sem nenhuma configuração fictícia. Com os dois
+itens do inventário de 7.6 convergidos, a etapa 7 permanece em andamento;
+o próximo ponto real da etapa 7 deve ser obtido em
+`docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7"
+(subetapa 7.6 — Complementos, restando avaliar o gate completo da
+subetapa quanto a estados vazios, erros relevantes, projeto concluído e
+largura reduzida, no momento em que este documento foi escrito).
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
