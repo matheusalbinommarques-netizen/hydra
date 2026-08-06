@@ -246,6 +246,16 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   convergidos e o restante do gate aprovado, **a subetapa 7.6 está
   concluída**. Etapa 7 (Convergência da experiência e das telas)
   permanece em andamento — próxima subetapa é 7.7 (Revisão final).
+- **Manutenção técnica — `hydra-verify full`** (harness de verificação,
+  anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
+  estabilizada — `hydra-verify full` volta a ser confiável e
+  determinístico. Execução de referência: PASS 5/5 (check, unitários,
+  build, 18 jornadas ponta a ponta, `git diff --check`); 18/18 jornadas
+  aprovadas; um único build por execução; aproximadamente 83,6 segundos
+  no total. As jornadas ponta a ponta foram sincronizadas com as
+  superfícies atuais — Biblioteca, Jornada, Acompanhamento, Registros,
+  Exportar e o wizard de criação (`/projects/new`); nenhuma
+  funcionalidade do produto foi alterada.
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -321,6 +331,15 @@ inventário convergidos e o restante do gate aprovado, a subetapa 7.6 está
 concluída; a etapa 7 permanece em andamento — o próximo ponto real é a
 subetapa 7.7 (Revisão final), descrita em
 `docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7".
+
+Antes de retomar a subetapa 7.7, uma manutenção técnica estabilizou a
+infraestrutura de verificação: `hydra-verify full` volta a ser confiável
+e determinístico (PASS 5/5, 18/18 jornadas, um único build,
+aproximadamente 83,6 segundos), com as jornadas ponta a ponta
+sincronizadas com as superfícies atuais do produto. Nenhuma
+funcionalidade foi alterada e a situação da etapa 7 não mudou — o
+próximo ponto real continua sendo concluir a auditoria da subetapa 7.7,
+agora com o harness confiável.
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,

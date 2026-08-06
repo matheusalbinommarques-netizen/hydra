@@ -11,20 +11,18 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 
 let tmpRoot: string;
 let server: EphemeralServer;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-summary-edit-'));
 	const port = await getFreePort();
 	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
@@ -40,12 +38,7 @@ test.afterAll(async () => {
 });
 
 async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
-	await page.goto(server.baseUrl + '/');
-	await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-	await page.waitForURL(/\/projects\/[^/]+\/now$/);
-	const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-	if (!match) throw new Error('projectId não encontrado na URL.');
-	const projectId = match[1];
+	const projectId = await createProject(page, server.baseUrl);
 
 	await page.getByLabel('O que deu origem a este projeto?').selectOption('Um problema');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();

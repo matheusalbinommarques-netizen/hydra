@@ -11,7 +11,6 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
@@ -24,8 +23,6 @@ let tmpRoot: string;
 let server: EphemeralServer;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-export-'));
 	const port = await getFreePort();
 	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));

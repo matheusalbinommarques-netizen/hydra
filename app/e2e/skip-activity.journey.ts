@@ -17,21 +17,19 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 
 let tmpRoot: string;
 let server: EphemeralServer;
 let dbPath: string;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-skip-'));
 	dbPath = path.join(tmpRoot, 'hydra.sqlite');
 	const port = await getFreePort();
@@ -51,12 +49,7 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 	let projectId = '';
 
 	await test.step('criar projeto e chegar a Origem (pulável)', async () => {
-		await page.goto(server.baseUrl + '/');
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		expect(match).not.toBeNull();
-		projectId = match![1];
+		projectId = await createProject(page, server.baseUrl);
 
 		await expect(page.getByRole('heading', { name: 'Origem do projeto', exact: true })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Pular etapa' })).toBeVisible();
@@ -109,14 +102,26 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 		await expect(page.getByRole('link', { name: 'Retomar etapa' })).toBeVisible();
 	});
 
-	await test.step('Registros reflete a pendência aberta', async () => {
-		await page.getByRole('link', { name: 'Registros' }).click();
-		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/records`);
-		await expect(page.getByText(/Atividade: Origem do projeto · Status: Aberta/)).toBeVisible();
+	// Pendências abertas não aparecem mais em Registros (D028,
+	// docs/07-management/decision-log.md) — já cobertas por Agora (verificado
+	// no passo anterior) e por Acompanhamento, que é onde esta checagem
+	// cruzada de superfície passa a viver.
+	await test.step('Acompanhamento reflete a pendência aberta', async () => {
+		await page.getByRole('link', { name: 'Acompanhamento' }).click();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/tracking`);
+
+		const attentions = page.getByRole('region', { name: 'Atenções' });
+		const pendingItem = attentions.getByRole('listitem').filter({ hasText: 'Origem do projeto não foi definida' });
+		await expect(pendingItem).toHaveCount(1);
+		await expect(pendingItem.getByText('Pendência', { exact: true })).toBeVisible();
 	});
 
 	await test.step('Retomar etapa abre a atividade pulada', async () => {
-		await page.getByRole('link', { name: 'Agora' }).click();
+		// A página de Acompanhamento tem dois links contendo "Agora": o de
+		// navegação do shell ("Agora", nome exato) e o de continuidade
+		// ("Continuar em Agora →"). Escopar à navegação + nome exato evita a
+		// ambiguidade sem usar .first() nem posição.
+		await page.getByRole('navigation').getByRole('link', { name: 'Agora', exact: true }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
 		await page.getByRole('link', { name: 'Retomar etapa' }).click();
@@ -137,9 +142,8 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 
 		await page.getByRole('link', { name: 'Registros' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/records`);
-		await expect(
-			page.getByText(/Atividade: Origem do projeto · Status: Resolvida · Criada em .+ · Resolvida em/)
-		).toBeVisible();
+		const resolvedSection = page.getByRole('region', { name: 'Pendências resolvidas' });
+		await expect(resolvedSection.getByText('Atividade: Origem do projeto · Resolvida')).toBeVisible();
 	});
 
 	await test.step('atividade não pulável (Resumo) não exibe o botão', async () => {

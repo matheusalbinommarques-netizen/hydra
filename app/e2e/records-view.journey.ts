@@ -19,7 +19,6 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
@@ -33,8 +32,6 @@ let server: EphemeralServer;
 let dbPath: string;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-records-'));
 	dbPath = path.join(tmpRoot, 'hydra.sqlite');
 	const port = await getFreePort();

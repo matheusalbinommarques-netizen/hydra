@@ -15,20 +15,18 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 
 let tmpRoot: string;
 let server: EphemeralServer;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-bancada-field-by-field-'));
 	const port = await getFreePort();
 	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
@@ -49,12 +47,7 @@ test('Bancada: "Problema ou oportunidade" campo a campo, painel crescendo, etapa
 	let projectId = '';
 
 	await test.step('criar projeto e pular Origem e Contexto para chegar a "Problema ou oportunidade"', async () => {
-		await page.goto(server.baseUrl + '/');
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		if (!match) throw new Error('projectId não encontrado na URL.');
-		projectId = match[1];
+		projectId = await createProject(page, server.baseUrl);
 
 		for (let i = 0; i < 2; i++) {
 			await page.getByRole('button', { name: 'Pular etapa' }).click();
@@ -63,7 +56,10 @@ test('Bancada: "Problema ou oportunidade" campo a campo, painel crescendo, etapa
 		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
 	});
 
-	const panel = page.getByRole('complementary', { name: 'O que já sabemos até aqui' });
+	// A `<aside>` externa é o complementary real ("Progresso e contexto");
+	// este painel específico é uma `<section>` aninhada com nome próprio, que
+	// a ARIA mapeia para "region", não "complementary".
+	const panel = page.getByRole('region', { name: 'O que já sabemos até aqui' });
 
 	await test.step('layout de duas colunas ativo e painel vazio (Origem/Contexto foram pulados, sem Answer)', async () => {
 		await expect(panel).toBeVisible();

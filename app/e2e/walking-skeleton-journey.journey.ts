@@ -9,13 +9,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 import { answerActivitiesGenerically } from './helpers/generic-activity';
 
 interface ExportedEnvelope {
@@ -32,8 +32,6 @@ let serverA: EphemeralServer;
 let serverB: EphemeralServer;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-'));
 	const [portA, portB] = await Promise.all([getFreePort(), getFreePort()]);
 
@@ -66,12 +64,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	let projectId = '';
 
 	await test.step('criar projeto', async () => {
-		await page.goto(serverA.baseUrl + '/');
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		expect(match).not.toBeNull();
-		projectId = match![1];
+		projectId = await createProject(page, serverA.baseUrl);
 	});
 
 	await test.step('Origem do projeto', async () => {
@@ -154,8 +147,13 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	await test.step('verificar respostas no Resumo', async () => {
 		await expect(page.getByRole('heading', { name: 'Revisão e confirmação', level: 1 })).toBeVisible();
 
-		// nome do projeto (cabeçalho persistente do layout do projeto)
-		await expect(page.getByText('Portal de Solicitações E2E')).toBeVisible();
+		// nome do projeto (cabeçalho persistente do layout do projeto) — o shell
+		// mantém cabeçalho desktop e mobile simultaneamente no DOM (navegação
+		// mobile do shell, subetapa 7.3), cada um com seu próprio "eyebrow" de
+		// nome; esta jornada roda em viewport desktop, então escopa ao
+		// cabeçalho desktop especificamente, sem depender de .first().
+		const desktopHeader = page.locator('header.header-desktop');
+		await expect(desktopHeader.getByText('Portal de Solicitações E2E')).toBeVisible();
 
 		// Visão geral (Corte 3) — só as Answers canônicas de problema/sinais/
 		// público/estado atual/resultado, sempre visíveis, escopadas a
@@ -275,8 +273,15 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })
 		).toBeVisible();
 
-		const downloadPromise = page.waitForEvent('download');
+		// Exportar (D031) virou página própria com ação explícita — o clique no
+		// nav só abre a página; o download real exige clicar em "Baixar
+		// exportação" nela.
 		await page.getByRole('link', { name: 'Exportar' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/export`);
+		await expect(page.getByRole('heading', { name: 'Exportar projeto', level: 1 })).toBeVisible();
+
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByRole('link', { name: 'Baixar exportação' }).click();
 		const download = await downloadPromise;
 
 		expect(download.suggestedFilename()).toBe(`hydra-${projectId}.json`);
@@ -321,7 +326,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 	await test.step('importar em banco limpo', async () => {
 		await page.goto(serverB.baseUrl + '/');
-		await page.getByLabel('Importar projeto (.json)').setInputFiles(downloadedFilePath);
+		// Campo de importação fica dentro de <details> recolhido por padrão, e
+		// o rótulo real do input é "Arquivo do projeto (.json)", não "Importar
+		// projeto (.json)".
+		await page.getByText('Selecionar arquivo').click();
+		await page.getByLabel('Arquivo do projeto (.json)').setInputFiles(downloadedFilePath);
 		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 
 		await page.waitForURL(`${serverB.baseUrl}/projects/${projectId}/now`);
@@ -332,7 +341,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 	await test.step('reimportar deve colidir e não sobrescrever', async () => {
 		await page.goto(serverB.baseUrl + '/');
-		await page.getByLabel('Importar projeto (.json)').setInputFiles(downloadedFilePath);
+		// Campo de importação fica dentro de <details> recolhido por padrão, e
+		// o rótulo real do input é "Arquivo do projeto (.json)", não "Importar
+		// projeto (.json)".
+		await page.getByText('Selecionar arquivo').click();
+		await page.getByLabel('Arquivo do projeto (.json)').setInputFiles(downloadedFilePath);
 		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 
 		await expect(page.getByRole('alert')).toContainText(

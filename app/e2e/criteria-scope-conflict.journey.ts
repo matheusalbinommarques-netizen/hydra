@@ -11,13 +11,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 import { answerActivitiesGenerically, answerCurrentActivityGenerically } from './helpers/generic-activity';
 
 let tmpRoot: string;
@@ -26,8 +26,6 @@ let server: EphemeralServer;
 const CONFLICT_MESSAGE = 'Você definiu critérios de sucesso, mas nenhum item de escopo em "Agora" os sustenta ainda.';
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-criteria-scope-conflict-'));
 	const port = await getFreePort();
 	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
@@ -85,12 +83,7 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 	let projectId = '';
 
 	await test.step('criar projeto e completar a Descoberta', async () => {
-		await page.goto(server.baseUrl + '/');
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		if (!match) throw new Error('projectId não encontrado na URL.');
-		projectId = match[1];
+		projectId = await createProject(page, server.baseUrl);
 
 		await completeDiscovery(page);
 	});

@@ -10,21 +10,19 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 
 let tmpRoot: string;
 let serverA: EphemeralServer;
 let serverB: EphemeralServer;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-project-list-'));
 	const [portA, portB] = await Promise.all([getFreePort(), getFreePort()]);
 	serverA = startServer(portA, path.join(tmpRoot, 'a', 'hydra.sqlite'));
@@ -47,26 +45,19 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 	await test.step('banco vazio mostra estado vazio', async () => {
 		await page.goto(serverA.baseUrl + '/');
 		await expect(page.getByRole('heading', { name: 'Seus projetos' })).toBeVisible();
-		await expect(page.getByText('Nenhum projeto ainda. Crie o primeiro acima.')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Nenhum projeto ainda' })).toBeVisible();
 	});
 
 	await test.step('criar projeto sem nome: aparece na página inicial como "Projeto sem nome"', async () => {
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		expect(match).not.toBeNull();
-		firstProjectId = match![1];
+		firstProjectId = await createProject(page, serverA.baseUrl);
 
 		await page.goto(serverA.baseUrl + '/');
-		await expect(page.getByRole('link', { name: 'Projeto sem nome' })).toBeVisible();
+		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
+		await expect(featured.getByRole('heading', { name: 'Projeto sem nome', level: 2 })).toBeVisible();
 	});
 
 	await test.step('criar um segundo projeto com nome: os dois aparecem em ordem determinística', async () => {
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		expect(match).not.toBeNull();
-		secondProjectId = match![1];
+		secondProjectId = await createProject(page, serverA.baseUrl);
 
 		await page.getByLabel('O que deu origem a este projeto?').selectOption('Uma ideia de produto');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
@@ -86,32 +77,50 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
 		await page.goto(serverA.baseUrl + '/');
-		const links = page.locator('.projects li a');
-		await expect(links).toHaveCount(2);
-		// mais recente primeiro: o segundo projeto (nomeado) vem antes do
-		// primeiro (sem nome).
-		await expect(links.nth(0)).toHaveText('Level Me Up');
-		await expect(links.nth(1)).toHaveText('Projeto sem nome');
+
+		// mais recente primeiro: o segundo projeto (nomeado) é o destaque, e a
+		// lista compacta "Projetos" traz os dois na mesma ordem.
+		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
+		await expect(featured.getByRole('heading', { name: 'Level Me Up', level: 2 })).toBeVisible();
+
+		const projectNames = page.locator('.project-row .col-name');
+		await expect(projectNames).toHaveCount(2);
+		await expect(projectNames.nth(0)).toHaveText('Level Me Up');
+		await expect(projectNames.nth(1)).toHaveText('Projeto sem nome');
 	});
 
 	await test.step('clicar em um projeto da lista abre /projects/<id>/now', async () => {
-		await page.getByRole('link', { name: 'Level Me Up' }).click();
+		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
+		await featured.getByRole('link', { name: /Começar projeto|Continuar projeto/ }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${secondProjectId}/now`);
 		await expect(
 			page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })
 		).toBeVisible();
 	});
 
-	await test.step('link "Projetos" no workspace retorna para a página inicial', async () => {
+	await test.step('link "Projetos" no workspace leva à Biblioteca (não mais à Home)', async () => {
 		await page.getByRole('link', { name: 'Projetos' }).click();
-		await page.waitForURL(serverA.baseUrl + '/');
-		await expect(page.getByRole('heading', { name: 'Seus projetos' })).toBeVisible();
-		await expect(page.locator('.projects li a')).toHaveCount(2);
+		// Convergência 7.2: "← Projetos" do workspace passa a levar à
+		// Biblioteca (/projects), não mais à Home (/) — waitForURL exige a
+		// rota exata, provando que a Home deixou de ser o destino.
+		await page.waitForURL(serverA.baseUrl + '/projects');
+		await expect(page.getByRole('heading', { name: 'Biblioteca de projetos' })).toBeVisible();
+
+		const rows = page.locator('.project-row .col-name');
+		await expect(rows).toHaveCount(2);
+
+		// possibilidade real de abrir/continuar o segundo projeto a partir da
+		// Biblioteca, com navegação para o mesmo projectId.
+		const levelMeUpRow = page.locator('.project-row', { hasText: 'Level Me Up' });
+		await expect(levelMeUpRow.getByRole('link', { name: /Começar projeto|Continuar projeto/ })).toHaveAttribute(
+			'href',
+			`/projects/${secondProjectId}/now`
+		);
 	});
 
 	await test.step('recarregar a página preserva a lista', async () => {
 		await page.reload();
-		await expect(page.locator('.projects li a')).toHaveCount(2);
+		await expect(page.locator('.project-row .col-name')).toHaveCount(2);
 	});
 
 	await test.step('acesso direto pela URL continua funcionando', async () => {
@@ -120,21 +129,30 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 	});
 
 	await test.step('importar projeto em cenário válido continua funcionando e aparece na lista do destino', async () => {
-		const downloadPromise = page.waitForEvent('download');
+		// Mesmo drift do walking-skeleton-journey (D031): Exportar virou página
+		// própria, o download real é a ação "Baixar exportação" dentro dela.
 		await page.getByRole('link', { name: 'Exportar' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${firstProjectId}/export`);
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByRole('link', { name: 'Baixar exportação' }).click();
 		const download = await downloadPromise;
 		const downloadedFilePath = path.join(tmpRoot, 'export.json');
 		await download.saveAs(downloadedFilePath);
 		expect(readFileSync(downloadedFilePath, 'utf-8').length).toBeGreaterThan(0);
 
 		await page.goto(serverB.baseUrl + '/');
-		await expect(page.getByText('Nenhum projeto ainda. Crie o primeiro acima.')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Nenhum projeto ainda' })).toBeVisible();
 
-		await page.getByLabel('Importar projeto (.json)').setInputFiles(downloadedFilePath);
+		// Campo de importação fica dentro de <details> recolhido por padrão, e
+		// o rótulo real do input é "Arquivo do projeto (.json)", não "Importar
+		// projeto (.json)".
+		await page.getByText('Selecionar arquivo').click();
+		await page.getByLabel('Arquivo do projeto (.json)').setInputFiles(downloadedFilePath);
 		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 		await page.waitForURL(`${serverB.baseUrl}/projects/${firstProjectId}/now`);
 
 		await page.goto(serverB.baseUrl + '/');
-		await expect(page.getByRole('link', { name: 'Projeto sem nome' })).toBeVisible();
+		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
+		await expect(featured.getByRole('heading', { name: 'Projeto sem nome', level: 2 })).toBeVisible();
 	});
 });

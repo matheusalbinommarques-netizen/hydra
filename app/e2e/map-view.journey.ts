@@ -9,21 +9,19 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-	buildApp,
 	type EphemeralServer,
 	getFreePort,
 	startServer,
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
+import { createProject } from './helpers/create-project';
 import { answerActivitiesGenerically } from './helpers/generic-activity';
 
 let tmpRoot: string;
 let server: EphemeralServer;
 
 test.beforeAll(async () => {
-	buildApp();
-
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-map-'));
 	const port = await getFreePort();
 	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
@@ -58,22 +56,24 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 	let projectId = '';
 
 	await test.step('criar projeto e navegar ao Mapa (projeto no início)', async () => {
-		await page.goto(server.baseUrl + '/');
-		await page.getByRole('button', { name: 'Criar novo projeto' }).click();
-		await page.waitForURL(/\/projects\/[^/]+\/now$/);
-		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
-		expect(match).not.toBeNull();
-		projectId = match![1];
+		projectId = await createProject(page, server.baseUrl);
 
 		await page.getByRole('link', { name: 'Mapa' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/map`);
-		await expect(page.getByRole('heading', { name: 'Mapa da jornada' })).toBeVisible();
+		// Rota/destino do shell continuam "Mapa"; o conteúdo principal virou a
+		// Jornada (convergência da subetapa 7.3) — heading renomeado junto.
+		await expect(page.getByRole('heading', { name: 'Jornada', level: 1 })).toBeVisible();
 	});
 
 	await test.step('projeto no início: fase Descoberta visível, atividade atual destacada', async () => {
 		await expect(page.getByRole('heading', { name: 'Descoberta' })).toBeVisible();
-		await expect(page.getByText('Origem do projeto')).toBeVisible();
-		await expect(page.getByText('Próxima atividade recomendada')).toBeVisible();
+
+		// Marcador de atividade atual é o rótulo "Atual" dentro do próprio item
+		// da lista (displayStatusLabel em map/+page.svelte) — não há
+		// aria-current nesta tela, o texto real é o marcador estrutural.
+		const originItem = page.locator('li', { hasText: 'Origem do projeto' });
+		await expect(originItem).toBeVisible();
+		await expect(originItem.getByText('Atual', { exact: true })).toBeVisible();
 	});
 
 	await test.step('todas as seis fases exibidas, cada uma com catálogo completo (jornada linear completa)', async () => {
@@ -96,7 +96,10 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 	});
 
 	await test.step('navegação Mapa → Agora → Resumo → Mapa', async () => {
-		await page.getByRole('link', { name: 'Agora' }).click();
+		// A Jornada (/map) tem um CTA próprio "Continuar em Agora" além do link
+		// de navegação do shell — escopar à navegação + nome exato evita a
+		// ambiguidade (mesmo padrão de skip-activity.journey.ts).
+		await page.getByRole('navigation').getByRole('link', { name: 'Agora', exact: true }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 		await expect(page.getByRole('heading', { name: 'Agora' })).toBeVisible();
 
@@ -106,7 +109,9 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 
 		await page.getByRole('link', { name: 'Mapa' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/map`);
-		await expect(page.getByRole('heading', { name: 'Mapa da jornada' })).toBeVisible();
+		// Rota/destino do shell continuam "Mapa"; o conteúdo principal virou a
+		// Jornada (convergência da subetapa 7.3) — heading renomeado junto.
+		await expect(page.getByRole('heading', { name: 'Jornada', level: 1 })).toBeVisible();
 	});
 
 	await test.step('avançar as 36 atividades reais até catalog_limit_reached', async () => {
@@ -219,8 +224,12 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 	await test.step('Mapa em catalog_limit_reached: todas as atividades concluídas, nenhuma marcada como atual', async () => {
 		await page.getByRole('link', { name: 'Mapa' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/map`);
+		await expect(page.getByRole('heading', { name: 'Jornada', level: 1 })).toBeVisible();
 
-		await expect(page.getByText('Próxima atividade recomendada')).toHaveCount(0);
+		// "Atual" também aparece fixo na legenda — escopar às fases reais
+		// (.phases-column), excluindo a legenda, para confirmar que nenhuma
+		// atividade de nenhuma fase está marcada como atual.
+		await expect(page.locator('.phases-column').getByText('Atual', { exact: true })).toHaveCount(0);
 
 		const descobertaSection = page.locator('section', { has: page.getByRole('heading', { name: 'Descoberta' }) });
 		const activityItems = descobertaSection.locator('li');

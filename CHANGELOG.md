@@ -412,6 +412,24 @@
   reservada a identidade/título) já implementadas em `app.css`; navegação,
   hierarquia funcional e demais seções do documento não foram alteradas.
 
+### Verificado
+
+- `hydra-verify full` (harness de verificação determinística) reconstruído:
+  execução assíncrona com logs progressivos por etapa, timeout próprio por
+  etapa e encerramento controlado de toda a árvore de processos ao atingir
+  o timeout, sem deixar processos órfãos;
+- eliminados os múltiplos builds redundantes por execução — o app passa a
+  ser construído uma única vez, reaproveitado pela suíte de jornadas ponta
+  a ponta;
+- o teste E2E demo do scaffold (sem relação com o produto) saiu do selo
+  `full`, que passa a cobrir só a cobertura real do Hydra;
+- as jornadas ponta a ponta foram sincronizadas com os fluxos atuais do
+  produto (wizard de criação, Biblioteca, Jornada, Acompanhamento,
+  Registros, Exportar);
+- resultado da execução de referência: `npm run check` aprovado, 458
+  testes unitários aprovados, build aprovado, 18 jornadas ponta a ponta
+  aprovadas — aproximadamente 84 segundos ao todo, sem processos órfãos.
+
 ## [0.4.0] — 25/07/2026
 
 ### Adicionado
