@@ -432,13 +432,18 @@ conclusão da etapa). Com os três alvos da ordem decididos e implementados,
 Configurações do projeto, Exportar, estados vazios, erros relevantes,
 projeto concluído, largura reduzida), ainda não iniciada.
 
-##### 7.6 — Complementos
+##### 7.6 — Complementos — concluído
 
 Inclui: Configurações do projeto; Exportar; estados vazios; erros
 relevantes; projeto concluído; largura reduzida.
 
 Gate: superfícies complementares coerentes; nenhuma configuração
 fictícia; estados principais tratados; exportação preservada.
+
+Gate atendido: Configurações e Exportar `convergida`; estados vazios,
+erros relevantes, projeto concluído e largura reduzida (~390px)
+avaliados nas duas superfícies, sem defeito encontrado e sem código
+adicional necessário — ver avaliação abaixo.
 
 Configurações do projeto (item 17) está `convergida` (D030,
 `docs/07-management/decision-log.md`): superfície própria reduzida,
@@ -449,12 +454,40 @@ implementada, testada e validada. Exportar (item 18) está `convergida`
 `/projects/[projectId]/export`, download movido para
 `/projects/[projectId]/export/download`, handler legado em `/export`
 preservado para requisições não HTML, use case e formato de exportação
-preservados sem alteração — implementada, testada e validada. Com os
-dois itens do inventário de 7.6 convergidos, o próximo ponto real é
-avaliar o restante do gate da subetapa — estados vazios, erros
-relevantes, projeto concluído e largura reduzida nas duas superfícies —,
-ainda não avaliado; nenhum desses quatro comportamentos foi comprovado
-tratado até aqui, então a subetapa 7.6 permanece em andamento.
+preservados sem alteração — implementada, testada e validada.
+
+O restante do gate da subetapa — estados vazios, erros relevantes,
+projeto concluído e largura reduzida nas duas superfícies — foi avaliado
+formalmente, sem alteração de código:
+
+- estados vazios: Configurações já suporta nome de projeto vazio como
+  estado real e alcançável pela interface (criação de projeto sem nome
+  provisório), campo e formulário permanecem operáveis; Exportar não tem
+  estado vazio aplicável — conteúdo exportado e nome do arquivo são
+  sempre estruturalmente presentes (nome do arquivo deriva só do
+  `projectId`, nunca do nome do projeto);
+- erros relevantes: nome vazio em Configurações produz mensagem
+  acessível (`role="alert"`, "Informe um nome para o projeto."), sem
+  persistir e sem quebrar o formulário; projeto inexistente em Exportar
+  já cai no 404 compartilhado do layout do workspace
+  (`+layout.server.ts`), sem necessidade de `+error.svelte` dedicado;
+- projeto concluído: verificado com fixture controlada (todas as
+  atividades do catálogo marcadas `concluída`, projeto com nome
+  preenchido, status `concluído` confirmado em `/now`) — Configurações
+  continua acessível e renomear continua funcionando; Exportar continua
+  acessível e o download continua funcionando; nenhum bloqueio ou aviso
+  fictício de "projeto concluído" aparece em nenhuma das duas
+  superfícies;
+- largura reduzida (~390px): verificado nas duas superfícies — sem
+  rolagem horizontal, campo e botões com alvo de toque adequado
+  (~308×48–50px), mensagem de erro de Configurações renderizada sem
+  corte, nome de arquivo de Exportar imune a nome de projeto longo (não
+  depende dele) e sem estourar a largura da tela.
+
+Nenhum defeito real foi encontrado nesta avaliação e nenhum código
+adicional foi necessário. Com os dois itens do inventário convergidos e
+o restante do gate aprovado, **a subetapa 7.6 está concluída** — próxima
+subetapa é 7.7 (Revisão final).
 
 ##### 7.7 — Revisão final
 

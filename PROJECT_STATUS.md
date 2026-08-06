@@ -214,7 +214,7 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   referência não foi implementado, por não haver hoje um ponto de falha
   isolado e real para esta rota. Subetapa 7.6 — Complementos (Configurações
   do projeto, Exportar, estados vazios, erros relevantes, projeto
-  concluído, largura reduzida) — em andamento. Configurações do projeto
+  concluído, largura reduzida) — concluída. Configurações do projeto
   (`/projects/[projectId]/settings`), primeiro alvo da subetapa, está
   `convergida` (D030, `docs/07-management/decision-log.md`): superfície
   própria reduzida, sustentada só pelo domínio já existente — renomear o
@@ -230,11 +230,22 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   handler legado (nome real do arquivo, headers, formato JSON), handler
   legado em `/export` preservado para requisições não HTML, sem nenhuma
   configuração fictícia (importação, escolha de formato, histórico,
-  agendamento ou compartilhamento). Etapa 7 (Convergência da experiência e
-  das telas) permanece em andamento — com os dois itens do inventário de
-  7.6 convergidos, a subetapa permanece em andamento até o restante do
-  gate (estados vazios, erros relevantes, projeto concluído, largura
-  reduzida) ser avaliado.
+  agendamento ou compartilhamento). O restante do gate da subetapa foi
+  avaliado formalmente, sem alteração de código: estados vazios
+  (Configurações suporta nome vazio como estado real; Exportar não tem
+  estado vazio aplicável, nome do arquivo depende só do `projectId`);
+  erros relevantes (nome vazio em Configurações gera mensagem acessível
+  sem persistir; projeto inexistente em Exportar já cai no 404
+  compartilhado do layout do workspace); projeto concluído (verificado
+  com fixture controlada — Configurações e Exportar continuam acessíveis
+  e funcionais, sem bloqueio ou aviso fictício); largura reduzida
+  (~390px, verificada nas duas superfícies — sem rolagem horizontal,
+  alvos de toque adequados, mensagens sem corte, nome de arquivo imune a
+  nome de projeto longo). Nenhum defeito real foi encontrado e nenhum
+  código adicional foi necessário. Com os dois itens do inventário
+  convergidos e o restante do gate aprovado, **a subetapa 7.6 está
+  concluída**. Etapa 7 (Convergência da experiência e das telas)
+  permanece em andamento — próxima subetapa é 7.7 (Revisão final).
 
 Histórico e conteúdo das entregas ficam no CHANGELOG e no Git; decisões
 relevantes permanecem no decision-log e, quando houver ciclo formal, o
@@ -289,7 +300,7 @@ Encerramento e aprendizado) — está concluída: as três posições convergem
 como a superfície própria `/projects/[projectId]/closure` ("Resultados e
 encerramento", D029, `docs/07-management/decision-log.md`), com
 navegação "Encerramento" no shell do workspace. A subetapa 7.6 —
-Complementos — está em andamento: Configurações do projeto
+Complementos — está concluída: Configurações do projeto
 (`/projects/[projectId]/settings`), primeiro alvo do inventário, está
 `convergida` (D030, `docs/07-management/decision-log.md`) — superfície
 própria reduzida, sustentada só pelo domínio já existente (renomear o
@@ -300,13 +311,16 @@ página visual própria com ação explícita "Baixar exportação", download
 movido para `/projects/[projectId]/export/download` preservando
 integralmente o contrato do handler legado (nome real do arquivo,
 headers, formato JSON), handler legado em `/export` preservado para
-requisições não HTML, sem nenhuma configuração fictícia. Com os dois
-itens do inventário de 7.6 convergidos, a etapa 7 permanece em andamento;
-o próximo ponto real da etapa 7 deve ser obtido em
-`docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7"
-(subetapa 7.6 — Complementos, restando avaliar o gate completo da
-subetapa quanto a estados vazios, erros relevantes, projeto concluído e
-largura reduzida, no momento em que este documento foi escrito).
+requisições não HTML, sem nenhuma configuração fictícia. O restante do
+gate da subetapa — estados vazios, erros relevantes, projeto concluído e
+largura reduzida (~390px), nas duas superfícies — foi avaliado
+formalmente: nenhum defeito real foi encontrado e nenhum código
+adicional foi necessário (detalhamento em
+`docs/03-product/product-roadmap.md`, seção 7.6). Com os dois itens do
+inventário convergidos e o restante do gate aprovado, a subetapa 7.6 está
+concluída; a etapa 7 permanece em andamento — o próximo ponto real é a
+subetapa 7.7 (Revisão final), descrita em
+`docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7".
 
 "Tailoring metodológico e modelos" deixa de ser tratado como próxima
 etapa imediata e passa a constar no roadmap como horizonte posterior,
