@@ -151,7 +151,7 @@ resulta em `concluído`; evidências consultáveis em `/records`, estado das
 atividades consultável em `/map`, mensagem final de conclusão em `/now`.
 Nenhuma mudança de código foi necessária.
 
-### 7. Convergência da experiência e das telas — em andamento
+### 7. Convergência da experiência e das telas — concluído
 
 Durante esta etapa, este roadmap é também o backlog operacional da
 convergência visual e de experiência. Ele define quais telas precisam ser
@@ -489,7 +489,7 @@ adicional foi necessário. Com os dois itens do inventário convergidos e
 o restante do gate aprovado, **a subetapa 7.6 está concluída** — próxima
 subetapa é 7.7 (Revisão final).
 
-##### 7.7 — Revisão final
+##### 7.7 — Revisão final — concluído
 
 Resultado: comparação integral AS-IS × TO-BE; correções de consistência;
 jornada ponta a ponta; aceite final da etapa.
@@ -498,6 +498,37 @@ Gate: todas as telas com decisão explícita; telas do escopo imediato
 convergidas; telas adiadas justificadas; jornada principal funcional;
 referências e produto comparados; roadmap, PROJECT_STATUS e código
 coerentes.
+
+Auditoria realizada em 06/08/2026: as 18 superfícies do inventário
+operacional foram verificadas uma a uma contra sua decisão registrada —
+13 `convergida`, 4 `combinada com outra superfície` (Atividade guiada,
+Detalhe de item de atenção, Resultados e benefícios, Transição e adoção)
+e 1 `adiada` com justificativa (Modelos de jornada, horizonte de
+Tailoring metodológico); nenhuma divergência funcional ou visual
+relevante foi encontrada. As mudanças de código ocorridas nas rotas de
+Home, Biblioteca, Agora e Acompanhamento após suas respectivas
+convergências foram conferidas e correspondem integralmente a decisões
+já registradas (D023–D031) — não representam drift. A navegação do
+workspace foi conferida como coerente entre a marcação desktop e o menu
+mobile, com os dez destinos reais presentes nas duas formas; nenhuma
+referência residual a `/cockpit` permanece no código de produto.
+
+Evidência funcional usada como selo: `hydra-verify full` PASS 5/5,
+458/458 testes unitários, 18/18 jornadas ponta a ponta, um único build,
+aproximadamente 84 segundos, commit `0a7e529` — sem necessidade de nova
+execução, por não ter havido mudança funcional nesta auditoria.
+
+Único achado, de impacto trivial: comentário desatualizado em
+`app/src/routes/projects/[projectId]/+layout.svelte` referindo-se a
+"oito destinos reais do workspace", quando `NAV_ITEMS` já continha dez
+(Encerramento e Configurações adicionados nas subetapas 7.5/7.6 sem
+atualizar o comentário) — corrigido para "dez" nesta entrega, sem
+alteração de `NAV_ITEMS`, rotas, markup ou comportamento.
+
+Gate atendido: **subetapa 7.7 concluída.**
+
+Com as sete subetapas (7.0–7.7) concluídas, **a etapa 7 — Convergência da
+experiência e das telas — está concluída.**
 
 #### Fatias preparatórias já entregues
 

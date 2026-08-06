@@ -244,8 +244,24 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   nome de projeto longo). Nenhum defeito real foi encontrado e nenhum
   código adicional foi necessário. Com os dois itens do inventário
   convergidos e o restante do gate aprovado, **a subetapa 7.6 está
-  concluída**. Etapa 7 (Convergência da experiência e das telas)
-  permanece em andamento — próxima subetapa é 7.7 (Revisão final).
+  concluída**. Subetapa 7.7 — Revisão final — está concluída: auditoria
+  realizada em 06/08/2026 comparou as 18 superfícies do inventário contra
+  sua decisão registrada (13 `convergida`, 4 `combinada com outra
+  superfície` — Atividade guiada, Detalhe de item de atenção, Resultados
+  e benefícios, Transição e adoção —, 1 `adiada` com justificativa —
+  Modelos de jornada), sem encontrar divergência funcional ou visual
+  relevante; as mudanças de código posteriores às convergências
+  individuais (Home, Biblioteca, Agora, Acompanhamento) foram conferidas
+  e correspondem integralmente às decisões D023–D031; navegação do
+  workspace coerente entre desktop e mobile; nenhuma referência residual
+  a `/cockpit`; evidência funcional reaproveitada sem nova execução —
+  `hydra-verify full` PASS 5/5, 458/458 testes unitários, 18/18 jornadas,
+  um build, ~84s, commit `0a7e529`. Único achado, trivial, corrigido
+  nesta entrega: comentário desatualizado em
+  `app/src/routes/projects/[projectId]/+layout.svelte` ("oito destinos"
+  → "dez destinos"), sem alteração de `NAV_ITEMS`, rotas ou comportamento.
+  Com as sete subetapas (7.0–7.7) concluídas, **a etapa 7 — Convergência
+  da experiência e das telas — está concluída.**
 - **Manutenção técnica — `hydra-verify full`** (harness de verificação,
   anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
   estabilizada — `hydra-verify full` volta a ser confiável e
@@ -288,63 +304,29 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-As etapas 1 a 6 do roadmap (`docs/03-product/product-roadmap.md`) —
-espinha mecânica do produto — estão concluídas. A etapa 7,
-"Convergência da experiência e das telas", está em andamento, agora com
-backlog operacional próprio no roadmap (inventário de telas, situação,
-sequência 7.0–7.7 e gates). As subetapas 7.0, 7.1, 7.2 e 7.3 estão
-concluídas — Agora, Jornada, Documento do projeto e Revisão e confirmação
-`convergidas`, Atividade guiada `combinada com Agora` (sem rota própria de
-execução); o gate da subetapa (usuário entende onde está, sabe a próxima
-ação, responde atividades, acompanha a jornada, consulta o artefato
-crescente, revisa e confirma as decisões da Descoberta) está atendido. A
-subetapa 7.4 — Execução e controle — está concluída: Entregas,
-Acompanhamento (`/tracking`, nome que substitui definitivamente
-"Cockpit") e Registros `convergidas`; a decisão sobre Detalhe de item de
-atenção está concluída — classificada como `combinada com outra
-superfície` (D027, `docs/07-management/decision-log.md`), sem rota
-dedicada. Registros converge como superfície própria reduzida (D028,
-`docs/07-management/decision-log.md`). A subetapa 7.5 — Resultados e
-encerramento (ordem: Resultados e benefícios; Transição e adoção;
-Encerramento e aprendizado) — está concluída: as três posições convergem
-como a superfície própria `/projects/[projectId]/closure` ("Resultados e
-encerramento", D029, `docs/07-management/decision-log.md`), com
-navegação "Encerramento" no shell do workspace. A subetapa 7.6 —
-Complementos — está concluída: Configurações do projeto
-(`/projects/[projectId]/settings`), primeiro alvo do inventário, está
-`convergida` (D030, `docs/07-management/decision-log.md`) — superfície
-própria reduzida, sustentada só pelo domínio já existente (renomear o
-projeto e exibir a data de criação), sem nenhuma configuração fictícia.
-Exportar (`/projects/[projectId]/export`), segundo alvo do inventário,
-também está `convergida` (D031, `docs/07-management/decision-log.md`) —
-página visual própria com ação explícita "Baixar exportação", download
-movido para `/projects/[projectId]/export/download` preservando
-integralmente o contrato do handler legado (nome real do arquivo,
-headers, formato JSON), handler legado em `/export` preservado para
-requisições não HTML, sem nenhuma configuração fictícia. O restante do
-gate da subetapa — estados vazios, erros relevantes, projeto concluído e
-largura reduzida (~390px), nas duas superfícies — foi avaliado
-formalmente: nenhum defeito real foi encontrado e nenhum código
-adicional foi necessário (detalhamento em
-`docs/03-product/product-roadmap.md`, seção 7.6). Com os dois itens do
-inventário convergidos e o restante do gate aprovado, a subetapa 7.6 está
-concluída; a etapa 7 permanece em andamento — o próximo ponto real é a
-subetapa 7.7 (Revisão final), descrita em
-`docs/03-product/product-roadmap.md`, seção "Sequência da etapa 7".
+As etapas 1 a 7 do roadmap (`docs/03-product/product-roadmap.md`) estão
+concluídas. A etapa 7, "Convergência da experiência e das telas",
+encerrou-se com a subetapa 7.7 (Revisão final): auditoria realizada em
+06/08/2026 confirmou que as 18 superfícies do inventário operacional têm
+decisão explícita e coerente com o código atual — 13 `convergida`, 4
+`combinada com outra superfície` (Atividade guiada, Detalhe de item de
+atenção, Resultados e benefícios, Transição e adoção) e 1 `adiada` com
+justificativa (Modelos de jornada, horizonte de Tailoring metodológico);
+nenhuma divergência funcional, visual ou documental bloqueante foi
+encontrada; a navegação do workspace está coerente entre desktop e
+mobile, sem referência residual a `/cockpit`. A manutenção técnica do
+harness (`hydra-verify full` PASS 5/5, 458/458 testes unitários, 18/18
+jornadas, um build, ~84s, commit `0a7e529`) segue válida como selo
+funcional confiável, sem necessidade de nova execução — nenhuma mudança
+funcional decorreu desta auditoria. Detalhamento completo em
+`docs/03-product/product-roadmap.md`, seção "7.7 — Revisão final".
 
-Antes de retomar a subetapa 7.7, uma manutenção técnica estabilizou a
-infraestrutura de verificação: `hydra-verify full` volta a ser confiável
-e determinístico (PASS 5/5, 18/18 jornadas, um único build,
-aproximadamente 83,6 segundos), com as jornadas ponta a ponta
-sincronizadas com as superfícies atuais do produto. Nenhuma
-funcionalidade foi alterada e a situação da etapa 7 não mudou — o
-próximo ponto real continua sendo concluir a auditoria da subetapa 7.7,
-agora com o harness confiável.
-
-"Tailoring metodológico e modelos" deixa de ser tratado como próxima
-etapa imediata e passa a constar no roadmap como horizonte posterior,
-dependente de sinais de contexto, aplicabilidade e profundidade ainda não
-especificados.
+Com a etapa 7 concluída, não há próxima etapa numerada já definida no
+roadmap. O próximo passo é Matheus definir formalmente o novo ciclo e sua
+meta. "Tailoring metodológico e modelos" permanece registrado como
+horizonte possível, dependente de sinais de contexto, aplicabilidade e
+profundidade ainda não especificados — não é uma decisão automaticamente
+aprovada nem a próxima etapa presumida.
 
 ## Não fazer agora
 

@@ -13,7 +13,7 @@
 		return pathname === target || pathname.startsWith(`${target}/`);
 	}
 
-	// Lista única dos oito destinos reais do workspace — reaproveitada pelo
+	// Lista única dos dez destinos reais do workspace — reaproveitada pelo
 	// menu mobile e pelo rótulo "área atual" do cabeçalho compacto. A
 	// navegação desktop abaixo continua com sua própria marcação (dois
 	// grupos com pesos visuais diferentes) e não usa esta lista, para não

@@ -428,7 +428,15 @@
   Registros, Exportar);
 - resultado da execução de referência: `npm run check` aprovado, 458
   testes unitários aprovados, build aprovado, 18 jornadas ponta a ponta
-  aprovadas — aproximadamente 84 segundos ao todo, sem processos órfãos.
+  aprovadas — aproximadamente 84 segundos ao todo, sem processos órfãos;
+- subetapa 7.7 (Revisão final) e, com ela, a etapa 7 (Convergência da
+  experiência e das telas) foram concluídas: auditoria integral das 18
+  superfícies do inventário operacional contra suas decisões registradas
+  (13 `convergida`, 4 `combinada com outra superfície`, 1 `adiada`),
+  confirmando coerência entre referências visuais, roadmap, decisões
+  (D023–D031), navegação do workspace e produto, sem nenhuma mudança
+  funcional necessária; corrigido comentário interno desatualizado sobre
+  a quantidade de destinos da navegação do workspace (`app/src/routes/projects/[projectId]/+layout.svelte`).
 
 ## [0.4.0] — 25/07/2026
 
