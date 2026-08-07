@@ -381,12 +381,19 @@ function assembleProjectState(
 		return invariantError('Existe ActivityProgress para atividade fora do catálogo');
 	}
 
-	// invariante: nenhuma atividade explicit_confirmation com status pulada
+	// invariante: uma atividade explicit_confirmation não pulável (allowsSkip
+	// false) nunca pode ter status pulada — skipActivity já impede isso em
+	// tempo de execução; aqui a mesma regra é verificada contra o estado
+	// desserializado.
 	for (const progress of activityProgress) {
 		const activity = findActivityDefinition(catalog, progress.activityDefinitionId);
-		if (activity?.completionMode === 'explicit_confirmation' && progress.status === 'pulada') {
+		if (
+			activity?.completionMode === 'explicit_confirmation' &&
+			activity.allowsSkip === false &&
+			progress.status === 'pulada'
+		) {
 			return invariantError(
-				`Atividade "${activity.id}" é explicit_confirmation mas tem ActivityProgress.status "pulada"`
+				`Atividade "${activity.id}" é explicit_confirmation com allowsSkip false mas tem ActivityProgress.status "pulada"`
 			);
 		}
 	}

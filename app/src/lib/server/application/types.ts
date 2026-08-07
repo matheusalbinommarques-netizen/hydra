@@ -178,6 +178,14 @@ export interface ConfirmSummaryInput {
 	projectId: string;
 }
 
+// C5-01 — confirmação de "Priorizar entregas" (explicit_confirmation,
+// allowsSkip true). Localiza a atividade por id fixo no domínio; não recebe
+// nenhum dado de PlanningItem — a coleção pertence à Answer de "Decompor o
+// trabalho" e não é tocada por esta transição.
+export interface ConfirmPlanningPriorityInput {
+	projectId: string;
+}
+
 export interface RenameProjectInput {
 	projectId: string;
 	name: string;
@@ -286,6 +294,7 @@ export interface ProjectUseCases {
 	answerActivity(input: AnswerActivityInput): Promise<UseCaseOutcome<ProjectView>>;
 	skipActivity(input: SkipActivityInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmSummary(input: ConfirmSummaryInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmPlanningPriority(input: ConfirmPlanningPriorityInput): Promise<UseCaseOutcome<ProjectView>>;
 	addScopeItem(input: AddScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setScopeItemText(input: SetScopeItemTextInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveScopeItem(input: MoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;

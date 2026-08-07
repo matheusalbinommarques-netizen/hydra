@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createInitialProjectState, encodeMultiSelectValue } from '$lib/domain';
+import { createInitialProjectState, encodeMultiSelectValue, encodePlanningItems } from '$lib/domain';
 import { completePhase } from '$lib/domain/test-support';
 import { catalog } from '../../catalog';
 import { createSqliteProjectRepository, type ProjectRepository, type SqliteProjectRepository } from '../persistence';
@@ -496,6 +496,82 @@ describe('createProjectUseCases — confirmSummary', () => {
 
 		const result = await useCases.confirmSummary({ projectId: created.value.projectId });
 		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+});
+
+describe('createProjectUseCases — confirmPlanningPriority (C5-01)', () => {
+	it('erro planning_no_items quando "Decompor o trabalho" está vazia', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.confirmPlanningPriority({ projectId: created.value.projectId });
+		expect(result).toEqual({ ok: false, error: { kind: 'planning_no_items' } });
+	});
+
+	it('conclui "Priorizar entregas" quando há ao menos um PlanningItem', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'decompor_trabalho',
+			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) }
+		});
+
+		const result = await useCases.confirmPlanningPriority({ projectId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.activityStatuses.priorizar_entregas).toBe('concluída');
+	});
+
+	it('erro transition_not_allowed ao confirmar duas vezes', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'decompor_trabalho',
+			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) }
+		});
+		await useCases.confirmPlanningPriority({ projectId });
+
+		const result = await useCases.confirmPlanningPriority({ projectId });
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('editar "Decompor o trabalho" depois de "Priorizar entregas" confirmada NÃO reabre nem sinaliza (comportamento silencioso, C5-01)', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'decompor_trabalho',
+			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) }
+		});
+		await useCases.confirmPlanningPriority({ projectId });
+
+		const edited = await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: 'decompor_trabalho',
+			values: {
+				partes_trabalho: encodePlanningItems([
+					{ id: 'p1', text: 'Parte 1' },
+					{ id: 'p2', text: 'Parte 2 adicionada depois' }
+				])
+			}
+		});
+		expect(edited.ok).toBe(true);
+		if (!edited.ok) return;
+		expect(edited.value.activityStatuses.priorizar_entregas).toBe('concluída');
+		expect(edited.value.openPendingItems).toHaveLength(0);
+		expect(edited.value.pendingItemHistory).toHaveLength(0);
 	});
 });
 

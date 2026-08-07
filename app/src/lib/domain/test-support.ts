@@ -9,6 +9,7 @@
 import {
 	addScopeItem,
 	answerActivity,
+	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
 	setHypothesis,
@@ -16,6 +17,7 @@ import {
 	skipActivity
 } from './transitions';
 import { encodeMultiSelectValue } from './multi-select';
+import { encodePlanningItems } from './planning-items';
 import type { ActivityDefinition, Catalog, PhaseDefinition } from './catalog-types';
 import type { ProjectState } from './state-types';
 import type { Result } from './result';
@@ -56,6 +58,8 @@ export function answerActivityMinimally(
 			values[field.id] = field.options[0];
 		} else if (field.dataTarget === 'answer' && field.type === 'selecao_multipla') {
 			values[field.id] = encodeMultiSelectValue([field.options[0].id]);
+		} else if (field.dataTarget === 'answer' && field.type === 'lista_partes') {
+			values[field.id] = encodePlanningItems([{ id: `${field.id}-item-1`, text: 'Parte de teste' }]);
 		} else {
 			values[field.id] = `resposta de teste (${field.id})`;
 		}
@@ -96,7 +100,8 @@ export function confirmScopeVersionMinimally(
 /**
  * Completa todas as atividades de uma fase, na ordem do catálogo:
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
- * via `confirmSummary`, `scope_confirmation` via {@link confirmScopeVersionMinimally}.
+ * via `confirmSummary` (Resumo) ou `confirmPlanningPriority` (Priorizar
+ * entregas, C5-01), `scope_confirmation` via {@link confirmScopeVersionMinimally}.
  */
 export function completePhase(catalog: Catalog, state: ProjectState, phaseId: string, occurredAt: string): ProjectState {
 	const phase = catalog.phases.find((p) => p.id === phaseId);
@@ -104,7 +109,15 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 	let next = state;
 	for (const activity of phase.activities) {
 		if (activity.completionMode === 'explicit_confirmation') {
-			next = unwrapResult(confirmSummary(catalog, next));
+			// Duas atividades explicit_confirmation no catálogo (C5-01) — cada
+			// uma tem sua própria transição de confirmação, localizada por id
+			// explícito; nunca uma seleção genérica "a explicit_confirmation
+			// desta fase".
+			if (activity.id === 'priorizar_entregas') {
+				next = unwrapResult(confirmPlanningPriority(catalog, next, occurredAt));
+			} else {
+				next = unwrapResult(confirmSummary(catalog, next));
+			}
 		} else if (activity.completionMode === 'scope_confirmation') {
 			next = confirmScopeVersionMinimally(catalog, next, `${activity.id}-scope-item-1`, occurredAt);
 		} else {

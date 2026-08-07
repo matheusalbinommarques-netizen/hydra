@@ -2,6 +2,12 @@
 // Fonte: docs/core/DOMAIN_MODEL.md §7. Os campos produzem um plano inicial
 // compreensível em texto estruturado — não é o objetivo reproduzir um
 // quadro de gestão de tarefas completo dentro do Hydra.
+//
+// "Decompor o trabalho" e "Priorizar entregas" (C5-01): laboratório da
+// mecânica CONSTRUIR → OPERAR — uma atividade cria dados vivos do projeto
+// (PlanningItem[], ver domain/planning-items.ts), a seguinte trabalha sobre
+// exatamente os mesmos dados, sem redigitação. Ver docs/06-architecture/
+// contracts.md e o backlog do Ciclo 5 para o desenho completo.
 
 import type { ActivityDefinition } from '$lib/domain';
 
@@ -11,9 +17,9 @@ const decomporTrabalho: ActivityDefinition = {
 	order: 1,
 	title: 'Decompor o trabalho',
 	mainQuestion: 'Como o trabalho deste projeto pode ser dividido em partes menores?',
-	why: 'Dividir o trabalho em partes menores torna o esforço mais fácil de estimar, priorizar e acompanhar.',
+	why: 'Dividir o trabalho em partes menores torna o esforço mais fácil de estimar, priorizar e acompanhar. Cada parte criada aqui passa a existir no projeto e será usada nas próximas atividades, sem precisar ser digitada de novo.',
 	example: 'Partes: tela de abertura de solicitação, fluxo de aprovação, notificação por e-mail, painel de acompanhamento.',
-	completionCriteria: 'Principais partes ou itens de trabalho estão listados.',
+	completionCriteria: 'Ao menos uma parte do trabalho foi adicionada, com texto próprio.',
 	completionMode: 'required_fields',
 	allowsSkip: true,
 	pendingItemLabel: 'O trabalho do projeto não foi decomposto',
@@ -22,11 +28,11 @@ const decomporTrabalho: ActivityDefinition = {
 		{
 			id: 'partes_trabalho',
 			activityId: 'decompor_trabalho',
-			label: 'Quais são as principais partes ou itens de trabalho?',
+			label: 'Partes do trabalho',
 			required: true,
-			placeholder: 'Ex.: tela de abertura de solicitação, fluxo de aprovação',
+			help: 'Adicione uma parte por vez. Você pode renomear ou remover a qualquer momento.',
 			dataTarget: 'answer',
-			type: 'texto_longo'
+			type: 'lista_partes'
 		}
 	]
 };
@@ -37,33 +43,13 @@ const priorizarEntregas: ActivityDefinition = {
 	order: 2,
 	title: 'Priorizar entregas',
 	mainQuestion: 'Qual é a ordem de prioridade entre essas partes do trabalho?',
-	why: 'Priorizar evita tentar avançar tudo ao mesmo tempo e ajuda a entregar valor mais cedo.',
-	example: 'Prioridade: 1) abertura de solicitação, 2) fluxo de aprovação, 3) notificação por e-mail. Critério: o que entrega valor sozinho primeiro.',
-	completionCriteria: 'Ordem de prioridade definida, com o critério usado quando relevante.',
-	completionMode: 'required_fields',
+	why: 'Priorizar evita tentar avançar tudo ao mesmo tempo e ajuda a entregar valor mais cedo. Estas são as partes que você criou em "Decompor o trabalho" — nada precisa ser digitado de novo, só a ordem muda.',
+	example: 'As mesmas partes definidas em "Decompor o trabalho", reordenadas por prioridade — a ordem da coleção é a própria prioridade.',
+	completionCriteria: 'A ordem das partes do trabalho foi revisada e a prioridade confirmada.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
 	pendingItemLabel: 'As entregas não foram priorizadas',
-	pendingItemDetail: 'Sem prioridade clara, o trabalho pode avançar em várias frentes sem nenhuma pronta.',
-	fields: [
-		{
-			id: 'ordem_prioridade_entregas',
-			activityId: 'priorizar_entregas',
-			label: 'Qual é a ordem de prioridade?',
-			required: true,
-			placeholder: 'Ex.: 1) abertura de solicitação, 2) fluxo de aprovação',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'criterio_priorizacao',
-			activityId: 'priorizar_entregas',
-			label: 'Qual critério orientou essa priorização?',
-			required: false,
-			placeholder: 'Ex.: o que entrega valor sozinho primeiro',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemDetail: 'Sem prioridade clara, o trabalho pode avançar em várias frentes sem nenhuma pronta.'
 };
 
 const mapearDependencias: ActivityDefinition = {

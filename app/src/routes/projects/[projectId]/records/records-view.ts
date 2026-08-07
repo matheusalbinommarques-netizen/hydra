@@ -8,7 +8,7 @@
 // resolução) — mostrá-las aqui duplicaria o mesmo dado sob outro nome
 // (auditoria de sustentação semântica das categorias do mockup, etapa 7.4).
 
-import { decodeMultiSelectValue } from '$lib/domain';
+import { decodeMultiSelectValue, decodePlanningItems } from '$lib/domain';
 import type { ActivityDefinition, ActivityStatus, Catalog } from '$lib/domain';
 
 export interface RecordsPendingItemInput {
@@ -65,6 +65,11 @@ export interface RecordsView {
 }
 
 const EDITABLE_PHASE_ID = 'descoberta';
+// Exceção nominal fora da Descoberta (C5-01) — mesma exceção e mesmo
+// comentário de now/+page.server.ts (REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA):
+// a próxima exceção fora desta lista deve provocar generalização da regra,
+// não a adição de outro id aqui.
+const EDITABLE_ACTIVITY_IDS_OUTSIDE_PHASE = new Set(['decompor_trabalho']);
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -92,7 +97,7 @@ function buildEditHref(
 	activityId: string,
 	activityStatuses: Record<string, ActivityStatus>
 ): string | null {
-	if (phaseId !== EDITABLE_PHASE_ID) return null;
+	if (phaseId !== EDITABLE_PHASE_ID && !EDITABLE_ACTIVITY_IDS_OUTSIDE_PHASE.has(activityId)) return null;
 	if (activityStatuses[activityId] !== 'concluída') return null;
 	return `/projects/${projectId}/now?activity=${activityId}&from=records`;
 }
@@ -116,6 +121,17 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 							id: field.id,
 							label: field.label,
 							value: selectedIds.map((id) => labelById.get(id) ?? id).join(', ')
+						};
+					}
+					if (field.dataTarget === 'answer' && field.type === 'lista_partes') {
+						// PlanningItem[] (C5-01) — conteúdo humano, nunca a
+						// serialização interna: lista numerada na ordem atual (que é a
+						// própria prioridade, se já reordenada em "Priorizar entregas").
+						const items = decodePlanningItems(input.answers[field.id]);
+						return {
+							id: field.id,
+							label: field.label,
+							value: items.map((item, index) => `${index + 1}. ${item.text}`).join('; ')
 						};
 					}
 					return { id: field.id, label: field.label, value: input.answers[field.id] };

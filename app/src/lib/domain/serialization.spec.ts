@@ -15,6 +15,7 @@ import {
 	skipActivity
 } from './transitions';
 import { deserializeProjectState, serializeProjectState } from './serialization';
+import { encodePlanningItems } from './planning-items';
 import type { ProjectState } from './state-types';
 import type { ProjectStateParseError } from './serialization';
 
@@ -186,11 +187,29 @@ describe('deserializeProjectState — invariant_violation', () => {
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 
-	it('rejeita o Resumo (explicit_confirmation) com status pulada', () => {
+	it('rejeita o Resumo (explicit_confirmation, allowsSkip false) com status pulada', () => {
 		const envelope = baseEnvelope() as { state: { activityProgress: Array<Record<string, unknown>> } };
 		const resumo = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'resumo')!;
 		resumo.status = 'pulada';
 		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('C5-01: aceita "Priorizar entregas" (explicit_confirmation, allowsSkip true) com status pulada', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(
+			answerActivity(
+				catalog,
+				state,
+				'decompor_trabalho',
+				{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) },
+				T1
+			)
+		);
+		state = unwrap(skipActivity(catalog, state, 'priorizar_entregas', 'pend-priorizar', T1));
+
+		const json = serializeProjectState(state);
+		const result = deserializeProjectState(json, catalog);
+		expect(result).toEqual({ ok: true, value: state });
 	});
 
 	it('rejeita Answer com projectId diferente do Project', () => {

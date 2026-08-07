@@ -5,6 +5,7 @@ import {
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
 	getScopeConfirmationIssues,
@@ -25,6 +26,7 @@ import {
 	shouldInvalidateSummary,
 	skipActivity
 } from './transitions';
+import { encodePlanningItems } from './planning-items';
 import type { RequiredFieldsActivity } from './catalog-types';
 import type { ProjectState } from './state-types';
 
@@ -82,6 +84,39 @@ describe('isActivityFieldsValid', () => {
 		);
 		expect(isActivityFieldsValid(contexto, complete)).toBe(true);
 		expect(complete.answers.some((a) => a.fieldDefinitionId === 'nome_provisorio')).toBe(false);
+	});
+
+	it('lista_partes (C5-01): é false quando a coleção está vazia', () => {
+		const decompor = findActivity('decompor_trabalho');
+		expect(isActivityFieldsValid(decompor, freshState())).toBe(false);
+	});
+
+	it('lista_partes: é true quando há ao menos um item com texto não vazio', () => {
+		const decompor = findActivity('decompor_trabalho');
+		const answered = unwrap(
+			answerActivity(
+				catalog,
+				freshState(),
+				'decompor_trabalho',
+				{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Tela de abertura' }]) },
+				T1
+			)
+		);
+		expect(isActivityFieldsValid(decompor, answered)).toBe(true);
+	});
+
+	it('lista_partes: é false quando todo item tem texto vazio (defesa contra escrita malformada)', () => {
+		const decompor = findActivity('decompor_trabalho');
+		const answered = unwrap(
+			answerActivity(
+				catalog,
+				freshState(),
+				'decompor_trabalho',
+				{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: '   ' }]) },
+				T1
+			)
+		);
+		expect(isActivityFieldsValid(decompor, answered)).toBe(false);
 	});
 });
 
@@ -308,6 +343,95 @@ describe('confirmSummary', () => {
 		const state = unwrap(confirmSummary(catalog, freshState()));
 		const result = confirmSummary(catalog, state);
 		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('C5-01: continua localizando e confirmando o Resumo corretamente mesmo existindo uma segunda atividade explicit_confirmation no catálogo (skipActivity/answerActivity em "priorizar_entregas" não interferem)', () => {
+		let state = freshState();
+		// Interage com a outra explicit_confirmation antes — prova que
+		// findExplicitConfirmationActivity/confirmSummary continuam resolvendo
+		// para "resumo" por identidade de fase/posição, não por ser a única.
+		state = unwrap(skipActivity(catalog, state, 'priorizar_entregas', 'pend-priorizar', T1));
+
+		const confirmed = unwrap(confirmSummary(catalog, state));
+		const resumoProgress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
+		const priorizarProgress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
+		expect(resumoProgress?.status).toBe('concluída');
+		expect(priorizarProgress?.status).toBe('pulada'); // intocada pela confirmação do Resumo
+
+		// Editar uma resposta da Descoberta continua reabrindo só o Resumo.
+		const edited = unwrap(answerActivity(catalog, confirmed, 'publico', { publico_detail: 'novo valor' }, T2));
+		const resumoAfterEdit = edited.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
+		expect(resumoAfterEdit?.status).toBe('em_andamento');
+	});
+});
+
+describe('confirmPlanningPriority (C5-01)', () => {
+	function withPlanningItems(state: ProjectState, items: { id: string; text: string }[]): ProjectState {
+		return unwrap(
+			answerActivity(catalog, state, 'decompor_trabalho', { partes_trabalho: encodePlanningItems(items) }, T1)
+		);
+	}
+
+	it('rejeita com planning_no_items quando a coleção de "Decompor o trabalho" está vazia', () => {
+		const result = confirmPlanningPriority(catalog, freshState(), T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'planning_no_items' } });
+	});
+
+	it('conclui "Priorizar entregas" quando há ao menos um item', () => {
+		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
+		const state = unwrap(confirmPlanningPriority(catalog, withItems, T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
+		expect(progress?.status).toBe('concluída');
+	});
+
+	it('erro transition_not_allowed ao confirmar uma prioridade já concluída', () => {
+		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
+		const state = unwrap(confirmPlanningPriority(catalog, withItems, T1));
+		const result = confirmPlanningPriority(catalog, state, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('permite pular "Priorizar entregas" mesmo sendo explicit_confirmation (allowsSkip true)', () => {
+		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
+		const skipped = unwrap(skipActivity(catalog, withItems, 'priorizar_entregas', 'pend-1', T1));
+		const progress = skipped.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
+		expect(progress?.status).toBe('pulada');
+		expect(skipped.pendingItems).toEqual([
+			{ id: 'pend-1', projectId: 'proj-1', activityDefinitionId: 'priorizar_entregas', status: 'aberta', createdAt: T1 }
+		]);
+	});
+
+	it('resolve a pendência aberta ao confirmar uma prioridade que estava pulada', () => {
+		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
+		const skipped = unwrap(skipActivity(catalog, withItems, 'priorizar_entregas', 'pend-1', T1));
+		const confirmed = unwrap(confirmPlanningPriority(catalog, skipped, T2));
+		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
+		expect(progress?.status).toBe('concluída');
+		expect(confirmed.pendingItems[0].status).toBe('resolvida');
+	});
+
+	it('editar "Decompor o trabalho" depois de "Priorizar entregas" confirmada NÃO reabre a confirmação nem cria pendência (comportamento silencioso, C5-01)', () => {
+		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
+		const confirmed = unwrap(confirmPlanningPriority(catalog, withItems, T1));
+
+		const edited = unwrap(
+			answerActivity(
+				catalog,
+				confirmed,
+				'decompor_trabalho',
+				{
+					partes_trabalho: encodePlanningItems([
+						{ id: 'p1', text: 'Parte 1' },
+						{ id: 'p2', text: 'Parte 2 adicionada depois' }
+					])
+				},
+				T2
+			)
+		);
+
+		const priorizarProgress = edited.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
+		expect(priorizarProgress?.status).toBe('concluída');
+		expect(edited.pendingItems).toHaveLength(0);
 	});
 });
 

@@ -17,6 +17,7 @@ import type {
 } from './state-types';
 import type { Result } from './result';
 import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
+import { decodePlanningItems } from './planning-items';
 
 // missing_effort carrega os ids dos itens concretos que faltam classificar —
 // a interface precisa apontar exatamente quais, não só dizer "falta algo"
@@ -42,7 +43,8 @@ export type DomainTransitionError =
 	| { kind: 'scope_version_not_confirmed' }
 	| { kind: 'impediment_not_found' }
 	| { kind: 'impediment_id_already_exists' }
-	| { kind: 'phase_not_found' };
+	| { kind: 'phase_not_found' }
+	| { kind: 'planning_no_items' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -152,6 +154,10 @@ export function isActivityFieldsValid(activity: RequiredFieldsActivity, state: P
 			// decodificar para saber se o array está de fato vazio.
 			const decoded = decodeMultiSelectValue(answer.value);
 			return !!decoded && decoded.length > 0;
+		}
+		if (field.type === 'lista_partes') {
+			const items = decodePlanningItems(answer.value);
+			return items.length > 0 && items.every((item) => item.text.trim().length > 0);
 		}
 		return answer.value.trim().length > 0;
 	});
@@ -295,6 +301,50 @@ export function confirmSummary(
 	}
 
 	return { ok: true, value: setActivityStatus(state, resumo.id, 'concluída') };
+}
+
+// C5-01 — "Priorizar entregas" (explicit_confirmation, allowsSkip: true).
+// Localiza a atividade por id explícito, nunca via
+// findExplicitConfirmationActivity: agora que há duas atividades
+// explicit_confirmation no catálogo (Resumo da Descoberta e esta), aquele
+// helper resolveria de forma ambígua — continua servindo só ao fluxo do
+// Resumo, sem alteração. A coleção de PlanningItem pertence à Answer de
+// "Decompor o trabalho" (partes_trabalho); esta função só lê essa Answer
+// para validar, nunca a modifica.
+const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
+const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
+const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
+
+export function confirmPlanningPriority(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, PRIORIZAR_ENTREGAS_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	const answer = state.answers.find(
+		(a) =>
+			a.activityDefinitionId === DECOMPOR_TRABALHO_ACTIVITY_ID && a.fieldDefinitionId === PARTES_TRABALHO_FIELD_ID
+	);
+	const items = decodePlanningItems(answer?.value);
+	if (items.length === 0) {
+		return { ok: false, error: { kind: 'planning_no_items' } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
 }
 
 export function skipActivity(

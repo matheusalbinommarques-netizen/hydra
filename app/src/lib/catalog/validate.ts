@@ -76,14 +76,53 @@ export function validateCatalog(catalog: Catalog): string[] {
 				if ('fields' in record && record.fields !== undefined) {
 					violations.push(`Atividade "${activity.id}" é ${mode} mas possui fields`);
 				}
-				if ('pendingItemLabel' in record && record.pendingItemLabel !== undefined) {
-					violations.push(`Atividade "${activity.id}" é ${mode} mas possui pendingItemLabel`);
-				}
-				if ('pendingItemDetail' in record && record.pendingItemDetail !== undefined) {
-					violations.push(`Atividade "${activity.id}" é ${mode} mas possui pendingItemDetail`);
-				}
-				if (record.allowsSkip !== false) {
-					violations.push(`Atividade "${activity.id}" é ${mode} mas allowsSkip não é false`);
+
+				if (mode === 'scope_confirmation') {
+					// scope_confirmation continua sem exceção: sempre allowsSkip
+					// false, nunca pendingItemLabel/pendingItemDetail (confirmação
+					// deriva de ScopeVersion.confirmedAt, nunca gera PendingItem).
+					if ('pendingItemLabel' in record && record.pendingItemLabel !== undefined) {
+						violations.push(`Atividade "${activity.id}" é ${mode} mas possui pendingItemLabel`);
+					}
+					if ('pendingItemDetail' in record && record.pendingItemDetail !== undefined) {
+						violations.push(`Atividade "${activity.id}" é ${mode} mas possui pendingItemDetail`);
+					}
+					if (record.allowsSkip !== false) {
+						violations.push(`Atividade "${activity.id}" é ${mode} mas allowsSkip não é false`);
+					}
+				} else {
+					// explicit_confirmation (C5-01): allowsSkip pode ser true ou
+					// false, mas pendingItemLabel/pendingItemDetail só existem
+					// exatamente quando allowsSkip é true — senão skipActivity nunca
+					// cria PendingItem para esta atividade, e os textos ficariam sem
+					// uso (caso do "Resumo da descoberta").
+					const hasLabel = 'pendingItemLabel' in record && record.pendingItemLabel !== undefined;
+					const hasDetail = 'pendingItemDetail' in record && record.pendingItemDetail !== undefined;
+					if (record.allowsSkip === true) {
+						if (!hasLabel) {
+							violations.push(
+								`Atividade "${activity.id}" é explicit_confirmation com allowsSkip true mas não possui pendingItemLabel`
+							);
+						}
+						if (!hasDetail) {
+							violations.push(
+								`Atividade "${activity.id}" é explicit_confirmation com allowsSkip true mas não possui pendingItemDetail`
+							);
+						}
+					} else if (record.allowsSkip === false) {
+						if (hasLabel) {
+							violations.push(
+								`Atividade "${activity.id}" é explicit_confirmation com allowsSkip false mas possui pendingItemLabel`
+							);
+						}
+						if (hasDetail) {
+							violations.push(
+								`Atividade "${activity.id}" é explicit_confirmation com allowsSkip false mas possui pendingItemDetail`
+							);
+						}
+					} else {
+						violations.push(`Atividade "${activity.id}" é explicit_confirmation mas allowsSkip não é booleano`);
+					}
 				}
 				continue;
 			}

@@ -255,14 +255,74 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
 	});
 
-	await test.step('demais atividades do catálogo (fase 2 restante a 6) respondidas genericamente até o encerramento', async () => {
-		// criterios_sucesso_produto (1, fase 2) + estruturação (6) +
-		// planejamento (7) + execução (6) + validação (6, incluindo
-		// "Confirmar encerramento do projeto") = 26. Conteúdo específico de
-		// cada campo já é coberto por catalog.spec.ts e por
-		// full-catalog-journey.spec.ts — aqui só precisa provar que a rota
+	await test.step('demais atividades da fase 2 e da Estruturação respondidas genericamente', async () => {
+		// criterios_sucesso_produto (1, fase 2) + estruturação (6) = 7.
+		// Conteúdo específico de cada campo já é coberto por catalog.spec.ts e
+		// por full-catalog-journey.spec.ts — aqui só precisa provar que a rota
 		// real atravessa essas fases sem erro.
-		await answerActivitiesGenerically(page, 26);
+		await answerActivitiesGenerically(page, 7);
+	});
+
+	const planningParts = [
+		'Tela de abertura de solicitação',
+		'Fluxo de aprovação',
+		'Notificação por e-mail'
+	];
+
+	async function clickAndWaitForAnswer(locator: ReturnType<Page['getByRole']>): Promise<void> {
+		await Promise.all([
+			page.waitForResponse((response) => response.url().includes('?/answer') && response.request().method() === 'POST'),
+			locator.click()
+		]);
+	}
+
+	await test.step('Decompor o trabalho — Construir (3 partes, uma única vez)', async () => {
+		await expect(page.getByRole('heading', { name: 'Decompor o trabalho' })).toBeVisible();
+
+		for (let i = 0; i < planningParts.length; i++) {
+			await page.getByRole('button', { name: 'Adicionar parte' }).click();
+			await page
+				.getByRole('textbox', { name: /Nome da parte/ })
+				.nth(i)
+				.fill(planningParts[i]);
+		}
+
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	});
+
+	await test.step('Priorizar entregas — Operar (mesmos itens, sem redigitação, reordenar e confirmar)', async () => {
+		await expect(page.getByRole('heading', { name: 'Priorizar entregas' })).toBeVisible();
+
+		// Recebe exatamente os mesmos itens de "Decompor o trabalho" — nomes
+		// somente leitura, nenhum campo de texto na tela.
+		for (const part of planningParts) {
+			await expect(page.getByText(part, { exact: true })).toBeVisible();
+		}
+		await expect(page.getByRole('textbox', { name: /Nome da parte/ })).toHaveCount(0);
+
+		// Reordena só com ↑/↓: sobe "Notificação por e-mail" (3ª posição) até o
+		// topo, duas vezes — a ordem final vira Notificação, Tela, Fluxo.
+		const moveNotificacaoUp = page.getByRole('button', { name: 'Mover "Notificação por e-mail" para cima' });
+		await clickAndWaitForAnswer(moveNotificacaoUp);
+		await clickAndWaitForAnswer(moveNotificacaoUp);
+
+		await page.getByRole('button', { name: 'Confirmar prioridade' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
+		// A confirmação usa redirect (303), diferente do round-trip AJAX que os
+		// demais passos genéricos já esperam via waitForResponse — waitForURL só
+		// garante a troca de URL, não que o Svelte já hidratou/renderizou o
+		// formulário de "Mapear dependências". Sem esperar o heading, o próximo
+		// passo genérico corre risco de preencher/submeter um formulário ainda
+		// não pronto (falha real observada: "Please fill out this field.").
+		await expect(page.getByRole('heading', { name: 'Mapear dependências' })).toBeVisible();
+	});
+
+	await test.step('demais atividades do catálogo (Planejamento restante, Execução, Validação) respondidas genericamente até o encerramento', async () => {
+		// mapear_dependencias, estimar_esforco_capacidade, definir_marcos,
+		// criterios_aceitacao_entrega, consolidar_plano_entrega (5) +
+		// execução (6) + validação (6, incluindo "Confirmar encerramento do
+		// projeto") = 17.
+		await answerActivitiesGenerically(page, 17);
 	});
 
 	let downloadedFilePath = '';
@@ -314,6 +374,19 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 			(answer) => answer.fieldDefinitionId === 'necessidade_central'
 		);
 		expect(necessidadeCentralAnswer?.value).toBe('Centralizar e priorizar solicitações internas.');
+
+		// C5-01 — prova que a ordem reorganizada em "Priorizar entregas"
+		// persistiu na MESMA Answer de "Decompor o trabalho" (partes_trabalho),
+		// nunca uma representação textual própria de prioridade.
+		const partesTrabalhoAnswer = exportedJson.state.answers.find(
+			(answer) => answer.fieldDefinitionId === 'partes_trabalho'
+		);
+		const planningItems = JSON.parse(partesTrabalhoAnswer?.value ?? '[]') as Array<{ text: string }>;
+		expect(planningItems.map((item) => item.text)).toEqual([
+			'Notificação por e-mail',
+			'Tela de abertura de solicitação',
+			'Fluxo de aprovação'
+		]);
 
 		// prova que a última atividade da última fase (Validação e
 		// encerramento) foi de fato alcançada e respondida — o encerramento

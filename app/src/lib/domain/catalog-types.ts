@@ -24,7 +24,13 @@ type AnswerFieldTypeVariant =
 	| { type: 'texto_curto'; options?: never }
 	| { type: 'texto_longo'; options?: never }
 	| { type: 'selecao'; options: string[] }
-	| { type: 'selecao_multipla'; options: SelectOption[] };
+	| { type: 'selecao_multipla'; options: SelectOption[] }
+	// PlanningItem[] estruturado (id/text, ordem = posição no array) — ver
+	// domain/planning-items.ts. Valor estruturado de Answer para o
+	// experimento C5-01 ("Decompor o trabalho"/"Priorizar entregas"), não uma
+	// infraestrutura genérica de listas — não reaproveitar para outro campo
+	// sem reavaliar essa decisão.
+	| { type: 'lista_partes'; options?: never };
 
 type AnswerFieldDefinition = FieldDefinitionBase &
 	AnswerFieldTypeVariant & {
@@ -97,16 +103,31 @@ export type RequiredFieldsActivity = ActivityDefinitionBase & {
 	pendingItemDetail: string;
 };
 
-type ExplicitConfirmationActivity = ActivityDefinitionBase & {
-	completionMode: 'explicit_confirmation';
-	allowsSkip: false;
-	// sem campos e sem textos de pendência — uma atividade de confirmação
-	// explícita nunca tem formulário nem pode ser pulada, então nunca gera
-	// PendingItem, e não precisa de textos para isso.
-	fields?: never;
-	pendingItemLabel?: never;
-	pendingItemDetail?: never;
-};
+// Discriminada por allowsSkip (não só um boolean solto): quando true (C5-01,
+// "Priorizar entregas"), pendingItemLabel/pendingItemDetail são obrigatórios
+// — sem isso, skipActivity criaria um PendingItem sem texto para exibir.
+// Quando false ("Resumo da descoberta", comportamento original preservado),
+// os dois ficam ausentes, porque nunca há PendingItem para esta atividade.
+// Nunca tem campos — conclui por ação explícita, não por formulário. Ver
+// catalog/validate.ts para a checagem estrutural em tempo de execução (o
+// catálogo é um valor, não passa pelo compilador sozinho).
+type ExplicitConfirmationActivity = ActivityDefinitionBase &
+	(
+		| {
+				completionMode: 'explicit_confirmation';
+				allowsSkip: true;
+				fields?: never;
+				pendingItemLabel: string;
+				pendingItemDetail: string;
+		  }
+		| {
+				completionMode: 'explicit_confirmation';
+				allowsSkip: false;
+				fields?: never;
+				pendingItemLabel?: never;
+				pendingItemDetail?: never;
+		  }
+	);
 
 // Confirmação deriva de ScopeVersion.confirmedAt (ver domain/state-types.ts),
 // nunca de Answer — mesmo raciocínio de "sem campos/pendência" acima.

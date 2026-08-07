@@ -4,6 +4,24 @@
 
 ### Adicionado
 
+- Ciclo 5, C5-01 — "Decompor o trabalho" (Planejamento da entrega) deixa
+  de ser um campo de texto livre e passa a criar uma coleção de partes do
+  trabalho: adicionar uma parte por vez, renomear e remover, sempre com
+  identidade estável; item novo entra sempre no final; remover preserva a
+  ordem relativa dos demais; nome vazio ou só espaços nunca é persistido.
+  "Priorizar entregas" passa a operar sobre exatamente essa mesma
+  coleção — os nomes aparecem somente leitura, sem nenhuma redigitação, e
+  a ordem só pode mudar por ↑/↓ (sem arrastar); a prioridade é confirmada
+  por uma ação explícita própria, recusada quando nenhuma parte foi
+  definida (nesse caso a tela oferece voltar a "Decompor o trabalho" ou
+  pular a etapa); editar "Decompor o trabalho" depois da prioridade já
+  confirmada nunca reabre a confirmação nem gera aviso — comportamento
+  silencioso, deliberado nesta primeira fatia. "Registros" continua
+  apresentando as partes como texto legível e numerado, nunca a
+  serialização interna. C5-01 é um experimento controlado (Ciclo 5) da
+  mecânica "uma atividade constrói dados vivos do projeto, a atividade
+  seguinte opera sobre os mesmos dados" — o Planejamento da entrega é só
+  o laboratório inicial, não uma reestruturação geral do produto.
 - Catálogo completo das seis fases do Release 0 (Estruturação, Planejamento,
   Execução e Validação, além de Descoberta e Definição do produto já
   existentes) — o estado `concluído` do projeto passa a ser alcançável de

@@ -15,6 +15,9 @@ O Release 0 está funcional e validado de ponta a ponta: os Ciclos 2, 3 e
 `docs/07-management/decision-log.md`) foi concluída. O workflow Hydra v2
 está publicado (`docs/08-delivery/workflow-v2-design.md`).
 
+O Ciclo 5 está aberto, com o item C5-01 ("Construir → Operar sobre partes
+do trabalho") em andamento — ver `docs/08-delivery/cycle-05-backlog.md`.
+
 Testes com usuários externos continuam dependendo de autorização
 explícita de Matheus (D021, `docs/07-management/decision-log.md`).
 
@@ -262,6 +265,27 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   → "dez destinos"), sem alteração de `NAV_ITEMS`, rotas ou comportamento.
   Com as sete subetapas (7.0–7.7) concluídas, **a etapa 7 — Convergência
   da experiência e das telas — está concluída.**
+- **Ciclo 5 — provar a mecânica Construir → Operar**
+  (`docs/08-delivery/cycle-05-backlog.md`): em andamento. Meta: provar, por
+  uma fatia pequena em produção, que uma atividade pode CONSTRUIR dados
+  vivos do projeto e que atividades seguintes podem OPERAR sobre os mesmos
+  dados sem redigitação, usando o Planejamento da entrega como laboratório
+  inicial. C5-01 ("Construir → Operar sobre partes do trabalho") —
+  `decompor_trabalho` passa a criar uma coleção estruturada de
+  `PlanningItem` (id/texto, ordem = posição no array, valor estruturado
+  dentro da própria `Answer`, sem entidade/tabela nova); `priorizar_entregas`
+  (agora `explicit_confirmation`, `allowsSkip: true`) opera sobre essa
+  mesma coleção — reordena só com ↑/↓, sem redigitação de nomes, e
+  confirma por ação explícita dedicada (`confirmPlanningPriority`), com
+  recusa quando a coleção está vazia. Editar "Decompor o trabalho" depois
+  de "Priorizar entregas" confirmada não reabre a confirmação nem gera
+  sinalização — comportamento deliberadamente silencioso nesta fatia.
+  Implementação local concluída, revisão técnica de código concluída
+  (nenhuma correção arquitetural pendente), correções da review já
+  aplicadas; ainda pendentes: `hydra-verify full` final, QA manual, seal,
+  stage, commit e publicação. Nível 3 (toca `domain/`, `catalog/`,
+  `orientation-engine/`), autorizado explicitamente ao longo da sessão de
+  implementação.
 - **Manutenção técnica — `hydra-verify full`** (harness de verificação,
   anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
   estabilizada — `hydra-verify full` volta a ser confiável e
@@ -280,13 +304,14 @@ detalhamento de aceite fica no respectivo backlog.
 ## Gate atual
 
 Gate do Release 0 atendido: baseline funcional validada de ponta a ponta
-(Ciclos 2, 3 e 4 encerrados, D022 concluída). Nenhum ciclo novo está
-aberto. O gate do Release 1 ainda não existe — depende da decisão
-pendente abaixo.
+(Ciclos 2, 3 e 4 encerrados, D022 concluída). O Ciclo 5 está aberto, com
+C5-01 em andamento — gate ainda não avaliado (ver
+`docs/08-delivery/cycle-05-backlog.md`, seção "Gate de conclusão do Ciclo
+5"). O gate do Release 1 ainda não existe.
 
 Detalhamento de cada gate de ciclo está nos respectivos backlogs
 (`docs/08-delivery/cycle-02-backlog.md`, `cycle-03-backlog.md`,
-`cycle-04-backlog.md`, seção "Gate de conclusão").
+`cycle-04-backlog.md`, `cycle-05-backlog.md`, seção "Gate de conclusão").
 
 ## Decisões de maior impacto
 
@@ -322,11 +347,17 @@ funcional decorreu desta auditoria. Detalhamento completo em
 `docs/03-product/product-roadmap.md`, seção "7.7 — Revisão final".
 
 Com a etapa 7 concluída, não há próxima etapa numerada já definida no
-roadmap. O próximo passo é Matheus definir formalmente o novo ciclo e sua
-meta. "Tailoring metodológico e modelos" permanece registrado como
+roadmap. "Tailoring metodológico e modelos" permanece registrado como
 horizonte possível, dependente de sinais de contexto, aplicabilidade e
 profundidade ainda não especificados — não é uma decisão automaticamente
 aprovada nem a próxima etapa presumida.
+
+O Ciclo 5 foi aberto separadamente do roadmap — não avança nem antecipa
+nenhuma etapa numerada, é um experimento deliberadamente pequeno para
+provar a mecânica Construir → Operar antes de qualquer decisão sobre
+generalizá-la. O próximo passo real é concluir C5-01: `hydra-verify full`
+final, QA manual e seal (`/hydra-review-item C5-01`), antes de considerar
+stage, commit e publicação.
 
 ## Não fazer agora
 
@@ -347,7 +378,7 @@ aprovada nem a próxima etapa presumida.
 
 - `docs/core/`: visão de produto, escopo do Release 0, UX e stack;
 - backlogs de ciclo: `docs/08-delivery/cycle-02-backlog.md`,
-  `cycle-03-backlog.md`, `cycle-04-backlog.md`;
+  `cycle-03-backlog.md`, `cycle-04-backlog.md`, `cycle-05-backlog.md`;
 - `docs/07-management/decision-log.md`: histórico de decisões;
 - `docs/07-management/risk-register.md`: riscos registrados;
 - `docs/08-delivery/workflow-v2-design.md`: desenho do workflow de

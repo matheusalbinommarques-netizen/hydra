@@ -8,6 +8,7 @@ import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	answerActivity as answerActivityInDomain,
+	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
 	createInitialProjectState,
@@ -35,6 +36,7 @@ import type {
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AnswerActivityInput,
+	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
 	CreateConfiguredProjectInput,
@@ -234,6 +236,17 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmSummaryInDomain(catalog, state);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmPlanningPriority(input: ConfirmPlanningPriorityInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmPlanningPriorityInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { tick } from 'svelte';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
+	import PlanningItemsEditor from '$lib/components/PlanningItemsEditor.svelte';
 	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
+	import { encodePlanningItems } from '$lib/domain';
+	import type { PlanningItem } from '$lib/domain';
 	import type { PhaseProgressGroupKey } from '$lib/phase-progress';
 
 	let { data, form } = $props();
@@ -20,10 +24,38 @@
 
 	// "Revisão recomendada" (Resumo) é só um card pequeno com um link de
 	// saída — sem isto, sobra muito espaço vazio na coluna principal ao lado
-	// do painel lateral, que a essa altura da jornada já está denso. Ajuste
+	// do painel lateral, que a essa altura da jornada já está densa. Ajuste
 	// só deste caso específico, sem alterar o layout geral de duas colunas.
-	let isReviewRecommendation = $derived(data.activity?.completionMode === 'explicit_confirmation');
+	// Identidade por id, não por completionMode: "Priorizar entregas" (C5-01)
+	// também é explicit_confirmation, mas tem sua própria apresentação (ver
+	// branch dedicada abaixo), não o link de saída do Resumo.
+	let isReviewRecommendation = $derived(data.activity?.id === 'resumo');
 	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
+
+	// C5-01 — "Priorizar entregas": estado local da MESMA coleção que
+	// "Decompor o trabalho" produziu. Cada ↑/↓ atualiza este estado e submete
+	// o form escondido abaixo, que reaproveita a action genérica `?/answer`
+	// gravando na Answer de "Decompor o trabalho" — nunca uma representação
+	// textual própria da prioridade.
+	// svelte-ignore state_referenced_locally -- seed intencional de montagem.
+	let priorityItems = $state<PlanningItem[]>(data.planningItems ?? []);
+	let priorityReorderForm = $state<HTMLFormElement | undefined>();
+
+	// A navegação entre atividades dentro de Agora é client-side (AJAX, via
+	// use:enhance) — o componente da página não remonta, então o seed acima
+	// não é suficiente sozinho: sem isto, priorityItems ficaria preso ao
+	// valor do primeiro carregamento (ex.: `[]`, se a página abriu em
+	// "Decompor o trabalho") e nunca refletiria os itens reais ao chegar em
+	// "Priorizar entregas" por essa navegação — só um recarregamento
+	// completo da página "corrigia" o sintoma, mascarando o bug. Resincroniza
+	// só quando a atividade atual É "Priorizar entregas": o efeito também
+	// re-executa depois do próprio autosave de reordenação (data.planningItems
+	// muda), o que é inofensivo — o servidor já confirma o mesmo conteúdo.
+	$effect(() => {
+		if (data.activity?.id === 'priorizar_entregas') {
+			priorityItems = data.planningItems ?? [];
+		}
+	});
 
 	// Mesmo vocabulário de ícone já usado pelo Mapa (Concluída/Atual ~
 	// em_andamento/Pendente/Pulada) — coerência de linguagem visual entre as
@@ -92,12 +124,69 @@
 		</section>
 	{/if}
 
-	{#if data.activity?.completionMode === 'explicit_confirmation'}
+	{#if data.activity?.id === 'resumo'}
 		<section class="next-action">
 			<p class="eyebrow">Revisão recomendada</p>
 			<h2>{data.activity.title}</h2>
 			<p class="main-question">{data.activity.mainQuestion}</p>
 			<p><a href="/projects/{view.projectId}/summary">Ir para o Resumo da descoberta →</a></p>
+		</section>
+	{:else if data.activity?.id === 'priorizar_entregas'}
+		<section class="next-action">
+			{#if priorityItems.length === 0}
+				<p class="eyebrow">Priorizar entregas</p>
+				<h2>{data.activity.title}</h2>
+				<p>Nenhuma parte foi definida.</p>
+				<p>
+					<a href="/projects/{view.projectId}/now?activity=decompor_trabalho"
+						>Voltar para decompor o trabalho →</a
+					>
+				</p>
+			{:else}
+				<p class="eyebrow">Atividade atual · dados já no projeto</p>
+				<h2>{data.activity.title}</h2>
+				<p class="main-question">{data.activity.mainQuestion}</p>
+
+				<!-- Reaproveita a action genérica `?/answer`, gravando na Answer de
+				     "Decompor o trabalho" mesmo estando em "Priorizar entregas" — a
+				     coleção é a mesma, nunca uma cópia. -->
+				<form
+					method="POST"
+					action="?/answer"
+					bind:this={priorityReorderForm}
+					use:enhance={() => async ({ update }) => update({ reset: false })}
+				>
+					<input type="hidden" name="activityDefinitionId" value="decompor_trabalho" />
+					<input type="hidden" name="partes_trabalho" value={encodePlanningItems(priorityItems)} />
+				</form>
+
+				<PlanningItemsEditor
+					items={priorityItems}
+					mode="operate"
+					onchange={async (items) => {
+						priorityItems = items;
+						// tick() é necessário aqui: requestSubmit() lê o DOM
+						// imediatamente, mas o <input type="hidden"> acima só reflete
+						// priorityItems depois que o Svelte aplica a atualização — sem
+						// aguardar, o form submeteria a ordem ANTERIOR (bug real,
+						// encontrado ao reproduzir manualmente antes desta correção).
+						await tick();
+						priorityReorderForm?.requestSubmit();
+					}}
+				/>
+
+				<form method="POST" action="?/confirmPlanningPriority" use:enhance>
+					<button type="submit">Confirmar prioridade</button>
+				</form>
+
+				{#if form?.message}
+					<p role="alert">{form.message}</p>
+				{/if}
+			{/if}
+
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
 		</section>
 	{:else if data.activity?.completionMode === 'scope_confirmation'}
 		<section class="next-action">
@@ -106,7 +195,7 @@
 			<p class="main-question">{data.activity.mainQuestion}</p>
 			<p><a href="/projects/{view.projectId}/next-version">Ir para Escolha o próximo foco →</a></p>
 		</section>
-	{:else if data.activity}
+	{:else if data.activity && data.activity.completionMode === 'required_fields'}
 		<section class="next-action">
 			<p class="eyebrow">
 				{#if data.reviewOrigin === 'summary'}

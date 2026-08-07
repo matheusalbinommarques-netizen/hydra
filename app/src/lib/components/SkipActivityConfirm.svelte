@@ -1,8 +1,15 @@
 <script lang="ts">
 	import { applyAction, enhance } from '$app/forms';
-	import type { RequiredFieldsActivity } from '$lib/domain';
 
-	let { activity }: { activity: RequiredFieldsActivity } = $props();
+	// Estrutural, não RequiredFieldsActivity: required_fields sempre satisfaz
+	// esta forma, e explicit_confirmation com allowsSkip true (C5-01,
+	// "Priorizar entregas") também — pendingItemLabel/pendingItemDetail só
+	// existem exatamente quando a atividade pode ser pulada (ver
+	// catalog-types.ts), então nunca há ambiguidade sobre quando este
+	// componente pode ser usado.
+	let {
+		activity
+	}: { activity: { id: string; title: string; pendingItemDetail: string } } = $props();
 
 	let dialogEl: HTMLDialogElement;
 	let submitting = $state(false);

@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { catalog } from '$lib/catalog';
-import { decodeMultiSelectValue, encodeMultiSelectValue } from '$lib/domain';
+import { decodeMultiSelectValue, decodePlanningItems, encodeMultiSelectValue } from '$lib/domain';
 import type { ActivityDefinition, FieldDefinition, RequiredFieldsActivity } from '$lib/domain';
 import { buildPhaseProgress } from '$lib/phase-progress';
 import { getProjectUseCases } from '$lib/server/composition';
@@ -11,6 +11,15 @@ import { buildJourneyContext } from './journey-context';
 import type { Actions, PageServerLoad } from './$types';
 
 const DESCOBERTA_PHASE_ID = 'descoberta';
+
+// C5-01 — "Priorizar entregas" opera sobre a MESMA coleção de PlanningItem
+// que "Decompor o trabalho" produziu; a coleção pertence à Answer de
+// `decompor_trabalho`/`partes_trabalho`, nunca duplicada. Decodificar aqui
+// (server, único ponto além de records-view.ts) é o que mantém
+// planning-items.ts como o único lugar que conhece o formato JSON interno —
+// a rota só repassa um array já decodificado para o template.
+const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
+const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
 
 // Conjunto fechado de origens de revisão reconhecidas (?from=<origem> na
 // carga, returnTo=<origem> na action `answer`) — Resumo e Registros, os dois
@@ -47,14 +56,26 @@ function findActivityDefinition(activityId: string): ActivityDefinition | undefi
 }
 
 // Edição a partir de Resumo ou Registros (?activity=<id>&from=summary|records):
-// só atividades required_fields da própria Descoberta, e só quando já
-// concluída — nunca uma atividade de outra fase, nem uma ainda não alcançada
-// pela Trilha A (não_iniciada/em_andamento nunca passa aqui), nem uma pulada
-// (essa continua exclusiva do fluxo de retomada de pendência, acima).
-function findDescobertaConcluidaActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
+// atividades required_fields da própria Descoberta, mais uma exceção nominal
+// fora dela (C5-01) — só quando já concluída, nunca uma atividade ainda não
+// alcançada pela Trilha A (não_iniciada/em_andamento nunca passa aqui), nem
+// uma pulada (essa continua exclusiva do fluxo de retomada de pendência,
+// acima).
+//
+// "Decompor o trabalho" entra aqui, fora da Descoberta, para viabilizar
+// "voltar para editar" depois de "Priorizar entregas" já confirmada (C5-01,
+// item 7 da decisão de implementação). É uma exceção nominal, não uma
+// política geral de edição por fase. A próxima exceção fora desta lista deve
+// provocar generalização da regra (ex.: um sinal explícito no catálogo,
+// tipo "editableAfterConclusion"), não a adição de outro id aqui.
+const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set(['decompor_trabalho']);
+
+function findReviewableConcludedActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
 	const activity = findActivityDefinition(activityId);
 	if (!activity || activity.completionMode !== 'required_fields') return undefined;
-	if (activity.phaseId !== DESCOBERTA_PHASE_ID) return undefined;
+	const isDescoberta = activity.phaseId === DESCOBERTA_PHASE_ID;
+	const isNominalException = REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA.has(activity.id);
+	if (!isDescoberta && !isNominalException) return undefined;
 	if (view.activityStatuses[activityId] !== 'concluída') return undefined;
 	return activity;
 }
@@ -117,14 +138,14 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	// Edição a partir de Resumo ou Registros: parâmetro adicional e explícito
 	// (from=summary | from=records), só resolvido quando não é um caso de
 	// retomada de pendência. Mesma regra de elegibilidade para as duas origens
-	// (findDescobertaConcluidaActivity: só atividade required_fields da
+	// (findReviewableConcludedActivity: só atividade required_fields da
 	// própria Descoberta, já concluída). Parâmetro presente mas inválido (id
 	// de outra fase, id inexistente, ou atividade ainda não concluída) falha
 	// de forma segura — redireciona à própria origem em vez de renderizar
 	// qualquer atividade.
 	const reviewOrigin = parseReviewOrigin(url.searchParams.get('from'));
 	if (resumeActivityId && reviewOrigin && !resumingPendingItem) {
-		const editActivity = findDescobertaConcluidaActivity(view, resumeActivityId);
+		const editActivity = findReviewableConcludedActivity(view, resumeActivityId);
 		if (!editActivity) {
 			redirect(303, reviewOriginRoute(params.projectId, reviewOrigin));
 		}
@@ -211,6 +232,15 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		// rede de segurança, nunca uma tela sem nenhum campo.
 	}
 
+	// C5-01 — "Priorizar entregas" não tem fields próprios (explicit_confirmation):
+	// a coleção que ela apresenta/reordena é a mesma Answer de "Decompor o
+	// trabalho", decodificada aqui para o template não precisar conhecer o
+	// formato JSON interno.
+	const planningItems =
+		activity?.id === PRIORIZAR_ENTREGAS_ACTIVITY_ID
+			? decodePlanningItems(view.answers[PARTES_TRABALHO_FIELD_ID])
+			: undefined;
+
 	return {
 		activity,
 		isResuming: Boolean(resumingPendingItem),
@@ -218,7 +248,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		stepKind: 'full' as const,
 		bancadaOverview,
 		journeyContext,
-		phaseProgress
+		phaseProgress,
+		planningItems
 	};
 };
 
@@ -355,6 +386,20 @@ export const actions: Actions = {
 		}
 
 		// Rota canônica de Agora, sem preservar o parâmetro de retomada.
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// C5-01 — confirma "Priorizar entregas". Não recebe nenhum dado de
+	// PlanningItem: a coleção pertence à Answer de "Decompor o trabalho" e
+	// não é tocada por esta action; a recusa por coleção vazia acontece no
+	// domínio (confirmPlanningPriority → planning_no_items).
+	confirmPlanningPriority: async ({ params }) => {
+		const result = await getProjectUseCases().confirmPlanningPriority({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
 		redirect(303, `/projects/${params.projectId}/now`);
 	}
 };

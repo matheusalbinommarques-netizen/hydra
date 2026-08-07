@@ -48,6 +48,48 @@ describe('buildProjectView — pendingItemHistory', () => {
 		expect(view.pendingItemHistory[0]).not.toHaveProperty('resolvedAt');
 	});
 
+	it('C5-01: projeta a pendência de "Priorizar entregas" (explicit_confirmation, allowsSkip true)', () => {
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-priorizar',
+					projectId: 'p1',
+					activityDefinitionId: 'priorizar_entregas',
+					status: 'aberta',
+					createdAt: '2026-01-02T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.pendingItemHistory).toHaveLength(1);
+		expect(view.pendingItemHistory[0]).toEqual({
+			id: 'pend-priorizar',
+			activityDefinitionId: 'priorizar_entregas',
+			label: 'As entregas não foram priorizadas',
+			detail: 'Sem prioridade clara, o trabalho pode avançar em várias frentes sem nenhuma pronta.',
+			status: 'aberta',
+			createdAt: '2026-01-02T00:00:00.000Z'
+		});
+	});
+
+	it('C5-01: nunca projeta pendência de "Escolha o próximo foco" (scope_confirmation, sem pendingItemLabel)', () => {
+		const state = baseState({
+			pendingItems: [
+				{
+					id: 'pend-scope',
+					projectId: 'p1',
+					activityDefinitionId: 'montar_proxima_versao',
+					status: 'aberta',
+					createdAt: '2026-01-02T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.pendingItemHistory).toEqual([]);
+	});
+
 	it('projeta uma pendência resolvida corretamente, com resolvedAt', () => {
 		const state = baseState({
 			pendingItems: [

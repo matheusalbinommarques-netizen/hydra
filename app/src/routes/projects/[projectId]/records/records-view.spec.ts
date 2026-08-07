@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
+import { encodePlanningItems } from '$lib/domain';
 import { buildRecordsView } from './records-view';
 
 const PROJECT_ID = 'proj-1';
@@ -121,6 +122,58 @@ describe('buildRecordsView', () => {
 		const descoberta = result.phases.find((phase) => phase.phaseId === 'descoberta')!;
 		const origemActivity = descoberta.activities.find((activity) => activity.activityId === 'origem')!;
 		expect(origemActivity.editHref).toBe('/projects/outro-projeto-xyz/now?activity=origem&from=records');
+	});
+
+	it('C5-01: lista_partes vira conteúdo humano numerado — nunca a serialização interna', () => {
+		const result = buildRecordsView(catalog, {
+			projectId: PROJECT_ID,
+			answers: {
+				partes_trabalho: encodePlanningItems([
+					{ id: 'p1', text: 'Tela de abertura' },
+					{ id: 'p2', text: 'Fluxo de aprovação' }
+				])
+			},
+			pendingItemHistory: [],
+			activityStatuses: {}
+		});
+
+		const planejamento = result.phases.find((phase) => phase.phaseId === 'planejamento')!;
+		const decomporActivity = planejamento.activities.find((activity) => activity.activityId === 'decompor_trabalho')!;
+		expect(decomporActivity.fields).toEqual([
+			{
+				id: 'partes_trabalho',
+				label: 'Partes do trabalho',
+				value: '1. Tela de abertura; 2. Fluxo de aprovação'
+			}
+		]);
+		expect(decomporActivity.fields[0].value).not.toContain('{');
+		expect(decomporActivity.fields[0].value).not.toContain('"id"');
+	});
+
+	it('C5-01: editHref é a URL completa (com from=records) para "Decompor o trabalho" concluída, fora da Descoberta', () => {
+		const result = buildRecordsView(catalog, {
+			projectId: PROJECT_ID,
+			answers: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) },
+			pendingItemHistory: [],
+			activityStatuses: { decompor_trabalho: 'concluída' }
+		});
+
+		const planejamento = result.phases.find((phase) => phase.phaseId === 'planejamento')!;
+		const decomporActivity = planejamento.activities.find((activity) => activity.activityId === 'decompor_trabalho')!;
+		expect(decomporActivity.editHref).toBe(`/projects/${PROJECT_ID}/now?activity=decompor_trabalho&from=records`);
+	});
+
+	it('C5-01: "Priorizar entregas" (explicit_confirmation, sem fields) nunca aparece em Registros', () => {
+		const result = buildRecordsView(catalog, {
+			projectId: PROJECT_ID,
+			answers: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) },
+			pendingItemHistory: [],
+			activityStatuses: { decompor_trabalho: 'concluída', priorizar_entregas: 'concluída' }
+		});
+
+		const planejamento = result.phases.find((phase) => phase.phaseId === 'planejamento')!;
+		const priorizarActivity = planejamento.activities.find((activity) => activity.activityId === 'priorizar_entregas');
+		expect(priorizarActivity).toBeUndefined();
 	});
 
 	it('não expõe pendências abertas — só pendências resolvidas, com o título da atividade relacionada', () => {

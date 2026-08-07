@@ -16,7 +16,14 @@ export function computeOpenPendingItems(catalog: Catalog, pendingItems: PendingI
 	for (const item of pendingItems) {
 		if (item.status !== 'aberta') continue;
 		const activity = findActivityDefinition(catalog, item.activityDefinitionId);
-		if (!activity || activity.completionMode !== 'required_fields') continue;
+		// A capacidade declarada de gerar pendência é allowsSkip — só uma
+		// atividade pulável pode ter um PendingItem aberto. pendingItemLabel/
+		// pendingItemDetail são exigidos apenas como defesa de apresentação
+		// (o texto precisa existir para ser exibido), não como proxy da
+		// capacidade em si.
+		if (!activity || !activity.allowsSkip || activity.pendingItemLabel === undefined || activity.pendingItemDetail === undefined) {
+			continue;
+		}
 		views.push({
 			id: item.id,
 			activityDefinitionId: item.activityDefinitionId,

@@ -37,6 +37,8 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Já existe um impedimento com este identificador.';
 		case 'phase_not_found':
 			return 'A fase escolhida não existe mais no catálogo.';
+		case 'planning_no_items':
+			return 'Adicione ao menos uma parte em "Decompor o trabalho" antes de confirmar a prioridade.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

@@ -24,7 +24,19 @@ function buildPendingItemHistory(catalog: Catalog, state: ProjectState): Pending
 	const history: PendingItemHistoryView[] = [];
 	for (const item of state.pendingItems) {
 		const activity = findActivityDefinition(catalog, item.activityDefinitionId);
-		if (!activity || activity.completionMode !== 'required_fields') continue;
+		// A capacidade declarada de gerar pendência é allowsSkip — só uma
+		// atividade pulável pode ter um PendingItem aberto. pendingItemLabel/
+		// pendingItemDetail são exigidos apenas como defesa de apresentação
+		// (o texto precisa existir para ser exibido), não como proxy da
+		// capacidade em si.
+		if (
+			!activity ||
+			!activity.allowsSkip ||
+			activity.pendingItemLabel === undefined ||
+			activity.pendingItemDetail === undefined
+		) {
+			continue;
+		}
 
 		if (item.status === 'aberta') {
 			history.push({

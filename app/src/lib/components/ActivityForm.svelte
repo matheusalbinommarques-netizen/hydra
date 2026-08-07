@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { decodeMultiSelectValue } from '$lib/domain';
-	import type { RequiredFieldsActivity } from '$lib/domain';
+	import { decodeMultiSelectValue, decodePlanningItems, encodePlanningItems } from '$lib/domain';
+	import type { PlanningItem, RequiredFieldsActivity } from '$lib/domain';
 	import type { FieldSuggestionView } from '$lib/orientation-engine';
+	import PlanningItemsEditor from './PlanningItemsEditor.svelte';
 
 	type FieldEntry = RequiredFieldsActivity['fields'][number];
 
@@ -61,6 +62,23 @@
 		if (checked) next.add(optionId);
 		else next.delete(optionId);
 		multiSelectState = { ...multiSelectState, [fieldId]: next };
+	}
+
+	// Estado local de cada campo lista_partes (C5-01) — mesmo espírito de
+	// multiSelectState: precisa ser reativo no cliente (adicionar/renomear/
+	// remover sem round-trip), refletido num input escondido cujo `value` é
+	// sempre o array codificado (planning-items.ts), nunca montado à mão aqui.
+	// svelte-ignore state_referenced_locally -- seed intencional de montagem.
+	let planningItemsState = $state<Record<string, PlanningItem[]>>(
+		Object.fromEntries(
+			activity.fields
+				.filter((field) => field.dataTarget === 'answer' && field.type === 'lista_partes')
+				.map((field) => [field.id, decodePlanningItems(values[field.id])])
+		)
+	);
+
+	function setPlanningItems(fieldId: string, items: PlanningItem[]) {
+		planningItemsState = { ...planningItemsState, [fieldId]: items };
 	}
 
 	function isVisible(field: FieldEntry): boolean {
@@ -168,6 +186,13 @@
 						</label>
 					{/each}
 				</div>
+			{:else if field.type === 'lista_partes'}
+				<input type="hidden" name={field.id} value={encodePlanningItems(planningItemsState[field.id] ?? [])} />
+				<PlanningItemsEditor
+					items={planningItemsState[field.id] ?? []}
+					mode="build"
+					onchange={(items) => setPlanningItems(field.id, items)}
+				/>
 			{:else if field.type === 'texto_longo'}
 				{#if field.dataTarget === 'answer' && suggestionByFieldId.has(field.id)}
 					<textarea

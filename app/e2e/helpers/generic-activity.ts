@@ -9,11 +9,42 @@
 // com um valor trivial e envia. Não serve para "Resumo da descoberta"
 // (explicit_confirmation, sem formulário) — essa atividade continua exigindo
 // o passo específico de "Confirmar resumo" em cada jornada.
+//
+// Duas interações adicionais reconhecidas por affordance observável, não por
+// id de atividade (C5-01):
+// - um campo `lista_partes` (ex.: "Decompor o trabalho") se revela pelo
+//   botão "Adicionar parte" dentro do próprio formulário — adiciona uma
+//   parte, preenche um texto não vazio e segue o fluxo normal de "Salvar e
+//   continuar";
+// - uma confirmação de prioridade sobre coleção já existente (ex.:
+//   "Priorizar entregas") não tem formulário com "Salvar e continuar": se
+//   revela pelo botão "Confirmar prioridade", que já opera sobre os itens
+//   herdados da atividade anterior, sem necessidade de reordenar nada aqui
+//   (a reordenação por ↑/↓ já é coberta pela walking-skeleton).
 
 import type { Page } from '@playwright/test';
 
 export async function answerCurrentActivityGenerically(page: Page): Promise<void> {
+	const confirmPriorityButton = page.getByRole('button', { name: 'Confirmar prioridade' });
+	if (await confirmPriorityButton.count()) {
+		await Promise.all([
+			page.waitForResponse(
+				(response) =>
+					response.url().includes('?/confirmPlanningPriority') && response.request().method() === 'POST'
+			),
+			confirmPriorityButton.click()
+		]);
+		await page.waitForTimeout(200);
+		return;
+	}
+
 	const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Salvar e continuar' }) });
+
+	const addPartButton = form.getByRole('button', { name: 'Adicionar parte' });
+	if (await addPartButton.count()) {
+		await addPartButton.click();
+		await form.getByRole('textbox', { name: /Nome da parte/ }).last().fill('Resposta de teste automatizada.');
+	}
 
 	const textInputs = form.locator('input[type="text"][required]');
 	for (let i = 0; i < (await textInputs.count()); i++) {

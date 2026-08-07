@@ -50,4 +50,28 @@ describe('computeOpenPendingItems (Trilha B)', () => {
 		expect(resolved.pendingItems).toHaveLength(1); // continua no conjunto, só não é "aberta"
 		expect(computeOpenPendingItems(catalog, resolved.pendingItems)).toHaveLength(0);
 	});
+
+	it('C5-01: expõe a pendência de "Priorizar entregas" (explicit_confirmation, allowsSkip true), com label/detail do catálogo', () => {
+		const state = unwrap(
+			skipActivity(
+				catalog,
+				createInitialProjectState(catalog, 'proj-1', T1),
+				'priorizar_entregas',
+				'pend-priorizar',
+				T1
+			)
+		);
+		const priorizarDef = catalog.phases
+			.flatMap((phase) => phase.activities)
+			.find((a) => a.id === 'priorizar_entregas')!;
+
+		expect(computeOpenPendingItems(catalog, state.pendingItems)).toEqual([
+			{
+				id: 'pend-priorizar',
+				activityDefinitionId: 'priorizar_entregas',
+				label: priorizarDef.pendingItemLabel,
+				detail: priorizarDef.pendingItemDetail
+			}
+		]);
+	});
 });
