@@ -15,8 +15,11 @@ O Release 0 está funcional e validado de ponta a ponta: os Ciclos 2, 3 e
 `docs/07-management/decision-log.md`) foi concluída. O workflow Hydra v2
 está publicado (`docs/08-delivery/workflow-v2-design.md`).
 
-O Ciclo 5 está aberto, com o item C5-01 ("Construir → Operar sobre partes
-do trabalho") em andamento — ver `docs/08-delivery/cycle-05-backlog.md`.
+O Ciclo 5 está aberto. O item C5-01 ("Construir → Operar sobre partes do
+trabalho") está concluído e publicado (commit `a070ed7`) — ver
+`docs/08-delivery/cycle-05-backlog.md`. O gate do próprio Ciclo 5 ainda
+não foi avaliado: depende de dogfooding real da hipótese "Construir →
+Operar", não da entrega técnica de C5-01.
 
 Testes com usuários externos continuam dependendo de autorização
 explícita de Matheus (D021, `docs/07-management/decision-log.md`).
@@ -72,8 +75,8 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   consultáveis em `/records`; status das seis atividades consultável em
   `/map`; mensagem final de conclusão em `/now`; nenhuma mudança de
   código foi necessária.
-- **Convergência da experiência e das telas** (roadmap, etapa 7): em
-  andamento. Subetapa 7.0 (estruturar a convergência) concluída — o
+- **Convergência da experiência e das telas** (roadmap, etapa 7):
+  concluída. Subetapa 7.0 (estruturar a convergência) concluída — o
   roadmap passou a ser também o backlog operacional desta etapa, com
   inventário de 18 telas-alvo, 16 imagens individuais aprovadas em
   `design/approved/screens/`, situação por tela e sequência 7.0–7.7 com
@@ -266,9 +269,10 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   Com as sete subetapas (7.0–7.7) concluídas, **a etapa 7 — Convergência
   da experiência e das telas — está concluída.**
 - **Ciclo 5 — provar a mecânica Construir → Operar**
-  (`docs/08-delivery/cycle-05-backlog.md`): em andamento. Meta: provar, por
-  uma fatia pequena em produção, que uma atividade pode CONSTRUIR dados
-  vivos do projeto e que atividades seguintes podem OPERAR sobre os mesmos
+  (`docs/08-delivery/cycle-05-backlog.md`): aberto, C5-01 concluído e
+  publicado, gate do ciclo ainda não avaliado. Meta: provar, por uma
+  fatia pequena em produção, que uma atividade pode CONSTRUIR dados vivos
+  do projeto e que atividades seguintes podem OPERAR sobre os mesmos
   dados sem redigitação, usando o Planejamento da entrega como laboratório
   inicial. C5-01 ("Construir → Operar sobre partes do trabalho") —
   `decompor_trabalho` passa a criar uma coleção estruturada de
@@ -280,12 +284,13 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   recusa quando a coleção está vazia. Editar "Decompor o trabalho" depois
   de "Priorizar entregas" confirmada não reabre a confirmação nem gera
   sinalização — comportamento deliberadamente silencioso nesta fatia.
-  Implementação local concluída, revisão técnica de código concluída
-  (nenhuma correção arquitetural pendente), correções da review já
-  aplicadas; ainda pendentes: `hydra-verify full` final, QA manual, seal,
-  stage, commit e publicação. Nível 3 (toca `domain/`, `catalog/`,
-  `orientation-engine/`), autorizado explicitamente ao longo da sessão de
-  implementação.
+  Implementação, revisão técnica, correções da review, `hydra-verify
+  full` final (PASS 5/5, 18/18 jornadas, ~82s), QA manual e seal Nível 3
+  concluídos; publicado em `main`/`origin` no commit `a070ed7` (32
+  arquivos). Nível 3 (toca `domain/`, `catalog/`, `orientation-engine/`),
+  autorizado explicitamente ao longo da sessão de implementação. Entrega
+  técnica de C5-01 não equivale à hipótese do Ciclo 5 validada — falta
+  dogfooding real (ver "Gate atual" abaixo).
 - **Manutenção técnica — `hydra-verify full`** (harness de verificação,
   anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
   estabilizada — `hydra-verify full` volta a ser confiável e
@@ -304,8 +309,10 @@ detalhamento de aceite fica no respectivo backlog.
 ## Gate atual
 
 Gate do Release 0 atendido: baseline funcional validada de ponta a ponta
-(Ciclos 2, 3 e 4 encerrados, D022 concluída). O Ciclo 5 está aberto, com
-C5-01 em andamento — gate ainda não avaliado (ver
+(Ciclos 2, 3 e 4 encerrados, D022 concluída). O Ciclo 5 está aberto: C5-01
+está concluído e publicado, com todas as condições técnicas do gate do
+ciclo atendidas; o gate do próprio Ciclo 5 continua não avaliado — falta
+o dogfooding real da hipótese Construir → Operar (ver
 `docs/08-delivery/cycle-05-backlog.md`, seção "Gate de conclusão do Ciclo
 5"). O gate do Release 1 ainda não existe.
 
@@ -355,9 +362,11 @@ aprovada nem a próxima etapa presumida.
 O Ciclo 5 foi aberto separadamente do roadmap — não avança nem antecipa
 nenhuma etapa numerada, é um experimento deliberadamente pequeno para
 provar a mecânica Construir → Operar antes de qualquer decisão sobre
-generalizá-la. O próximo passo real é concluir C5-01: `hydra-verify full`
-final, QA manual e seal (`/hydra-review-item C5-01`), antes de considerar
-stage, commit e publicação.
+generalizá-la. C5-01 está concluído e publicado (commit `a070ed7`); a
+próxima decisão real é o dogfooding em uso real da hipótese do Ciclo 5 —
+"estou trabalhando sobre um projeto que o Hydra já conhece ou ainda estou
+explicando o mesmo projeto repetidamente?" — antes de considerar o gate
+do Ciclo 5 avaliado.
 
 ## Não fazer agora
 

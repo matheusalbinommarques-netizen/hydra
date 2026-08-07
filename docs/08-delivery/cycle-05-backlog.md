@@ -7,35 +7,40 @@ atividades seguintes OPEREM sobre os mesmos dados sem redigitação.
 
 ## Origem
 
-Ciclo 5 formalizado no repositório com C5-01 atualmente em andamento. O
-Ciclo 4 encerrou a baseline funcional do Release 0 (gate aprovado em
-25/07/2026); este ciclo abre uma frente nova, deliberadamente pequena: o
-Planejamento da entrega serve como laboratório inicial da mecânica
-Construir → Operar, não como escopo de uma reestruturação geral do
-produto.
+Ciclo 5 formalizado no repositório com C5-01 publicado. O Ciclo 4 encerrou
+a baseline funcional do Release 0 (gate aprovado em 25/07/2026); este
+ciclo abre uma frente nova, deliberadamente pequena: o Planejamento da
+entrega serve como laboratório inicial da mecânica Construir → Operar,
+não como escopo de uma reestruturação geral do produto.
 
 ## Must
 
 ### C5-01 — Construir → Operar sobre partes do trabalho
 
-**Status:** EM ANDAMENTO.
+**Status:** ✅ CONCLUÍDO / PUBLICADO (commit `a070ed7` — `feat: implementar
+mecânica Construir → Operar no planejamento`).
 
 **Hipótese:** `decompor_trabalho` cria uma coleção estruturada de partes
 do trabalho e `priorizar_entregas` opera exatamente sobre essa mesma
 coleção, sem pedir que o usuário reescreva o que já definiu.
 
 **Estado verdadeiro atual:**
-- implementação realizada localmente;
-- revisão técnica de código realizada;
-- correções técnicas resultantes da review aplicadas;
-- documentação de entrega preparada (este backlog, `PROJECT_STATUS.md`,
-  `CHANGELOG.md`);
-- stage ainda vazio;
-- nenhum commit/push da entrega;
-- `hydra-verify full` final ainda não executado;
-- QA final/seal ainda não realizado.
+- implementação realizada e revisada tecnicamente, correções da review
+  aplicadas;
+- todos os critérios de aceite técnicos atendidos;
+- `hydra-verify full` final: PASS 5/5, 18/18 jornadas Playwright,
+  aproximadamente 82s;
+- QA manual final aprovado;
+- seal Nível 3 aprovado;
+- stage e commit únicos, 32 arquivos publicados;
+- publicado em `main`/`origin` — commit `a070ed7`, branch e remoto
+  sincronizados;
+- nenhum problema pendente da implementação.
 
-**Evidências (parciais — C5-01 em andamento, nada abaixo é conclusão):**
+C5-01 entregue tecnicamente ≠ hipótese do Ciclo 5 validada — ver "Gate de
+conclusão do Ciclo 5" abaixo.
+
+**Evidências:**
 - domínio: `PlanningItem` (`domain/planning-items.ts`, novo) — codec e
   operações puras (adicionar, renomear, remover, mover, commit de texto
   com trim); `confirmPlanningPriority` (`domain/transitions.ts`), que
@@ -65,9 +70,9 @@ coleção, sem pedir que o usuário reescreva o que já definiu.
   reordenar, confirmar, ordem persistindo na exportação);
 - `npm run check` e a suíte de unitários passam a cada rodada de
   verificação feita durante a implementação e a review; `hydra-verify
-  --mode fast` passou; a jornada Playwright completa foi executada
-  isoladamente com sucesso (~27,6s) durante a implementação — a execução
-  formal via `hydra-verify --mode full` ainda está pendente.
+  --mode fast` passou durante a implementação; execução formal final via
+  `hydra-verify --mode full` aprovada — PASS 5/5, 18/18 jornadas
+  Playwright, ~82s.
 
 **Critérios de aceite:**
 - criar pelo menos 3 partes uma única vez;
@@ -119,11 +124,18 @@ A aprovação técnica de C5-01 não valida automaticamente a jornada
 inteira — depois da publicação haverá dogfooding real.
 
 Antes de considerar o Ciclo 5 entregue:
-- C5-01 concluído, com todos os critérios de aceite atendidos;
-- `hydra-verify full` PASS;
+- C5-01 concluído, com todos os critérios de aceite atendidos; ✅ atendido
+  (commit `a070ed7`);
+- `hydra-verify full` PASS; ✅ atendido (PASS 5/5, 18/18 jornadas, ~82s);
 - nenhuma mudança nas áreas protegidas (`domain/`, `catalog/`,
   `orientation-engine/`, `server/persistence/`) sem justificativa técnica
-  e autorização explícita registradas antes da alteração;
-- nenhuma regressão nas demais atividades `explicit_confirmation`.
+  e autorização explícita registradas antes da alteração; ✅ atendido
+  (Nível 3, autorização registrada ao longo da sessão de implementação);
+- nenhuma regressão nas demais atividades `explicit_confirmation`. ✅
+  atendido (verificado em revisão e QA manual).
 
-Gate ainda não avaliado — C5-01 em andamento.
+Com C5-01 publicado, as condições técnicas do gate estão atendidas. O
+gate do Ciclo 5 continua não avaliado: falta o dogfooding real da
+hipótese — "estou trabalhando sobre um projeto que o Hydra já conhece ou
+ainda estou explicando o mesmo projeto repetidamente?" C5-01 entregue
+tecnicamente não equivale à hipótese do Ciclo 5 validada.
