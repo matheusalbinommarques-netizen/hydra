@@ -15,11 +15,11 @@ O Release 0 está funcional e validado de ponta a ponta: os Ciclos 2, 3 e
 `docs/07-management/decision-log.md`) foi concluída. O workflow Hydra v2
 está publicado (`docs/08-delivery/workflow-v2-design.md`).
 
-O Ciclo 5 está aberto. O item C5-01 ("Construir → Operar sobre partes do
-trabalho") está concluído e publicado (commit `a070ed7`) — ver
-`docs/08-delivery/cycle-05-backlog.md`. O gate do próprio Ciclo 5 ainda
-não foi avaliado: depende de dogfooding real da hipótese "Construir →
-Operar", não da entrega técnica de C5-01.
+O Ciclo 5 está concluído — gate aprovado em 09/08/2026. O item C5-01
+("Construir → Operar sobre partes do trabalho") está concluído e
+publicado (commit `a070ed7`) e o dogfooding real da hipótese "Construir →
+Operar" confirmou a hipótese central do ciclo — ver
+`docs/08-delivery/cycle-05-backlog.md`.
 
 Testes com usuários externos continuam dependendo de autorização
 explícita de Matheus (D021, `docs/07-management/decision-log.md`).
@@ -269,12 +269,12 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   Com as sete subetapas (7.0–7.7) concluídas, **a etapa 7 — Convergência
   da experiência e das telas — está concluída.**
 - **Ciclo 5 — provar a mecânica Construir → Operar**
-  (`docs/08-delivery/cycle-05-backlog.md`): aberto, C5-01 concluído e
-  publicado, gate do ciclo ainda não avaliado. Meta: provar, por uma
-  fatia pequena em produção, que uma atividade pode CONSTRUIR dados vivos
-  do projeto e que atividades seguintes podem OPERAR sobre os mesmos
-  dados sem redigitação, usando o Planejamento da entrega como laboratório
-  inicial. C5-01 ("Construir → Operar sobre partes do trabalho") —
+  (`docs/08-delivery/cycle-05-backlog.md`): concluído, gate aprovado em
+  09/08/2026. Meta: provar, por uma fatia pequena em produção, que uma
+  atividade pode CONSTRUIR dados vivos do projeto e que atividades
+  seguintes podem OPERAR sobre os mesmos dados sem redigitação, usando o
+  Planejamento da entrega como laboratório inicial. C5-01 ("Construir →
+  Operar sobre partes do trabalho") —
   `decompor_trabalho` passa a criar uma coleção estruturada de
   `PlanningItem` (id/texto, ordem = posição no array, valor estruturado
   dentro da própria `Answer`, sem entidade/tabela nova); `priorizar_entregas`
@@ -288,9 +288,14 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   full` final (PASS 5/5, 18/18 jornadas, ~82s), QA manual e seal Nível 3
   concluídos; publicado em `main`/`origin` no commit `a070ed7` (32
   arquivos). Nível 3 (toca `domain/`, `catalog/`, `orientation-engine/`),
-  autorizado explicitamente ao longo da sessão de implementação. Entrega
-  técnica de C5-01 não equivale à hipótese do Ciclo 5 validada — falta
-  dogfooding real (ver "Gate atual" abaixo).
+  autorizado explicitamente ao longo da sessão de implementação.
+  Dogfooding real confirmou a hipótese do Ciclo 5: o fluxo
+  `decompor_trabalho` → `priorizar_entregas` ficou perceptivelmente
+  melhor porque a segunda atividade opera sobre as partes construídas na
+  primeira, sem redigitação — o ganho percebido veio de operar objetos
+  do projeto que permanecem vivos entre atividades, não apenas de reduzir
+  digitação. Gate do Ciclo 5 aprovado em 09/08/2026 (ver "Gate atual"
+  abaixo e `docs/08-delivery/cycle-05-backlog.md`).
 - **Manutenção técnica — `hydra-verify full`** (harness de verificação,
   anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
   estabilizada — `hydra-verify full` volta a ser confiável e
@@ -309,10 +314,10 @@ detalhamento de aceite fica no respectivo backlog.
 ## Gate atual
 
 Gate do Release 0 atendido: baseline funcional validada de ponta a ponta
-(Ciclos 2, 3 e 4 encerrados, D022 concluída). O Ciclo 5 está aberto: C5-01
-está concluído e publicado, com todas as condições técnicas do gate do
-ciclo atendidas; o gate do próprio Ciclo 5 continua não avaliado — falta
-o dogfooding real da hipótese Construir → Operar (ver
+(Ciclos 2, 3 e 4 encerrados, D022 concluída). O Ciclo 5 está concluído:
+C5-01 concluído e publicado, todas as condições técnicas atendidas, e o
+gate do próprio Ciclo 5 aprovado em 09/08/2026 — o dogfooding real
+confirmou a hipótese Construir → Operar (ver
 `docs/08-delivery/cycle-05-backlog.md`, seção "Gate de conclusão do Ciclo
 5"). O gate do Release 1 ainda não existe.
 
@@ -359,14 +364,25 @@ horizonte possível, dependente de sinais de contexto, aplicabilidade e
 profundidade ainda não especificados — não é uma decisão automaticamente
 aprovada nem a próxima etapa presumida.
 
-O Ciclo 5 foi aberto separadamente do roadmap — não avança nem antecipa
-nenhuma etapa numerada, é um experimento deliberadamente pequeno para
+O Ciclo 5 foi aberto separadamente do roadmap — não avançou nem antecipou
+nenhuma etapa numerada; foi um experimento deliberadamente pequeno para
 provar a mecânica Construir → Operar antes de qualquer decisão sobre
-generalizá-la. C5-01 está concluído e publicado (commit `a070ed7`); a
-próxima decisão real é o dogfooding em uso real da hipótese do Ciclo 5 —
-"estou trabalhando sobre um projeto que o Hydra já conhece ou ainda estou
-explicando o mesmo projeto repetidamente?" — antes de considerar o gate
-do Ciclo 5 avaliado.
+generalizá-la. C5-01 está concluído e publicado (commit `a070ed7`), e o
+dogfooding real em uso confirmou a hipótese do ciclo — "estou trabalhando
+sobre um projeto que o Hydra já conhece" em vez de reexplicar o mesmo
+projeto repetidamente. O gate do Ciclo 5 está aprovado (09/08/2026,
+`docs/08-delivery/cycle-05-backlog.md`).
+
+Não há próxima etapa numerada já aberta no roadmap nem próximo ciclo
+decidido. O dogfooding também revelou dois aprendizados que não fazem
+parte do escopo entregue e não constituem próxima ação obrigatória, mas
+são insumos para a definição do próximo ciclo/direção de produto: a
+continuidade de objetos vivos entre atividades foi o que gerou o ganho
+percebido, mais do que a redução de digitação em si; e atividades bem
+desenhadas têm custo autoral relevante, com a jornada atual apresentando
+granularidade excessiva. Essas decisões não fazem parte do fechamento do
+Ciclo 5 e deverão ser formalizadas separadamente na definição do próximo
+ciclo/direção de produto. Nenhum Ciclo 6 foi aberto neste fechamento.
 
 ## Não fazer agora
 

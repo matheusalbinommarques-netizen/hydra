@@ -134,8 +134,37 @@ Antes de considerar o Ciclo 5 entregue:
 - nenhuma regressão nas demais atividades `explicit_confirmation`. ✅
   atendido (verificado em revisão e QA manual).
 
-Com C5-01 publicado, as condições técnicas do gate estão atendidas. O
-gate do Ciclo 5 continua não avaliado: falta o dogfooding real da
+Com C5-01 publicado, as condições técnicas do gate estavam atendidas. A
+entrega técnica de C5-01, isoladamente, não equivalia à hipótese do
+Ciclo 5 validada; a avaliação do gate dependia do dogfooding real da
 hipótese — "estou trabalhando sobre um projeto que o Hydra já conhece ou
-ainda estou explicando o mesmo projeto repetidamente?" C5-01 entregue
-tecnicamente não equivale à hipótese do Ciclo 5 validada.
+ainda estou explicando o mesmo projeto repetidamente?".
+
+**Resultado do Gate de conclusão do Ciclo 5 — avaliado em 09/08/2026:
+✅ APROVADO.**
+
+- C5-01 concluído, com todos os critérios de aceite atendidos — ✅
+  (commit `a070ed7`);
+- `hydra-verify full` PASS — ✅ (PASS 5/5, 18/18 jornadas, ~82s);
+- nenhuma mudança nas áreas protegidas (`domain/`, `catalog/`,
+  `orientation-engine/`, `server/persistence/`) sem justificativa técnica
+  e autorização explícita — ✅;
+- nenhuma regressão nas demais atividades `explicit_confirmation` — ✅;
+- dogfooding real da hipótese Construir → Operar — ✅ realizado em uso
+  real: o fluxo `decompor_trabalho` → `priorizar_entregas` ficou
+  perceptivelmente melhor porque a segunda atividade opera sobre as
+  partes construídas na primeira, sem redigitação. O ganho percebido não
+  veio apenas de reduzir digitação — o valor principal foi manipular
+  objetos do projeto que permanecem vivos entre atividades. Isso
+  confirma a hipótese central do ciclo: uma atividade pode CONSTRUIR
+  dados estruturados do projeto e atividades seguintes podem OPERAR
+  sobre esses mesmos dados.
+
+**Ciclo 5 concluído.**
+
+Achado adicional do dogfooding, fora do escopo desta entrega e sem
+ampliar C5-01: atividades bem desenhadas têm custo autoral relevante, e
+a jornada atual tem granularidade excessiva. Fica registrado como
+aprendizado, não como item de backlog deste ciclo — insumo para a
+próxima direção de produto (ver `PROJECT_STATUS.md`, seção "Próxima
+decisão relevante").
