@@ -21,6 +21,14 @@ publicado (commit `a070ed7`) e o dogfooding real da hipótese "Construir →
 Operar" confirmou a hipótese central do ciclo — ver
 `docs/08-delivery/cycle-05-backlog.md`.
 
+O Ciclo 6 está aberto (`docs/08-delivery/cycle-06-backlog.md`), a partir
+da direção de produto registrada em D032
+(`docs/07-management/decision-log.md`): estender a experiência
+estruturada para o início da jornada, partindo da Home, com uma atividade
+construindo objetos vivos do projeto e a seguinte se ramificando a partir
+deles, sem redigitação. Três itens: C6-01 (Home), C6-02 (Mapear grupos
+afetados) e C6-03 (Entender estado atual). Nenhum item iniciado.
+
 Testes com usuários externos continuam dependendo de autorização
 explícita de Matheus (D021, `docs/07-management/decision-log.md`).
 
@@ -296,6 +304,30 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   do projeto que permanecem vivos entre atividades, não apenas de reduzir
   digitação. Gate do Ciclo 5 aprovado em 09/08/2026 (ver "Gate atual"
   abaixo e `docs/08-delivery/cycle-05-backlog.md`).
+- **Ciclo 6 — estender a experiência estruturada ao início da jornada**
+  (`docs/08-delivery/cycle-06-backlog.md`): aberto, nenhum item iniciado.
+  Meta: provar que o Hydra estende a experiência estruturada ao início da
+  jornada — Home usando dados reais, uma atividade construindo objetos
+  vivos do projeto (grupos afetados) e a atividade seguinte se
+  ramificando de verdade a partir deles, sem redigitação. C6-01 (Home):
+  bloco "Continue de onde parou", lista densa com fase atual e atividades
+  concluídas naquela fase (sem porcentagem/barra), sinais reais
+  (bloqueado, parado há X dias, avançando), sem "aguardando alguém" e sem
+  Configurações globais inventadas. C6-02 (Mapear grupos afetados):
+  substitui o texto livre de `publico` por uma coleção estruturada de
+  grupos com identidade estável, severidade e frequência, no espírito do
+  protótipo aprovado `Quem é Afetado.dc.html` (D032), sem copiar sua
+  implementação. C6-03 (Entender estado atual): substitui o texto livre
+  de `estado_atual`; primeira atividade do produto com ramificação real
+  (existe solução / não existe), reaproveitando os grupos de C6-02 sem
+  redigitação, no espírito de `Como é Tratado Hoje.dc.html` (D032). A
+  jornada permanece mista ao final do ciclo — `origem`, `contexto`,
+  `problema` e as demais atividades não redesenhadas continuam como
+  estão; não é uma migração completa Home → Estado atual. `Organizar
+  quem participa` e `Identificar riscos do projeto` ficam registrados
+  como próximo bloco candidato (D032), sem abrir Ciclo 7 nem comprometer
+  escopo — o desenho de domínio de Riscos (entidade própria, não JSON em
+  `Answer`) fica para o planejamento específico desse trabalho.
 - **Manutenção técnica — `hydra-verify full`** (harness de verificação,
   anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
   estabilizada — `hydra-verify full` volta a ser confiável e
@@ -319,11 +351,14 @@ C5-01 concluído e publicado, todas as condições técnicas atendidas, e o
 gate do próprio Ciclo 5 aprovado em 09/08/2026 — o dogfooding real
 confirmou a hipótese Construir → Operar (ver
 `docs/08-delivery/cycle-05-backlog.md`, seção "Gate de conclusão do Ciclo
-5"). O gate do Release 1 ainda não existe.
+5"). O Ciclo 6 está aberto, nenhum item iniciado, gate ainda não avaliado
+(ver `docs/08-delivery/cycle-06-backlog.md`, seção "Gate de conclusão do
+Ciclo 6"). O gate do Release 1 ainda não existe.
 
 Detalhamento de cada gate de ciclo está nos respectivos backlogs
 (`docs/08-delivery/cycle-02-backlog.md`, `cycle-03-backlog.md`,
-`cycle-04-backlog.md`, `cycle-05-backlog.md`, seção "Gate de conclusão").
+`cycle-04-backlog.md`, `cycle-05-backlog.md`, `cycle-06-backlog.md`, seção
+"Gate de conclusão").
 
 ## Decisões de maior impacto
 
@@ -373,16 +408,20 @@ sobre um projeto que o Hydra já conhece" em vez de reexplicar o mesmo
 projeto repetidamente. O gate do Ciclo 5 está aprovado (09/08/2026,
 `docs/08-delivery/cycle-05-backlog.md`).
 
-Não há próxima etapa numerada já aberta no roadmap nem próximo ciclo
-decidido. O dogfooding também revelou dois aprendizados que não fazem
-parte do escopo entregue e não constituem próxima ação obrigatória, mas
-são insumos para a definição do próximo ciclo/direção de produto: a
-continuidade de objetos vivos entre atividades foi o que gerou o ganho
-percebido, mais do que a redução de digitação em si; e atividades bem
-desenhadas têm custo autoral relevante, com a jornada atual apresentando
-granularidade excessiva. Essas decisões não fazem parte do fechamento do
-Ciclo 5 e deverão ser formalizadas separadamente na definição do próximo
-ciclo/direção de produto. Nenhum Ciclo 6 foi aberto neste fechamento.
+Não há próxima etapa numerada já aberta no roadmap. Os aprendizados do
+dogfooding de C5-01 — continuidade de objetos vivos entre atividades como
+origem real do ganho percebido, e granularidade excessiva da jornada —
+foram formalizados como direção de produto em D032
+(`docs/07-management/decision-log.md`), com apoio de quatro protótipos
+avaliados no Claude Design, e deram origem ao Ciclo 6
+(`docs/08-delivery/cycle-06-backlog.md`), aberto separadamente do
+roadmap, do mesmo modo que o Ciclo 5 foi.
+
+A próxima decisão real é a implementação de C6-01 (Home), primeiro item
+do Ciclo 6, sem dependência técnica dos outros dois itens do próprio
+ciclo. `Organizar quem participa` e `Identificar riscos do projeto`
+seguem registrados em D032 como próximo bloco candidato depois do Ciclo
+6, sem número de ciclo nem escopo comprometido.
 
 ## Não fazer agora
 
@@ -403,7 +442,8 @@ ciclo/direção de produto. Nenhum Ciclo 6 foi aberto neste fechamento.
 
 - `docs/core/`: visão de produto, escopo do Release 0, UX e stack;
 - backlogs de ciclo: `docs/08-delivery/cycle-02-backlog.md`,
-  `cycle-03-backlog.md`, `cycle-04-backlog.md`, `cycle-05-backlog.md`;
+  `cycle-03-backlog.md`, `cycle-04-backlog.md`, `cycle-05-backlog.md`,
+  `cycle-06-backlog.md`;
 - `docs/07-management/decision-log.md`: histórico de decisões;
 - `docs/07-management/risk-register.md`: riscos registrados;
 - `docs/08-delivery/workflow-v2-design.md`: desenho do workflow de
