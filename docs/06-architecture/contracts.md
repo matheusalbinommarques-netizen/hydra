@@ -486,12 +486,24 @@ export interface ProjectView {
   hypotheses: HypothesisView[];
 }
 
-// Página inicial (C4-03A) — DTO leve, sem status/snapshot; routes/ nunca
-// recebe Project (domain/) diretamente, só este DTO da camada de aplicação.
+// Página inicial (C4-03A, estendido em etapa 7 e C6-01) — DTO leve; routes/
+// nunca recebe Project (domain/) diretamente, só este DTO da camada de
+// aplicação. currentPhase/movementSignal/lastMovementAt (C6-01) nunca são
+// persistidos — projeção calculada a cada listRecentProjects() a partir do
+// ProjectState já carregado (ver project-use-cases.ts).
 export interface ProjectListItem {
   projectId: string;
   projectName: string | null;
   createdAt: string;
+  projectStatus: ProjectStatus;
+  nextAction:
+    | { kind: 'activity'; activityDefinitionId: string; label: string }
+    | { kind: 'completed' };
+  currentPhase:
+    | { phaseId: string; phaseLabel: string; completedActivities: number; totalActivities: number }
+    | undefined;
+  movementSignal: 'bloqueado' | 'parado' | 'avancando' | undefined;
+  lastMovementAt: string | null;
 }
 
 export type UseCaseError =

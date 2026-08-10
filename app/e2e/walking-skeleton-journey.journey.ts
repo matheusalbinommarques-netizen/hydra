@@ -399,12 +399,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 	await test.step('importar em banco limpo', async () => {
 		await page.goto(serverB.baseUrl + '/');
-		// Campo de importação fica dentro de <details> recolhido por padrão, e
-		// o rótulo real do input é "Arquivo do projeto (.json)", não "Importar
+		// Home (identidade convergida, C6-01): "Importar" aciona um input de
+		// arquivo escondido (sem <details> visível) — selecionar o arquivo já
+		// submete o formulário real. O rótulo do input continua "Arquivo do
 		// projeto (.json)".
-		await page.getByText('Selecionar arquivo').click();
 		await page.getByLabel('Arquivo do projeto (.json)').setInputFiles(downloadedFilePath);
-		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 
 		await page.waitForURL(`${serverB.baseUrl}/projects/${projectId}/now`);
 		await expect(
@@ -414,12 +413,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 	await test.step('reimportar deve colidir e não sobrescrever', async () => {
 		await page.goto(serverB.baseUrl + '/');
-		// Campo de importação fica dentro de <details> recolhido por padrão, e
-		// o rótulo real do input é "Arquivo do projeto (.json)", não "Importar
+		// Home (identidade convergida, C6-01): "Importar" aciona um input de
+		// arquivo escondido (sem <details> visível) — selecionar o arquivo já
+		// submete o formulário real. O rótulo do input continua "Arquivo do
 		// projeto (.json)".
-		await page.getByText('Selecionar arquivo').click();
 		await page.getByLabel('Arquivo do projeto (.json)').setInputFiles(downloadedFilePath);
-		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 
 		await expect(page.getByRole('alert')).toContainText(
 			`Já existe um projeto com o identificador "${projectId}"`

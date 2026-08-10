@@ -26,9 +26,62 @@ ver "Fora de escopo" abaixo.
 
 ### C6-01 — Home
 
+**Status:** ✅ concluído.
+
 **Hipótese:** aplicar a direção de Home já aprovada (etapa 7.2 do
 roadmap, refinada por D032) usando somente dados reais já existentes,
 sem inventar sinais nem capacidades.
+
+**Evidências:**
+- `server/application/types.ts` — `ProjectListItem` ganha `currentPhase`
+  (fase atual, `completedActivities`/`totalActivities`, contando só
+  `'concluída'`, nunca `'pulada'`), `movementSignal`
+  (`'bloqueado' | 'parado' | 'avancando' | undefined`) e `lastMovementAt`,
+  nenhum dos três persistido — projeção calculada a cada
+  `listRecentProjects()`;
+- `server/application/project-use-cases.ts` — sinal calculado a partir dos
+  timestamps reais já existentes em `ProjectState` (`Answer.updatedAt`,
+  `ScopeItem.updatedAt`, `Impediment.updatedAt`,
+  `PendingItem.createdAt`/`resolvedAt`, `ScopeVersion.confirmedAt`);
+  prioridade `bloqueado > parado > avancando`; sem nenhuma movimentação
+  real, `Project.createdAt` entra só como fallback para medir inatividade
+  (nunca gera `avancando`); cálculo mantido fora de
+  `phase-progress.ts`/`buildPhaseProgress` para não inverter a direção de
+  dependência entre `server/application/` e uma projeção de apresentação;
+- `routes/+page.svelte` — bloco "Continue de onde parou" passa a
+  selecionar, entre os projetos não concluídos, o de movimentação real
+  mais recente (nunca por `createdAt`); lista abaixo filtra o destaque por
+  `projectId` antes do `slice(0, 5)` (corrige duplicação que existia
+  antes desta entrega); texto "Fase · N de M concluídas" substitui
+  qualquer porcentagem/barra; nenhuma tela ou link de Configurações
+  globais criado; nenhum sinal de "aguardando alguém";
+- `docs/06-architecture/contracts.md` — assinatura de `ProjectListItem`
+  atualizada (inclui também `projectStatus`/`nextAction`, que já
+  estavam implementados mas não documentados);
+- testes: `project-use-cases.spec.ts` — contagem de `completedActivities`
+  ignorando `'pulada'`; `avancando` logo após movimento; `parado` aos 7
+  dias exatos sem movimento; `bloqueado` com prioridade sobre `parado`
+  mesmo com impedimento antigo; rascunho nunca trabalhado sem nenhum
+  sinal antes de 7 dias; rascunho nunca trabalhado com 7+ dias de
+  `createdAt` vira `parado` sem que `createdAt` entre em
+  `lastMovementAt`;
+- `hydra-verify --mode fast` final: PASS 3/3 (check, 507 testes
+  unitários, `git diff --check`); QA manual em navegador (desktop e
+  ~390px) contra dados reais de desenvolvimento, sem erros de console;
+- convergência visual (D033, `docs/07-management/decision-log.md`):
+  `routes/+page.svelte` reescrita para a nova identidade aprovada no
+  Claude Design (`Home.dc.html`) — sidebar global (Home/Projetos/
+  Configurações, esta última sem link), topbar decorativa estática (sem
+  capacidade real), card "Continue de onde parou" com indicador de
+  progresso em 6 fases e texto de apoio da próxima ação
+  (`ActivityDefinition.why`, dado real), lista de projetos ordenada por
+  urgência de sinal; `server/application/types.ts`/`project-use-cases.ts`
+  ganham `nextAction.why`; `routes/+page.server.ts` passa `catalogPhases`
+  para o indicador de progresso; `routes/+layout.svelte` adiciona a fonte
+  Inter (aditivo, não afeta as demais telas); todo o "cérebro funcional"
+  de C6-01 (sinais, prioridade, limiar de 7 dias, seleção do destaque,
+  não duplicação) preservado sem alteração; `e2e/project-list.journey.ts`
+  atualizado para a nova estrutura.
 
 **Critérios de aceite:**
 - bloco "Continue de onde parou" com o projeto em destaque;

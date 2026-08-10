@@ -2,8 +2,9 @@
 // ProjectRepository, domain/, catalog/ (via dependência) e orientation-engine/.
 // Nenhum SQL, nenhuma rota, nenhum HTML — só orquestração.
 
-import type { ActivityDefinition, Catalog, ProjectState } from '$lib/domain';
+import type { ActivityDefinition, ActivityProgress, Catalog, ProjectState } from '$lib/domain';
 import { computeNextActivity, computeProjectStatus, computeSnapshot } from '$lib/orientation-engine';
+import type { NextActivityResult } from '$lib/orientation-engine';
 import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
@@ -89,6 +90,83 @@ function requireActivityDefinition(catalog: Catalog, activityId: string): Activi
 	return found;
 }
 
+// Home (Ciclo 6, C6-01) — resumo mínimo de fase, calculado localmente em vez
+// de reaproveitar phase-progress.ts/phase-activities.ts (projeção de
+// apresentação, ver comentário de ProjectListItem.currentPhase em types.ts).
+// Mesma regra de fase-alvo do painel "Progresso da fase": a fase da
+// atividade recomendada, ou a última fase aplicável quando o catálogo já
+// foi esgotado.
+function currentPhaseSummary(
+	catalog: Catalog,
+	activityProgress: ActivityProgress[],
+	nextActivityResult: NextActivityResult
+): ProjectListItem['currentPhase'] {
+	const phase =
+		nextActivityResult.kind === 'recommendation'
+			? catalog.phases.find((p) => p.activities.some((activity) => activity.id === nextActivityResult.activityDefinitionId))
+			: [...catalog.phases].reverse().find((p) => p.catalogStatus !== 'unavailable');
+	if (!phase) return undefined;
+
+	const activityIds = new Set(phase.activities.map((activity) => activity.id));
+	const completedActivities = activityProgress.filter(
+		(progress) => activityIds.has(progress.activityDefinitionId) && progress.status === 'concluída'
+	).length;
+
+	return {
+		phaseId: phase.id,
+		phaseLabel: phase.label,
+		completedActivities,
+		totalActivities: phase.activities.length
+	};
+}
+
+// Home (Ciclo 6, C6-01) — "última movimentação significativa": máximo entre
+// todos os timestamps já existentes em ProjectState que representam uma
+// mutação real do usuário. ActivityProgress e ScopeVersion (fora de
+// confirmedAt) não têm timestamp próprio, por isso não entram aqui.
+// Project.createdAt nunca entra nesta lista — a criação do projeto sozinha
+// não é evidência de movimento (ver computeMovementSignal), só serve de
+// referência para "há quanto tempo" quando não há nenhum movimento real.
+function computeLastMovementAt(state: ProjectState): string | null {
+	const timestamps: string[] = [];
+	for (const answer of state.answers) timestamps.push(answer.updatedAt);
+	for (const item of state.scopeItems) timestamps.push(item.updatedAt);
+	for (const impediment of state.impediments) timestamps.push(impediment.updatedAt);
+	for (const pending of state.pendingItems) {
+		timestamps.push(pending.createdAt);
+		if (pending.status === 'resolvida') timestamps.push(pending.resolvedAt);
+	}
+	if (state.scopeVersion.confirmedAt) timestamps.push(state.scopeVersion.confirmedAt);
+
+	if (timestamps.length === 0) return null;
+	return timestamps.reduce((latest, timestamp) => (Date.parse(timestamp) > Date.parse(latest) ? timestamp : latest));
+}
+
+// Home (Ciclo 6, C6-01) — sinal real por projeto: 'bloqueado' > 'parado' >
+// 'avancando', nesta ordem de prioridade. Sete dias é uma constante simples
+// desta primeira versão (sem configuração, sem campo persistido). Com
+// movimentação real registrada, o sinal deriva só dela (lastMovementAt).
+// Sem nenhuma movimentação real, Project.createdAt entra apenas como
+// fallback para medir inatividade — nunca gera 'avancando' (um projeto só
+// criado não é evidência de avanço): projeto criado há menos de 7 dias e
+// nunca trabalhado fica sem nenhum sinal (undefined — "Rascunho" já
+// comunica a situação); criado há 7 dias ou mais vira 'parado'.
+const STALL_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+
+function computeMovementSignal(state: ProjectState, nowIso: string): ProjectListItem['movementSignal'] {
+	const hasOpenImpediment = state.impediments.some((impediment) => impediment.status === 'aberto');
+	if (hasOpenImpediment) return 'bloqueado';
+
+	const lastMovementAt = computeLastMovementAt(state);
+	if (lastMovementAt) {
+		const elapsedMs = Date.parse(nowIso) - Date.parse(lastMovementAt);
+		return elapsedMs >= STALL_THRESHOLD_MS ? 'parado' : 'avancando';
+	}
+
+	const elapsedSinceCreation = Date.parse(nowIso) - Date.parse(state.project.createdAt);
+	return elapsedSinceCreation >= STALL_THRESHOLD_MS ? 'parado' : undefined;
+}
+
 export function createProjectUseCases(deps: ProjectUseCasesDependencies): ProjectUseCases {
 	const { repository, catalog, clock, idGenerator } = deps;
 
@@ -128,6 +206,7 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 
 		async listRecentProjects(): Promise<UseCaseOutcome<ProjectListItem[]>> {
 			const projects = await repository.listRecent();
+			const nowIso = clock.now();
 			const items: ProjectListItem[] = [];
 			for (const project of projects) {
 				// listRecent() só traz id/name/createdAt (ver ports.ts) — o status
@@ -150,15 +229,25 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 						? {
 								kind: 'activity',
 								activityDefinitionId: nextActivityResult.activityDefinitionId,
-								label: requireActivityDefinition(catalog, nextActivityResult.activityDefinitionId).title
+								label: requireActivityDefinition(catalog, nextActivityResult.activityDefinitionId).title,
+								why: requireActivityDefinition(catalog, nextActivityResult.activityDefinitionId).why
 							}
 						: { kind: 'completed' };
+				const currentPhase = currentPhaseSummary(catalog, activityProgress, nextActivityResult);
+				// Sem state (projeto órfão, ver comentário acima), não há nenhum
+				// evento real para avaliar — sinal e última movimentação ficam
+				// ausentes, mesmo tratamento de "nunca trabalhado".
+				const movementSignal = state ? computeMovementSignal(state, nowIso) : undefined;
+				const lastMovementAt = state ? computeLastMovementAt(state) : null;
 				items.push({
 					projectId: project.id,
 					projectName: project.name,
 					createdAt: project.createdAt,
 					projectStatus,
-					nextAction
+					nextAction,
+					currentPhase,
+					movementSignal,
+					lastMovementAt
 				});
 			}
 			return { ok: true, value: items };

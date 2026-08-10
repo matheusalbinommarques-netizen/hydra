@@ -60,6 +60,29 @@ export type PendingItemHistoryView =
 // usa em /now e /map — não de computeNextActivity direto sobre o catálogo
 // completo. Estado explícito em vez de null/string mágica: 'completed' é o
 // único caso sem atividade recomendada (kind === 'catalog_limit_reached').
+// currentPhase (Ciclo 6, C6-01): resumo mínimo de fase para a Home — fase
+// alvo pela mesma regra de app/src/lib/phase-progress.ts (fase da atividade
+// recomendada; ou a última fase aplicável quando o catálogo já foi
+// esgotado), mas computado aqui em vez de reaproveitar
+// buildPhaseProgress/buildPhaseActivities: aqueles são projeção de
+// apresentação (ver phase-progress.ts), e server/application/ não deve
+// depender de um helper de apresentação só para evitar repetir um cálculo
+// pequeno — camada errada de dependência. completedActivities conta só
+// status 'concluída' (nunca 'pulada' — pulada não é "concluída" para este
+// texto). undefined só quando o catálogo não tem nenhuma fase aplicável
+// (não deveria ocorrer com o catálogo atual).
+//
+// movementSignal/lastMovementAt (Ciclo 6, C6-01): sinal real de "Continue
+// de onde parou" na Home — nunca persistido, sempre recalculado a partir
+// dos timestamps já existentes em ProjectState (Answer.updatedAt,
+// ScopeItem.updatedAt, Impediment.updatedAt, PendingItem.createdAt/
+// resolvedAt, ScopeVersion.confirmedAt — nunca Project.createdAt, que não
+// entra em lastMovementAt). 'bloqueado' tem prioridade sobre
+// 'parado'/'avancando'. Sem nenhuma movimentação real, Project.createdAt
+// vira fallback só para medir inatividade (nunca gera 'avancando'):
+// projeto criado há menos de 7 dias fica sem nenhum sinal (undefined —
+// "Rascunho" já comunica a situação); criado há 7 dias ou mais vira
+// 'parado'.
 export interface ProjectListItem {
 	projectId: string;
 	projectName: string | null;
@@ -70,10 +93,25 @@ export interface ProjectListItem {
 				kind: 'activity';
 				activityDefinitionId: string;
 				label: string;
+				// Home (Ciclo 6, C6-01, convergência visual): texto de apoio da
+				// próxima ação, sempre dado real — reaproveita
+				// ActivityDefinition.why (já usado em ActivityForm/journey-context),
+				// nunca texto inventado para a tela.
+				why: string;
 			}
 		| {
 				kind: 'completed';
 			};
+	currentPhase:
+		| {
+				phaseId: string;
+				phaseLabel: string;
+				completedActivities: number;
+				totalActivities: number;
+			}
+		| undefined;
+	movementSignal: 'bloqueado' | 'parado' | 'avancando' | undefined;
+	lastMovementAt: string | null;
 }
 
 // "Escolha o próximo foco" (C5) — view leve de ScopeItem/ScopeVersion, sem

@@ -44,8 +44,7 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 
 	await test.step('banco vazio mostra estado vazio', async () => {
 		await page.goto(serverA.baseUrl + '/');
-		await expect(page.getByRole('heading', { name: 'Seus projetos' })).toBeVisible();
-		await expect(page.getByRole('heading', { name: 'Nenhum projeto ainda' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Você ainda não tem projetos' })).toBeVisible();
 	});
 
 	await test.step('criar projeto sem nome: aparece na página inicial como "Projeto sem nome"', async () => {
@@ -54,9 +53,14 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		await page.goto(serverA.baseUrl + '/');
 		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
 		await expect(featured.getByRole('heading', { name: 'Projeto sem nome', level: 2 })).toBeVisible();
+
+		// C6-01: com um único projeto (o próprio destaque), a seção "Meus
+		// projetos" abaixo não é renderizada vazia — o card de destaque já é
+		// suficiente nesse cenário.
+		await expect(page.locator('.hp-list-section')).toHaveCount(0);
 	});
 
-	await test.step('criar um segundo projeto com nome: os dois aparecem em ordem determinística', async () => {
+	await test.step('criar um segundo projeto com nome: o destaque é escolhido por movimentação real e nunca se duplica na lista (C6-01)', async () => {
 		secondProjectId = await createProject(page, serverA.baseUrl);
 
 		await page.getByLabel('O que deu origem a este projeto?').selectOption('Uma ideia de produto');
@@ -78,15 +82,29 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 
 		await page.goto(serverA.baseUrl + '/');
 
-		// mais recente primeiro: o segundo projeto (nomeado) é o destaque, e a
-		// lista compacta "Projetos" traz os dois na mesma ordem.
+		// C6-01: o destaque ("Continue de onde parou") é escolhido por
+		// movimentação real, não pela ordem de criação — "Level Me Up" tem
+		// respostas reais (Answer.updatedAt), "Projeto sem nome" nunca foi
+		// trabalhado, então "Level Me Up" vira o destaque.
 		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
 		await expect(featured.getByRole('heading', { name: 'Level Me Up', level: 2 })).toBeVisible();
 
-		const projectNames = page.locator('.project-row .col-name');
-		await expect(projectNames).toHaveCount(2);
-		await expect(projectNames.nth(0)).toHaveText('Level Me Up');
-		await expect(projectNames.nth(1)).toHaveText('Projeto sem nome');
+		// Regra de não duplicação (C6-01): o projeto em destaque nunca
+		// reaparece na lista abaixo — com só dois projetos e um deles em
+		// destaque, a lista mostra exatamente o outro. Cada linha da lista é
+		// o próprio link (`.hp-row`), não um botão separado.
+		const projectRows = page.locator('.hp-row .col-name');
+		await expect(projectRows).toHaveCount(1);
+		await expect(projectRows.nth(0)).toHaveText('Projeto sem nome');
+		await expect(page.locator('.hp-row', { hasText: 'Level Me Up' })).toHaveCount(0);
+
+		// Os dois projetos continuam acessíveis a partir da Home: o destaque
+		// pelo próprio card, o outro pela linha da lista.
+		await expect(
+			featured.getByRole('link', { name: /Começar projeto|Continuar projeto/ })
+		).toHaveAttribute('href', `/projects/${secondProjectId}/now`);
+		const otherRow = page.locator('.hp-row', { hasText: 'Projeto sem nome' });
+		await expect(otherRow).toHaveAttribute('href', `/projects/${firstProjectId}/now`);
 	});
 
 	await test.step('clicar em um projeto da lista abre /projects/<id>/now', async () => {
@@ -141,14 +159,13 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		expect(readFileSync(downloadedFilePath, 'utf-8').length).toBeGreaterThan(0);
 
 		await page.goto(serverB.baseUrl + '/');
-		await expect(page.getByRole('heading', { name: 'Nenhum projeto ainda' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Você ainda não tem projetos' })).toBeVisible();
 
-		// Campo de importação fica dentro de <details> recolhido por padrão, e
-		// o rótulo real do input é "Arquivo do projeto (.json)", não "Importar
+		// Home (identidade convergida, C6-01): "Importar" aciona um input de
+		// arquivo escondido (sem <details> visível) — selecionar o arquivo já
+		// submete o formulário real. O rótulo do input continua "Arquivo do
 		// projeto (.json)".
-		await page.getByText('Selecionar arquivo').click();
 		await page.getByLabel('Arquivo do projeto (.json)').setInputFiles(downloadedFilePath);
-		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 		await page.waitForURL(`${serverB.baseUrl}/projects/${firstProjectId}/now`);
 
 		await page.goto(serverB.baseUrl + '/');

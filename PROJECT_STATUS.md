@@ -27,7 +27,8 @@ da direção de produto registrada em D032
 estruturada para o início da jornada, partindo da Home, com uma atividade
 construindo objetos vivos do projeto e a seguinte se ramificando a partir
 deles, sem redigitação. Três itens: C6-01 (Home), C6-02 (Mapear grupos
-afetados) e C6-03 (Entender estado atual). Nenhum item iniciado.
+afetados) e C6-03 (Entender estado atual). C6-01 concluído; C6-02 e C6-03
+pendentes.
 
 Testes com usuários externos continuam dependendo de autorização
 explícita de Matheus (D021, `docs/07-management/decision-log.md`).
@@ -305,19 +306,36 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   digitação. Gate do Ciclo 5 aprovado em 09/08/2026 (ver "Gate atual"
   abaixo e `docs/08-delivery/cycle-05-backlog.md`).
 - **Ciclo 6 — estender a experiência estruturada ao início da jornada**
-  (`docs/08-delivery/cycle-06-backlog.md`): aberto, nenhum item iniciado.
-  Meta: provar que o Hydra estende a experiência estruturada ao início da
-  jornada — Home usando dados reais, uma atividade construindo objetos
-  vivos do projeto (grupos afetados) e a atividade seguinte se
-  ramificando de verdade a partir deles, sem redigitação. C6-01 (Home):
-  bloco "Continue de onde parou", lista densa com fase atual e atividades
-  concluídas naquela fase (sem porcentagem/barra), sinais reais
-  (bloqueado, parado há X dias, avançando), sem "aguardando alguém" e sem
-  Configurações globais inventadas. C6-02 (Mapear grupos afetados):
+  (`docs/08-delivery/cycle-06-backlog.md`): aberto. Meta: provar que o
+  Hydra estende a experiência estruturada ao início da jornada — Home
+  usando dados reais, uma atividade construindo objetos vivos do projeto
+  (grupos afetados) e a atividade seguinte se ramificando de verdade a
+  partir deles, sem redigitação. C6-01 (Home) concluído: bloco "Continue
+  de onde parou" seleciona, entre os projetos não concluídos, o de
+  movimentação real mais recente (nunca por `createdAt`), sem duplicar
+  esse projeto na lista abaixo; lista densa com fase atual e contagem de
+  atividades `concluída` daquela fase — nunca `pulada` (sem
+  porcentagem/barra); sinal real por projeto com prioridade `bloqueado` >
+  `parado` > `avancando`, calculado a partir dos timestamps já existentes
+  em `ProjectState` (nunca persistido); sem nenhuma movimentação real,
+  `Project.createdAt` só mede inatividade (7 dias) e nunca gera
+  `avancando`; sem "aguardando alguém" e sem Configurações globais
+  inventadas; nenhuma mudança em `domain/`, `catalog/`,
+  `orientation-engine/` ou persistência — só `server/application/` e a
+  rota. Convergência visual (D033, `docs/07-management/decision-log.md`):
+  a Home passa a usar uma nova identidade global — tema escuro, acento
+  ciano/teal, fonte Inter, sidebar de navegação (Home/Projetos/
+  Configurações, esta sem link real) — a partir do artefato aprovado no
+  Claude Design (`Home.dc.html`); migração tela a tela, não simultânea —
+  as demais telas do produto (Biblioteca, Nova iniciativa, shell interno
+  de projeto) continuam na identidade papel/tinta/grafite até serem
+  migradas individualmente; busca, notificações e perfil de usuário no
+  topo da Home são decoração estática, sem nenhuma capacidade real. C6-02
+  (Mapear grupos afetados), pendente:
   substitui o texto livre de `publico` por uma coleção estruturada de
   grupos com identidade estável, severidade e frequência, no espírito do
   protótipo aprovado `Quem é Afetado.dc.html` (D032), sem copiar sua
-  implementação. C6-03 (Entender estado atual): substitui o texto livre
+  implementação. C6-03 (Entender estado atual), pendente: substitui o texto livre
   de `estado_atual`; primeira atividade do produto com ramificação real
   (existe solução / não existe), reaproveitando os grupos de C6-02 sem
   redigitação, no espírito de `Como é Tratado Hoje.dc.html` (D032). A
@@ -351,9 +369,9 @@ C5-01 concluído e publicado, todas as condições técnicas atendidas, e o
 gate do próprio Ciclo 5 aprovado em 09/08/2026 — o dogfooding real
 confirmou a hipótese Construir → Operar (ver
 `docs/08-delivery/cycle-05-backlog.md`, seção "Gate de conclusão do Ciclo
-5"). O Ciclo 6 está aberto, nenhum item iniciado, gate ainda não avaliado
-(ver `docs/08-delivery/cycle-06-backlog.md`, seção "Gate de conclusão do
-Ciclo 6"). O gate do Release 1 ainda não existe.
+5"). O Ciclo 6 está aberto — C6-01 concluído, C6-02 e C6-03 pendentes —,
+gate ainda não avaliado (ver `docs/08-delivery/cycle-06-backlog.md`, seção
+"Gate de conclusão do Ciclo 6"). O gate do Release 1 ainda não existe.
 
 Detalhamento de cada gate de ciclo está nos respectivos backlogs
 (`docs/08-delivery/cycle-02-backlog.md`, `cycle-03-backlog.md`,
@@ -417,11 +435,11 @@ avaliados no Claude Design, e deram origem ao Ciclo 6
 (`docs/08-delivery/cycle-06-backlog.md`), aberto separadamente do
 roadmap, do mesmo modo que o Ciclo 5 foi.
 
-A próxima decisão real é a implementação de C6-01 (Home), primeiro item
-do Ciclo 6, sem dependência técnica dos outros dois itens do próprio
-ciclo. `Organizar quem participa` e `Identificar riscos do projeto`
-seguem registrados em D032 como próximo bloco candidato depois do Ciclo
-6, sem número de ciclo nem escopo comprometido.
+C6-01 (Home) está concluído. A próxima decisão real é a implementação de
+C6-02 (Mapear grupos afetados), segundo item do Ciclo 6. `Organizar quem
+participa` e `Identificar riscos do projeto` seguem registrados em D032
+como próximo bloco candidato depois do Ciclo 6, sem número de ciclo nem
+escopo comprometido.
 
 ## Não fazer agora
 
@@ -437,6 +455,11 @@ seguem registrados em D032 como próximo bloco candidato depois do Ciclo
 - `docs/core/RELEASE_0_SPEC.md` §9 desatualizado frente a
   ScopeItem/ScopeVersion/Impediment — requer reconciliação de `docs/core/`
   inteiro, não fix pontual; pendente.
+- `docs/core/UX_DESIGN_SPEC.md` desatualizado para a Home desde D033: o
+  documento ainda descreve só a identidade papel/tinta/grafite; a Home já
+  usa a nova identidade (tema escuro, sidebar). Reconciliação fica para
+  quando a migração tela a tela avançar o suficiente para não reescrever
+  o documento a cada tela convertida; pendente.
 
 ## Fontes de detalhamento
 

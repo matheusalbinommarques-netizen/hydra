@@ -716,8 +716,17 @@ describe('createProjectUseCases — listRecentProjects', () => {
 				nextAction: {
 					kind: 'activity',
 					activityDefinitionId: firstActivity.id,
-					label: firstActivity.title
-				}
+					label: firstActivity.title,
+					why: firstActivity.why
+				},
+				currentPhase: {
+					phaseId: catalog.phases[0].id,
+					phaseLabel: catalog.phases[0].label,
+					completedActivities: 0,
+					totalActivities: catalog.phases[0].activities.length
+				},
+				movementSignal: undefined,
+				lastMovementAt: null
 			}
 		]);
 	});
@@ -796,10 +805,114 @@ describe('createProjectUseCases — listRecentProjects', () => {
 				nextAction: {
 					kind: 'activity',
 					activityDefinitionId: estruturacaoPhase.activities[0].id,
-					label: estruturacaoPhase.activities[0].title
+					label: estruturacaoPhase.activities[0].title,
+					why: estruturacaoPhase.activities[0].why
 				}
 			})
 		]);
+	});
+
+	it('currentPhase.completedActivities conta só "concluída", nunca "pulada"', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const discoveryPhase = catalog.phases[0];
+		const [origem, contexto] = discoveryPhase.activities;
+
+		const answered = await useCases.answerActivity({
+			projectId,
+			activityDefinitionId: origem.id,
+			values: { origem: 'Um problema' }
+		});
+		if (!answered.ok) throw new Error('esperado ok');
+		expect(answered.value.activityStatuses[origem.id]).toBe('concluída');
+
+		const skipped = await useCases.skipActivity({ projectId, activityDefinitionId: contexto.id });
+		if (!skipped.ok) throw new Error('esperado ok');
+		expect(skipped.value.activityStatuses[contexto.id]).toBe('pulada');
+
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value[0].currentPhase).toEqual({
+			phaseId: discoveryPhase.id,
+			phaseLabel: discoveryPhase.label,
+			completedActivities: 1,
+			totalActivities: discoveryPhase.activities.length
+		});
+	});
+
+	it('movementSignal é "avancando" logo após uma movimentação real', async () => {
+		const { useCases } = setup('2026-01-01T00:00:00.000Z');
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const origem = catalog.phases[0].activities[0];
+		await useCases.answerActivity({ projectId, activityDefinitionId: origem.id, values: { origem: 'Um problema' } });
+
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value[0].movementSignal).toBe('avancando');
+		expect(result.value[0].lastMovementAt).toBe('2026-01-01T00:00:00.000Z');
+	});
+
+	it('movementSignal vira "parado" depois de 7 dias sem nenhuma movimentação', async () => {
+		const { useCases, clock } = setup('2026-01-01T00:00:00.000Z');
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const origem = catalog.phases[0].activities[0];
+		await useCases.answerActivity({ projectId, activityDefinitionId: origem.id, values: { origem: 'Um problema' } });
+
+		clock.set('2026-01-08T00:00:00.000Z'); // exatamente 7 dias depois
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value[0].movementSignal).toBe('parado');
+	});
+
+	it('movementSignal é "bloqueado" e tem prioridade sobre "parado", mesmo com impedimento antigo', async () => {
+		const { useCases, clock } = setup('2026-01-01T00:00:00.000Z');
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.addImpediment({ projectId, text: 'Fornecedor não respondeu', tipo: 'dependencia_externa' });
+
+		clock.set('2026-01-10T00:00:00.000Z'); // 9 dias depois, impedimento continua aberto
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value[0].movementSignal).toBe('bloqueado');
+	});
+
+	it('rascunho nunca trabalhado não recebe nenhum dos três sinais', async () => {
+		const { useCases } = setup();
+		await useCases.createProject();
+
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value[0].movementSignal).toBeUndefined();
+		expect(result.value[0].lastMovementAt).toBeNull();
+	});
+
+	it('rascunho nunca trabalhado, criado há 7 dias ou mais, vira "parado" (createdAt como fallback, não gera "avancando")', async () => {
+		const { useCases, clock } = setup('2026-01-01T00:00:00.000Z');
+		await useCases.createProject();
+
+		clock.set('2026-01-08T00:00:00.000Z'); // exatamente 7 dias depois, sem nenhuma movimentação
+		const result = await useCases.listRecentProjects();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value[0].movementSignal).toBe('parado');
+		// createdAt só mede inatividade — nunca entra em lastMovementAt.
+		expect(result.value[0].lastMovementAt).toBeNull();
 	});
 
 	it('não executa insert nem save ao listar', async () => {

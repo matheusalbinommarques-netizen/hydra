@@ -388,6 +388,33 @@
   requisitos (D028, `docs/07-management/decision-log.md`); tela marcada
   `convergida` no inventário da etapa 7 — com os quatro alvos da ordem
   decididos, subetapa 7.4 concluída.
+- Ciclo 6, C6-01 — Home (`/`) passa a mostrar sinais reais por projeto,
+  substituindo a leitura de próxima ação sozinha: bloco "Continue de onde
+  parou" agora seleciona, entre os projetos não concluídos, o de
+  movimentação real mais recente (nunca pela data de criação), e deixa de
+  aparecer duplicado na lista de projetos abaixo; cada projeto passa a
+  mostrar a fase atual e quantas atividades já foram concluídas nela
+  (ex.: "Descoberta · 3 de 5 concluídas"), nunca porcentagem ou barra de
+  progresso; um sinal real por projeto — bloqueado (impedimento aberto),
+  parado (sem nenhuma movimentação há 7 dias ou mais) ou avançando —
+  calculado a partir de dados já existentes do projeto, nunca persistido;
+  "aguardando alguém" não entra nesta fatia, por depender de dados de
+  participantes/aprovação que ainda não existem; nenhuma Configuração
+  global foi criada. Primeiro item do Ciclo 6 (provar a experiência
+  estruturada a partir da Home), sem mudança em domínio, catálogo, motor
+  de orientação ou persistência. Convergência visual (D033,
+  `docs/07-management/decision-log.md`): a Home passa a usar a nova
+  identidade global aprovada — tema escuro, acento ciano/teal, fonte
+  Inter, sidebar de navegação fixa (Home/Projetos/Configurações, esta
+  última sem link real por não existir configuração global ainda);
+  bloco "Continue de onde parou" ganha um indicador de progresso nas seis
+  fases do catálogo e um texto de apoio da próxima ação (reaproveitando
+  `ActivityDefinition.why`, dado já existente); lista de projetos passa a
+  priorizar quem precisa de atenção (bloqueado, depois parado, depois
+  avançando); busca, notificações e perfil de usuário no topo são
+  decoração estática, sem nenhuma capacidade real por trás. Migração
+  tela a tela — as demais telas do produto continuam na identidade
+  papel/tinta/grafite até serem convergidas individualmente.
 
 ### Reconciliado
 
