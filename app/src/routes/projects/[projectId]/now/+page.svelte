@@ -15,8 +15,9 @@
 	// Layout de duas colunas só quando a atividade atual pertence a
 	// Descoberta, Definição do produto ou Estruturação — as demais fases
 	// continuam sem Bancada, revisadas só quando Acompanhamento/Colheita
-	// chegarem lá. A coluna lateral em si (Progresso da fase) aparece em
-	// todas as fases — ver workspace-layout abaixo.
+	// chegarem lá. A coluna lateral genérica (Progresso da fase) aparece em
+	// todas as fases, exceto "Entender a situação" — ver workspace-layout
+	// abaixo.
 	let isBancadaPhase = $derived(
 		data.activity?.phaseId === 'descoberta' ||
 			data.activity?.phaseId === 'definicao' ||
@@ -112,7 +113,7 @@
 		</p>
 	{/if}
 
-	{#if data.journeyContext}
+	{#if data.journeyContext && data.activity?.id !== 'problema'}
 		<section class="journey-context" aria-label="Onde estamos">
 			<p class="journey-label">Onde estamos</p>
 			{#if data.journeyContext.kind === 'in_progress'}
@@ -190,14 +191,14 @@
 			{/if}
 		</section>
 	{:else if data.activity?.id === 'problema' && data.activity.completionMode === 'required_fields'}
-		<section class="next-action">
-			<EntenderSituacao
-				activity={data.activity}
-				values={form?.values ?? view.answers}
-				originAnswer={view.answers['origem']}
-				reviewOrigin={data.reviewOrigin ?? undefined}
-			/>
-		</section>
+		<EntenderSituacao
+			activity={data.activity}
+			values={form?.values ?? view.answers}
+			originAnswer={view.answers['origem']}
+			reviewOrigin={data.reviewOrigin ?? undefined}
+			phaseProgress={data.phaseProgress}
+			projectName={view.projectName}
+		/>
 	{:else if data.activity?.completionMode === 'scope_confirmation'}
 		<section class="next-action">
 			<p class="eyebrow">Próxima ação recomendada</p>
@@ -296,10 +297,11 @@
 	{/if}
 {/snippet}
 
-<div class="workspace-layout">
+<div class="workspace-layout" class:full-width={data.activity?.id === 'problema'}>
 	<div class="workspace-main" class:center-single-card={isReviewRecommendation}>
 		{@render mainContent()}
 	</div>
+	{#if data.activity?.id !== 'problema'}
 	<aside class="workspace-sidebar" aria-label="Progresso e contexto">
 		{#if data.phaseProgress}
 			<section class="sidebar-card" aria-label="Progresso da fase">
@@ -354,6 +356,7 @@
 			</section>
 		{/if}
 	</aside>
+	{/if}
 </div>
 
 <style>
@@ -465,6 +468,14 @@
 		grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
 		gap: 2rem;
 		align-items: start;
+	}
+
+	/* "Entender a situação" traz seu próprio painel lateral ("Documento do
+	   projeto", dentro de EntenderSituacao.svelte) — sem o Progresso da
+	   fase/Bancada genéricos ao lado, a coluna principal ocupa a largura
+	   toda. */
+	.workspace-layout.full-width {
+		grid-template-columns: 1fr;
 	}
 
 	/* Só o caso "Revisão recomendada" (explicit_confirmation) — estica a

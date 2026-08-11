@@ -430,6 +430,15 @@
   escopado, ativo somente quando a atividade atual é "Entender a
   situação" — as demais atividades continuam na identidade
   papel/tinta/grafite.
+- "Entender a situação" passa a usar a mecânica completa do mockup
+  (Claude Design, "Entender a Situacao.dc.html"): topbar de progresso com
+  as atividades da fase (pílulas), painel lateral "Documento do projeto"
+  que reflete ao vivo as seleções em curso (com destaque temporário ao
+  adicionar), e um passo final "Etapa concluída" antes de avançar para a
+  próxima atividade. Substitui, só para esta atividade, o painel genérico
+  "Progresso da fase"/Bancada de `/now`; implementado local ao componente
+  (`EntenderSituacao.svelte`), sem abstração compartilhada — extraída
+  quando uma segunda atividade adotar a mesma mecânica, não antes.
 
 ### Reconciliado
 

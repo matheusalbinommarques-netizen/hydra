@@ -425,25 +425,37 @@ Ainda em 10/08/2026, direcionamento ao vivo produziu o redesenho de
 oportunidade"), a partir de duas telas do Claude Design; ver D034
 (`docs/07-management/decision-log.md`) para o detalhamento técnico
 completo. "Contexto inicial" foi removida da jornada como parte da mesma
-decisão. `hydra-verify fast` PASS (check + 505 testes unitários);
-`hydra-verify full` não foi refeito depois da remoção de "Contexto
-inicial" (a última execução `full`, antes dela, já tinha achado as
-jornadas Playwright quebradas — ver abaixo). **Nada disso está staged nem
-commitado.**
+decisão. Publicado em 11/08/2026, commit `9bdd1a4` (`main`/`origin/main`),
+junto com a consolidação de processo (skills) e os novos assets de marca.
 
-Pendência real conhecida: as jornadas e2e (`app/e2e/*.journey.ts`) ainda
-testam a UI antiga de `/projects/new` (diagnóstico de rota) e de
-"Problema ou oportunidade" (checkbox de sinais, campo de texto livre) —
+Em 11/08/2026, direcionamento ao vivo aplicou a mecânica completa do
+mockup de "Entender a situação" (Claude Design, "Entender a
+Situacao.dc.html", já referenciado em D034): topbar de progresso da fase,
+painel lateral "Documento do projeto" com reflexo ao vivo das seleções, e
+passo final "Etapa concluída" antes de avançar — só para esta atividade,
+substituindo o painel genérico "Progresso da fase"/Bancada de `/now`;
+implementado local ao componente, sem abstração compartilhada (extração
+fica para quando uma segunda atividade adotar a mesma mecânica — decisão
+explícita de Matheus, fase a fase, não em lote). `hydra-verify fast` PASS
+(check + 505 testes unitários) e verificação manual completa no browser
+(os 3 passos, síntese, "Etapa concluída", avanço para "Público afetado"
+com dado persistido em Bancada). Publicado no mesmo commit acima.
+
+Pendência real conhecida, ainda não resolvida: as jornadas e2e
+(`app/e2e/*.journey.ts`) ainda testam a UI antiga de `/projects/new`
+(diagnóstico de rota) e de "Problema ou oportunidade" (checkbox de
+sinais, campo de texto livre, sem a mecânica de "Documento do projeto") —
 `bancada-field-by-field`, `problema-optional-group`, `skip-activity`,
-`walking-skeleton-journey`. Não foram atualizadas (fora do escopo pedido
-nas duas rodadas em que o redesenho foi feito).
+`walking-skeleton-journey`. `hydra-verify full` não foi refeito desde que
+essas jornadas ficaram desatualizadas.
 
 A próxima decisão real é de Matheus: (a) atualizar as quatro jornadas e2e
-pendentes para fechar `hydra-verify full` antes de publicar; (b) revisar
-e autorizar stage/commit do que já está pronto (catálogo, `/projects/new`,
-"Entender a situação", assets de marca — tudo com `fast` PASS); ou (c)
-continuar direcionando ao vivo outra coisa antes de voltar a isso. Nenhuma
-das três foi decidida ainda.
+pendentes para fechar `hydra-verify full`; (b) continuar o rework visual
+para as próximas atividades da Descoberta (Público afetado, Estado atual,
+Resultado desejado — hoje texto livre, sem chips, então a mecânica de
+"Documento do projeto" precisaria de uma variante própria) ou para a
+Biblioteca de projetos (`/projects`), ainda na identidade clara; ou (c)
+direcionar ao vivo outra coisa. Nenhuma das três foi decidida ainda.
 
 ## Não fazer agora
 
