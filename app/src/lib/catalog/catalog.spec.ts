@@ -15,11 +15,10 @@ describe('catalog', () => {
 		}
 	});
 
-	it('Descoberta tem as 7 atividades na ordem esperada', () => {
+	it('Descoberta tem as 6 atividades na ordem esperada', () => {
 		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
 		expect(descoberta?.activities.map((activity) => activity.id)).toEqual([
 			'origem',
-			'contexto',
 			'problema',
 			'publico',
 			'estado_atual',
@@ -154,61 +153,64 @@ describe('catalog', () => {
 		expect(byId.priorizar_entregas.allowsSkip).toBe(true);
 	});
 
-	it('"Problema ou oportunidade" tem só situação e sinais da situação como obrigatórios', () => {
+	it('"Entender a situação" tem só a síntese e "o que está acontecendo" como obrigatórios', () => {
 		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
 		const problema = descoberta?.activities.find((activity) => activity.id === 'problema');
 		if (!problema || problema.completionMode !== 'required_fields') {
 			throw new Error('atividade "problema" deveria ser required_fields');
 		}
 		const required = problema.fields.filter((field) => field.required).map((field) => field.id);
-		expect(required).toEqual(['situacao', 'sinais_situacao']);
+		expect(required).toEqual(['situacao', 'situacao_o_que']);
 		const optional = problema.fields.filter((field) => !field.required).map((field) => field.id);
 		expect(optional).toEqual([
-			'sinais_situacao_outro',
-			'evidencias',
-			'consequencias',
-			'hipotese_opt',
-			'solucao_imaginada',
-			'observacoes'
+			'situacao_o_que_outro',
+			'situacao_onde',
+			'situacao_onde_outro',
+			'situacao_peso',
+			'hipotese_opt'
 		]);
 	});
 
-	it('"sinais_situacao" é selecao_multipla com 7 opções, incluindo "other"; "sinais_situacao_outro" só aparece quando "other" é selecionado', () => {
+	it('"situacao_o_que" é selecao_multipla com as opções de problema e de oportunidade namespaced', () => {
 		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
 		const problema = descoberta?.activities.find((activity) => activity.id === 'problema');
 		if (!problema || problema.completionMode !== 'required_fields') {
 			throw new Error('atividade "problema" deveria ser required_fields');
 		}
-		const sinais = problema.fields.find((field) => field.id === 'sinais_situacao');
-		if (!sinais || sinais.dataTarget !== 'answer' || sinais.type !== 'selecao_multipla') {
-			throw new Error('"sinais_situacao" deveria ser selecao_multipla');
+		const oQue = problema.fields.find((field) => field.id === 'situacao_o_que');
+		if (!oQue || oQue.dataTarget !== 'answer' || oQue.type !== 'selecao_multipla') {
+			throw new Error('"situacao_o_que" deveria ser selecao_multipla');
 		}
-		expect(sinais.options.map((option) => option.id)).toEqual([
-			'too_many_steps',
-			'duplicated_information',
-			'rework',
-			'lack_of_clarity',
-			'dispersed_decisions',
-			'insufficient_tracking',
-			'other'
+		expect(oQue.options.map((option) => option.id)).toEqual([
+			'prob_demora',
+			'prob_custo',
+			'prob_erros',
+			'prob_retrabalho',
+			'prob_insatisfacao',
+			'prob_manual',
+			'prob_visibilidade',
+			'prob_quebrado',
+			'prob_risco',
+			'prob_outro',
+			'opor_tempo',
+			'opor_custo',
+			'opor_experiencia',
+			'opor_automacao',
+			'opor_necessidade',
+			'opor_negocio',
+			'opor_simplicidade',
+			'opor_confiabilidade',
+			'opor_criacao',
+			'opor_outro'
 		]);
 
-		const outro = problema.fields.find((field) => field.id === 'sinais_situacao_outro');
+		const outro = problema.fields.find((field) => field.id === 'situacao_o_que_outro');
 		expect(outro?.required).toBe(false);
-		expect(outro?.dataTarget === 'answer' ? outro.revealWhen : undefined).toEqual({
-			fieldId: 'sinais_situacao',
-			optionId: 'other'
-		});
 	});
 
-	it('"Contexto inicial" tem o campo de nome como project_property, sem gerar Answer', () => {
-		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
-		const contexto = descoberta?.activities.find((activity) => activity.id === 'contexto');
-		if (!contexto || contexto.completionMode !== 'required_fields') {
-			throw new Error('atividade "contexto" deveria ser required_fields');
-		}
-		const nome = contexto.fields.find((field) => field.id === 'nome_provisorio');
-		expect(nome?.dataTarget).toBe('project_property');
-		expect(nome?.projectProperty).toBe('name');
-	});
+	// "Contexto inicial" (nome provisório como project_property) foi removida
+	// do catálogo em 10/08/2026 — nome do projeto agora vem de /projects/new
+	// na criação. Cobertura do mecanismo genérico project_property segue em
+	// domain/transitions.spec.ts e domain/serialization.spec.ts, com fixture
+	// local (nenhuma atividade real usa mais esse dataTarget).
 });

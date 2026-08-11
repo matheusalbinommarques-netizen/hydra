@@ -21,14 +21,12 @@ publicado (commit `a070ed7`) e o dogfooding real da hipótese "Construir →
 Operar" confirmou a hipótese central do ciclo — ver
 `docs/08-delivery/cycle-05-backlog.md`.
 
-O Ciclo 6 está aberto (`docs/08-delivery/cycle-06-backlog.md`), a partir
-da direção de produto registrada em D032
-(`docs/07-management/decision-log.md`): estender a experiência
-estruturada para o início da jornada, partindo da Home, com uma atividade
-construindo objetos vivos do projeto e a seguinte se ramificando a partir
-deles, sem redigitação. Três itens: C6-01 (Home), C6-02 (Mapear grupos
-afetados) e C6-03 (Entender estado atual). C6-01 concluído; C6-02 e C6-03
-pendentes.
+O Ciclo 6 (`docs/08-delivery/cycle-06-backlog.md`) está concluído com
+apenas C6-01 (Home) entregue. C6-02 (Mapear grupos afetados) e C6-03
+(Entender estado atual) foram cortados em 10/08/2026, a pedido explícito
+de Matheus — o planejamento em lote apoiado por ChatGPT dá lugar a
+direção dada ao vivo, diretamente por Matheus usando o produto (ver
+"Próxima decisão relevante").
 
 Testes com usuários externos continuam dependendo de autorização
 explícita de Matheus (D021, `docs/07-management/decision-log.md`).
@@ -306,46 +304,24 @@ explícita de Matheus (D021, `docs/07-management/decision-log.md`).
   digitação. Gate do Ciclo 5 aprovado em 09/08/2026 (ver "Gate atual"
   abaixo e `docs/08-delivery/cycle-05-backlog.md`).
 - **Ciclo 6 — estender a experiência estruturada ao início da jornada**
-  (`docs/08-delivery/cycle-06-backlog.md`): aberto. Meta: provar que o
-  Hydra estende a experiência estruturada ao início da jornada — Home
-  usando dados reais, uma atividade construindo objetos vivos do projeto
-  (grupos afetados) e a atividade seguinte se ramificando de verdade a
-  partir deles, sem redigitação. C6-01 (Home) concluído: bloco "Continue
-  de onde parou" seleciona, entre os projetos não concluídos, o de
-  movimentação real mais recente (nunca por `createdAt`), sem duplicar
-  esse projeto na lista abaixo; lista densa com fase atual e contagem de
-  atividades `concluída` daquela fase — nunca `pulada` (sem
-  porcentagem/barra); sinal real por projeto com prioridade `bloqueado` >
-  `parado` > `avancando`, calculado a partir dos timestamps já existentes
-  em `ProjectState` (nunca persistido); sem nenhuma movimentação real,
-  `Project.createdAt` só mede inatividade (7 dias) e nunca gera
-  `avancando`; sem "aguardando alguém" e sem Configurações globais
-  inventadas; nenhuma mudança em `domain/`, `catalog/`,
-  `orientation-engine/` ou persistência — só `server/application/` e a
-  rota. Convergência visual (D033, `docs/07-management/decision-log.md`):
-  a Home passa a usar uma nova identidade global — tema escuro, acento
-  ciano/teal, fonte Inter, sidebar de navegação (Home/Projetos/
-  Configurações, esta sem link real) — a partir do artefato aprovado no
-  Claude Design (`Home.dc.html`); migração tela a tela, não simultânea —
-  as demais telas do produto (Biblioteca, Nova iniciativa, shell interno
-  de projeto) continuam na identidade papel/tinta/grafite até serem
-  migradas individualmente; busca, notificações e perfil de usuário no
-  topo da Home são decoração estática, sem nenhuma capacidade real. C6-02
-  (Mapear grupos afetados), pendente:
-  substitui o texto livre de `publico` por uma coleção estruturada de
-  grupos com identidade estável, severidade e frequência, no espírito do
-  protótipo aprovado `Quem é Afetado.dc.html` (D032), sem copiar sua
-  implementação. C6-03 (Entender estado atual), pendente: substitui o texto livre
-  de `estado_atual`; primeira atividade do produto com ramificação real
-  (existe solução / não existe), reaproveitando os grupos de C6-02 sem
-  redigitação, no espírito de `Como é Tratado Hoje.dc.html` (D032). A
-  jornada permanece mista ao final do ciclo — `origem`, `contexto`,
-  `problema` e as demais atividades não redesenhadas continuam como
-  estão; não é uma migração completa Home → Estado atual. `Organizar
-  quem participa` e `Identificar riscos do projeto` ficam registrados
-  como próximo bloco candidato (D032), sem abrir Ciclo 7 nem comprometer
-  escopo — o desenho de domínio de Riscos (entidade própria, não JSON em
-  `Answer`) fica para o planejamento específico desse trabalho.
+  (`docs/08-delivery/cycle-06-backlog.md`): concluído, com apenas C6-01
+  entregue. C6-01 (Home): bloco "Continue de onde parou" seleciona, entre
+  os projetos não concluídos, o de movimentação real mais recente (nunca
+  por `createdAt`), sem duplicar esse projeto na lista abaixo; lista densa
+  com fase atual e contagem de atividades `concluída` daquela fase — nunca
+  `pulada` (sem porcentagem/barra); sinal real por projeto com prioridade
+  `bloqueado` > `parado` > `avancando`, calculado a partir dos timestamps
+  já existentes em `ProjectState` (nunca persistido); sem "aguardando
+  alguém" e sem Configurações globais inventadas; nenhuma mudança em
+  `domain/`, `catalog/`, `orientation-engine/` ou persistência. Convergência
+  visual (D033, `docs/07-management/decision-log.md`): Home passa a usar
+  nova identidade global — tema escuro, acento ciano/teal, fonte Inter,
+  sidebar de navegação — a partir do artefato aprovado no Claude Design
+  (`Home.dc.html`); migração tela a tela, demais telas seguem na
+  identidade papel/tinta/grafite até migradas individualmente. C6-02
+  (Mapear grupos afetados) e C6-03 (Entender estado atual) foram cortados
+  em 10/08/2026 antes de qualquer implementação — ver
+  `docs/08-delivery/cycle-06-backlog.md` para o motivo do corte.
 - **Manutenção técnica — `hydra-verify full`** (harness de verificação,
   anterior ao fechamento da subetapa 7.7): infraestrutura de verificação
   estabilizada — `hydra-verify full` volta a ser confiável e
@@ -369,9 +345,9 @@ C5-01 concluído e publicado, todas as condições técnicas atendidas, e o
 gate do próprio Ciclo 5 aprovado em 09/08/2026 — o dogfooding real
 confirmou a hipótese Construir → Operar (ver
 `docs/08-delivery/cycle-05-backlog.md`, seção "Gate de conclusão do Ciclo
-5"). O Ciclo 6 está aberto — C6-01 concluído, C6-02 e C6-03 pendentes —,
-gate ainda não avaliado (ver `docs/08-delivery/cycle-06-backlog.md`, seção
-"Gate de conclusão do Ciclo 6"). O gate do Release 1 ainda não existe.
+5"). O Ciclo 6 está concluído — C6-01 entregue, C6-02 e C6-03 cortados —,
+gate atendido (ver `docs/08-delivery/cycle-06-backlog.md`, seção "Gate de
+conclusão do Ciclo 6"). O gate do Release 1 ainda não existe.
 
 Detalhamento de cada gate de ciclo está nos respectivos backlogs
 (`docs/08-delivery/cycle-02-backlog.md`, `cycle-03-backlog.md`,
@@ -433,13 +409,41 @@ foram formalizados como direção de produto em D032
 (`docs/07-management/decision-log.md`), com apoio de quatro protótipos
 avaliados no Claude Design, e deram origem ao Ciclo 6
 (`docs/08-delivery/cycle-06-backlog.md`), aberto separadamente do
-roadmap, do mesmo modo que o Ciclo 5 foi.
+roadmap, do mesmo modo que o Ciclo 5 foi. O Ciclo 6 está concluído com
+apenas C6-01 (Home) entregue.
 
-C6-01 (Home) está concluído. A próxima decisão real é a implementação de
-C6-02 (Mapear grupos afetados), segundo item do Ciclo 6. `Organizar quem
-participa` e `Identificar riscos do projeto` seguem registrados em D032
-como próximo bloco candidato depois do Ciclo 6, sem número de ciclo nem
-escopo comprometido.
+Em 10/08/2026, Matheus decidiu não planejar mais os próximos passos em
+lote com antecedência (como C6-02/C6-03 foram, com apoio do ChatGPT) —
+cortou os dois itens pendentes do Ciclo 6 (ver
+`docs/08-delivery/cycle-06-backlog.md`) e passa a direcionar o trabalho
+seguinte diretamente, ao vivo, usando o produto. Não há próximo item nem
+próximo ciclo pré-definido — cada rodada de trabalho parte de uma
+instrução direta, sem backlog pré-planejado.
+
+Ainda em 10/08/2026, direcionamento ao vivo produziu o redesenho de
+`/projects/new` e da atividade "Entender a situação" (era "Problema ou
+oportunidade"), a partir de duas telas do Claude Design; ver D034
+(`docs/07-management/decision-log.md`) para o detalhamento técnico
+completo. "Contexto inicial" foi removida da jornada como parte da mesma
+decisão. `hydra-verify fast` PASS (check + 505 testes unitários);
+`hydra-verify full` não foi refeito depois da remoção de "Contexto
+inicial" (a última execução `full`, antes dela, já tinha achado as
+jornadas Playwright quebradas — ver abaixo). **Nada disso está staged nem
+commitado.**
+
+Pendência real conhecida: as jornadas e2e (`app/e2e/*.journey.ts`) ainda
+testam a UI antiga de `/projects/new` (diagnóstico de rota) e de
+"Problema ou oportunidade" (checkbox de sinais, campo de texto livre) —
+`bancada-field-by-field`, `problema-optional-group`, `skip-activity`,
+`walking-skeleton-journey`. Não foram atualizadas (fora do escopo pedido
+nas duas rodadas em que o redesenho foi feito).
+
+A próxima decisão real é de Matheus: (a) atualizar as quatro jornadas e2e
+pendentes para fechar `hydra-verify full` antes de publicar; (b) revisar
+e autorizar stage/commit do que já está pronto (catálogo, `/projects/new`,
+"Entender a situação", assets de marca — tudo com `fast` PASS); ou (c)
+continuar direcionando ao vivo outra coisa antes de voltar a isso. Nenhuma
+das três foi decidida ainda.
 
 ## Não fazer agora
 

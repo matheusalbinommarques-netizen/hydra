@@ -37,7 +37,7 @@ describe('buildRecordsView', () => {
 
 		const problemaActivity = descoberta.activities.find((activity) => activity.activityId === 'problema')!;
 		expect(problemaActivity.fields).toEqual([
-			{ id: 'situacao', label: 'Qual situação precisa mudar?', value: 'Situação de teste' }
+			{ id: 'situacao', label: 'Síntese da situação', value: 'Situação de teste' }
 		]);
 	});
 

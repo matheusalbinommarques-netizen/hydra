@@ -30,14 +30,7 @@ export interface DiscoverySummaryView {
 	detailsOpenByDefault: boolean;
 }
 
-const DISCOVERY_REQUIRED_FIELDS_ACTIVITY_IDS = [
-	'origem',
-	'contexto',
-	'problema',
-	'publico',
-	'estado_atual',
-	'resultado'
-];
+const DISCOVERY_REQUIRED_FIELDS_ACTIVITY_IDS = ['origem', 'problema', 'publico', 'estado_atual', 'resultado'];
 
 function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: string, encodedValue: string): string[] {
 	for (const phase of catalog.phases) {
@@ -61,13 +54,13 @@ export function buildDiscoverySummaryView(
 
 	const situacao = answers['situacao'];
 	if (situacao) {
-		const sinaisValue = answers['sinais_situacao'];
+		const oQueValue = answers['situacao_o_que'];
 		overview.push({
 			activityId: 'problema',
-			heading: 'Problema',
-			editLabel: 'Editar problema',
+			heading: 'Situação',
+			editLabel: 'Editar situação',
 			value: situacao,
-			chips: sinaisValue ? decodeMultiSelectLabels(catalog, 'problema', 'sinais_situacao', sinaisValue) : undefined
+			chips: oQueValue ? decodeMultiSelectLabels(catalog, 'problema', 'situacao_o_que', oQueValue) : undefined
 		});
 	}
 

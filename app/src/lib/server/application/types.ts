@@ -234,14 +234,25 @@ export interface SetRouteStartPhaseInput {
 	phaseId: string | null;
 }
 
-// Nova iniciativa (`/projects/new`, etapa 7.2 do roadmap) — criação atômica:
-// nome e fase inicial são aplicados ao estado em memória antes do único
+// Nova iniciativa (`/projects/new`) — criação atômica: nome, fase inicial e
+// origem são aplicados ao estado em memória antes do único
 // `repository.insert()` (ver project-use-cases.ts), nunca em gravações
-// separadas. Reaproveita as mesmas transições/validações de renameProject e
-// setRouteStartPhase — nenhuma regra nova.
+// separadas. Reaproveita as mesmas transições/validações de renameProject,
+// setRouteStartPhase e answerActivity — nenhuma regra nova.
+// `routeStartPhaseId: null` — o redesenho de /projects/new (Claude Design,
+// "Novo Projeto.dc.html") não faz mais o diagnóstico de rota nesta tela;
+// `null` preserva o comportamento padrão (jornada completa a partir da
+// Descoberta). O diagnóstico continua disponível em /map (D023/D024),
+// sem alteração — este campo apenas deixou de ser obrigatório aqui.
+// `originAnswer` — rótulo de `catalog/discovery.ts` (ORIGIN_OPTIONS),
+// gravado como a própria Answer da atividade "Origem do projeto"
+// (activityDefinitionId 'origem', fieldDefinitionId 'origem') via
+// answerActivity — não um campo novo de projeto, o mesmo dado que a
+// atividade sempre usou, só capturado mais cedo.
 export interface CreateConfiguredProjectInput {
 	name?: string | null;
-	routeStartPhaseId: string;
+	routeStartPhaseId: string | null;
+	originAnswer?: string | null;
 }
 
 export interface AddScopeItemInput {

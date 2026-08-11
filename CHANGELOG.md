@@ -191,6 +191,10 @@
   endpoint legado em `/projects/[projectId]/export` continua funcionando
   sem alteração de contrato para requisições que não navegam para a
   página; experiência convergida em desktop e em mobile (~390px).
+- "Entender a situação" (era "Problema ou oportunidade"): seleção
+  estruturada em 3 passos (o quê/onde/peso) com síntese automática, no
+  lugar de texto livre; taxonomia de opções varia conforme a origem do
+  projeto (D034, `docs/07-management/decision-log.md`).
 
 ### Alterado
 
@@ -415,6 +419,17 @@
   decoração estática, sem nenhuma capacidade real por trás. Migração
   tela a tela — as demais telas do produto continuam na identidade
   papel/tinta/grafite até serem convergidas individualmente.
+- Marca: logo/favicon/App Icon substituídos pelos assets oficiais da
+  identidade escura (símbolo prata/ciano); topo esquerdo da Home passa a
+  usar o Horizontal Lockup compacto em vez de ícone+texto separados.
+- `/projects/new`: tela única de nome + origem (Claude Design), sem
+  diagnóstico de rota (que continua existindo em `/map`, D023/D024); leva
+  direto para "Entender a situação" — "Contexto inicial" foi removida da
+  jornada (D034).
+- Shell do workspace (`[projectId]/+layout.svelte`) ganha tema escuro
+  escopado, ativo somente quando a atividade atual é "Entender a
+  situação" — as demais atividades continuam na identidade
+  papel/tinta/grafite.
 
 ### Reconciliado
 

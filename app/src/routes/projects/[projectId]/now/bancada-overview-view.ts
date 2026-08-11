@@ -23,12 +23,12 @@ const BANCADA_PHASE_IDS = ['descoberta', 'definicao', 'estruturacao'];
 
 // Um campo "manchete" por atividade — mesma curadoria de
 // discovery-summary-view.ts (problema/publico/estado_atual/resultado),
-// estendida às atividades de Definição do produto e às duas primeiras da
-// Descoberta (origem/contexto), que a visão do Resumo não expõe hoje mas que
-// aqui precisam aparecer desde o início — senão o painel fica vazio durante
-// as duas primeiras atividades da jornada, contradizendo o efeito de
-// "documento crescendo". Decisão de conteúdo, não regra mecânica — revisável
-// depois do dogfooding sem migrar dado nenhum.
+// estendida às atividades de Definição do produto e à primeira da Descoberta
+// (origem), que a visão do Resumo não expõe hoje mas que aqui precisa
+// aparecer desde o início — senão o painel fica vazio na primeira atividade
+// da jornada, contradizendo o efeito de "documento crescendo". Decisão de
+// conteúdo, não regra mecânica — revisável depois do dogfooding sem migrar
+// dado nenhum.
 //
 // Estruturação (seis atividades) segue a mesma curadoria: quando uma
 // atividade tem mais de um campo obrigatório (objetivo_entregaveis,
@@ -37,8 +37,7 @@ const BANCADA_PHASE_IDS = ['descoberta', 'definicao', 'estruturacao'];
 // (mudanca, não beneficiario/percepcao).
 const BLOCK_SPECS: Record<string, { heading: string; valueFieldId: string; chipsFieldId?: string }> = {
 	origem: { heading: 'Origem do projeto', valueFieldId: 'origem' },
-	contexto: { heading: 'Contexto inicial', valueFieldId: 'breve_descricao' },
-	problema: { heading: 'Problema', valueFieldId: 'situacao', chipsFieldId: 'sinais_situacao' },
+	problema: { heading: 'Situação', valueFieldId: 'situacao', chipsFieldId: 'situacao_o_que' },
 	publico: { heading: 'Público afetado', valueFieldId: 'publico_detail' },
 	estado_atual: { heading: 'Estado atual', valueFieldId: 'estado_atual_detail' },
 	resultado: { heading: 'Resultado desejado', valueFieldId: 'mudanca' },

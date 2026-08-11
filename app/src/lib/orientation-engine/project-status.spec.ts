@@ -18,12 +18,17 @@ describe('computeProjectStatus', () => {
 	});
 
 	it('permanece em_andamento enquanto restarem fases não concluídas', () => {
-		const state = completePhase(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'descoberta', T1);
+		// Nome definido explicitamente (renameProject) — desde a remoção de
+		// "Contexto inicial" (nome agora vem de /projects/new na criação real),
+		// nenhuma atividade do catálogo define Project.name.
+		const named = unwrapResult(renameProject(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'Portal'));
+		const state = completePhase(catalog, named, 'descoberta', T1);
 		expect(computeProjectStatus(state.project, catalog, state.activityProgress)).toBe('em_andamento');
 	});
 
 	it('concluído é alcançável quando todas as fases são completadas de ponta a ponta', () => {
-		const state = completeEntireCatalog(catalog, createInitialProjectState(catalog, 'proj-1', T1), T1);
+		const named = unwrapResult(renameProject(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'Portal'));
+		const state = completeEntireCatalog(catalog, named, T1);
 		expect(computeProjectStatus(state.project, catalog, state.activityProgress)).toBe('concluído');
 	});
 });

@@ -1,387 +1,227 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { computeRouteStartRecommendation } from '$lib/orientation-engine';
-	import { ROUTE_DIAGNOSTIC_FALLBACK, ROUTE_DIAGNOSTIC_QUESTIONS } from '$lib/route-diagnostic-questions';
+	import { ORIGIN_OPTIONS } from '$lib/catalog/discovery';
 
-	let { data, form } = $props();
+	let { form } = $props();
 
-	const STEP_META = [
-		{ n: 1, title: 'Ponto de partida', subtitle: 'O que já está estruturado?' },
-		{ n: 2, title: 'Rota recomendada', subtitle: 'Onde começar faz mais sentido?' },
-		{ n: 3, title: 'Nome provisório', subtitle: 'Como vamos chamar?' },
-		{ n: 4, title: 'Revisão', subtitle: 'Confirmar e criar' }
-	];
-
-	const HEADER_SUBTITLE: Record<number, string> = {
-		1: 'Vamos entender o que já está estruturado.',
-		2: 'Aceite a recomendação ou escolha outra fase.',
-		3: 'Como você quer chamar este projeto por enquanto?',
-		4: 'Confira antes de criar.'
+	const ORIGIN_DESCRIPTIONS: Record<string, string> = {
+		'Existe um problema': 'Algo não está funcionando como deveria.',
+		'Existe uma oportunidade': 'Há algo que podemos aproveitar ou fazer melhor.',
+		'Quero melhorar algo': 'Já existe, mas poderia funcionar muito melhor.',
+		'Quero criar algo novo': 'Existe uma ideia que quero transformar em algo real.',
+		'Recebi uma solicitação': 'Alguém pediu ou precisa que isso aconteça.',
+		'Existe uma obrigação': 'Uma regra, prazo, contrato ou necessidade tornou isso necessário.',
+		'Ainda não sei direito': 'Tenho uma situação em mãos, mas ainda preciso entendê-la.'
 	};
 
-	// Descrição curta por fase, derivada do mesmo conteúdo do diagnóstico
-	// (structureLabel) — não duplica id nem rótulo de fase, que vêm de
-	// data.phases (catálogo real, ver +page.server.ts).
-	const PHASE_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
-		ROUTE_DIAGNOSTIC_QUESTIONS.map((q) => [q.phaseId, q.structureLabel.charAt(0).toUpperCase() + q.structureLabel.slice(1) + '.'])
-	);
-	PHASE_DESCRIPTIONS[ROUTE_DIAGNOSTIC_FALLBACK.phaseId] = 'Validar resultados e encerrar o projeto.';
+	// svelte-ignore state_referenced_locally -- seed intencional a partir do
+	// último submit com erro (nome preservado para nova tentativa).
+	let projectName = $state(form?.name ?? '');
+	let originKey = $state<string | null>(null);
+	let originPulse = $state(false);
+	let pulseTimer: ReturnType<typeof setTimeout> | undefined;
 
-	let step = $state(1);
-	let answers = $state<Record<string, boolean | null>>(
-		Object.fromEntries(ROUTE_DIAGNOSTIC_QUESTIONS.map((q) => [q.phaseId, null]))
-	);
-	let manualPhaseId = $state<string | null>(null);
-	let projectName = $state('');
-	let showValidation = $state(false);
-
-	let allAnswered = $derived(ROUTE_DIAGNOSTIC_QUESTIONS.every((q) => typeof answers[q.phaseId] === 'boolean'));
-
-	let recommendation = $derived(
-		allAnswered
-			? computeRouteStartRecommendation(
-					ROUTE_DIAGNOSTIC_QUESTIONS.map((q) => ({
-						phaseId: q.phaseId,
-						phaseLabel: q.phaseLabel,
-						structureLabel: q.structureLabel,
-						answer: answers[q.phaseId] as boolean
-					})),
-					ROUTE_DIAGNOSTIC_FALLBACK
-				)
-			: null
-	);
-
-	let selectedPhaseId = $derived(manualPhaseId ?? recommendation?.phaseId ?? null);
-	let isManualChoice = $derived(!!(manualPhaseId && recommendation && manualPhaseId !== recommendation.phaseId));
-	let reviewName = $derived(projectName.trim() ? projectName.trim() : 'Projeto sem nome');
-	let reviewPhaseLabel = $derived(data.phases.find((phase) => phase.id === selectedPhaseId)?.label ?? '');
-
-	function setAnswer(phaseId: string, value: boolean) {
-		answers = { ...answers, [phaseId]: value };
-		showValidation = false;
+	function selectOrigin(label: string) {
+		originKey = label;
+		originPulse = true;
+		clearTimeout(pulseTimer);
+		pulseTimer = setTimeout(() => (originPulse = false), 1400);
 	}
 
-	function goStep(n: number) {
-		if (n < step) step = n;
-	}
-
-	function next() {
-		if (step === 1 && !allAnswered) {
-			showValidation = true;
-			return;
-		}
-		step = Math.min(4, step + 1);
-		showValidation = false;
-	}
-
-	function back() {
-		step = Math.max(1, step - 1);
-	}
+	let nameFilled = $derived(projectName.trim().length > 0);
+	let canSubmit = $derived(nameFilled && !!originKey);
 </script>
 
 <svelte:head>
 	<title>Nova iniciativa — Hydra</title>
 </svelte:head>
 
-<div class="wizard-page">
-	<header class="wizard-header">
-		<div class="identity">
-			<a class="wordmark-link" href="/">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-					<path d="M6 2v9c0 3 2.5 5 6 5s6-2 6-5V2M12 16v6" />
-				</svg>
-				<span class="wordmark-text">Hydra</span>
-			</a>
-			<span class="identity-divider" aria-hidden="true"></span>
-			<nav class="breadcrumb" aria-label="Localização">
-				<a href="/projects">Projetos</a>
-				<span class="breadcrumb-sep" aria-hidden="true">/</span>
-				<span aria-current="page">Nova iniciativa</span>
-			</nav>
-		</div>
-		<a class="close-link" href="/projects" aria-label="Cancelar e voltar para Projetos">×</a>
+<div class="np-page">
+	<header class="np-header">
+		<a class="np-wordmark" href="/">
+			<img class="np-wordmark-icon" src="/brand/hydra-app-icon-512.png" width="24" height="24" alt="" />
+			<span class="np-wordmark-text">HYDRA</span>
+		</a>
+		<nav class="np-breadcrumb" aria-label="Localização">
+			<a href="/projects">Projetos</a>
+			<span aria-hidden="true">/</span>
+			<span aria-current="page">Nova iniciativa</span>
+		</nav>
+		<a class="np-close" href="/projects" aria-label="Cancelar e voltar para Projetos">×</a>
 	</header>
 
-	<main class="wizard-main">
-		<div class="mobile-progress">
-			<p class="mobile-step-label">PASSO {step} DE 4</p>
-			<p class="mobile-step-title">{STEP_META[step - 1].title}</p>
-			<div class="progress-track">
-				<div class="progress-fill" style:width="{(step / 4) * 100}%"></div>
+	<main class="np-main">
+		<form method="POST" action="?/confirm" use:enhance class="np-layout">
+			<div class="np-content">
+				<p class="np-eyebrow">Novo projeto</p>
+				<h1 class="np-title">Vamos começar.</h1>
+				<p class="np-subtitle">Você só precisa nos dizer de onde este projeto está partindo.</p>
+
+				<div class="np-field">
+					<label class="np-field-label" for="np-name">Nome do projeto</label>
+					<input
+						id="np-name"
+						name="name"
+						type="text"
+						class="np-name-input"
+						bind:value={projectName}
+						placeholder="Ex.: Renovação do sistema de atendimento"
+					/>
+				</div>
+
+				<div class="np-origins-block">
+					<h2 class="np-origins-title">O que trouxe este projeto até aqui?</h2>
+					<p class="np-origins-help">Escolha a opção que mais se aproxima. Você poderá refinar isso depois.</p>
+
+					<div class="np-origins-grid">
+						{#each ORIGIN_OPTIONS as label (label)}
+							<button
+								type="button"
+								class="np-origin-card"
+								class:selected={originKey === label}
+								onclick={() => selectOrigin(label)}
+							>
+								<span class="np-origin-label">{label}</span>
+								<span class="np-origin-desc">{ORIGIN_DESCRIPTIONS[label]}</span>
+							</button>
+						{/each}
+					</div>
+					<input type="hidden" name="origin" value={originKey ?? ''} />
+				</div>
+
+				<div class="np-submit-row">
+					<button type="submit" class="np-submit-btn" disabled={!canSubmit}>
+						Criar projeto e começar <span aria-hidden="true">→</span>
+					</button>
+					<p class="np-submit-note">Isso leva você direto para a primeira atividade da Descoberta.</p>
+				</div>
+
+				{#if form?.message}
+					<p class="np-error" role="alert">{form.message}</p>
+				{/if}
 			</div>
-		</div>
 
-		<form method="POST" action="?/confirm" use:enhance class="wizard-form">
-			<div class="wizard-card">
-				<aside class="step-rail" aria-label="Etapas da criação">
-					{#each STEP_META as s (s.n)}
-						{@const isActive = s.n === step}
-						{@const isDone = s.n < step}
-						<button
-							type="button"
-							class="step-item"
-							class:active={isActive}
-							class:done={isDone}
-							disabled={!isDone}
-							onclick={() => goStep(s.n)}
-						>
-							<span class="step-circle">{isDone ? '✓' : s.n}</span>
-							<span class="step-text">
-								<span class="step-title">{s.title}</span>
-								<span class="step-subtitle">{s.subtitle}</span>
-							</span>
-						</button>
-					{/each}
-				</aside>
+			<aside class="np-doc-panel">
+				<div class="np-doc-header">
+					<span class="np-doc-eyebrow">Documento do projeto</span>
+					<span class="np-doc-phase">Descoberta</span>
+				</div>
 
-				<div class="wizard-content">
-					<div class="content-head">
-						<h1>Nova iniciativa</h1>
-						<p class="content-subtitle">{HEADER_SUBTITLE[step]}</p>
-					</div>
+				<div class="np-doc-item">
+					<span class="np-doc-item-label">Nome do projeto</span>
+					<span class="np-doc-item-value" class:empty={!nameFilled}>
+						{nameFilled ? projectName : 'Ainda não preenchido'}
+					</span>
+				</div>
 
-					<div class="content-body">
-						{#if step === 1}
-							<p class="step-intro">
-								Suas respostas serão usadas apenas para recomendar o melhor ponto de partida. Somente a fase
-								escolhida será registrada no projeto.
-							</p>
-							{#if showValidation}
-								<p class="validation-banner" role="alert">Responda todas as perguntas para continuar.</p>
-							{/if}
-							<ol class="question-list">
-								{#each ROUTE_DIAGNOSTIC_QUESTIONS as q (q.phaseId)}
-									{@const val = answers[q.phaseId]}
-									{@const showError = showValidation && val === null}
-									<li class="question-row" class:error={showError}>
-										<div class="question-text">
-											{q.question}
-											{#if showError}<div class="question-error">Obrigatório</div>{/if}
-										</div>
-										<div class="answer-buttons" role="radiogroup" aria-label={q.question}>
-											<button
-												type="button"
-												class="answer-btn"
-												class:selected={val === true}
-												aria-pressed={val === true}
-												onclick={() => setAnswer(q.phaseId, true)}
-											>
-												Sim
-											</button>
-											<button
-												type="button"
-												class="answer-btn"
-												class:selected={val === false}
-												aria-pressed={val === false}
-												onclick={() => setAnswer(q.phaseId, false)}
-											>
-												Não
-											</button>
-										</div>
-									</li>
-								{/each}
-							</ol>
-						{/if}
+				<div class="np-doc-item" class:pulse={originPulse}>
+					<span class="np-doc-item-label">Origem do projeto</span>
+					<span class="np-doc-item-value" class:empty={!originKey}>
+						{originKey ?? 'Ainda não preenchido'}
+					</span>
+				</div>
 
-						{#if step === 2}
-							<p class="step-intro">
-								O Hydra procurou a primeira parte do trabalho que ainda não está estruturada. Aceite a
-								recomendação ou escolha outra fase manualmente.
-							</p>
-							<ul class="phase-list">
-								{#each data.phases as p (p.id)}
-									{@const isRecommended = recommendation?.phaseId === p.id}
-									{@const isSelected = p.id === selectedPhaseId}
-									<li class="phase-row" class:selected={isSelected} class:recommended={isRecommended}>
-										<button type="button" class="phase-row-btn" onclick={() => (manualPhaseId = p.id)}>
-											<span class="phase-radio" aria-hidden="true"></span>
-											<span class="phase-body">
-												<span class="phase-heading">
-													<span class="phase-label">{p.label}</span>
-													{#if isRecommended}<span class="phase-tag">Recomendado</span>{/if}
-												</span>
-												<span class="phase-desc">{PHASE_DESCRIPTIONS[p.id] ?? ''}</span>
-												{#if isRecommended && recommendation}
-													<span class="phase-justification">{recommendation.justification}</span>
-												{/if}
-											</span>
-										</button>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-
-						{#if step === 3}
-							<div class="name-field">
-								<div class="name-label-row">
-									<span class="name-label">Nome provisório do projeto</span>
-									<span class="optional-pill">opcional</span>
-								</div>
-								<input
-									type="text"
-									class="name-input"
-									bind:value={projectName}
-									placeholder="Ex.: Consolidação diária automatizada"
-								/>
-								<p class="name-help">O nome poderá ser alterado a qualquer momento depois da criação.</p>
-							</div>
-						{/if}
-
-						{#if step === 4}
-							<div class="review-box">
-								<div class="review-row">
-									<span class="review-key">Nome provisório</span>
-									<span class="review-value">{reviewName}</span>
-								</div>
-								<div class="review-row">
-									<span class="review-key">Fase inicial</span>
-									<span class="review-value-group">
-										<span class="review-value">{reviewPhaseLabel}</span>
-										<span class="review-tag" class:manual={isManualChoice}>
-											{isManualChoice ? 'Escolha manual' : 'Recomendada'}
-										</span>
-									</span>
-								</div>
-							</div>
-							{#if form?.message}
-								<div class="confirm-error" role="alert">
-									<p>Não foi possível criar o projeto agora. Seus dados foram mantidos — tente novamente.</p>
-									<p class="confirm-error-detail">{form.message}</p>
-								</div>
-							{:else}
-								<p class="not-created-note">Nada será criado até a confirmação final.</p>
-							{/if}
-						{/if}
-					</div>
-
-					<div class="wizard-footer">
-						{#if step === 1}
-							<a class="back-link" href="/projects">Cancelar</a>
-						{:else}
-							<button type="button" class="back-btn" onclick={back}>← Voltar</button>
-						{/if}
-
-						{#if step < 4}
-							<button type="button" class="next-btn" onclick={next}>Continuar →</button>
-						{:else}
-							<button type="submit" class="next-btn">Confirmar e criar →</button>
-						{/if}
+				<div class="np-doc-next" class:dim={!originKey}>
+					<span class="np-doc-next-icon" aria-hidden="true">→</span>
+					<div>
+						<p class="np-doc-next-label">Primeira atividade</p>
+						<p class="np-doc-next-value">Entender a situação</p>
 					</div>
 				</div>
-			</div>
-
-			<input type="hidden" name="name" value={projectName} />
-			<input type="hidden" name="phaseId" value={selectedPhaseId ?? ''} />
+			</aside>
 		</form>
 	</main>
 </div>
 
 <style>
-	/* Tokens locais extraídos do artefato aprovado (Claude Design —
-	   "Nova Iniciativa - Wizard.dc.html"). Mesmo padrão de routes/+page.svelte
-	   (Home) e routes/projects/+page.svelte (Biblioteca): escopados a esta
-	   rota, sem tocar app.css nem outras telas ainda não convergidas. */
-	.wizard-page {
-		--wz-bg: #f7f3ec;
-		--wz-surface: #ffffff;
-		--wz-border: #e7e1d3;
-		--wz-border-soft: #efeae0;
-		--wz-input-border: #d8d0c0;
-		--wz-text: #2a2520;
-		--wz-muted: #6b655c;
-		--wz-muted-light: #9a9285;
-		--wz-accent: #bb4534;
-		--wz-accent-hover: #a03a2b;
-		--wz-error-text: #9c3a2c;
-		--wz-error-bg: #fcf3ef;
-		--wz-error-border: #e9c9be;
-		--wz-success-text: #2a6b45;
-		--wz-success-bg: #eff6f0;
-		--wz-success-border: #c9e2cf;
-		--wz-dark: #2a2520;
-		--wz-dark-strong: #211d19;
-		--wz-radius-lg: 1rem;
-		--wz-radius: 0.5rem;
+	/* Tokens locais escopados a esta rota — direção visual aprovada no Claude
+	   Design ("Redesenho da tela /new"): tema escuro, acento teal, mesma
+	   linguagem já usada na Home (D033). Outras telas ainda não convergidas
+	   continuam na identidade papel/tinta/grafite, sem alteração. */
+	.np-page {
+		--np-bg: #0a1420;
+		--np-surface: #101f2f;
+		--np-panel: #0c1826;
+		--np-item-bg: #0e1c2b;
+		--np-border: rgba(255, 255, 255, 0.08);
+		--np-border-strong: rgba(255, 255, 255, 0.14);
+		--np-text: #e9f2f6;
+		--np-text-strong: #f5fafb;
+		--np-muted: #8fa4b8;
+		--np-faint: #5f7c90;
+		--np-disabled: #4d6577;
+		--np-accent: #2dd4c4;
+		--np-accent-light: #5be9d8;
+		--np-accent-tint: rgba(45, 212, 196, 0.1);
+		--np-accent-tint-strong: rgba(45, 212, 196, 0.14);
+		--np-accent-border: rgba(45, 212, 196, 0.3);
+		--np-accent-border-strong: rgba(45, 212, 196, 0.55);
+		--np-error: #f97066;
 
 		min-height: 100vh;
-		background: var(--wz-bg);
-		color: var(--wz-text);
-		font-family: 'Inter', 'Manrope', -apple-system, sans-serif;
+		background: var(--np-bg);
+		color: var(--np-text);
+		font-family: 'Inter', system-ui, -apple-system, sans-serif;
 	}
 
-	.wizard-header {
+	.np-header {
 		height: 4rem;
-		background: var(--wz-surface);
-		border-bottom: 1px solid var(--wz-border);
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		gap: 1.25rem;
 		padding: 0 2.5rem;
+		border-bottom: 1px solid var(--np-border);
 	}
 
-	.identity {
+	.np-wordmark {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		min-width: 0;
-	}
-
-	.wordmark-link {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
+		gap: 0.5625rem;
 		color: inherit;
 		text-decoration: none;
 		flex-shrink: 0;
 	}
 
-	.wordmark-text {
-		font-family: 'Source Serif 4', Georgia, serif;
-		font-weight: 700;
-		font-size: 1.1875rem;
+	.np-wordmark-icon {
+		display: block;
 	}
 
-	.identity-divider {
-		width: 1px;
-		height: 1.125rem;
-		background: var(--wz-border-soft);
-		flex-shrink: 0;
+	.np-wordmark-text {
+		font-size: 0.9375rem;
+		font-weight: 800;
+		letter-spacing: 0.14em;
+		color: var(--np-text-strong);
 	}
 
-	.breadcrumb {
+	.np-breadcrumb {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.8125rem;
-		white-space: nowrap;
+		color: var(--np-faint);
+		flex: 1;
 	}
 
-	.breadcrumb a {
-		color: var(--wz-muted-light);
+	.np-breadcrumb a {
+		color: var(--np-faint);
 		text-decoration: none;
 	}
 
-	.breadcrumb a:hover {
-		color: var(--wz-muted);
-		text-decoration: underline;
+	.np-breadcrumb a:hover {
+		color: var(--np-muted);
 	}
 
-	.breadcrumb-sep {
-		color: #c9c1b2;
-	}
-
-	.breadcrumb [aria-current='page'] {
-		color: var(--wz-text);
+	.np-breadcrumb [aria-current='page'] {
+		color: var(--np-text);
 		font-weight: 600;
 	}
 
-	.close-link {
+	.np-close {
 		width: 2rem;
 		height: 2rem;
 		border-radius: 50%;
-		border: 1px solid var(--wz-border);
-		background: #fbf8f2;
-		color: var(--wz-muted);
+		border: 1px solid var(--np-border);
+		color: var(--np-muted);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -391,602 +231,325 @@
 		flex-shrink: 0;
 	}
 
-	.close-link:hover {
-		color: var(--wz-text);
+	.np-close:hover {
+		color: var(--np-text);
+		border-color: var(--np-border-strong);
 	}
 
-	.wizard-main {
-		max-width: 65rem;
-		margin: 2.25rem auto 4rem;
-		padding: 0 1.5rem;
+	.np-main {
+		max-width: 68rem;
+		margin: 0 auto;
+		padding: 3.25rem 1.5rem 4rem;
 	}
 
-	.mobile-progress {
-		display: none;
-	}
-
-	.wizard-card {
+	.np-layout {
 		display: flex;
-		background: var(--wz-surface);
-		border: 1px solid var(--wz-border);
-		border-radius: var(--wz-radius-lg);
-		box-shadow:
-			0 1px 2px rgba(30, 20, 10, 0.04),
-			0 8px 24px rgba(30, 20, 10, 0.05);
-		overflow: hidden;
-		min-height: 40rem;
-	}
-
-	.step-rail {
-		width: 16.75rem;
-		flex-shrink: 0;
-		background: #fbf8f2;
-		border-right: 1px solid var(--wz-border);
-		padding: 2.25rem 1.75rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.625rem;
-	}
-
-	.step-item {
-		display: flex;
-		gap: 0.75rem;
+		gap: 0;
 		align-items: flex-start;
-		background: none;
-		border: none;
-		padding: 0;
-		font: inherit;
-		text-align: left;
-		cursor: default;
-	}
-
-	.step-item.done {
-		cursor: pointer;
-	}
-
-	.step-circle {
-		width: 1.75rem;
-		height: 1.75rem;
-		border-radius: 50%;
-		flex-shrink: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.8125rem;
-		font-weight: 700;
-		border: 1px solid var(--wz-input-border);
-		color: var(--wz-muted-light);
-	}
-
-	.step-item.active .step-circle {
-		background: var(--wz-accent);
-		border-color: var(--wz-accent);
-		color: #ffffff;
-	}
-
-	.step-item.done .step-circle {
-		background: var(--wz-dark);
-		border-color: var(--wz-dark);
-		color: #ffffff;
-	}
-
-	.step-title {
-		display: block;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--wz-muted-light);
-	}
-
-	.step-item.active .step-title,
-	.step-item.done .step-title {
-		color: var(--wz-text);
-	}
-
-	.step-subtitle {
-		display: block;
-		font-size: 0.75rem;
-		color: var(--wz-muted-light);
-		margin-top: 0.125rem;
-	}
-
-	.wizard-content {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.content-head {
-		padding: 2.5rem 2.75rem 1.25rem;
-	}
-
-	.content-head h1 {
-		font-family: 'Source Serif 4', Georgia, serif;
-		font-size: 1.625rem;
-		font-weight: 600;
-		margin: 0;
-	}
-
-	.content-subtitle {
-		font-size: 0.875rem;
-		color: var(--wz-muted);
-		margin: 0.375rem 0 0;
-	}
-
-	.content-body {
-		flex: 1;
-		padding: 0 2.75rem 1.5rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	.step-intro {
-		font-size: 0.8125rem;
-		color: var(--wz-muted);
-		line-height: 1.55;
-		max-width: 37.5rem;
-		margin: 0;
-	}
-
-	.validation-banner {
-		font-size: 0.8125rem;
-		color: var(--wz-error-text);
-		background: var(--wz-error-bg);
-		border: 1px solid var(--wz-error-border);
-		border-radius: var(--wz-radius);
-		padding: 0.625rem 0.875rem;
-		margin: 0;
-	}
-
-	.question-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		border: 1px solid var(--wz-border);
-		border-radius: 0.75rem;
+		background: var(--np-surface);
+		border: 1px solid var(--np-border);
+		border-radius: 1rem;
 		overflow: hidden;
 	}
 
-	.question-row {
-		padding: 1.125rem 1.25rem;
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		align-items: center;
-		gap: 0.75rem 1rem;
-		border-bottom: 1px solid var(--wz-border-soft);
-		border-left: 3px solid transparent;
-	}
-
-	.question-row:last-child {
-		border-bottom: none;
-	}
-
-	.question-row.error {
-		border-left-color: #c0392e;
-	}
-
-	.question-text {
-		font-size: 0.875rem;
-		color: var(--wz-text);
-		flex: 1 1 13.75rem;
-		line-height: 1.4;
-	}
-
-	.question-error {
-		font-size: 0.75rem;
-		color: var(--wz-error-text);
-		margin-top: 0.25rem;
-		font-weight: 600;
-	}
-
-	.answer-buttons {
-		display: flex;
-		gap: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.answer-btn {
-		padding: 0.625rem 1.125rem;
-		min-height: 2.75rem;
-		border-radius: var(--wz-radius);
-		font-size: 0.8125rem;
-		font-weight: 600;
-		cursor: pointer;
-		border: 1px solid var(--wz-input-border);
-		background: var(--wz-surface);
-		color: var(--wz-muted);
-	}
-
-	.answer-btn.selected {
-		background: var(--wz-dark);
-		border-color: var(--wz-dark);
-		color: #ffffff;
-	}
-
-	.phase-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		border: 1px solid var(--wz-border);
-		border-radius: 0.75rem;
-		overflow: hidden;
-	}
-
-	.phase-row {
-		border-bottom: 1px solid var(--wz-border-soft);
-	}
-
-	.phase-row:last-child {
-		border-bottom: none;
-	}
-
-	.phase-row-btn {
-		width: 100%;
-		display: flex;
-		gap: 0.875rem;
-		align-items: flex-start;
-		padding: 1rem 1.25rem;
-		background: var(--wz-surface);
-		border: none;
-		border-left: 3px solid transparent;
-		font: inherit;
-		text-align: left;
-		cursor: pointer;
-	}
-
-	.phase-row.selected .phase-row-btn {
-		background: #fbf8f2;
-	}
-
-	.phase-row.recommended .phase-row-btn {
-		border-left-color: var(--wz-accent);
-	}
-
-	.phase-radio {
-		width: 1.125rem;
-		height: 1.125rem;
-		border-radius: 50%;
-		margin-top: 0.125rem;
-		flex-shrink: 0;
-		border: 2px solid var(--wz-input-border);
-	}
-
-	.phase-row.selected .phase-radio {
-		border-color: var(--wz-dark);
-		background: radial-gradient(var(--wz-dark) 0 0.3125rem, transparent 0.375rem);
-	}
-
-	.phase-body {
-		flex: 1;
+	.np-content {
+		flex: 1.5;
 		min-width: 0;
+		padding: 3rem 3rem 2.5rem;
 	}
 
-	.phase-heading {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		flex-wrap: wrap;
-	}
-
-	.phase-label {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--wz-text);
-	}
-
-	.phase-tag {
-		font-size: 0.625rem;
+	.np-eyebrow {
+		margin: 0 0 0.75rem;
+		font-size: 0.75rem;
 		font-weight: 700;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: #ffffff;
-		background: var(--wz-accent);
-		padding: 0.1875rem 0.5rem;
-		border-radius: 999px;
+		color: var(--np-accent);
 	}
 
-	.phase-desc {
-		display: block;
-		font-size: 0.75rem;
-		color: var(--wz-muted-light);
-		margin-top: 0.1875rem;
+	.np-title {
+		font-family: 'Source Serif 4', Georgia, serif;
+		font-size: 2rem;
+		font-weight: 600;
+		line-height: 1.15;
+		margin: 0 0 0.75rem;
+		color: var(--np-text-strong);
 	}
 
-	.phase-justification {
-		display: block;
-		font-size: 0.75rem;
-		color: var(--wz-muted);
-		margin-top: 0.5rem;
+	.np-subtitle {
+		font-size: 0.9375rem;
+		color: var(--np-muted);
+		margin: 0 0 2rem;
 		line-height: 1.5;
-		max-width: 32.5rem;
 	}
 
-	.name-field {
-		max-width: 32.5rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+	.np-field {
+		margin-bottom: 2.25rem;
 	}
 
-	.name-label-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.name-label {
+	.np-field-label {
+		display: block;
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: var(--wz-text);
+		color: var(--np-muted);
+		margin-bottom: 0.625rem;
 	}
 
-	.optional-pill {
-		font-size: 0.6875rem;
-		color: var(--wz-muted-light);
-		border: 1px solid var(--wz-border);
-		border-radius: 999px;
-		padding: 0.125rem 0.5rem;
-	}
-
-	.name-input {
-		height: 3rem;
-		border: 1px solid var(--wz-input-border);
+	.np-name-input {
+		width: 100%;
+		box-sizing: border-box;
+		background: var(--np-item-bg);
+		border: 1px solid var(--np-border-strong);
 		border-radius: 0.625rem;
-		padding: 0 1rem;
-		font-size: 0.9375rem;
-		color: var(--wz-text);
+		padding: 1rem 1.125rem;
+		color: var(--np-text-strong);
+		font-size: 1.125rem;
+		font-weight: 600;
 		font-family: inherit;
 		outline: none;
 	}
 
-	.name-input:focus-visible {
-		outline: 2px solid var(--wz-accent);
+	.np-name-input:focus-visible {
+		outline: 2px solid var(--np-accent);
 		outline-offset: 1px;
 	}
 
-	.name-help {
-		font-size: 0.75rem;
-		color: var(--wz-muted-light);
-		margin: 0.125rem 0 0;
+	.np-origins-block {
+		border-top: 1px solid var(--np-border);
+		padding-top: 2rem;
 	}
 
-	.review-box {
-		border: 1px solid var(--wz-border);
-		border-radius: 0.75rem;
-		overflow: hidden;
-		max-width: 37.5rem;
-	}
-
-	.review-row {
-		padding: 1rem 1.25rem;
-		display: flex;
-		justify-content: space-between;
-		gap: 0.25rem;
-		border-bottom: 1px solid var(--wz-border-soft);
-	}
-
-	.review-row:last-child {
-		border-bottom: none;
-	}
-
-	.review-key {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--wz-muted-light);
-	}
-
-	.review-value {
-		font-size: 0.9375rem;
-		font-weight: 600;
-		color: var(--wz-text);
-	}
-
-	.review-value-group {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-	}
-
-	.review-tag {
-		font-size: 0.625rem;
+	.np-origins-title {
+		font-size: 1.1875rem;
 		font-weight: 700;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--wz-accent);
-		background: var(--wz-error-bg);
-		padding: 0.1875rem 0.5rem;
-		border-radius: 999px;
+		color: var(--np-text-strong);
+		margin: 0 0 0.375rem;
 	}
 
-	.review-tag.manual {
-		color: var(--wz-muted);
-		background: var(--wz-border-soft);
+	.np-origins-help {
+		font-size: 0.84375rem;
+		color: var(--np-faint);
+		margin: 0 0 1.25rem;
 	}
 
-	.confirm-error {
-		font-size: 0.8125rem;
-		color: var(--wz-error-text);
-		background: var(--wz-error-bg);
-		border: 1px solid var(--wz-error-border);
-		border-radius: 0.625rem;
-		padding: 0.875rem 1rem;
-		max-width: 37.5rem;
-		margin: 0;
-	}
-
-	.confirm-error p {
-		margin: 0;
-	}
-
-	.confirm-error-detail {
-		margin-top: 0.375rem !important;
-		font-weight: 600;
-	}
-
-	.not-created-note {
-		font-size: 0.8125rem;
-		color: var(--wz-muted);
-		font-style: italic;
-		margin: 0.25rem 0 0;
-	}
-
-	.wizard-footer {
-		padding: 1.25rem 2.75rem;
-		border-top: 1px solid var(--wz-border);
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
+	.np-origins-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
 		gap: 0.625rem;
 	}
 
-	.back-link {
-		background: none;
-		border: none;
-		color: var(--wz-accent);
-		font-weight: 600;
-		font-size: 0.875rem;
-		text-decoration: none;
-		padding: 0.75rem 0.25rem;
-	}
-
-	.back-link:hover {
-		text-decoration: underline;
-	}
-
-	.back-btn {
-		background: transparent;
-		border: 1px solid var(--wz-input-border);
-		color: var(--wz-text);
-		font-weight: 600;
-		font-size: 0.875rem;
-		padding: 0.75rem 1.125rem;
-		border-radius: var(--wz-radius);
+	.np-origin-card {
+		text-align: left;
+		border-radius: 0.75rem;
+		padding: 1rem;
 		cursor: pointer;
+		font-family: inherit;
+		transition: all 0.15s;
+		background: var(--np-item-bg);
+		border: 1px solid var(--np-border-strong);
+		color: var(--np-text);
 	}
 
-	.next-btn {
-		background: var(--wz-dark-strong);
-		color: #ffffff;
+	.np-origin-card.selected {
+		background: var(--np-accent-tint-strong);
+		border-color: var(--np-accent-border-strong);
+		color: #eafffb;
+	}
+
+	.np-origin-label {
+		display: block;
+		font-size: 0.90625rem;
+		font-weight: 700;
+		margin-bottom: 0.375rem;
+	}
+
+	.np-origin-desc {
+		display: block;
+		font-size: 0.75rem;
+		color: var(--np-muted);
+		line-height: 1.4;
+	}
+
+	.np-origin-card.selected .np-origin-desc {
+		color: #bdf3ea;
+	}
+
+	.np-submit-row {
+		margin-top: 2rem;
+	}
+
+	.np-submit-btn {
+		background: linear-gradient(135deg, #22d3c5, #0891b2);
+		color: #04211f;
 		border: none;
-		font-weight: 600;
+		border-radius: 0.625rem;
+		font-weight: 700;
 		font-size: 0.875rem;
+		font-family: inherit;
 		padding: 0.75rem 1.25rem;
-		border-radius: var(--wz-radius);
 		cursor: pointer;
 	}
 
-	.next-btn:hover {
-		background: #000000;
+	.np-submit-btn:disabled {
+		background: rgba(255, 255, 255, 0.06);
+		color: var(--np-disabled);
+		cursor: default;
+	}
+
+	.np-submit-note {
+		font-size: 0.75rem;
+		color: var(--np-faint);
+		margin: 0.875rem 0 0;
+	}
+
+	.np-error {
+		margin: 1rem 0 0;
+		font-size: 0.8125rem;
+		color: var(--np-error);
+	}
+
+	.np-doc-panel {
+		width: 25rem;
+		flex-shrink: 0;
+		border-left: 1px solid var(--np-border);
+		background: var(--np-panel);
+		padding: 2rem 1.75rem;
+		align-self: stretch;
+	}
+
+	.np-doc-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 1.25rem;
+	}
+
+	.np-doc-eyebrow {
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--np-faint);
+	}
+
+	.np-doc-phase {
+		font-size: 0.6875rem;
+		color: var(--np-accent);
+		background: var(--np-accent-tint);
+		border: 1px solid var(--np-accent-border);
+		border-radius: 999px;
+		padding: 0.1875rem 0.625rem;
+	}
+
+	.np-doc-item {
+		border-radius: 0.5rem;
+		padding: 0.6875rem 0.75rem;
+		margin-bottom: 0.5rem;
+		background: var(--np-item-bg);
+		border: 1px solid var(--np-border);
+		transition: all 0.3s ease;
+	}
+
+	.np-doc-item.pulse {
+		background: var(--np-accent-tint);
+		border-color: var(--np-accent-border-strong);
+	}
+
+	.np-doc-item-label {
+		display: block;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--np-faint);
+		margin-bottom: 0.3125rem;
+	}
+
+	.np-doc-item-value {
+		display: block;
+		font-size: 0.84375rem;
+		font-weight: 600;
+		color: var(--np-text);
+	}
+
+	.np-doc-item-value.empty {
+		font-style: italic;
+		color: var(--np-disabled);
+		font-weight: 500;
+	}
+
+	.np-doc-next {
+		border: 1px solid var(--np-border);
+		background: rgba(255, 255, 255, 0.02);
+		border-radius: 0.875rem;
+		padding: 1rem 1.125rem;
+		margin-top: 1.375rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		transition: opacity 0.2s;
+	}
+
+	.np-doc-next.dim {
+		opacity: 0.5;
+	}
+
+	.np-doc-next-icon {
+		width: 1.875rem;
+		height: 1.875rem;
+		border-radius: 50%;
+		background: var(--np-accent-tint-strong);
+		border: 1px solid var(--np-accent-border-strong);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		color: var(--np-accent-light);
+		font-size: 0.875rem;
+	}
+
+	.np-doc-next-label {
+		margin: 0 0 0.125rem;
+		font-size: 0.6875rem;
+		color: var(--np-faint);
+	}
+
+	.np-doc-next-value {
+		margin: 0;
+		font-size: 0.84375rem;
+		font-weight: 600;
+		color: var(--np-text-strong);
 	}
 
 	@media (max-width: 860px) {
-		.wizard-header {
-			height: 3.5rem;
-			padding: 0 1rem;
+		.np-header {
+			padding: 0 1.25rem;
 		}
 
-		.breadcrumb {
+		.np-breadcrumb {
 			display: none;
 		}
 
-		.wordmark-text {
-			font-size: 1rem;
+		.np-main {
+			padding: 1.5rem 1rem 3rem;
 		}
 
-		.wizard-main {
-			margin: 1.25rem auto 2.5rem;
-			padding: 0 0.75rem;
-		}
-
-		.mobile-progress {
-			display: block;
-			background: var(--wz-surface);
-			border: 1px solid var(--wz-border);
-			border-radius: 0.75rem;
-			padding: 0.875rem 1rem;
-			margin-bottom: 1rem;
-		}
-
-		.mobile-step-label {
-			font-size: 0.75rem;
-			font-weight: 600;
-			color: var(--wz-muted-light);
-			letter-spacing: 0.03em;
-			margin: 0;
-		}
-
-		.mobile-step-title {
-			font-size: 0.9375rem;
-			font-weight: 600;
-			color: var(--wz-text);
-			margin: 0.125rem 0 0;
-		}
-
-		.progress-track {
-			height: 0.25rem;
-			border-radius: 999px;
-			background: var(--wz-border-soft);
-			margin-top: 0.625rem;
-			overflow: hidden;
-		}
-
-		.progress-fill {
-			height: 100%;
-			border-radius: 999px;
-			background: var(--wz-accent);
-		}
-
-		.wizard-card {
+		.np-layout {
 			flex-direction: column;
-			min-height: 0;
 		}
 
-		.step-rail {
-			display: none;
+		.np-content {
+			padding: 1.75rem 1.5rem;
 		}
 
-		.content-head {
-			padding: 1.5rem 1.25rem 0.875rem;
+		.np-origins-grid {
+			grid-template-columns: 1fr;
 		}
 
-		.content-head h1 {
-			font-size: 1.3125rem;
-		}
-
-		.content-body {
-			padding: 0 1.25rem 1.25rem;
-		}
-
-		.question-row {
-			flex-direction: column;
-			align-items: stretch;
-		}
-
-		.answer-buttons {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-		}
-
-		.review-row {
-			flex-direction: column;
-			gap: 0.25rem;
-		}
-
-		.wizard-footer {
-			padding: 1rem 1.25rem;
-			flex-direction: column-reverse;
-			align-items: stretch;
-		}
-
-		.back-link,
-		.back-btn,
-		.next-btn {
+		.np-doc-panel {
 			width: 100%;
-			text-align: center;
+			border-left: none;
+			border-top: 1px solid var(--np-border);
 		}
 	}
 </style>

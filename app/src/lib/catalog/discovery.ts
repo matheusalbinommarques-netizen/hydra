@@ -1,11 +1,89 @@
 // Catálogo estático — fase Descoberta (catalogStatus: complete).
 // Fonte: docs/core/DOMAIN_MODEL.md §7, docs/core/RELEASE_0_SPEC.md §4.2–4.7.
 
-import type { ActivityDefinition } from '$lib/domain';
+import type { ActivityDefinition, SelectOption } from '$lib/domain';
 
-// Agrupa os campos opcionais menos usados de "Problema ou oportunidade" numa
-// seção expansível — situação e sinais continuam sempre visíveis.
-const MAIS_CONTEXTO_GROUP = { id: 'mais_contexto', label: 'Adicionar mais contexto' };
+// Taxonomia de origem — capturada em /projects/new (criação do projeto) e
+// gravada como a própria Answer desta atividade (mesmo campo, mesma
+// atividade); ao chegar aqui na Descoberta, "Origem do projeto" já aparece
+// concluída, sem repetir a pergunta. Substitui a taxonomia anterior de 6
+// opções (D033-adjacent, Claude Design "Novo Projeto.dc.html").
+export const ORIGIN_OPTIONS = [
+	'Existe um problema',
+	'Existe uma oportunidade',
+	'Quero melhorar algo',
+	'Quero criar algo novo',
+	'Recebi uma solicitação',
+	'Existe uma obrigação',
+	'Ainda não sei direito'
+] as const;
+
+// Grupo "oportunidade" no espírito do Claude Design ("Entender a
+// Situacao.dc.html", originGroup()) — as demais origens usam o vocabulário
+// de problema. Export para /projects/new decidir texto de apoio, se preciso.
+export const OPPORTUNITY_ORIGIN_LABELS: readonly string[] = ['Existe uma oportunidade', 'Quero melhorar algo', 'Quero criar algo novo'];
+
+export function isOpportunityOrigin(originLabel: string | undefined): boolean {
+	return !!originLabel && OPPORTUNITY_ORIGIN_LABELS.includes(originLabel);
+}
+
+// Opções de "O que está acontecendo?" (situacao_o_que) — união dos dois
+// vocabulários (problema/oportunidade) do Claude Design, com ids
+// namespaced (prob_/opor_) porque os mesmos conceitos têm rótulos
+// diferentes conforme a origem (ex.: "custo" é "Está custando demais" no
+// grupo problema e "Podemos reduzir custos" no grupo oportunidade) — um
+// único id sem prefixo colidiria. A interface (Entender a Situação) filtra
+// por prefixo conforme a origem do projeto.
+export const SITUATION_WHAT_PROBLEM_OPTIONS: SelectOption[] = [
+	{ id: 'prob_demora', label: 'Está demorando demais' },
+	{ id: 'prob_custo', label: 'Está custando demais' },
+	{ id: 'prob_erros', label: 'Há muitos erros' },
+	{ id: 'prob_retrabalho', label: 'Existe muito retrabalho' },
+	{ id: 'prob_insatisfacao', label: 'As pessoas estão insatisfeitas' },
+	{ id: 'prob_manual', label: 'O processo é manual demais' },
+	{ id: 'prob_visibilidade', label: 'Falta informação ou visibilidade' },
+	{ id: 'prob_quebrado', label: 'Algo não funciona como deveria' },
+	{ id: 'prob_risco', label: 'Existe um risco relevante' },
+	{ id: 'prob_outro', label: 'Outro' }
+];
+
+export const SITUATION_WHAT_OPPORTUNITY_OPTIONS: SelectOption[] = [
+	{ id: 'opor_tempo', label: 'Podemos economizar tempo' },
+	{ id: 'opor_custo', label: 'Podemos reduzir custos' },
+	{ id: 'opor_experiencia', label: 'Podemos melhorar a experiência' },
+	{ id: 'opor_automacao', label: 'Existe algo que pode ser automatizado' },
+	{ id: 'opor_necessidade', label: 'Há uma necessidade ainda não atendida' },
+	{ id: 'opor_negocio', label: 'Há uma nova possibilidade de negócio' },
+	{ id: 'opor_simplicidade', label: 'Podemos tornar algo mais simples' },
+	{ id: 'opor_confiabilidade', label: 'Podemos tornar algo mais confiável' },
+	{ id: 'opor_criacao', label: 'Podemos criar algo que hoje não existe' },
+	{ id: 'opor_outro', label: 'Outro' }
+];
+
+// Opções de "Onde isso aparece principalmente?" (situacao_onde) — lista
+// única, mesma para qualquer origem.
+export const SITUATION_WHERE_OPTIONS: SelectOption[] = [
+	{ id: 'area_clientes', label: 'Clientes ou usuários' },
+	{ id: 'area_produto', label: 'Produto ou serviço' },
+	{ id: 'area_processo', label: 'Processo' },
+	{ id: 'area_operacao', label: 'Operação' },
+	{ id: 'area_equipe', label: 'Equipe' },
+	{ id: 'area_tecnologia', label: 'Tecnologia' },
+	{ id: 'area_financeiro', label: 'Financeiro' },
+	{ id: 'area_mercado', label: 'Mercado' },
+	{ id: 'area_outra', label: 'Outra área' }
+];
+
+// Opções de "Qual é o peso disso hoje?" (situacao_peso) — selecao de
+// escolha única, id = label (mesma convenção já usada nos demais campos
+// selecao do catálogo).
+export const SITUATION_WEIGHT_OPTIONS = [
+	'É crítico',
+	'Tem impacto relevante',
+	'É um incômodo',
+	'É mais uma oportunidade do que um problema',
+	'Ainda não sabemos'
+] as const;
 
 const origem: ActivityDefinition = {
 	id: 'origem',
@@ -29,156 +107,111 @@ const origem: ActivityDefinition = {
 			help: 'Selecione a opção mais próxima.',
 			dataTarget: 'answer',
 			type: 'selecao',
-			options: [
-				'Um problema',
-				'Uma oportunidade',
-				'Uma solicitação',
-				'Uma ideia de produto',
-				'Uma solução já iniciada',
-				'Outro'
-			]
+			options: [...ORIGIN_OPTIONS]
 		}
 	]
 };
 
-const contexto: ActivityDefinition = {
-	id: 'contexto',
-	phaseId: 'descoberta',
-	order: 2,
-	title: 'Contexto inicial',
-	mainQuestion: 'Um mínimo de contexto para começar sem formulário pesado.',
-	why: 'Esse contexto ajuda o Hydra a calibrar a profundidade das próximas atividades.',
-	example: 'Portal de Solicitações, projeto individual, primeira vez liderando um projeto, ainda em ideia.',
-	completionCriteria: 'Nome, descrição, formato de trabalho, experiência e estágio atual informados.',
-	completionMode: 'required_fields',
-	allowsSkip: true,
-	pendingItemLabel: 'Contexto inicial não foi detalhado',
-	pendingItemDetail: 'Sem esse contexto, as próximas atividades podem pedir mais detalhe do que o necessário.',
-	fields: [
-		{
-			id: 'nome_provisorio',
-			activityId: 'contexto',
-			label: 'Nome provisório do projeto',
-			required: true,
-			help: 'Pode ser alterado depois.',
-			placeholder: 'Ex.: Portal de Solicitações',
-			dataTarget: 'project_property',
-			projectProperty: 'name',
-			type: 'texto_curto'
-		},
-		{
-			id: 'breve_descricao',
-			activityId: 'contexto',
-			label: 'Breve descrição',
-			required: true,
-			help: 'Uma ou duas frases já ajudam.',
-			placeholder: 'Descreva brevemente o projeto...',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'modo_trabalho',
-			activityId: 'contexto',
-			label: 'Trabalho individual ou em equipe?',
-			required: true,
-			dataTarget: 'answer',
-			type: 'selecao',
-			options: ['Individual', 'Em equipe']
-		},
-		{
-			id: 'nivel_experiencia',
-			activityId: 'contexto',
-			label: 'Qual seu nível de experiência com gestão de projetos?',
-			required: true,
-			dataTarget: 'answer',
-			type: 'selecao',
-			options: ['Iniciante', 'Intermediário', 'Experiente']
-		},
-		{
-			id: 'estagio_atual',
-			activityId: 'contexto',
-			label: 'Qual o estágio atual?',
-			required: true,
-			dataTarget: 'answer',
-			type: 'selecao',
-			options: ['Ideia inicial', 'Em planejamento', 'Já em execução']
-		}
-	]
-};
+// "Contexto inicial" (nome provisório, breve descrição, modo de trabalho,
+// experiência, estágio atual) foi removida da jornada ativa em 10/08/2026 —
+// decisão de produto: nome e origem já são capturados em /projects/new,
+// e a contextualização livre foi substituída pela informação estruturada e
+// pela síntese automática de "Entender a situação". Os três campos sem
+// equivalente hoje (modo_trabalho, nivel_experiencia, estagio_atual) não
+// foram redistribuídos — não havia necessidade técnica de preservá-los, e
+// esse tipo de sinal (tailoring de profundidade/abordagem) fica para quando
+// for realmente necessário, não antecipado aqui. Nenhuma tela substituta foi
+// criada. Answers de projetos antigos com activityDefinitionId 'contexto'
+// (se existirem) ficam órfãs, sem erro — todas as projeções desta fase
+// iteram o catálogo, nunca a lista bruta de respostas.
 
+// "Entender a situação" (Claude Design, projeto "Redesenho da tela /new") —
+// substitui o mecanismo anterior baseado em texto livre por seleção
+// estruturada em três passos (o quê / onde / peso), com síntese
+// determinística gerada a partir das escolhas. `situacao` é preservado como
+// campo real (texto_longo) para sustentar `suggestedSource` já existente em
+// `product-definition.ts` e a leitura em `bancada-overview-view.ts`/
+// `discovery-summary-view.ts` — não é mais digitado pelo usuário, é
+// preenchido automaticamente com a síntese (ver
+// `catalog/situation-synthesis.ts`) no momento da confirmação.
 const problema: ActivityDefinition = {
 	id: 'problema',
 	phaseId: 'descoberta',
-	order: 3,
-	title: 'Problema ou oportunidade',
-	mainQuestion: 'Qual situação precisa mudar?',
-	why: 'Entender bem o problema é o que garante uma solução certeira. Quanto mais claro agora, menor o risco depois.',
-	example: 'Hoje as solicitações internas chegam por e-mail e mensagens, sem prioridade ou histórico centralizado.',
-	completionCriteria: 'O usuário descreveu o que acontece e por que a situação é problemática.',
+	order: 2,
+	title: 'Entender a situação',
+	mainQuestion: 'O que está acontecendo?',
+	why: 'Entender bem a situação é o que garante uma solução certeira. Quanto mais claro agora, menor o risco depois.',
+	example: 'Retrabalho e falta de visibilidade no atendimento, sentidos principalmente pelos clientes.',
+	completionCriteria: 'O que está acontecendo foi selecionado e a síntese confirmada.',
 	completionMode: 'required_fields',
 	allowsSkip: true,
-	pendingItemLabel: 'Problema ou oportunidade não foi detalhado',
+	pendingItemLabel: 'Situação não foi detalhada',
 	pendingItemDetail: 'As recomendações seguintes podem ser menos precisas sem essa informação.',
 	fields: [
 		{
 			id: 'situacao',
 			activityId: 'problema',
-			label: 'Qual situação precisa mudar?',
+			label: 'Síntese da situação',
 			required: true,
-			help: 'Descreva o problema de forma clara e objetiva.',
-			placeholder: 'Descreva a situação atual e o que precisa mudar...',
+			help: 'Gerada automaticamente a partir das seleções abaixo — não é digitada.',
 			dataTarget: 'answer',
 			type: 'texto_longo'
 		},
 		{
-			id: 'sinais_situacao',
+			id: 'situacao_o_que',
 			activityId: 'problema',
-			label: 'Quais sinais representam melhor a situação?',
+			label: 'O que está acontecendo?',
 			required: true,
-			help: 'Selecione os sinais que melhor descrevem o obstáculo — pode escolher mais de um.',
+			help: 'Selecione todos que se aplicam.',
 			dataTarget: 'answer',
 			type: 'selecao_multipla',
-			options: [
-				{ id: 'too_many_steps', label: 'Excesso de etapas' },
-				{ id: 'duplicated_information', label: 'Informação duplicada' },
-				{ id: 'rework', label: 'Retrabalho' },
-				{ id: 'lack_of_clarity', label: 'Falta de clareza' },
-				{ id: 'dispersed_decisions', label: 'Decisões dispersas' },
-				{ id: 'insufficient_tracking', label: 'Acompanhamento insuficiente' },
-				{ id: 'other', label: 'Outro' }
-			]
+			options: [...SITUATION_WHAT_PROBLEM_OPTIONS, ...SITUATION_WHAT_OPPORTUNITY_OPTIONS]
 		},
 		{
-			id: 'sinais_situacao_outro',
+			id: 'situacao_o_que_outro',
 			activityId: 'problema',
-			label: 'Descreva o sinal "Outro"',
+			label: 'Descreva em poucas palavras',
 			required: false,
-			help: 'Não alimenta nenhuma regra nesta prova.',
-			placeholder: 'Descreva o sinal...',
+			placeholder: 'Descreva em poucas palavras…',
 			dataTarget: 'answer',
-			type: 'texto_curto',
-			revealWhen: { fieldId: 'sinais_situacao', optionId: 'other' }
+			type: 'texto_curto'
 		},
 		{
-			id: 'evidencias',
+			id: 'situacao_onde',
 			activityId: 'problema',
-			label: 'Evidências',
+			label: 'Onde isso aparece principalmente?',
 			required: false,
-			placeholder: 'Dados, exemplos ou registros que comprovam o problema...',
+			help: 'Selecione uma ou mais áreas.',
 			dataTarget: 'answer',
-			type: 'texto_longo',
-			optionalGroup: MAIS_CONTEXTO_GROUP
+			type: 'selecao_multipla',
+			options: SITUATION_WHERE_OPTIONS
 		},
 		{
-			id: 'consequencias',
+			id: 'situacao_onde_outro',
 			activityId: 'problema',
-			label: 'Consequências de não agir',
+			label: 'Descreva em poucas palavras',
 			required: false,
-			placeholder: 'O que acontece se essa situação continuar...',
+			placeholder: 'Descreva em poucas palavras…',
 			dataTarget: 'answer',
-			type: 'texto_longo',
-			optionalGroup: MAIS_CONTEXTO_GROUP
+			type: 'texto_curto'
 		},
+		{
+			id: 'situacao_peso',
+			activityId: 'problema',
+			label: 'Qual é o peso disso hoje?',
+			required: false,
+			help: 'Uma estimativa vale mais que nada.',
+			dataTarget: 'answer',
+			type: 'selecao',
+			options: [...SITUATION_WEIGHT_OPTIONS]
+		},
+		// Dormente nesta entrega: a interface redesenhada (EntenderSituacao.svelte)
+		// não expõe este campo — o "Passo a passo" novo não tem uma etapa de
+		// hipótese livre. Mantido no catálogo (não removido) só porque é o único
+		// campo com semanticRole: 'hypothesis' hoje; removê-lo eliminaria a
+		// metade "Descoberta" de computeHypotheses como efeito colateral desta
+		// mudança, não como decisão própria — mesmo espírito de manter
+		// orientation-engine/scope-suggestions dormente em vez de remover.
 		{
 			id: 'hipotese_opt',
 			activityId: 'problema',
@@ -187,27 +220,7 @@ const problema: ActivityDefinition = {
 			placeholder: 'Suposições que ainda precisam ser validadas...',
 			dataTarget: 'answer',
 			semanticRole: 'hypothesis',
-			type: 'texto_longo',
-			optionalGroup: MAIS_CONTEXTO_GROUP
-		},
-		{
-			id: 'solucao_imaginada',
-			activityId: 'problema',
-			label: 'Solução imaginada',
-			required: false,
-			placeholder: 'Se já tem uma ideia de solução, descreva aqui...',
-			dataTarget: 'answer',
-			type: 'texto_longo',
-			optionalGroup: MAIS_CONTEXTO_GROUP
-		},
-		{
-			id: 'observacoes',
-			activityId: 'problema',
-			label: 'Observações',
-			required: false,
-			dataTarget: 'answer',
-			type: 'texto_longo',
-			optionalGroup: MAIS_CONTEXTO_GROUP
+			type: 'texto_longo'
 		}
 	]
 };
@@ -215,7 +228,7 @@ const problema: ActivityDefinition = {
 const publico: ActivityDefinition = {
 	id: 'publico',
 	phaseId: 'descoberta',
-	order: 4,
+	order: 3,
 	title: 'Público afetado',
 	mainQuestion: 'Quem é afetado por esta situação, em detalhe?',
 	why: 'Saber quem é afetado ajuda a priorizar requisitos e critérios de aceitação.',
@@ -242,7 +255,7 @@ const publico: ActivityDefinition = {
 const estadoAtual: ActivityDefinition = {
 	id: 'estado_atual',
 	phaseId: 'descoberta',
-	order: 5,
+	order: 4,
 	title: 'Estado atual',
 	mainQuestion: 'Como a situação é tratada hoje, em detalhe?',
 	why: 'Entender o estado atual em detalhe ajuda a dimensionar o esforço da mudança necessária.',
@@ -269,7 +282,7 @@ const estadoAtual: ActivityDefinition = {
 const resultado: ActivityDefinition = {
 	id: 'resultado',
 	phaseId: 'descoberta',
-	order: 6,
+	order: 5,
 	title: 'Resultado desejado',
 	mainQuestion: 'O que deverá estar diferente quando este projeto tiver sucesso?',
 	why: 'Um resultado claro ajuda a priorizar funcionalidades e critérios de aceitação, evitando medir sucesso apenas por entregas.',
@@ -323,7 +336,7 @@ const resultado: ActivityDefinition = {
 const resumo: ActivityDefinition = {
 	id: 'resumo',
 	phaseId: 'descoberta',
-	order: 7,
+	order: 6,
 	title: 'Resumo da descoberta',
 	mainQuestion: 'Revise o que entendemos até aqui antes de avançar.',
 	why: 'Revisar o resumo garante que problema, público e resultado estão alinhados antes de seguir.',
@@ -335,7 +348,6 @@ const resumo: ActivityDefinition = {
 
 export const discoveryActivities: ActivityDefinition[] = [
 	origem,
-	contexto,
 	problema,
 	publico,
 	estadoAtual,

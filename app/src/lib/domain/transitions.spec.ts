@@ -27,7 +27,7 @@ import {
 	skipActivity
 } from './transitions';
 import { encodePlanningItems } from './planning-items';
-import type { RequiredFieldsActivity } from './catalog-types';
+import type { Catalog, RequiredFieldsActivity } from './catalog-types';
 import type { ProjectState } from './state-types';
 
 const T1 = '2026-01-01T00:00:00.000Z';
@@ -63,26 +63,45 @@ describe('isActivityFieldsValid', () => {
 	});
 
 	it('valida o campo project_property contra Project.name, não contra Answer', () => {
-		const contexto = findActivity('contexto');
-		const partial = unwrap(
-			answerActivity(
-				catalog,
-				freshState(),
-				'contexto',
+		// Nenhuma atividade do catálogo real usa mais dataTarget: 'project_property'
+		// desde a remoção de "Contexto inicial" (nome agora vem de /projects/new
+		// na criação real) — fixture local só para cobrir o mecanismo genérico,
+		// mesmo padrão de fixture_atividade em domain/test-support.ts.
+		const projectPropertyActivity: RequiredFieldsActivity = {
+			id: 'fixture_project_property',
+			phaseId: 'descoberta',
+			order: 1,
+			title: 'Fixture de teste',
+			mainQuestion: 'Pergunta fabricada de teste?',
+			why: 'Fixture de teste.',
+			example: 'Fixture de teste.',
+			completionCriteria: 'Nome preenchido.',
+			completionMode: 'required_fields',
+			allowsSkip: true,
+			pendingItemLabel: 'Pendência fabricada de teste',
+			pendingItemDetail: 'Fixture de teste.',
+			fields: [
 				{
-					breve_descricao: 'x',
-					modo_trabalho: 'Individual',
-					nivel_experiencia: 'Iniciante',
-					estagio_atual: 'Ideia inicial'
-				},
-				T1
-			)
-		);
-		expect(isActivityFieldsValid(contexto, partial)).toBe(false); // falta nome_provisorio
+					id: 'nome_provisorio',
+					activityId: 'fixture_project_property',
+					label: 'Nome provisório do projeto',
+					required: true,
+					dataTarget: 'project_property',
+					projectProperty: 'name',
+					type: 'texto_curto'
+				}
+			]
+		};
+		const fixtureCatalog: Catalog = {
+			phases: [{ id: 'descoberta', order: 1, label: 'Descoberta', catalogStatus: 'complete', activities: [projectPropertyActivity] }]
+		};
+		const state = createInitialProjectState(fixtureCatalog, 'proj-1', T1);
+		expect(isActivityFieldsValid(projectPropertyActivity, state)).toBe(false);
 		const complete = unwrap(
-			answerActivity(catalog, partial, 'contexto', { nome_provisorio: 'Meu Projeto' }, T1)
+			answerActivity(fixtureCatalog, state, 'fixture_project_property', { nome_provisorio: 'Meu Projeto' }, T1)
 		);
-		expect(isActivityFieldsValid(contexto, complete)).toBe(true);
+		expect(isActivityFieldsValid(projectPropertyActivity, complete)).toBe(true);
+		expect(complete.project.name).toBe('Meu Projeto');
 		expect(complete.answers.some((a) => a.fieldDefinitionId === 'nome_provisorio')).toBe(false);
 	});
 
@@ -213,13 +232,9 @@ describe('answerActivity', () => {
 		});
 	});
 
-	it('renomear o projeto via campo project_property atualiza Project.name e não cria Answer', () => {
-		const state = unwrap(
-			answerActivity(catalog, freshState(), 'contexto', { nome_provisorio: 'Portal' }, T1)
-		);
-		expect(state.project.name).toBe('Portal');
-		expect(state.answers.some((a) => a.fieldDefinitionId === 'nome_provisorio')).toBe(false);
-	});
+	// "renomear via project_property atualiza Project.name e não cria Answer"
+	// já coberto acima ('valida o campo project_property contra Project.name,
+	// não contra Answer') — sem duplicar a mesma fixture aqui.
 
 	it('conclui a atividade quando todos os campos obrigatórios ficam válidos', () => {
 		const state = unwrap(answerActivity(catalog, freshState(), 'origem', { origem: 'Um problema' }, T1));
@@ -256,11 +271,9 @@ describe('answerActivity', () => {
 	});
 
 	it('pulada com preenchimento parcial permanece pulada e a pendência continua aberta', () => {
-		const skipped = unwrap(skipActivity(catalog, freshState(), 'contexto', 'pend-1', T1));
-		const partial = unwrap(
-			answerActivity(catalog, skipped, 'contexto', { breve_descricao: 'x' }, T2)
-		);
-		const progress = partial.activityProgress.find((p) => p.activityDefinitionId === 'contexto');
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'problema', 'pend-1', T1));
+		const partial = unwrap(answerActivity(catalog, skipped, 'problema', { situacao: 'x' }, T2));
+		const progress = partial.activityProgress.find((p) => p.activityDefinitionId === 'problema');
 		expect(progress?.status).toBe('pulada');
 		expect(partial.pendingItems[0].status).toBe('aberta');
 	});

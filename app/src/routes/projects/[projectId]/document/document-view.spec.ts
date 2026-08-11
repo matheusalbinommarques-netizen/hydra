@@ -43,11 +43,11 @@ describe('buildDocumentView', () => {
 	it('preserva a ordem dos blocos dentro de cada seção, conforme recebida', () => {
 		const blocks: BancadaOverviewBlock[] = [
 			{ activityId: 'origem', heading: 'Origem do projeto', value: 'Origem' },
-			{ activityId: 'contexto', heading: 'Contexto inicial', value: 'Contexto' },
-			{ activityId: 'problema', heading: 'Problema', value: 'Problema' }
+			{ activityId: 'problema', heading: 'Situação', value: 'Situação' },
+			{ activityId: 'publico', heading: 'Público afetado', value: 'Público' }
 		];
 		const view = buildDocumentView(catalog, blocks);
-		expect(view.sections[0].blocks.map((b) => b.activityId)).toEqual(['origem', 'contexto', 'problema']);
+		expect(view.sections[0].blocks.map((b) => b.activityId)).toEqual(['origem', 'problema', 'publico']);
 	});
 
 	it('preserva heading, value e chips tal como recebidos, sem recalcular nada', () => {

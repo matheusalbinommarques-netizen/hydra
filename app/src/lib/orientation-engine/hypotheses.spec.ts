@@ -22,7 +22,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'A centralização reduzirá o retrabalho' },
+				{ situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']), hipotese_opt: 'A centralização reduzirá o retrabalho' },
 				T1
 			)
 		);
@@ -37,7 +37,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), evidencias: 'dados internos' },
+				{ situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']), situacao_peso: 'É crítico' },
 				T1
 			)
 		);
@@ -50,7 +50,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: '' },
+				{ situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']), hipotese_opt: '' },
 				T1
 			)
 		);
@@ -80,7 +80,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Mesmo texto' },
+				{ situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']), hipotese_opt: 'Mesmo texto' },
 				T1
 			)
 		);
@@ -99,7 +99,7 @@ describe('computeHypotheses', () => {
 				catalog,
 				createInitialProjectState(catalog, 'proj-1', T1),
 				'problema',
-				{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Hipótese da Descoberta' },
+				{ situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']), hipotese_opt: 'Hipótese da Descoberta' },
 				T1
 			)
 		);

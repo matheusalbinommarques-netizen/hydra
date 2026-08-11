@@ -181,11 +181,12 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			return viewOf(state);
 		},
 
-		// Nova iniciativa (`/projects/new`) — nome e fase inicial são aplicados
-		// ao estado em memória, antes de qualquer persistência: um único
-		// `repository.insert()` no final, nunca createProject + renameProject +
-		// setRouteStartPhase como gravações separadas. Reaproveita as mesmas
-		// transições de domínio usadas por renameProject/setRouteStartPhase.
+		// Nova iniciativa (`/projects/new`) — nome, fase inicial e origem são
+		// aplicados ao estado em memória, antes de qualquer persistência: um
+		// único `repository.insert()` no final, nunca createProject +
+		// renameProject + setRouteStartPhase + answerActivity como gravações
+		// separadas. Reaproveita as mesmas transições de domínio usadas por
+		// renameProject/setRouteStartPhase/answerActivity — nenhuma regra nova.
 		async createConfiguredProject(input: CreateConfiguredProjectInput) {
 			let state = createInitialProjectState(catalog, idGenerator.generate(), clock.now());
 
@@ -199,6 +200,16 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			const routed = setRouteStartPhaseInDomain(catalog, state, input.routeStartPhaseId);
 			if (!routed.ok) return { ok: false, error: routed.error };
 			state = routed.value;
+
+			// Origem (Claude Design, "Novo Projeto.dc.html") — grava a própria
+			// Answer da atividade "Origem do projeto" (ver catalog/discovery.ts),
+			// não um campo próprio de projeto. Ao chegar na Descoberta, a
+			// atividade já aparece concluída, sem repetir a pergunta.
+			if (input.originAnswer) {
+				const answered = answerActivityInDomain(catalog, state, 'origem', { origem: input.originAnswer }, clock.now());
+				if (!answered.ok) return { ok: false, error: answered.error };
+				state = answered.value;
+			}
 
 			await repository.insert(state);
 			return viewOf(state);

@@ -66,7 +66,7 @@ function nonTrivialState(): ProjectState {
 			catalog,
 			state,
 			'problema',
-			{ situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']), hipotese_opt: 'Uma hipótese' },
+			{ situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']), hipotese_opt: 'Uma hipótese' },
 			T1
 		)
 	);

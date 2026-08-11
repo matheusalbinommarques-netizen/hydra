@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { tick } from 'svelte';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
+	import EntenderSituacao from '$lib/components/EntenderSituacao.svelte';
 	import PlanningItemsEditor from '$lib/components/PlanningItemsEditor.svelte';
 	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
 	import { encodePlanningItems } from '$lib/domain';
@@ -187,6 +188,15 @@
 			{#if data.activity.allowsSkip}
 				<SkipActivityConfirm activity={data.activity} />
 			{/if}
+		</section>
+	{:else if data.activity?.id === 'problema' && data.activity.completionMode === 'required_fields'}
+		<section class="next-action">
+			<EntenderSituacao
+				activity={data.activity}
+				values={form?.values ?? view.answers}
+				originAnswer={view.answers['origem']}
+				reviewOrigin={data.reviewOrigin ?? undefined}
+			/>
 		</section>
 	{:else if data.activity?.completionMode === 'scope_confirmation'}
 		<section class="next-action">

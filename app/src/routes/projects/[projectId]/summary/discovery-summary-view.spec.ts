@@ -7,7 +7,6 @@ import { buildDiscoverySummaryView, filterDiscoveryOpenPendingItems } from './di
 
 const ALL_NAO_INICIADA: Record<string, ActivityStatus> = {
 	origem: 'não_iniciada',
-	contexto: 'não_iniciada',
 	problema: 'não_iniciada',
 	publico: 'não_iniciada',
 	estado_atual: 'não_iniciada',
@@ -16,7 +15,6 @@ const ALL_NAO_INICIADA: Record<string, ActivityStatus> = {
 
 const ALL_CONCLUIDA: Record<string, ActivityStatus> = {
 	origem: 'concluída',
-	contexto: 'concluída',
 	problema: 'concluída',
 	publico: 'concluída',
 	estado_atual: 'concluída',
@@ -29,25 +27,25 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 		expect(view.overview).toEqual([]);
 	});
 
-	it('bloco "Problema" só aparece quando situacao existe, com chips decodificados de sinais_situacao', () => {
+	it('bloco "Situação" só aparece quando situacao existe, com chips decodificados de situacao_o_que', () => {
 		const view = buildDiscoverySummaryView(
 			catalog,
 			{
 				situacao: 'As solicitações chegam sem padrão.',
-				sinais_situacao: encodeMultiSelectValue(['too_many_steps', 'duplicated_information'])
+				situacao_o_que: encodeMultiSelectValue(['prob_manual', 'prob_visibilidade'])
 			},
 			ALL_NAO_INICIADA
 		);
 
 		const problema = view.overview.find((block) => block.activityId === 'problema')!;
 		expect(problema).toBeDefined();
-		expect(problema.heading).toBe('Problema');
-		expect(problema.editLabel).toBe('Editar problema');
+		expect(problema.heading).toBe('Situação');
+		expect(problema.editLabel).toBe('Editar situação');
 		expect(problema.value).toBe('As solicitações chegam sem padrão.');
-		expect(problema.chips).toEqual(['Excesso de etapas', 'Informação duplicada']);
+		expect(problema.chips).toEqual(['O processo é manual demais', 'Falta informação ou visibilidade']);
 	});
 
-	it('bloco "Problema" sem sinais_situacao respondido não tem chips', () => {
+	it('bloco "Situação" sem situacao_o_que respondido não tem chips', () => {
 		const view = buildDiscoverySummaryView(catalog, { situacao: 'Situação X' }, ALL_NAO_INICIADA);
 		const problema = view.overview.find((block) => block.activityId === 'problema')!;
 		expect(problema.chips).toBeUndefined();
@@ -171,13 +169,13 @@ describe('buildDiscoverySummaryView — detailsOpenByDefault', () => {
 		expect(view.detailsOpenByDefault).toBe(true);
 	});
 
-	it('false quando as seis atividades da Descoberta estão concluídas', () => {
+	it('false quando as cinco atividades da Descoberta estão concluídas', () => {
 		const view = buildDiscoverySummaryView(catalog, {}, ALL_CONCLUIDA);
 		expect(view.detailsOpenByDefault).toBe(false);
 	});
 
-	it('true mesmo com só uma atividade pendente (contexto em_andamento, resto concluída)', () => {
-		const view = buildDiscoverySummaryView(catalog, {}, { ...ALL_CONCLUIDA, contexto: 'em_andamento' });
+	it('true mesmo com só uma atividade pendente (problema em_andamento, resto concluída)', () => {
+		const view = buildDiscoverySummaryView(catalog, {}, { ...ALL_CONCLUIDA, problema: 'em_andamento' });
 		expect(view.detailsOpenByDefault).toBe(true);
 	});
 });

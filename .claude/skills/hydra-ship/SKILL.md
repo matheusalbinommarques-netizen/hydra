@@ -27,7 +27,7 @@ Se o script sair com código diferente de zero, pare antes de qualquer
 peça uma mensagem nova — não corrija nem complete a mensagem recebida.
 
 Este comando não decide o que deve ser staged — isso já foi feito e selado
-por `/hydra-review-item`. `git add`, `git commit` e `git push` não estão
+por `/hydra-work`. `git add`, `git commit` e `git push` não estão
 pré-aprovados nas ferramentas desta skill: cada execução deles passa pela
 aprovação normal do usuário, mesmo sendo o propósito do comando.
 
@@ -40,7 +40,7 @@ aprovação normal do usuário, mesmo sendo o propósito do comando.
    (`??`). Se não houver stage, ou houver sobra, pare.
 3. `node .claude/scripts/hydra-delivery-guard.mjs check` deve passar — o
    stage precisa corresponder exatamente ao que foi selado por
-   `/hydra-review-item`. Se falhar, pare e reporte; não tente selar você
+   `/hydra-work`. Se falhar, pare e reporte; não tente selar você
    mesmo.
 4. Leia o seal de forma pontual para obter `item` e `level`:
    ```

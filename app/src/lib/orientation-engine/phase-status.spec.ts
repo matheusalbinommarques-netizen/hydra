@@ -22,11 +22,12 @@ describe('computePhaseStatus — fase complete (Descoberta)', () => {
 	});
 
 	it('uma atividade em_andamento (preenchimento parcial) → em_andamento', () => {
-		// "contexto" tem 5 campos obrigatórios; preencher só 1 deixa a atividade em_andamento.
+		// "problema" tem 2 campos obrigatórios (situacao, situacao_o_que);
+		// preencher só 1 deixa a atividade em_andamento.
 		const state = unwrapResult(
-			answerActivity(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'contexto', { breve_descricao: 'x' }, T1)
+			answerActivity(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'problema', { situacao: 'x' }, T1)
 		);
-		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'contexto');
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'problema');
 		expect(progress?.status).toBe('em_andamento');
 		expect(computePhaseStatus(descoberta, state.activityProgress, state.pendingItems)).toBe('em_andamento');
 	});

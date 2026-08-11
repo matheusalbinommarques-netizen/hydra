@@ -135,15 +135,8 @@
 	<aside class="hp-sidebar">
 		<div class="hp-sidebar-inner">
 			<a class="hp-logo" href="/" aria-label="Hydra — Home">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-					<path
-						d="M4 3v18M20 3v18M4 12h16M4 3l16 18M20 3L4 21"
-						stroke="var(--hp-accent)"
-						stroke-width="1.6"
-						stroke-linecap="round"
-					/>
-				</svg>
-				<span class="hp-logo-text">HYDRA</span>
+				<img class="hp-logo-lockup" src="/brand/hydra-horizontal-lockup-compact.png" alt="" />
+				<img class="hp-logo-icon" src="/brand/hydra-app-icon-512.png" alt="" />
 			</a>
 			<nav class="hp-nav" aria-label="Navegação global">
 				<span class="hp-nav-item hp-nav-active" aria-current="page">
@@ -410,11 +403,14 @@
 		text-decoration: none;
 	}
 
-	.hp-logo-text {
-		font-size: 0.9375rem;
-		font-weight: 800;
-		letter-spacing: 0.14em;
-		color: var(--hp-text-strong);
+	.hp-logo-lockup {
+		display: block;
+		height: 48px;
+		width: auto;
+	}
+
+	.hp-logo-icon {
+		display: none;
 	}
 
 	.hp-nav {
@@ -943,8 +939,14 @@
 			gap: 0.5rem;
 		}
 
-		.hp-logo-text {
+		.hp-logo-lockup {
 			display: none;
+		}
+
+		.hp-logo-icon {
+			display: block;
+			height: 28px;
+			width: auto;
 		}
 
 		.hp-nav {

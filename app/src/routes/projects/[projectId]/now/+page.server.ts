@@ -42,10 +42,13 @@ function reviewOriginRoute(projectId: string, origin: ReviewOrigin): string {
 	}
 }
 
-// Só estas três atividades ganham a apresentação "um campo por vez" nesta
-// rodada (Bancada, Descoberta + Definição do produto) — as demais 33
-// continuam mostrando todos os campos de uma vez, como hoje.
-const DECOMPOSED_ACTIVITY_IDS = new Set(['problema', 'contexto', 'visao_produto']);
+// Só estas atividades ganham a apresentação "um campo por vez" nesta rodada
+// (Bancada, Descoberta + Definição do produto) — as demais continuam
+// mostrando todos os campos de uma vez, como hoje. "problema" segue listada
+// aqui só por compatibilidade estrutural do load — a própria apresentação
+// campo a campo nunca chega a ser usada para essa atividade, que tem
+// componente bespoke próprio (EntenderSituacao.svelte, ignora stepKind).
+const DECOMPOSED_ACTIVITY_IDS = new Set(['problema', 'visao_produto']);
 
 function findActivityDefinition(activityId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -164,7 +167,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	}
 
 	// Etapa opcional agrupada de uma atividade decomposta já concluída
-	// (problema/contexto/visao_produto) — só alcançada via
+	// (problema/visao_produto) — só alcançada via
 	// `?activity=<id>&field=optional`, gerado pelo redirect da própria action
 	// `answer` logo depois do último campo obrigatório. A recomendação normal
 	// (view.nextActivity) já teria avançado para a atividade seguinte nesse

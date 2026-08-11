@@ -16,8 +16,43 @@ import {
 } from './transitions';
 import { deserializeProjectState, serializeProjectState } from './serialization';
 import { encodePlanningItems } from './planning-items';
+import type { Catalog, RequiredFieldsActivity } from './catalog-types';
 import type { ProjectState } from './state-types';
 import type { ProjectStateParseError } from './serialization';
+
+// Nenhuma atividade do catálogo real usa mais dataTarget: 'project_property'
+// desde a remoção de "Contexto inicial" — fixture local só para o teste que
+// precisa dessa forma de campo, mesmo padrão de domain/test-support.ts.
+const PROJECT_PROPERTY_ACTIVITY: RequiredFieldsActivity = {
+	id: 'fixture_project_property',
+	phaseId: 'descoberta',
+	order: 1,
+	title: 'Fixture de teste',
+	mainQuestion: 'Pergunta fabricada de teste?',
+	why: 'Fixture de teste.',
+	example: 'Fixture de teste.',
+	completionCriteria: 'Nome preenchido.',
+	completionMode: 'required_fields',
+	allowsSkip: true,
+	pendingItemLabel: 'Pendência fabricada de teste',
+	pendingItemDetail: 'Fixture de teste.',
+	fields: [
+		{
+			id: 'nome_provisorio',
+			activityId: 'fixture_project_property',
+			label: 'Nome provisório do projeto',
+			required: true,
+			dataTarget: 'project_property',
+			projectProperty: 'name',
+			type: 'texto_curto'
+		}
+	]
+};
+const PROJECT_PROPERTY_CATALOG: Catalog = {
+	phases: [
+		{ id: 'descoberta', order: 1, label: 'Descoberta', catalogStatus: 'complete', activities: [PROJECT_PROPERTY_ACTIVITY] }
+	]
+};
 
 const T1 = '2026-01-01T00:00:00.000Z';
 const T2 = '2026-01-02T00:00:00.000Z';
@@ -35,7 +70,7 @@ function baseEnvelope(): { version: number; state: unknown } {
 function nonTrivialState(): ProjectState {
 	let state = createInitialProjectState(catalog, 'proj-1', T1);
 	state = unwrap(answerActivity(catalog, state, 'origem', { origem: 'Um problema' }, T1));
-	state = unwrap(skipActivity(catalog, state, 'contexto', 'pend-1', T1));
+	state = unwrap(skipActivity(catalog, state, 'problema', 'pend-1', T1));
 	state = unwrap(
 		answerActivity(catalog, state, 'publico', { publico_detail: 'Clientes' }, T2)
 	);
@@ -224,21 +259,25 @@ describe('deserializeProjectState — invariant_violation', () => {
 	});
 
 	it('rejeita Answer referenciando um campo project_property', () => {
-		const state = unwrap(
-			answerActivity(
-				catalog,
-				createInitialProjectState(catalog, 'proj-1', T1),
-				'contexto',
-				{ breve_descricao: 'x' },
-				T1
-			)
-		);
+		// Estado base contra o próprio PROJECT_PROPERTY_CATALOG (não o catálogo
+		// real) — senão o ActivityProgress de "origem"/"problema"/etc. do
+		// catálogo real já seria rejeitado por invalid_reference antes de
+		// chegar na violação que este teste quer provar.
+		const state = createInitialProjectState(PROJECT_PROPERTY_CATALOG, 'proj-1', T1);
 		const envelope = JSON.parse(serializeProjectState(state)) as {
 			state: { answers: Array<Record<string, unknown>> };
 		};
-		envelope.state.answers[0].activityDefinitionId = 'contexto';
-		envelope.state.answers[0].fieldDefinitionId = 'nome_provisorio';
-		expectError(JSON.stringify(envelope), 'invariant_violation');
+		envelope.state.answers.push({
+			projectId: 'proj-1',
+			activityDefinitionId: 'fixture_project_property',
+			fieldDefinitionId: 'nome_provisorio',
+			value: 'Portal',
+			createdAt: T1,
+			updatedAt: T1
+		});
+		const result = deserializeProjectState(JSON.stringify(envelope), PROJECT_PROPERTY_CATALOG);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.kind).toBe('invariant_violation');
 	});
 
 	it('rejeita Answer duplicada para o mesmo campo/atividade', () => {
@@ -281,7 +320,7 @@ describe('deserializeProjectState — invariant_violation', () => {
 		const state1 = unwrap(
 			skipActivity(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'origem', 'pend-1', T1)
 		);
-		const state2 = unwrap(skipActivity(catalog, state1, 'contexto', 'pend-1', T1)); // mesmo id, outra atividade
+		const state2 = unwrap(skipActivity(catalog, state1, 'problema', 'pend-1', T1)); // mesmo id, outra atividade
 		const envelope = JSON.parse(serializeProjectState(state2));
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});

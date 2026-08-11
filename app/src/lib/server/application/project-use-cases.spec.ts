@@ -63,11 +63,11 @@ afterEach(() => {
 	for (const filePath of tempFiles.splice(0)) fs.rmSync(filePath, { force: true });
 });
 
-function setup(clockValue = '2026-01-01T00:00:00.000Z') {
+function setup(clockValue = '2026-01-01T00:00:00.000Z', catalogOverride: typeof catalog = catalog) {
 	const repo = memoryRepo();
 	const clock = fakeClock(clockValue);
 	const idGenerator = fakeIdGenerator('id');
-	const useCases = createProjectUseCases({ repository: repo, catalog, clock, idGenerator });
+	const useCases = createProjectUseCases({ repository: repo, catalog: catalogOverride, clock, idGenerator });
 	return { repo, clock, idGenerator, useCases };
 }
 
@@ -346,13 +346,54 @@ describe('createProjectUseCases — answerActivity', () => {
 	});
 
 	it('grava o campo project_property (nome do projeto)', async () => {
-		const { useCases, repo } = setup();
+		// Nenhuma atividade do catálogo real usa mais dataTarget: 'project_property'
+		// desde a remoção de "Contexto inicial" (nome agora vem de /projects/new
+		// na criação real, via createConfiguredProject/renameProject, não via
+		// answerActivity) — fixture local só para cobrir o mecanismo genérico
+		// ponta a ponta (use case → domínio → SQLite).
+		const projectPropertyActivity = {
+			id: 'fixture_project_property',
+			phaseId: 'descoberta',
+			order: 1,
+			title: 'Fixture de teste',
+			mainQuestion: 'Pergunta fabricada de teste?',
+			why: 'Fixture de teste.',
+			example: 'Fixture de teste.',
+			completionCriteria: 'Nome preenchido.',
+			completionMode: 'required_fields' as const,
+			allowsSkip: true,
+			pendingItemLabel: 'Pendência fabricada de teste',
+			pendingItemDetail: 'Fixture de teste.',
+			fields: [
+				{
+					id: 'nome_provisorio',
+					activityId: 'fixture_project_property',
+					label: 'Nome provisório do projeto',
+					required: true,
+					dataTarget: 'project_property' as const,
+					projectProperty: 'name' as const,
+					type: 'texto_curto' as const
+				}
+			]
+		};
+		const fixtureCatalog = {
+			phases: [
+				{
+					id: 'descoberta',
+					order: 1,
+					label: 'Descoberta',
+					catalogStatus: 'complete' as const,
+					activities: [projectPropertyActivity]
+				}
+			]
+		};
+		const { useCases, repo } = setup('2026-01-01T00:00:00.000Z', fixtureCatalog);
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
 
 		const result = await useCases.answerActivity({
 			projectId: created.value.projectId,
-			activityDefinitionId: 'contexto',
+			activityDefinitionId: 'fixture_project_property',
 			values: { nome_provisorio: 'Portal de Solicitações' }
 		});
 		expect(result.ok).toBe(true);
@@ -377,19 +418,8 @@ describe('createProjectUseCases — answerActivity', () => {
 		await useCases.answerActivity({ projectId, activityDefinitionId: 'origem', values: { origem: 'x' } });
 		await useCases.answerActivity({
 			projectId,
-			activityDefinitionId: 'contexto',
-			values: {
-				nome_provisorio: 'Portal',
-				breve_descricao: 'x',
-				modo_trabalho: 'Individual',
-				nivel_experiencia: 'Iniciante',
-				estagio_atual: 'Ideia inicial'
-			}
-		});
-		await useCases.answerActivity({
-			projectId,
 			activityDefinitionId: 'problema',
-			values: { situacao: 'x', sinais_situacao: encodeMultiSelectValue(['too_many_steps']) }
+			values: { situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']) }
 		});
 		await useCases.answerActivity({ projectId, activityDefinitionId: 'publico', values: { publico_detail: 'x' } });
 		await useCases.answerActivity({
@@ -753,6 +783,11 @@ describe('createProjectUseCases — listRecentProjects', () => {
 	it('nextAction é completed quando o catálogo inteiro já foi percorrido', async () => {
 		const { repo } = setup();
 		let state = createInitialProjectState(catalog, 'proj-concluido', '2026-01-01T00:00:00.000Z');
+		// Nome definido diretamente — desde a remoção de "Contexto inicial",
+		// nenhuma atividade do catálogo define Project.name (agora vem de
+		// /projects/new na criação real); sem nome, computeProjectStatus nunca
+		// sai de 'rascunho', mesmo com o catálogo inteiro percorrido.
+		state = { ...state, project: { ...state.project, name: 'Projeto concluído' } };
 		await repo.insert(state);
 		for (const phase of catalog.phases) {
 			state = completePhase(catalog, state, phase.id, '2026-01-01T00:00:00.000Z');
@@ -1126,7 +1161,18 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 		expect(stored?.scopeItems).toEqual([]);
 	});
 
-	it('sinal → sugestão → aceite → ScopeItem: usar a sugestão a remove da lista; excluir o item a traz de volta', async () => {
+	// "Entender a situação" (Claude Design) substituiu o campo
+	// `sinais_situacao` (catalog/discovery.ts) por `situacao_o_que`, com ids
+	// namespaced (prob_/opor_) diferentes dos ids que
+	// orientation-engine/scope-suggestions.ts ainda verifica
+	// (too_many_steps/duplicated_information/rework) — por decisão explícita,
+	// essas três regras ficam dormentes nesta entrega (não removidas, não
+	// remapeadas): `answerActivity` já rejeita `sinais_situacao` por não
+	// existir mais no catálogo, então nenhum fluxo real do produto consegue
+	// mais produzir essas sugestões. `answerActivity` genérico e
+	// `scope-suggestions.spec.ts` continuam cobrindo, respectivamente, a
+	// validação de campo e a lógica pura de sinal→sugestão isoladamente.
+	it('responder "Entender a situação" com os novos campos não produz as sugestões antigas (regra dormente)', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1135,19 +1181,24 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 		await useCases.answerActivity({
 			projectId,
 			activityDefinitionId: 'problema',
-			values: { situacao: 'x', sinais_situacao: encodeMultiSelectValue(['duplicated_information']) }
+			values: { situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']) }
 		});
 
-		const withSuggestion = await useCases.loadProjectView(projectId);
-		if (!withSuggestion.ok) throw new Error('esperado ok');
-		expect(withSuggestion.value.scopeSuggestions).toEqual([
-			{
-				id: 'reuse_existing_information',
-				title: 'Reaproveitar informações já registradas',
-				reason: 'Sugerido porque você indicou informação duplicada.'
-			}
-		]);
+		const view = await useCases.loadProjectView(projectId);
+		if (!view.ok) throw new Error('esperado ok');
+		expect(view.value.scopeSuggestions).toEqual([]);
+	});
 
+	it('aceite → ScopeItem: usar a sugestão a remove da lista; excluir o item a traz de volta', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		// sourceSuggestionId atribuído diretamente (não computado por
+		// scope-suggestions.ts, dormente — ver teste acima) só para exercitar
+		// a mecânica real de proveniência de ScopeItem: aceitar remove da
+		// lista de sugestões calculada, excluir o item traz de volta.
 		const accepted = await useCases.addScopeItem({
 			projectId,
 			text: 'Reaproveitar informações já registradas',
@@ -1161,13 +1212,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 		const itemId = accepted.value.scopeItems[0].id;
 		const afterRemoval = await useCases.removeScopeItem({ projectId, itemId });
 		if (!afterRemoval.ok) throw new Error('esperado ok');
-		expect(afterRemoval.value.scopeSuggestions).toEqual([
-			{
-				id: 'reuse_existing_information',
-				title: 'Reaproveitar informações já registradas',
-				reason: 'Sugerido porque você indicou informação duplicada.'
-			}
-		]);
+		expect(afterRemoval.value.scopeItems).toEqual([]);
 	});
 });
 

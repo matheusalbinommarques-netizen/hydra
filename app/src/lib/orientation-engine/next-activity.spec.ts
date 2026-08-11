@@ -20,7 +20,7 @@ describe('computeNextActivity (Trilha A)', () => {
 		const state = answerActivityMinimally(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'origem', T1);
 		expect(computeNextActivity(catalog, state.activityProgress)).toEqual({
 			kind: 'recommendation',
-			activityDefinitionId: 'contexto'
+			activityDefinitionId: 'problema'
 		});
 	});
 
@@ -28,7 +28,7 @@ describe('computeNextActivity (Trilha A)', () => {
 		const state = skipActivityForTest(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'origem', 'pend-1', T1);
 		expect(computeNextActivity(catalog, state.activityProgress)).toEqual({
 			kind: 'recommendation',
-			activityDefinitionId: 'contexto'
+			activityDefinitionId: 'problema'
 		});
 	});
 

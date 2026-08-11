@@ -14,24 +14,17 @@ describe('buildBancadaOverviewView', () => {
 		expect(view.blocks).toEqual([{ activityId: 'origem', heading: 'Origem do projeto', value: 'Um problema' }]);
 	});
 
-	it('bloco "Contexto inicial" usa breve_descricao, não nome_provisorio (project_property, fora de answers)', () => {
-		const view = buildBancadaOverviewView(catalog, { breve_descricao: 'Portal de solicitações internas.' });
-		const contexto = view.blocks.find((b) => b.activityId === 'contexto')!;
-		expect(contexto.heading).toBe('Contexto inicial');
-		expect(contexto.value).toBe('Portal de solicitações internas.');
-	});
-
-	it('bloco "Problema" com chips decodificados de sinais_situacao', () => {
+	it('bloco "Situação" com chips decodificados de situacao_o_que', () => {
 		const view = buildBancadaOverviewView(catalog, {
 			situacao: 'As solicitações chegam sem padrão.',
-			sinais_situacao: encodeMultiSelectValue(['too_many_steps', 'rework'])
+			situacao_o_que: encodeMultiSelectValue(['prob_manual', 'prob_retrabalho'])
 		});
 		const problema = view.blocks.find((b) => b.activityId === 'problema')!;
 		expect(problema.value).toBe('As solicitações chegam sem padrão.');
-		expect(problema.chips).toEqual(['Excesso de etapas', 'Retrabalho']);
+		expect(problema.chips).toEqual(['O processo é manual demais', 'Existe muito retrabalho']);
 	});
 
-	it('bloco "Problema" sem sinais_situacao respondido não tem chips', () => {
+	it('bloco "Situação" sem situacao_o_que respondido não tem chips', () => {
 		const view = buildBancadaOverviewView(catalog, { situacao: 'Situação X' });
 		const problema = view.blocks.find((b) => b.activityId === 'problema')!;
 		expect(problema.chips).toBeUndefined();
@@ -193,7 +186,6 @@ describe('buildBancadaOverviewView', () => {
 			view.blocks.every((b) =>
 				[
 					'origem',
-					'contexto',
 					'problema',
 					'publico',
 					'estado_atual',
@@ -215,7 +207,6 @@ describe('buildBancadaOverviewView', () => {
 	it('todos os blocos juntos, na ordem do catálogo (Descoberta, Definição, depois Estruturação)', () => {
 		const view = buildBancadaOverviewView(catalog, {
 			origem: 'Um problema',
-			breve_descricao: 'Portal de solicitações.',
 			situacao: 'Situação',
 			publico_detail: 'Público',
 			estado_atual_detail: 'Estado atual',
@@ -232,7 +223,6 @@ describe('buildBancadaOverviewView', () => {
 		});
 		expect(view.blocks.map((b) => b.activityId)).toEqual([
 			'origem',
-			'contexto',
 			'problema',
 			'publico',
 			'estado_atual',

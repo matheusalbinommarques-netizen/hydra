@@ -36,15 +36,15 @@ describe('buildPhaseActivities', () => {
 
 	it('marca a atividade recomendada pela Trilha A como isCurrent, e nenhuma outra', () => {
 		const result = buildPhaseActivities(catalog, {
-			activityStatuses: { origem: 'concluída', contexto: 'em_andamento' },
+			activityStatuses: { origem: 'concluída', problema: 'em_andamento' },
 			phaseStatuses: { descoberta: 'em_andamento' },
-			nextActivity: { kind: 'recommendation', activityDefinitionId: 'contexto' }
+			nextActivity: { kind: 'recommendation', activityDefinitionId: 'problema' }
 		});
 
 		const allActivities = result.flatMap((phase) => phase.activities);
 		const current = allActivities.filter((activity) => activity.isCurrent);
 		expect(current).toHaveLength(1);
-		expect(current[0].id).toBe('contexto');
+		expect(current[0].id).toBe('problema');
 
 		const descobertaView = result.find((phase) => phase.id === 'descoberta')!;
 		expect(descobertaView.isCurrent).toBe(true);
@@ -75,20 +75,20 @@ describe('buildPhaseActivities', () => {
 		const result = buildPhaseActivities(catalog, {
 			activityStatuses: {
 				origem: 'concluída',
-				contexto: 'em_andamento',
-				problema: 'pulada',
-				publico: 'não_iniciada'
+				problema: 'em_andamento',
+				publico: 'pulada',
+				estado_atual: 'não_iniciada'
 			},
 			phaseStatuses: { descoberta: 'em_andamento' },
-			nextActivity: { kind: 'recommendation', activityDefinitionId: 'contexto' }
+			nextActivity: { kind: 'recommendation', activityDefinitionId: 'problema' }
 		});
 
 		const descobertaView = result.find((phase) => phase.id === 'descoberta')!;
 		const byId = (id: string) => descobertaView.activities.find((activity) => activity.id === id)!;
 		expect(byId('origem').status).toBe('concluída');
-		expect(byId('contexto').status).toBe('em_andamento');
-		expect(byId('problema').status).toBe('pulada');
-		expect(byId('publico').status).toBe('não_iniciada');
+		expect(byId('problema').status).toBe('em_andamento');
+		expect(byId('publico').status).toBe('pulada');
+		expect(byId('estado_atual').status).toBe('não_iniciada');
 	});
 
 	// A capacidade genérica de mapear fases 'partial'/'unavailable' continua

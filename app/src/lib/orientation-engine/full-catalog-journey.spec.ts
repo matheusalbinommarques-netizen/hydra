@@ -6,17 +6,20 @@
 
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
-import { createInitialProjectState } from '$lib/domain';
+import { createInitialProjectState, renameProject } from '$lib/domain';
 import { computeNextActivity } from './next-activity';
 import { computePhaseStatus } from './phase-status';
 import { computeProjectStatus } from './project-status';
-import { completePhase } from '$lib/domain/test-support';
+import { completePhase, unwrapResult } from '$lib/domain/test-support';
 
 const T1 = '2026-01-01T00:00:00.000Z';
 
 describe('jornada completa do catálogo (fases 1–6)', () => {
 	it('recomenda a primeira atividade de cada fase na hora certa e termina com o projeto concluído', () => {
-		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		// Nome definido explicitamente — desde a remoção de "Contexto inicial",
+		// nenhuma atividade do catálogo define Project.name (agora vem de
+		// /projects/new na criação real, fora desta jornada de catálogo).
+		let state = unwrapResult(renameProject(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'Portal'));
 
 		expect(catalog.phases.map((phase) => phase.id)).toEqual([
 			'descoberta',

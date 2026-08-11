@@ -540,24 +540,15 @@ completa segundo o critério acima:
 3. continuidade Mapa → Agora;
 4. orientação por projeto na Home.
 
-#### Roadmap como backlog
+#### Roadmap como backlog (histórico, etapa 7 já concluída)
 
-Durante a etapa 7, este roadmap é também o backlog operacional. O
-`/hydra-next` deverá futuramente: localizar a subetapa atual; escolher a
-primeira tela não convergida da ordem; comparar somente sua imagem
-individual com a superfície atual; não procurar aleatoriamente outra
-microfatia fora da sequência; parar em caso de bloqueio ou divergência.
-Esta entrega não altera a skill.
-
-## Horizonte posterior — Tailoring metodológico e modelos
-
-Resultado: ativar profundidade e artefatos proporcionais a cada projeto.
-
-- Não significa implementar dezenas de documentos independentes.
-- Depende de sinais de contexto, aplicabilidade e profundidade variável —
-  não de uma lista fixa de templates.
-- É horizonte de longo prazo, não uma etapa imediatamente seguinte às
-  demais.
+Durante a etapa 7, este roadmap funcionou também como backlog
+operacional, com apoio da skill `/hydra-next` (removida em 10/08/2026 —
+ver `CLAUDE.md`, "Fluxo operacional"). Com a etapa 7 concluída e a
+direção de trabalho seguinte passando a ser dada diretamente por Matheus
+durante o uso do produto, este roadmap não planeja mais próximos passos
+com antecedência — ver "Próxima decisão relevante" em
+`PROJECT_STATUS.md`.
 
 ## Exclusões atuais
 

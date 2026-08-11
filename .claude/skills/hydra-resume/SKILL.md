@@ -42,4 +42,4 @@ erro (`stderr`) — não tente adivinhar o estado.
 
 Não edita nada. Não roda testes. Não faz stage, commit ou push. Não
 recomenda qual item começar a seguir — isso é uma decisão do usuário (ou de
-`/hydra-plan-item` depois que o usuário escolher).
+`/hydra-work` depois que o usuário escolher).

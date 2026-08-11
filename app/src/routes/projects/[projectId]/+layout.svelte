@@ -6,6 +6,16 @@
 	let projectId = $derived(page.params.projectId);
 	let pathname = $derived(page.url.pathname);
 
+	// "Entender a situação" (Claude Design) é a única atividade já convergida
+	// para a identidade escura — o resto do shell continua papel/tinta/
+	// grafite. Em vez de uma "ilha escura" isolada dentro do card claro,
+	// aplicamos o tema escuro ao shell inteiro só quando esta é a atividade
+	// atual: os mesmos tokens --hydra-* já usados por todo o shell/página
+	// (header, nav, /now) são redefinidos num escopo (.dark-activity), sem
+	// tocar o markup ou o CSS de nenhuma outra atividade. Ao sair desta
+	// atividade, o shell volta ao normal — nenhuma outra tela foi redesenhada.
+	let isDarkActivity = $derived((page.data as { activity?: { id?: string } })?.activity?.id === 'problema');
+
 	// Ativo tanto na rota exata quanto em subrotas (ex.: /deliveries/x),
 	// com limite de segmento para não casar caminhos apenas parecidos
 	// (ex.: /deliveries-archive).
@@ -49,13 +59,13 @@
 	});
 </script>
 
-<div class="project-shell">
+<div class="project-shell" class:dark-activity={isDarkActivity}>
 	<header class="project-header header-desktop">
 		<div class="identity">
 			<a class="projects-link" href="/projects">← Projetos</a>
 			<span class="identity-divider" aria-hidden="true"></span>
 			<a class="symbol-link" href="/">
-				<img class="symbol" src="/brand/hydra-symbol-primary-transparent.png" alt="" />
+				<img class="symbol" src="/brand/hydra-symbol-header-128.png" alt="" />
 			</a>
 			<div>
 				<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
@@ -136,7 +146,7 @@
 			<a class="projects-link" href="/projects">← Projetos</a>
 			<span class="identity-divider" aria-hidden="true"></span>
 			<a class="symbol-link" href="/">
-				<img class="symbol" src="/brand/hydra-symbol-primary-transparent.png" alt="" />
+				<img class="symbol" src="/brand/hydra-symbol-header-128.png" alt="" />
 			</a>
 		</div>
 		<div class="mobile-header-identity">
@@ -175,6 +185,28 @@
 </div>
 
 <style>
+	/* Redefine só os tokens de cor já usados pelo shell/página (--hydra-*),
+	   para a paleta escura aprovada no Claude Design ("Entender a
+	   Situacao.dc.html") — mesmos valores usados na Home (D033). Nenhuma
+	   regra nova de layout/espaçamento; header, nav e /now continuam com o
+	   mesmo CSS, só lendo cores diferentes enquanto esta atividade é a atual. */
+	.dark-activity {
+		--hydra-bg: #0a1420;
+		--hydra-surface: #101f2f;
+		--hydra-surface-raised: #0c1826;
+		--hydra-border: rgba(255, 255, 255, 0.1);
+		--hydra-text: #f5fafb;
+		--hydra-muted: #8fa4b8;
+		--hydra-accent: #2dd4c4;
+		--hydra-warning: #f5b955;
+		--hydra-shadow-raised: none;
+	}
+
+	.dark-activity {
+		background: var(--hydra-bg);
+		min-height: 100vh;
+	}
+
 	.project-header {
 		display: flex;
 		align-items: center;
