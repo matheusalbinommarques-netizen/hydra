@@ -131,7 +131,7 @@
 	<title>Hydra</title>
 </svelte:head>
 
-<div class="home-shell">
+<div class="home-shell hydra-dark-tokens">
 	<aside class="hp-sidebar">
 		<div class="hp-sidebar-inner">
 			<a class="hp-logo" href="/" aria-label="Hydra — Home">
@@ -344,36 +344,36 @@
 	   global do produto, aplicada tela a tela a partir daqui (C6-01).
 	   Tokens escopados a `.home-shell`: enquanto as demais telas não forem
 	   migradas, elas continuam na identidade papel/tinta/grafite de
-	   app.css, sem alteração. */
+	   app.css, sem alteração. Valores comprovadamente iguais a /projects/new
+	   e Entender a situação passam a ler de `--hydra-dark-*`
+	   (`.hydra-dark-tokens`, app.css, ETAPA 1); os que são específicos desta
+	   tela (sinais de movimento, superfície alternativa do resumo, raio
+	   grande) continuam locais. */
 	.home-shell {
-		--hp-bg: #0a1420;
-		--hp-surface: #101f2f;
+		--hp-bg: var(--hydra-dark-bg);
+		--hp-surface: var(--hydra-dark-surface);
 		--hp-surface-alt: #0e1a27;
-		--hp-border: rgba(255, 255, 255, 0.08);
+		--hp-border: var(--hydra-dark-border);
 		--hp-border-soft: rgba(255, 255, 255, 0.07);
-		--hp-text: #e9f2f6;
-		--hp-text-strong: #f5fafb;
+		--hp-text: var(--hydra-dark-text-soft);
+		--hp-text-strong: var(--hydra-dark-text);
 		--hp-muted: #6f8ba0;
-		--hp-muted-strong: #8fa4b8;
-		--hp-accent: #5be9d8;
-		--hp-accent-strong: #2dd4c4;
-		--hp-accent-tint: rgba(45, 212, 196, 0.1);
-		--hp-signal-blocked: #f97066;
+		--hp-muted-strong: var(--hydra-dark-muted);
+		--hp-accent: var(--hydra-dark-accent-light);
+		--hp-accent-strong: var(--hydra-dark-accent);
+		--hp-accent-tint: var(--hydra-dark-accent-tint);
+		--hp-signal-blocked: var(--hydra-dark-danger);
 		--hp-signal-stalled: #f5b955;
-		--hp-signal-advancing: #2dd4c4;
+		--hp-signal-advancing: var(--hydra-dark-accent);
 		--hp-signal-none: rgba(255, 255, 255, 0.18);
-		--hp-radius: 10px;
+		--hp-radius: var(--hydra-dark-radius);
 		--hp-radius-lg: 16px;
 
 		min-height: 100vh;
 		display: flex;
 		background: var(--hp-bg);
 		color: var(--hp-text);
-		font-family:
-			'Inter',
-			system-ui,
-			-apple-system,
-			sans-serif;
+		font-family: var(--hydra-dark-font);
 	}
 
 	.hp-sidebar {

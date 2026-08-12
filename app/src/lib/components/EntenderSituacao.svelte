@@ -500,7 +500,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5625rem;
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		padding: 0.6875rem 1rem;
 		font-size: 0.84375rem;
 		font-weight: 500;
@@ -513,8 +513,8 @@
 	}
 
 	.es-chip.selected {
-		background: rgba(45, 212, 196, 0.14);
-		border-color: rgba(45, 212, 196, 0.55);
+		background: var(--hydra-dark-accent-tint-strong);
+		border-color: var(--hydra-dark-accent-border-strong);
 		color: #eafffb;
 	}
 
@@ -540,7 +540,7 @@
 
 	.es-row {
 		text-align: left;
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		padding: 0.875rem 1rem;
 		width: 100%;
 		box-sizing: border-box;
@@ -555,8 +555,8 @@
 	}
 
 	.es-row.selected {
-		background: rgba(45, 212, 196, 0.14);
-		border-color: rgba(45, 212, 196, 0.55);
+		background: var(--hydra-dark-accent-tint-strong);
+		border-color: var(--hydra-dark-accent-border-strong);
 		color: #eafffb;
 	}
 
@@ -570,7 +570,7 @@
 		box-sizing: border-box;
 		background: var(--hydra-surface);
 		border: 1px solid var(--hydra-border);
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		padding: 0.6875rem 0.875rem;
 		color: var(--hydra-text);
 		font-size: 0.875rem;
@@ -580,7 +580,7 @@
 
 	.es-synthesis-box {
 		border: 1px solid rgba(45, 212, 196, 0.4);
-		background: rgba(45, 212, 196, 0.1);
+		background: var(--hydra-dark-accent-tint);
 		border-radius: 0.75rem;
 		padding: 1.375rem 1.5rem;
 		margin-bottom: 1.75rem;
@@ -606,7 +606,7 @@
 		background: linear-gradient(135deg, #22d3c5, #0891b2);
 		color: #04211f;
 		border: none;
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		font-weight: 700;
 		font-size: 0.875rem;
 		font-family: inherit;
@@ -628,7 +628,7 @@
 		font-size: 0.875rem;
 		font-family: inherit;
 		padding: 0.75rem 1.125rem;
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		cursor: pointer;
 	}
 
@@ -659,7 +659,7 @@
 		width: 3.25rem;
 		height: 3.25rem;
 		border-radius: 50%;
-		background: rgba(45, 212, 196, 0.14);
+		background: var(--hydra-dark-accent-tint-strong);
 		border: 1px solid rgba(45, 212, 196, 0.4);
 		display: flex;
 		align-items: center;
@@ -705,8 +705,8 @@
 	.es-doc-phase-badge {
 		font-size: 0.6875rem;
 		color: var(--hydra-accent);
-		background: rgba(45, 212, 196, 0.1);
-		border: 1px solid rgba(45, 212, 196, 0.3);
+		background: var(--hydra-dark-accent-tint);
+		border: 1px solid var(--hydra-dark-accent-border);
 		border-radius: 999px;
 		padding: 0.1875rem 0.625rem;
 		white-space: nowrap;
@@ -772,7 +772,7 @@
 	}
 
 	.es-doc-chip.highlighted {
-		background: rgba(45, 212, 196, 0.14);
+		background: var(--hydra-dark-accent-tint-strong);
 		border-color: rgba(45, 212, 196, 0.5);
 	}
 

@@ -1,3 +1,11 @@
+/* Inter (variável, só eixo de peso, sem itálico/optical-size) — fonte real
+   da nova UI escura (Home, /projects/new, Entender a situação). Self-hosted
+   via @fontsource-variable/inter (ETAPA 1, correção complementar): antes,
+   `--hydra-dark-font` declarava 'Inter' sem nenhum arquivo carregado, então
+   caía em system-ui sem efeito. A paleta papel/tinta/grafite (Manrope,
+   Source Serif 4) não é afetada — nenhuma delas foi carregada aqui. */
+@import '@fontsource-variable/inter/wght.css';
+
 /* Identidade visual mínima do Hydra — ver docs/core/UX_DESIGN_SPEC.md.
    Não é um design system completo: só a paleta e a tipografia de base.
 
@@ -48,6 +56,40 @@
 	--hydra-radius: 8px;
 	--hydra-radius-pill: 999px;
 	--hydra-shadow-raised: 0 1px 2px rgba(21, 25, 24, 0.08);
+}
+
+/* Fundação da identidade escura do rework (ETAPA 1 — docs/core/
+   HYDRA_PRODUCT_REWORK.md §27/§31). Fonte única para os valores hoje
+   comprovadamente iguais entre Home (--hp-*), /projects/new (--np-*) e a
+   atividade "Entender a situação" (.dark-activity redefinindo --hydra-*
+   em projects/[projectId]/+layout.svelte) — as três superfícies aprovadas
+   no Claude Design. Cada uma continua com seus próprios tokens locais para
+   o que é realmente específico (ex.: --hp-signal-stalled, --np-disabled);
+   só os valores confirmados idênticos em pelo menos duas delas passam a ler
+   daqui. Escopado por classe, não em :root — o restante do produto
+   permanece na paleta papel/tinta/grafite acima até ser migrado tela a
+   tela; nenhuma tela nova foi convertida por esta mudança. */
+.hydra-dark-tokens {
+	--hydra-dark-bg: #0a1420;
+	--hydra-dark-surface: #101f2f;
+	--hydra-dark-surface-raised: #0c1826;
+	--hydra-dark-border: rgba(255, 255, 255, 0.08);
+	--hydra-dark-text: #f5fafb;
+	--hydra-dark-text-soft: #e9f2f6;
+	--hydra-dark-muted: #8fa4b8;
+	--hydra-dark-accent: #2dd4c4;
+	--hydra-dark-accent-light: #5be9d8;
+	--hydra-dark-accent-tint: rgba(45, 212, 196, 0.1);
+	--hydra-dark-accent-tint-strong: rgba(45, 212, 196, 0.14);
+	--hydra-dark-accent-border: rgba(45, 212, 196, 0.3);
+	--hydra-dark-accent-border-strong: rgba(45, 212, 196, 0.55);
+	--hydra-dark-danger: #f97066;
+	--hydra-dark-radius: 10px;
+	--hydra-dark-font:
+		'Inter Variable',
+		system-ui,
+		-apple-system,
+		sans-serif;
 }
 
 * {

@@ -36,7 +36,7 @@
 	<title>Nova iniciativa — Hydra</title>
 </svelte:head>
 
-<div class="np-page">
+<div class="np-page hydra-dark-tokens">
 	<header class="np-header">
 		<a class="np-wordmark" href="/">
 			<img class="np-wordmark-icon" src="/brand/hydra-app-icon-512.png" width="24" height="24" alt="" />
@@ -137,31 +137,35 @@
 	/* Tokens locais escopados a esta rota — direção visual aprovada no Claude
 	   Design ("Redesenho da tela /new"): tema escuro, acento teal, mesma
 	   linguagem já usada na Home (D033). Outras telas ainda não convergidas
-	   continuam na identidade papel/tinta/grafite, sem alteração. */
+	   continuam na identidade papel/tinta/grafite, sem alteração. Valores
+	   comprovadamente iguais à Home e a Entender a situação passam a ler de
+	   `--hydra-dark-*` (`.hydra-dark-tokens`, app.css, ETAPA 1); os que são
+	   específicos desta tela (superfície de item, estados de borda/texto
+	   desabilitado) continuam locais. */
 	.np-page {
-		--np-bg: #0a1420;
-		--np-surface: #101f2f;
-		--np-panel: #0c1826;
+		--np-bg: var(--hydra-dark-bg);
+		--np-surface: var(--hydra-dark-surface);
+		--np-panel: var(--hydra-dark-surface-raised);
 		--np-item-bg: #0e1c2b;
-		--np-border: rgba(255, 255, 255, 0.08);
+		--np-border: var(--hydra-dark-border);
 		--np-border-strong: rgba(255, 255, 255, 0.14);
-		--np-text: #e9f2f6;
-		--np-text-strong: #f5fafb;
-		--np-muted: #8fa4b8;
+		--np-text: var(--hydra-dark-text-soft);
+		--np-text-strong: var(--hydra-dark-text);
+		--np-muted: var(--hydra-dark-muted);
 		--np-faint: #5f7c90;
 		--np-disabled: #4d6577;
-		--np-accent: #2dd4c4;
-		--np-accent-light: #5be9d8;
-		--np-accent-tint: rgba(45, 212, 196, 0.1);
-		--np-accent-tint-strong: rgba(45, 212, 196, 0.14);
-		--np-accent-border: rgba(45, 212, 196, 0.3);
-		--np-accent-border-strong: rgba(45, 212, 196, 0.55);
-		--np-error: #f97066;
+		--np-accent: var(--hydra-dark-accent);
+		--np-accent-light: var(--hydra-dark-accent-light);
+		--np-accent-tint: var(--hydra-dark-accent-tint);
+		--np-accent-tint-strong: var(--hydra-dark-accent-tint-strong);
+		--np-accent-border: var(--hydra-dark-accent-border);
+		--np-accent-border-strong: var(--hydra-dark-accent-border-strong);
+		--np-error: var(--hydra-dark-danger);
 
 		min-height: 100vh;
 		background: var(--np-bg);
 		color: var(--np-text);
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
+		font-family: var(--hydra-dark-font);
 	}
 
 	.np-header {
@@ -300,7 +304,7 @@
 		box-sizing: border-box;
 		background: var(--np-item-bg);
 		border: 1px solid var(--np-border-strong);
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		padding: 1rem 1.125rem;
 		color: var(--np-text-strong);
 		font-size: 1.125rem;
@@ -382,7 +386,7 @@
 		background: linear-gradient(135deg, #22d3c5, #0891b2);
 		color: #04211f;
 		border: none;
-		border-radius: 0.625rem;
+		border-radius: var(--hydra-dark-radius);
 		font-weight: 700;
 		font-size: 0.875rem;
 		font-family: inherit;

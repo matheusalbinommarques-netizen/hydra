@@ -59,7 +59,7 @@
 	});
 </script>
 
-<div class="project-shell" class:dark-activity={isDarkActivity}>
+<div class="project-shell" class:dark-activity={isDarkActivity} class:hydra-dark-tokens={isDarkActivity}>
 	<header class="project-header header-desktop">
 		<div class="identity">
 			<a class="projects-link" href="/projects">← Projetos</a>
@@ -189,17 +189,29 @@
 	   para a paleta escura aprovada no Claude Design ("Entender a
 	   Situacao.dc.html") — mesmos valores usados na Home (D033). Nenhuma
 	   regra nova de layout/espaçamento; header, nav e /now continuam com o
-	   mesmo CSS, só lendo cores diferentes enquanto esta atividade é a atual. */
+	   mesmo CSS, só lendo cores diferentes enquanto esta atividade é a atual.
+	   Valores comprovadamente iguais à Home e a /projects/new passam a ler
+	   de `--hydra-dark-*` (`.hydra-dark-tokens`, app.css, ETAPA 1); a borda
+	   e o aviso desta tela têm valor próprio, aprovado neste mockup
+	   especificamente, e continuam locais — não foram forçados a coincidir
+	   com o valor levemente diferente usado pelas outras duas telas.
+	   font-family: correção complementar da ETAPA 1 — esta tela herdava
+	   Manrope do body (sem efeito visual até aqui, porque nem Manrope nem
+	   'Inter' declarada tinham arquivo carregado); agora que Inter é
+	   carregada de verdade (app.css), esta tela passa a usar a mesma fonte
+	   real da Home e de /projects/new, em vez de continuar na única
+	   divergência de fallback que restava entre as três. */
 	.dark-activity {
-		--hydra-bg: #0a1420;
-		--hydra-surface: #101f2f;
-		--hydra-surface-raised: #0c1826;
+		--hydra-bg: var(--hydra-dark-bg);
+		--hydra-surface: var(--hydra-dark-surface);
+		--hydra-surface-raised: var(--hydra-dark-surface-raised);
 		--hydra-border: rgba(255, 255, 255, 0.1);
-		--hydra-text: #f5fafb;
-		--hydra-muted: #8fa4b8;
-		--hydra-accent: #2dd4c4;
+		--hydra-text: var(--hydra-dark-text);
+		--hydra-muted: var(--hydra-dark-muted);
+		--hydra-accent: var(--hydra-dark-accent);
 		--hydra-warning: #f5b955;
 		--hydra-shadow-raised: none;
+		font-family: var(--hydra-dark-font);
 	}
 
 	.dark-activity {
