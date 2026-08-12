@@ -405,7 +405,7 @@
 
 	.hp-logo-lockup {
 		display: block;
-		height: 48px;
+		height: 36px;
 		width: auto;
 	}
 
