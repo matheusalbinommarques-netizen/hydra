@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addAffectedGroup,
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
 	resolveImpediment,
+	setAffectedGroupFrequency,
+	setAffectedGroupImpact,
 	setHypothesis,
 	setImpedimentNextAction,
 	setRouteStartPhase,
@@ -71,9 +75,10 @@ function nonTrivialState(): ProjectState {
 	let state = createInitialProjectState(catalog, 'proj-1', T1);
 	state = unwrap(answerActivity(catalog, state, 'origem', { origem: 'Um problema' }, T1));
 	state = unwrap(skipActivity(catalog, state, 'problema', 'pend-1', T1));
-	state = unwrap(
-		answerActivity(catalog, state, 'publico', { publico_detail: 'Clientes' }, T2)
-	);
+	state = unwrap(addAffectedGroup(catalog, state, 'ag-1', 'Clientes', T2));
+	state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T2));
+	state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'constante', T2));
+	state = unwrap(confirmAffectedGroups(catalog, state, T2));
 	state = unwrap(confirmSummary(catalog, state));
 	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
 	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'depois', T1));
@@ -601,6 +606,214 @@ describe('deserializeProjectState — Impediment', () => {
 			state: { impediments: Array<Record<string, unknown>> };
 		};
 		envelope.state.impediments[0].resolvedAt = null;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores à ETAPA 2 (sem affectedGroups)', () => {
+	it('trata state.affectedGroups ausente como [] (envelope válido pré-ETAPA 2)', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		delete envelope.state.affectedGroups;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.affectedGroups).toEqual([]);
+	});
+
+	it('continua rejeitando state.affectedGroups: null', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		envelope.state.affectedGroups = null;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — READ-LEGACY de publico_detail (snapshot exportado antes da ETAPA 2)', () => {
+	// Simula um export legítimo feito ANTES da ETAPA 2: "publico" era
+	// required_fields, o usuário respondeu publico_detail e a atividade ficou
+	// concluída por esse mecanismo — sem nenhum AffectedGroup, que não
+	// existia ainda. baseEnvelope() já traz activityProgress/affectedGroups
+	// no formato atual; só a Answer + o status de "publico" precisam ser
+	// ajustados para reproduzir o formato antigo.
+	function legacyEnvelopeWithPublicoDetail(): {
+		state: {
+			project: { id: string };
+			answers: Array<Record<string, unknown>>;
+			activityProgress: Array<Record<string, unknown>>;
+			affectedGroups: unknown[];
+		};
+	} {
+		const envelope = baseEnvelope() as {
+			state: {
+				project: { id: string };
+				answers: Array<Record<string, unknown>>;
+				activityProgress: Array<Record<string, unknown>>;
+				affectedGroups: unknown[];
+			};
+		};
+		envelope.state.answers.push({
+			projectId: envelope.state.project.id,
+			activityDefinitionId: 'publico',
+			fieldDefinitionId: 'publico_detail',
+			value: 'Agentes de atendimento e clientes internos.',
+			createdAt: T1,
+			updatedAt: T1
+		});
+		const publicoProgress = envelope.state.activityProgress.find(
+			(p) => p.activityDefinitionId === 'publico'
+		)!;
+		publicoProgress.status = 'concluída';
+		return envelope;
+	}
+
+	it('export/snapshot legado com publico_detail importa com sucesso (não invalida o projeto inteiro)', () => {
+		const envelope = legacyEnvelopeWithPublicoDetail();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+	});
+
+	it('o dado legado é preservado (READ-LEGACY) mas não cria nenhum AffectedGroup automaticamente', () => {
+		const envelope = legacyEnvelopeWithPublicoDetail();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// dado antigo preservado tal como estava — nunca reescrito, nunca apagado
+		const legacyAnswer = result.value.answers.find(
+			(a) => a.activityDefinitionId === 'publico' && a.fieldDefinitionId === 'publico_detail'
+		);
+		expect(legacyAnswer?.value).toBe('Agentes de atendimento e clientes internos.');
+
+		// nenhuma conversão automática texto livre → objeto estruturado
+		expect(result.value.affectedGroups).toEqual([]);
+
+		// o status antigo de conclusão é preservado (grandfathered), mesmo sem
+		// nenhum AffectedGroup — é exatamente o que existia no snapshot original
+		const publicoProgress = result.value.activityProgress.find((p) => p.activityDefinitionId === 'publico');
+		expect(publicoProgress?.status).toBe('concluída');
+	});
+
+	it('o fluxo novo a partir desse estado usa só AffectedGroup — publico_detail nunca é reescrita nem lida por nenhuma projeção', () => {
+		const envelope = legacyEnvelopeWithPublicoDetail();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// adicionar um grupo novo a partir daqui opera exclusivamente sobre
+		// AffectedGroup — a Answer legada não é tocada, não é apagada, e a
+		// mutação não depende dela de forma alguma.
+		const withGroup = unwrap(addAffectedGroup(catalog, result.value, 'ag-legacy', 'Novo grupo', T2));
+		expect(withGroup.affectedGroups).toEqual([
+			{
+				id: 'ag-legacy',
+				projectId: result.value.project.id,
+				label: 'Novo grupo',
+				impact: null,
+				frequency: null,
+				createdAt: T2,
+				updatedAt: T2
+			}
+		]);
+		const legacyAnswerStillThere = withGroup.answers.find(
+			(a) => a.activityDefinitionId === 'publico' && a.fieldDefinitionId === 'publico_detail'
+		);
+		expect(legacyAnswerStillThere?.value).toBe('Agentes de atendimento e clientes internos.');
+		expect(legacyAnswerStillThere?.updatedAt).toBe(T1); // nunca reescrita
+
+		// a nova classificação torna "publico" incompleta de novo (1 grupo por
+		// classificar) — reabre a atividade mesmo tendo vindo de conclusão legada.
+		const publicoProgress = withGroup.activityProgress.find((p) => p.activityDefinitionId === 'publico');
+		expect(publicoProgress?.status).toBe('em_andamento');
+	});
+
+	it('rejeita publico_detail com projectId diferente do Project (validação estrita continua para o que é realmente inválido)', () => {
+		const envelope = legacyEnvelopeWithPublicoDetail();
+		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'publico_detail')!;
+		legacyAnswer.projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita publico_detail duplicada', () => {
+		const envelope = legacyEnvelopeWithPublicoDetail();
+		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'publico_detail')!;
+		envelope.state.answers.push({ ...legacyAnswer });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('um campo desconhecido (não deprecado, não existe no catálogo) continua rejeitado normalmente', () => {
+		const envelope = legacyEnvelopeWithPublicoDetail();
+		envelope.state.answers.push({
+			projectId: envelope.state.project.id,
+			activityDefinitionId: 'publico',
+			fieldDefinitionId: 'campo_totalmente_inventado',
+			value: 'x',
+			createdAt: T1,
+			updatedAt: T1
+		});
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+});
+
+describe('deserializeProjectState — AffectedGroup (ETAPA 2, "Quem é afetado")', () => {
+	function affectedGroupState(): ProjectState {
+		return unwrap(
+			addAffectedGroup(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'ag-1', 'Operação', T1)
+		);
+	}
+
+	it('rejeita AffectedGroup.impact fora da união aprovada (nem literal nem null)', () => {
+		const envelope = JSON.parse(serializeProjectState(affectedGroupState())) as {
+			state: { affectedGroups: Array<Record<string, unknown>> };
+		};
+		envelope.state.affectedGroups[0].impact = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita AffectedGroup.frequency fora da união aprovada (nem literal nem null)', () => {
+		const envelope = JSON.parse(serializeProjectState(affectedGroupState())) as {
+			state: { affectedGroups: Array<Record<string, unknown>> };
+		};
+		envelope.state.affectedGroups[0].frequency = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita AffectedGroup.label vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(affectedGroupState())) as {
+			state: { affectedGroups: Array<Record<string, unknown>> };
+		};
+		envelope.state.affectedGroups[0].label = '   ';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita AffectedGroup com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(affectedGroupState())) as {
+			state: { affectedGroups: Array<Record<string, unknown>> };
+		};
+		envelope.state.affectedGroups[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita AffectedGroup.id duplicado', () => {
+		const envelope = JSON.parse(serializeProjectState(affectedGroupState())) as {
+			state: { affectedGroups: unknown[] };
+		};
+		envelope.state.affectedGroups.push(envelope.state.affectedGroups[0]);
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('aceita "publico" concluída quando o mapa atende aos critérios de confirmação', () => {
+		let state = affectedGroupState();
+		state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T1));
+		state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'constante', T1));
+		state = unwrap(confirmAffectedGroups(catalog, state, T2));
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('rejeita "publico" concluída quando o mapa não atende aos critérios de confirmação', () => {
+		const envelope = JSON.parse(serializeProjectState(affectedGroupState())) as {
+			state: { activityProgress: Array<Record<string, unknown>> };
+		};
+		const publico = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'publico')!;
+		publico.status = 'concluída';
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 });

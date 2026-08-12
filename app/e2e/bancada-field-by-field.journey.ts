@@ -62,7 +62,13 @@ test('Bancada: "Definir visão do produto" campo a campo, painel crescendo, etap
 		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
 		await skipCurrentActivity(page);
 
-		for (const heading of ['Público afetado', 'Estado atual', 'Resultado desejado']) {
+		// "Quem é afetado" (Mapa de Impacto, ETAPA 2 do rework) tem componente
+		// bespoke próprio (MapaDeImpacto.svelte) — heading próprio, fora do loop
+		// genérico abaixo.
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
+		await skipCurrentActivity(page);
+
+		for (const heading of ['Estado atual', 'Resultado desejado']) {
 			await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
 			await skipCurrentActivity(page);
 		}

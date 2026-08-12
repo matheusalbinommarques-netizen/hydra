@@ -5,6 +5,9 @@ import type { ActivityDefinition, Catalog, RequiredFieldsActivity } from './cata
 import type {
 	ActivityProgress,
 	ActivityStatus,
+	AffectedGroup,
+	AffectedGroupFrequency,
+	AffectedGroupImpact,
 	Impediment,
 	ImpedimentType,
 	PendingItem,
@@ -44,7 +47,9 @@ export type DomainTransitionError =
 	| { kind: 'impediment_not_found' }
 	| { kind: 'impediment_id_already_exists' }
 	| { kind: 'phase_not_found' }
-	| { kind: 'planning_no_items' };
+	| { kind: 'planning_no_items' }
+	| { kind: 'affected_group_not_found' }
+	| { kind: 'affected_group_confirmation_invalid'; issues: AffectedGroupConfirmationIssue[] };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -60,12 +65,19 @@ function findActivityDefinition(catalog: Catalog, activityId: string): ActivityD
 	return undefined;
 }
 
+// Resolve especificamente "Resumo da descoberta" (usado por invalidateSummary/
+// shouldInvalidateSummary/confirmSummary). Historicamente buscava "a primeira
+// atividade explicit_confirmation do catálogo" — seguro enquanto "resumo" era
+// a única. Desde que "Priorizar entregas" (C5-01) e "publico" (ETAPA 2, Mapa
+// de Impacto) também viraram explicit_confirmation, uma busca genérica por
+// completionMode resolveria de forma ambígua (poderia encontrar "publico",
+// que aparece antes de "resumo" na própria fase Descoberta) — por isso a
+// busca é por id explícito, mesmo padrão já usado por
+// PRIORIZAR_ENTREGAS_ACTIVITY_ID/confirmPlanningPriority abaixo.
+const RESUMO_ACTIVITY_ID = 'resumo';
 function findExplicitConfirmationActivity(catalog: Catalog): ActivityDefinition | undefined {
-	for (const phase of catalog.phases) {
-		const found = phase.activities.find((activity) => activity.completionMode === 'explicit_confirmation');
-		if (found) return found;
-	}
-	return undefined;
+	const activity = findActivityDefinition(catalog, RESUMO_ACTIVITY_ID);
+	return activity?.completionMode === 'explicit_confirmation' ? activity : undefined;
 }
 
 function findScopeConfirmationActivity(catalog: Catalog): ActivityDefinition | undefined {
@@ -795,4 +807,169 @@ export function reopenImpediment(
 			)
 		}
 	};
+}
+
+// --- AffectedGroup / Mapa de Impacto (ETAPA 2 do rework, "Quem é afetado") ---
+//
+// Ao contrário de Impediment, esta coleção pertence à atividade `publico` do
+// catálogo (completionMode explicit_confirmation) — qualquer mutação que
+// torne o mapa novamente incompleto reabre a atividade se ela já estava
+// concluída (mesmo espírito de invalidateScopeConfirmation), e também
+// invalida o Resumo da descoberta já confirmado, exatamente como uma edição
+// de Answer faria (mesmo `shouldInvalidateSummary`/`invalidateSummary` já
+// usados por answerActivity).
+
+export type AffectedGroupConfirmationIssue =
+	| { kind: 'no_groups' }
+	| { kind: 'missing_impact'; groupIds: string[] }
+	| { kind: 'missing_frequency'; groupIds: string[] };
+
+const AFFECTED_GROUPS_ACTIVITY_ID = 'publico';
+
+/**
+ * Retorna a lista de motivos pelos quais o Mapa de Impacto ainda não pode ser
+ * concluído (array vazio = pode confirmar). Função pura, sem dependência do
+ * catálogo — mesmo papel de getScopeConfirmationIssues: usada pelo domínio
+ * (confirmAffectedGroups), pela interface (desabilitar "Concluir mapa") e
+ * pelos testes, nenhum dos três deve duplicar esta lógica. impact/frequency
+ * `null` (não classificado) é o único caso que bloqueia — 'desconhecido' é
+ * uma resposta válida (ver AffectedGroup em state-types.ts).
+ */
+export function getAffectedGroupConfirmationIssues(groups: AffectedGroup[]): AffectedGroupConfirmationIssue[] {
+	const issues: AffectedGroupConfirmationIssue[] = [];
+	if (groups.length === 0) issues.push({ kind: 'no_groups' });
+
+	const missingImpactIds = groups.filter((group) => group.impact === null).map((group) => group.id);
+	if (missingImpactIds.length > 0) issues.push({ kind: 'missing_impact', groupIds: missingImpactIds });
+
+	const missingFrequencyIds = groups.filter((group) => group.frequency === null).map((group) => group.id);
+	if (missingFrequencyIds.length > 0) issues.push({ kind: 'missing_frequency', groupIds: missingFrequencyIds });
+
+	return issues;
+}
+
+function findAffectedGroup(state: ProjectState, groupId: string): AffectedGroup | undefined {
+	return state.affectedGroups.find((group) => group.id === groupId);
+}
+
+function invalidateAffectedGroupsConfirmation(catalog: Catalog, state: ProjectState): ProjectState {
+	const activity = findActivityDefinition(catalog, AFFECTED_GROUPS_ACTIVITY_ID);
+	if (!activity) return state;
+	const progress = findActivityProgress(state, activity.id);
+	if (progress?.status !== 'concluída') return state;
+	if (getAffectedGroupConfirmationIssues(state.affectedGroups).length === 0) return state;
+	return setActivityStatus(state, activity.id, 'em_andamento');
+}
+
+function afterAffectedGroupsMutation(catalog: Catalog, state: ProjectState): ProjectState {
+	let next = invalidateAffectedGroupsConfirmation(catalog, state);
+	if (shouldInvalidateSummary(catalog, next, { kind: 'answer', activityDefinitionId: AFFECTED_GROUPS_ACTIVITY_ID })) {
+		next = invalidateSummary(catalog, next);
+	}
+	return next;
+}
+
+export function addAffectedGroup(
+	catalog: Catalog,
+	state: ProjectState,
+	groupId: string,
+	label: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const group: AffectedGroup = {
+		id: groupId,
+		projectId: state.project.id,
+		label,
+		impact: null,
+		frequency: null,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	const next = afterAffectedGroupsMutation(catalog, {
+		...state,
+		affectedGroups: [...state.affectedGroups, group]
+	});
+	return { ok: true, value: next };
+}
+
+export function setAffectedGroupImpact(
+	catalog: Catalog,
+	state: ProjectState,
+	groupId: string,
+	impact: AffectedGroupImpact,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const group = findAffectedGroup(state, groupId);
+	if (!group) return { ok: false, error: { kind: 'affected_group_not_found' } };
+	if (group.impact === impact) return { ok: true, value: state };
+
+	const next = afterAffectedGroupsMutation(catalog, {
+		...state,
+		affectedGroups: state.affectedGroups.map((g) => (g.id === groupId ? { ...g, impact, updatedAt: occurredAt } : g))
+	});
+	return { ok: true, value: next };
+}
+
+export function setAffectedGroupFrequency(
+	catalog: Catalog,
+	state: ProjectState,
+	groupId: string,
+	frequency: AffectedGroupFrequency,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const group = findAffectedGroup(state, groupId);
+	if (!group) return { ok: false, error: { kind: 'affected_group_not_found' } };
+	if (group.frequency === frequency) return { ok: true, value: state };
+
+	const next = afterAffectedGroupsMutation(catalog, {
+		...state,
+		affectedGroups: state.affectedGroups.map((g) =>
+			g.id === groupId ? { ...g, frequency, updatedAt: occurredAt } : g
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function removeAffectedGroup(
+	catalog: Catalog,
+	state: ProjectState,
+	groupId: string
+): Result<ProjectState, DomainTransitionError> {
+	const group = findAffectedGroup(state, groupId);
+	if (!group) return { ok: false, error: { kind: 'affected_group_not_found' } };
+
+	const next = afterAffectedGroupsMutation(catalog, {
+		...state,
+		affectedGroups: state.affectedGroups.filter((g) => g.id !== groupId)
+	});
+	return { ok: true, value: next };
+}
+
+export function confirmAffectedGroups(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, AFFECTED_GROUPS_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	const issues = getAffectedGroupConfirmationIssues(state.affectedGroups);
+	if (issues.length > 0) {
+		return { ok: false, error: { kind: 'affected_group_confirmation_invalid', issues } };
+	}
+
+	let next = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		next = resolvePendingItem(next, activity.id, occurredAt);
+	}
+	return { ok: true, value: next };
 }

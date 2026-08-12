@@ -118,8 +118,8 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		await featured.getByRole('link', { name: /Começar projeto|Continuar projeto/ }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${secondProjectId}/now`);
 		// "Entender a situação" foi pulada — a atividade atual agora é
-		// "Público afetado".
-		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
+		// "Quem é afetado" (Mapa de Impacto).
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
 	});
 
 	await test.step('link "Projetos" no workspace leva à Biblioteca (não mais à Home)', async () => {

@@ -137,9 +137,14 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await page.getByRole('button', { name: 'Sim, continuar' }).click();
 		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
-		await answerAndContinue(page, {
-			publico: { label: 'Quem é afetado por esta situação, em detalhe?', value: 'Público de teste do Mapa.' }
-		});
+		// "Quem é afetado" (Mapa de Impacto, ETAPA 2 do rework) não é mais
+		// required_fields — não passa por answerAndContinue.
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
+		await page.getByRole('button', { name: '+ Adicionar grupo' }).click();
+		await page.getByRole('button', { name: 'Equipe interna', exact: true }).click();
+		await page.getByRole('button', { name: 'Alto', exact: true }).click();
+		await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
+		await page.getByRole('button', { name: 'Concluir mapa' }).click();
 
 		await answerAndContinue(page, {
 			estado: { label: 'Como a situação é tratada hoje, em detalhe?', value: 'Estado atual de teste do Mapa.' }

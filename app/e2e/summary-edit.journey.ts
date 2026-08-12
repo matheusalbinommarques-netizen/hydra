@@ -54,8 +54,11 @@ async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	await page.getByRole('button', { name: 'Sim, continuar' }).click();
 	await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
-	await page.getByLabel('Quem é afetado por esta situação, em detalhe?').fill('Público original.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByRole('button', { name: '+ Adicionar grupo' }).click();
+	await page.getByRole('button', { name: 'Equipe interna', exact: true }).click();
+	await page.getByRole('button', { name: 'Alto', exact: true }).click();
+	await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
+	await page.getByRole('button', { name: 'Concluir mapa' }).click();
 
 	await page.getByLabel('Como a situação é tratada hoje, em detalhe?').fill('Estado atual original.');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();

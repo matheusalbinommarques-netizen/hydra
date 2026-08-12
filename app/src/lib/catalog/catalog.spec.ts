@@ -140,17 +140,30 @@ describe('catalog', () => {
 		expect(priorizar?.pendingItemDetail).toBeTruthy();
 	});
 
-	it('C5-01: há exatamente duas atividades explicit_confirmation, com allowsSkip diferentes', () => {
+	it('há exatamente três atividades explicit_confirmation, com allowsSkip diferentes', () => {
 		const explicitConfirmationActivities = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.completionMode === 'explicit_confirmation');
 		expect(explicitConfirmationActivities.map((activity) => activity.id).sort()).toEqual([
 			'priorizar_entregas',
+			'publico',
 			'resumo'
 		]);
 		const byId = Object.fromEntries(explicitConfirmationActivities.map((activity) => [activity.id, activity]));
 		expect(byId.resumo.allowsSkip).toBe(false);
 		expect(byId.priorizar_entregas.allowsSkip).toBe(true);
+		expect(byId.publico.allowsSkip).toBe(true);
+	});
+
+	it('ETAPA 2: "Quem é afetado" (publico) é explicit_confirmation, allowsSkip true, sem fields, com pendingItemLabel/Detail', () => {
+		const descoberta = catalog.phases.find((phase) => phase.id === 'descoberta');
+		const publico = descoberta?.activities.find((activity) => activity.id === 'publico');
+		expect(publico?.title).toBe('Quem é afetado');
+		expect(publico?.completionMode).toBe('explicit_confirmation');
+		expect(publico?.allowsSkip).toBe(true);
+		expect('fields' in (publico ?? {})).toBe(false);
+		expect(publico?.pendingItemLabel).toBeTruthy();
+		expect(publico?.pendingItemDetail).toBeTruthy();
 	});
 
 	it('"Entender a situação" tem só a síntese e "o que está acontecendo" como obrigatórios', () => {

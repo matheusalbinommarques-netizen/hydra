@@ -6,21 +6,26 @@ import type { ActivityDefinition, ActivityProgress, Catalog, ProjectState } from
 import { computeNextActivity, computeProjectStatus, computeSnapshot } from '$lib/orientation-engine';
 import type { NextActivityResult } from '$lib/orientation-engine';
 import {
+	addAffectedGroup as addAffectedGroupInDomain,
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	answerActivity as answerActivityInDomain,
+	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
 	createInitialProjectState,
 	deserializeProjectState,
 	moveScopeItem as moveScopeItemInDomain,
+	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	renameProject as renameProjectInDomain,
 	reopenImpediment as reopenImpedimentInDomain,
 	reorderAgoraItems as reorderAgoraItemsInDomain,
 	resolveImpediment as resolveImpedimentInDomain,
 	serializeProjectState,
+	setAffectedGroupFrequency as setAffectedGroupFrequencyInDomain,
+	setAffectedGroupImpact as setAffectedGroupImpactInDomain,
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
@@ -34,9 +39,11 @@ import type { ProjectRepository } from '../persistence';
 import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
 import type {
+	AddAffectedGroupInput,
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AnswerActivityInput,
+	ConfirmAffectedGroupsInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
@@ -44,11 +51,14 @@ import type {
 	MoveScopeItemInput,
 	ProjectListItem,
 	ProjectUseCases,
+	RemoveAffectedGroupInput,
 	RemoveScopeItemInput,
 	RenameProjectInput,
 	ReopenImpedimentInput,
 	ReorderAgoraItemsInput,
 	ResolveImpedimentInput,
+	SetAffectedGroupFrequencyInput,
+	SetAffectedGroupImpactInput,
 	SetHypothesisInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
@@ -132,6 +142,7 @@ function computeLastMovementAt(state: ProjectState): string | null {
 	for (const answer of state.answers) timestamps.push(answer.updatedAt);
 	for (const item of state.scopeItems) timestamps.push(item.updatedAt);
 	for (const impediment of state.impediments) timestamps.push(impediment.updatedAt);
+	for (const group of state.affectedGroups) timestamps.push(group.updatedAt);
 	for (const pending of state.pendingItems) {
 		timestamps.push(pending.createdAt);
 		if (pending.status === 'resolvida') timestamps.push(pending.resolvedAt);
@@ -518,6 +529,61 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!result.ok) return { ok: false, error: result.error };
 
 			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async addAffectedGroup(input: AddAffectedGroupInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addAffectedGroupInDomain(catalog, state, idGenerator.generate(), input.label, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setAffectedGroupImpact(input: SetAffectedGroupImpactInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setAffectedGroupImpactInDomain(catalog, state, input.groupId, input.impact, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setAffectedGroupFrequencyInDomain(catalog, state, input.groupId, input.frequency, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeAffectedGroup(input: RemoveAffectedGroupInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeAffectedGroupInDomain(catalog, state, input.groupId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmAffectedGroups(input: ConfirmAffectedGroupsInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmAffectedGroupsInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

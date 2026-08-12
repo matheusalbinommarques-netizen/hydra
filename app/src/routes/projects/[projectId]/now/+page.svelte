@@ -4,6 +4,7 @@
 	import { tick } from 'svelte';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
 	import EntenderSituacao from '$lib/components/EntenderSituacao.svelte';
+	import MapaDeImpacto from '$lib/components/MapaDeImpacto.svelte';
 	import PlanningItemsEditor from '$lib/components/PlanningItemsEditor.svelte';
 	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
 	import { encodePlanningItems } from '$lib/domain';
@@ -23,6 +24,13 @@
 			data.activity?.phaseId === 'definicao' ||
 			data.activity?.phaseId === 'estruturacao'
 	);
+
+	// "Entender a situação" e "Quem é afetado" trazem seu próprio shell (topbar
+	// de progresso e, quando aplicável, painel lateral próprio) — sem o
+	// Progresso da fase/Bancada genéricos ao lado, a coluna principal ocupa a
+	// largura toda (mesmo espírito de .dark-activity em +layout.svelte).
+	const OWN_SHELL_ACTIVITY_IDS = new Set(['problema', 'publico']);
+	let hasOwnShell = $derived(OWN_SHELL_ACTIVITY_IDS.has(data.activity?.id ?? ''));
 
 	// "Revisão recomendada" (Resumo) é só um card pequeno com um link de
 	// saída — sem isto, sobra muito espaço vazio na coluna principal ao lado
@@ -113,7 +121,7 @@
 		</p>
 	{/if}
 
-	{#if data.journeyContext && data.activity?.id !== 'problema'}
+	{#if data.journeyContext && !hasOwnShell}
 		<section class="journey-context" aria-label="Onde estamos">
 			<p class="journey-label">Onde estamos</p>
 			{#if data.journeyContext.kind === 'in_progress'}
@@ -198,6 +206,17 @@
 			reviewOrigin={data.reviewOrigin ?? undefined}
 			phaseProgress={data.phaseProgress}
 			projectName={view.projectName}
+		/>
+	{:else if data.activity?.id === 'publico' && data.activity.completionMode === 'explicit_confirmation'}
+		<MapaDeImpacto
+			activity={data.activity}
+			affectedGroups={view.affectedGroups}
+			affectedGroupConfirmationIssues={view.affectedGroupConfirmationIssues}
+			reviewOrigin={data.reviewOrigin ?? undefined}
+			phaseProgress={data.phaseProgress}
+			projectName={view.projectName}
+			projectId={view.projectId}
+			situacaoSynthesis={view.answers['situacao']}
 		/>
 	{:else if data.activity?.completionMode === 'scope_confirmation'}
 		<section class="next-action">
@@ -297,11 +316,11 @@
 	{/if}
 {/snippet}
 
-<div class="workspace-layout" class:full-width={data.activity?.id === 'problema'}>
+<div class="workspace-layout" class:full-width={hasOwnShell}>
 	<div class="workspace-main" class:center-single-card={isReviewRecommendation}>
 		{@render mainContent()}
 	</div>
-	{#if data.activity?.id !== 'problema'}
+	{#if !hasOwnShell}
 	<aside class="workspace-sidebar" aria-label="Progresso e contexto">
 		{#if data.phaseProgress}
 			<section class="sidebar-card" aria-label="Progresso da fase">

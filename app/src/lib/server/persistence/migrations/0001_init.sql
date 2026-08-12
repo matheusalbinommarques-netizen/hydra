@@ -100,3 +100,21 @@ CREATE TABLE IF NOT EXISTS impediment (
 		(status = 'resolvido' AND resolved_at IS NOT NULL)
 	)
 );
+
+-- Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — ver
+-- app/src/lib/domain/state-types.ts. Ligado à atividade `publico` do
+-- catálogo (completion deriva do estado destes grupos, ver
+-- domain/transitions.ts, confirmAffectedGroups), mas sem
+-- activity_definition_id próprio: a ligação é fixa, não um dado armazenado
+-- por linha. impact/frequency aceitam NULL (por classificar) além dos
+-- literais aprovados — 'desconhecido' é uma resposta explícita do usuário
+-- ("Ainda não sabemos"), diferente de NULL.
+CREATE TABLE IF NOT EXISTS affected_group (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	label TEXT NOT NULL,
+	impact TEXT CHECK (impact IN ('alto', 'medio', 'baixo', 'desconhecido')),
+	frequency TEXT CHECK (frequency IN ('constante', 'frequente', 'as_vezes', 'raro', 'desconhecido')),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);

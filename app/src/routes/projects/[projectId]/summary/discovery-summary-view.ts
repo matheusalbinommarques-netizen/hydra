@@ -7,6 +7,8 @@
 import { decodeMultiSelectValue } from '$lib/domain';
 import type { ActivityStatus, Catalog } from '$lib/domain';
 import type { PendingItemView } from '$lib/orientation-engine';
+import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
+import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
 
 export interface DiscoveryOverviewBlock {
 	activityId: string;
@@ -48,7 +50,8 @@ function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: 
 export function buildDiscoverySummaryView(
 	catalog: Catalog,
 	answers: Record<string, string>,
-	activityStatuses: Record<string, ActivityStatus>
+	activityStatuses: Record<string, ActivityStatus>,
+	affectedGroups: AffectedGroupSummaryInput[] = []
 ): DiscoverySummaryView {
 	const overview: DiscoveryOverviewBlock[] = [];
 
@@ -64,13 +67,13 @@ export function buildDiscoverySummaryView(
 		});
 	}
 
-	const publicoDetail = answers['publico_detail'];
-	if (publicoDetail) {
+	if (affectedGroups.length > 0) {
 		overview.push({
 			activityId: 'publico',
-			heading: 'Público afetado',
-			editLabel: 'Editar público',
-			value: publicoDetail
+			heading: 'Quem é afetado',
+			editLabel: 'Editar quem é afetado',
+			value: summarizeAffectedGroups(affectedGroups),
+			chips: affectedGroups.map((group) => group.label)
 		});
 	}
 

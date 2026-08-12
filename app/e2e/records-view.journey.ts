@@ -134,7 +134,7 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 			const now = new Date().toISOString();
 			const earlier = new Date(Date.now() - 60_000).toISOString();
 
-			// "Público afetado" fica pulada — pendência aberta.
+			// "Quem é afetado" fica pulada — pendência aberta.
 			db.prepare(
 				`UPDATE activity_progress SET status = 'pulada'
 				 WHERE project_id = ? AND activity_definition_id = 'publico'`
@@ -166,7 +166,7 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 	await test.step('Registros não mostra a pendência aberta — ela pertence a Acompanhamento e a Agora', async () => {
 		await page.reload();
 
-		await expect(page.getByText('Público afetado não foi detalhado')).toHaveCount(0);
+		await expect(page.getByText('Quem é afetado não foi mapeado')).toHaveCount(0);
 	});
 
 	await test.step('Registros reflete a pendência resolvida, sem data (dado não exibido nesta projeção)', async () => {
@@ -236,8 +236,8 @@ test('Registros: quarta combinação de estados — sem respostas, com pendênci
 	).toBeVisible();
 
 	// pendência resolvida listada
-	await expect(page.getByText('Público afetado não foi detalhado')).toBeVisible();
-	await expect(page.getByText('Atividade: Público afetado · Resolvida')).toBeVisible();
+	await expect(page.getByText('Quem é afetado não foi mapeado')).toBeVisible();
+	await expect(page.getByText('Atividade: Quem é afetado · Resolvida')).toBeVisible();
 
 	// Continuidade presente
 	await expect(page.getByRole('heading', { name: 'Registros' })).toBeVisible();

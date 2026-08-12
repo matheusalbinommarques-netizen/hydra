@@ -82,7 +82,7 @@ test('"Pular esta pergunta" nos passos 2 e 3: síntese sem eles, valor do passo 
 
 		await expect(page.getByRole('heading', { name: 'Etapa concluída' })).toBeVisible();
 		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
-		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
 	});
 
 	await test.step('reabrir a partir de Registros: passo 1 preservado, passos 2 e 3 continuam vazios', async () => {

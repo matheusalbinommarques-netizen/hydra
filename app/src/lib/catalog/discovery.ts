@@ -225,31 +225,32 @@ const problema: ActivityDefinition = {
 	]
 };
 
+// "Quem é afetado" (era "Público afetado") — ETAPA 2 do rework (Claude
+// Design, "Quem é Afetado.dc.html"): substitui o texto livre de
+// `publico_detail` por um Mapa de Impacto que constrói e classifica objetos
+// `AffectedGroup` reais (ver domain/state-types.ts e domain/transitions.ts,
+// confirmAffectedGroups). completionMode passa de required_fields para
+// explicit_confirmation — a conclusão deriva do estado estruturado dos
+// grupos (pelo menos um grupo, todos com impacto e frequência classificados,
+// "Ainda não sabemos" incluído), nunca de uma Answer. `publico_detail` deixa
+// de ser escrito para projetos novos (ver AffectedGroup como fonte canônica);
+// Answers legadas desse campo, se existirem em projetos antigos, permanecem
+// no banco sem uso (mesmo tratamento já dado a `contexto` ao ser
+// incorporada) — não há dual-write nem conversão automática de texto livre
+// em grupos.
 const publico: ActivityDefinition = {
 	id: 'publico',
 	phaseId: 'descoberta',
 	order: 3,
-	title: 'Público afetado',
-	mainQuestion: 'Quem é afetado por esta situação, em detalhe?',
+	title: 'Quem é afetado',
+	mainQuestion: 'Quem sente mais essa situação?',
 	why: 'Saber quem é afetado ajuda a priorizar requisitos e critérios de aceitação.',
 	example: 'Agentes de atendimento e clientes que abrem e acompanham solicitações.',
-	completionCriteria: 'O público afetado foi descrito com clareza.',
-	completionMode: 'required_fields',
+	completionCriteria: 'Pelo menos um grupo afetado foi adicionado, com impacto e frequência classificados.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'Público afetado não foi detalhado',
-	pendingItemDetail: 'Impacta decisões de priorização e critérios de aceitação.',
-	fields: [
-		{
-			id: 'publico_detail',
-			activityId: 'publico',
-			label: 'Quem é afetado por esta situação, em detalhe?',
-			required: true,
-			help: 'Descreva pessoas ou áreas impactadas.',
-			placeholder: 'Descreva o público afetado...',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'Quem é afetado não foi mapeado',
+	pendingItemDetail: 'Impacta decisões de priorização e critérios de aceitação.'
 };
 
 const estadoAtual: ActivityDefinition = {
@@ -311,14 +312,12 @@ const resultado: ActivityDefinition = {
 			help: 'Identifique quem sente essa mudança primeiro.',
 			placeholder: 'Ex.: clientes, equipe de atendimento...',
 			dataTarget: 'answer',
-			type: 'texto_longo',
-			suggestedSource: {
-				activityId: 'publico',
-				fieldId: 'publico_detail',
-				actionLabel: 'Usar Público afetado como ponto de partida',
-				helpText:
-					'Você poderá ajustar o texto para representar especificamente quem percebe essa mudança primeiro.'
-			}
+			type: 'texto_longo'
+			// suggestedSource para "Quem é afetado" (publico/publico_detail) foi
+			// removido nesta etapa: o campo de origem não existe mais no catálogo
+			// (ver AffectedGroup, ETAPA 2 do rework) — reaproveitar os grupos
+			// estruturados como sugestão de texto livre exigiria um mecanismo novo,
+			// fora do escopo deste corte (ver relatório do Gate 2).
 		},
 		{
 			id: 'percepcao',

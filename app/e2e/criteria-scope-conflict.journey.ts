@@ -53,8 +53,11 @@ async function completeDiscovery(page: Page): Promise<void> {
 	await page.getByRole('button', { name: 'Sim, continuar' }).click();
 	await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
-	await page.getByLabel('Quem é afetado por esta situação, em detalhe?').fill('Público de teste.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByRole('button', { name: '+ Adicionar grupo' }).click();
+	await page.getByRole('button', { name: 'Equipe interna', exact: true }).click();
+	await page.getByRole('button', { name: 'Alto', exact: true }).click();
+	await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
+	await page.getByRole('button', { name: 'Concluir mapa' }).click();
 
 	await page.getByLabel('Como a situação é tratada hoje, em detalhe?').fill('Estado atual de teste.');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();

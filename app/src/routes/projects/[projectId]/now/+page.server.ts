@@ -73,9 +73,21 @@ function findActivityDefinition(activityId: string): ActivityDefinition | undefi
 // tipo "editableAfterConclusion"), não a adição de outro id aqui.
 const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set(['decompor_trabalho']);
 
+// "Quem é afetado" (publico) é a única exceção não required_fields: o Mapa
+// de Impacto (MapaDeImpacto.svelte, ETAPA 2 do rework) é editável diretamente
+// mesmo depois de concluído — adicionar/remover/reclassificar grupo depois da
+// confirmação reabre a atividade automaticamente quando o mapa fica
+// incompleto (ver domain/transitions.ts, confirmAffectedGroups). Sem esta
+// exceção, não haveria como retomar o Mapa após concluí-lo — `?activity=`
+// só chega aqui via este mecanismo de revisão.
+const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico']);
+
 function findReviewableConcludedActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
 	const activity = findActivityDefinition(activityId);
-	if (!activity || activity.completionMode !== 'required_fields') return undefined;
+	if (!activity) return undefined;
+	const hasReviewableCompletionMode =
+		activity.completionMode === 'required_fields' || REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS.has(activity.id);
+	if (!hasReviewableCompletionMode) return undefined;
 	const isDescoberta = activity.phaseId === DESCOBERTA_PHASE_ID;
 	const isNominalException = REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA.has(activity.id);
 	if (!isDescoberta && !isNominalException) return undefined;
@@ -125,7 +137,7 @@ function resolveOptionalFields(activity: RequiredFieldsActivity, view: ProjectVi
 
 export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const { view } = await parent();
-	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers);
+	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers, view.affectedGroups);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 	const phaseProgress = buildPhaseProgress(catalog, view);
 
@@ -162,7 +174,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 			reviewOrigin,
 			stepKind: 'full' as const,
 			bancadaOverview,
-			journeyContext
+			journeyContext,
+			phaseProgress
 		};
 	}
 
@@ -403,6 +416,85 @@ export const actions: Actions = {
 			return fail(400, { message: mapUseCaseError(result.error) });
 		}
 
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — cada interação
+	// persiste imediatamente (mesmo padrão de next-version/+page.server.ts
+	// para ScopeItem): nunca staging local submetido de uma vez só. Não
+	// redireciona — MapaDeImpacto.svelte permanece na mesma tela após cada
+	// ação, atualizando via `update()` (use:enhance), exatamente como a
+	// edição de ScopeItem em /next-version.
+	addAffectedGroup: async ({ request, params }) => {
+		const formData = await request.formData();
+		const label = formData.get('label');
+		if (typeof label !== 'string' || label.trim().length === 0) {
+			return fail(400, { message: 'Informe um nome para o grupo.' });
+		}
+
+		const result = await getProjectUseCases().addAffectedGroup({ projectId: params.projectId, label: label.trim() });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setAffectedGroupImpact: async ({ request, params }) => {
+		const formData = await request.formData();
+		const groupId = formData.get('groupId');
+		const impact = formData.get('impact');
+		if (typeof groupId !== 'string' || !groupId) return fail(400, { message: 'Grupo inválido.' });
+		if (
+			typeof impact !== 'string' ||
+			!(['alto', 'medio', 'baixo', 'desconhecido'] as const).includes(impact as never)
+		) {
+			return fail(400, { message: 'Impacto inválido.' });
+		}
+
+		const result = await getProjectUseCases().setAffectedGroupImpact({
+			projectId: params.projectId,
+			groupId,
+			impact: impact as 'alto' | 'medio' | 'baixo' | 'desconhecido'
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setAffectedGroupFrequency: async ({ request, params }) => {
+		const formData = await request.formData();
+		const groupId = formData.get('groupId');
+		const frequency = formData.get('frequency');
+		if (typeof groupId !== 'string' || !groupId) return fail(400, { message: 'Grupo inválido.' });
+		if (
+			typeof frequency !== 'string' ||
+			!(['constante', 'frequente', 'as_vezes', 'raro', 'desconhecido'] as const).includes(frequency as never)
+		) {
+			return fail(400, { message: 'Frequência inválida.' });
+		}
+
+		const result = await getProjectUseCases().setAffectedGroupFrequency({
+			projectId: params.projectId,
+			groupId,
+			frequency: frequency as 'constante' | 'frequente' | 'as_vezes' | 'raro' | 'desconhecido'
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	removeAffectedGroup: async ({ request, params }) => {
+		const formData = await request.formData();
+		const groupId = formData.get('groupId');
+		if (typeof groupId !== 'string' || !groupId) return fail(400, { message: 'Grupo inválido.' });
+
+		const result = await getProjectUseCases().removeAffectedGroup({ projectId: params.projectId, groupId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	confirmAffectedGroups: async ({ params }) => {
+		const result = await getProjectUseCases().confirmAffectedGroups({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		// Mesmo padrão de confirmPlanningPriority: a rota canônica de Agora
+		// recomputa a atividade recomendada, que já avançou para a próxima da
+		// jornada agora que "publico" está concluída.
 		redirect(303, `/projects/${params.projectId}/now`);
 	}
 };

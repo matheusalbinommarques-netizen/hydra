@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
-import { answerActivity, createInitialProjectState } from '$lib/domain';
+import { createInitialProjectState, setAffectedGroupFrequency } from '$lib/domain';
 import { computeNextActivity } from './next-activity';
 import { answerActivityMinimally, completePhase, skipActivityForTest, unwrapResult } from '$lib/domain/test-support';
 
@@ -39,10 +39,13 @@ describe('computeNextActivity (Trilha A)', () => {
 			activityDefinitionId: 'usuario_principal'
 		});
 
-		// edita uma resposta anterior da Descoberta com um valor genuinamente
-		// diferente (answerActivityMinimally reusaria o mesmo texto e não
-		// contaria como mudança) → invalida o Resumo
-		state = unwrapResult(answerActivity(catalog, state, 'publico', { publico_detail: 'Outro valor' }, T2));
+		// muda uma atividade anterior da Descoberta com um valor genuinamente
+		// diferente, sem tornar "Quem é afetado" incompleta de novo (reclassificar
+		// a frequência do grupo já existente, criado por
+		// confirmAffectedGroupsMinimally, mantém publico concluída) → invalida só
+		// o Resumo, mesma regra de invalidação de answerActivity (ver
+		// domain/transitions.ts, setAffectedGroupFrequency)
+		state = unwrapResult(setAffectedGroupFrequency(catalog, state, 'publico-affected-group-1', 'raro', T2));
 		expect(computeNextActivity(catalog, state.activityProgress)).toEqual({
 			kind: 'recommendation',
 			activityDefinitionId: 'resumo'

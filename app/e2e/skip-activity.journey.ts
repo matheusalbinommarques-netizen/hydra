@@ -106,7 +106,7 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 		await page.locator('dialog[open]').getByRole('button', { name: 'Confirmar' }).click();
 
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
-		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
 
 		await expect(page.getByText('Situação não foi detalhada')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Retomar etapa' })).toBeVisible();
@@ -160,7 +160,7 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 		await expect(page.getByRole('heading', { name: 'Etapa concluída' })).toBeVisible();
 		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
-		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
 		await expect(page.locator('.pendencias')).toHaveCount(0);
 
 		await page.getByRole('link', { name: 'Registros' }).click();

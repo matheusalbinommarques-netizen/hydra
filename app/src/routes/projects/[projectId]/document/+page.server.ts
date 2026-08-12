@@ -5,6 +5,6 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { view } = await parent();
-	const { blocks } = buildBancadaOverviewView(catalog, view.answers);
+	const { blocks } = buildBancadaOverviewView(catalog, view.answers, view.affectedGroups);
 	return buildDocumentView(catalog, blocks);
 };

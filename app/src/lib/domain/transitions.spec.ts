@@ -2,20 +2,26 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addAffectedGroup,
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	confirmAffectedGroups,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
+	getAffectedGroupConfirmationIssues,
 	getScopeConfirmationIssues,
 	isActivityFieldsValid,
 	moveScopeItem,
+	removeAffectedGroup,
 	removeScopeItem,
 	renameProject,
 	reopenImpediment,
 	reorderAgoraItems,
 	resolveImpediment,
+	setAffectedGroupFrequency,
+	setAffectedGroupImpact,
 	setHypothesis,
 	setImpedimentNextAction,
 	setImpedimentType,
@@ -193,12 +199,14 @@ describe('answerActivity', () => {
 	});
 
 	it('campo answer gera uma Answer nova, com createdAt e updatedAt = occurredAt', () => {
-		const state = unwrap(answerActivity(catalog, freshState(), 'publico', { publico_detail: 'Clientes' }, T1));
-		const answer = state.answers.find((a) => a.fieldDefinitionId === 'publico_detail');
+		const state = unwrap(
+			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
+		);
+		const answer = state.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail');
 		expect(answer).toEqual({
 			projectId: 'proj-1',
-			activityDefinitionId: 'publico',
-			fieldDefinitionId: 'publico_detail',
+			activityDefinitionId: 'estado_atual',
+			fieldDefinitionId: 'estado_atual_detail',
 			value: 'Clientes',
 			createdAt: T1,
 			updatedAt: T1
@@ -207,25 +215,27 @@ describe('answerActivity', () => {
 
 	it('resposta idêntica não altera timestamps nem cria uma segunda Answer', () => {
 		const first = unwrap(
-			answerActivity(catalog, freshState(), 'publico', { publico_detail: 'Clientes' }, T1)
+			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
 		);
-		const second = unwrap(answerActivity(catalog, first, 'publico', { publico_detail: 'Clientes' }, T2));
+		const second = unwrap(
+			answerActivity(catalog, first, 'estado_atual', { estado_atual_detail: 'Clientes' }, T2)
+		);
 		expect(second.answers).toEqual(first.answers); // updatedAt continua T1, não vira T2
 		expect(second.answers).toHaveLength(1);
 	});
 
 	it('resposta diferente atualiza updatedAt mas preserva createdAt', () => {
 		const first = unwrap(
-			answerActivity(catalog, freshState(), 'publico', { publico_detail: 'Clientes' }, T1)
+			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
 		);
 		const second = unwrap(
-			answerActivity(catalog, first, 'publico', { publico_detail: 'Clientes e atendentes' }, T2)
+			answerActivity(catalog, first, 'estado_atual', { estado_atual_detail: 'Clientes e atendentes' }, T2)
 		);
-		const answer = second.answers.find((a) => a.fieldDefinitionId === 'publico_detail');
+		const answer = second.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail');
 		expect(answer).toEqual({
 			projectId: 'proj-1',
-			activityDefinitionId: 'publico',
-			fieldDefinitionId: 'publico_detail',
+			activityDefinitionId: 'estado_atual',
+			fieldDefinitionId: 'estado_atual_detail',
 			value: 'Clientes e atendentes',
 			createdAt: T1,
 			updatedAt: T2
@@ -281,7 +291,7 @@ describe('answerActivity', () => {
 	it('mudança real em atividade anterior invalida o Resumo já concluída', () => {
 		const withSummary = unwrap(confirmSummary(catalog, freshState()));
 		const answered = unwrap(
-			answerActivity(catalog, withSummary, 'publico', { publico_detail: 'Clientes' }, T2)
+			answerActivity(catalog, withSummary, 'estado_atual', { estado_atual_detail: 'Clientes' }, T2)
 		);
 		const resumo = answered.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
@@ -289,11 +299,11 @@ describe('answerActivity', () => {
 
 	it('mudança repetindo o mesmo valor não invalida o Resumo já concluída', () => {
 		const answered = unwrap(
-			answerActivity(catalog, freshState(), 'publico', { publico_detail: 'Clientes' }, T1)
+			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
 		);
 		const withSummary = unwrap(confirmSummary(catalog, answered));
 		const reanswered = unwrap(
-			answerActivity(catalog, withSummary, 'publico', { publico_detail: 'Clientes' }, T2)
+			answerActivity(catalog, withSummary, 'estado_atual', { estado_atual_detail: 'Clientes' }, T2)
 		);
 		const resumo = reanswered.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('concluída');
@@ -371,10 +381,144 @@ describe('confirmSummary', () => {
 		expect(resumoProgress?.status).toBe('concluída');
 		expect(priorizarProgress?.status).toBe('pulada'); // intocada pela confirmação do Resumo
 
-		// Editar uma resposta da Descoberta continua reabrindo só o Resumo.
-		const edited = unwrap(answerActivity(catalog, confirmed, 'publico', { publico_detail: 'novo valor' }, T2));
+		// Editar uma resposta da Descoberta continua reabrindo só o Resumo —
+		// inclusive uma mutação de AffectedGroup (publico deixou de ser
+		// required_fields na ETAPA 2, mas shouldInvalidateSummary/invalidateSummary
+		// continuam sendo acionados a partir de addAffectedGroup).
+		const edited = unwrap(addAffectedGroup(catalog, confirmed, 'ag-1', 'Clientes', T2));
 		const resumoAfterEdit = edited.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumoAfterEdit?.status).toBe('em_andamento');
+	});
+});
+
+describe('AffectedGroup / Mapa de Impacto (ETAPA 2 — "Quem é afetado")', () => {
+	it('addAffectedGroup cria um grupo com impact/frequency null e timestamps = occurredAt', () => {
+		const state = unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Operação', T1));
+		expect(state.affectedGroups).toEqual([
+			{
+				id: 'ag-1',
+				projectId: 'proj-1',
+				label: 'Operação',
+				impact: null,
+				frequency: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+	});
+
+	it('getAffectedGroupConfirmationIssues: no_groups quando vazio', () => {
+		expect(getAffectedGroupConfirmationIssues([])).toEqual([{ kind: 'no_groups' }]);
+	});
+
+	it('getAffectedGroupConfirmationIssues: missing_impact e missing_frequency apontam os ids certos, "desconhecido" conta como resposta válida', () => {
+		let state = unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Operação', T1));
+		state = unwrap(addAffectedGroup(catalog, state, 'ag-2', 'Clientes', T1));
+		state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'desconhecido', T1));
+		state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'desconhecido', T1));
+		// ag-1 totalmente classificado (com 'desconhecido', não null); ag-2 ainda
+		// não tem nem impact nem frequency.
+		expect(getAffectedGroupConfirmationIssues(state.affectedGroups)).toEqual([
+			{ kind: 'missing_impact', groupIds: ['ag-2'] },
+			{ kind: 'missing_frequency', groupIds: ['ag-2'] }
+		]);
+	});
+
+	it('setAffectedGroupImpact: valor repetido é no-op (não altera updatedAt)', () => {
+		const added = unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Operação', T1));
+		const first = unwrap(setAffectedGroupImpact(catalog, added, 'ag-1', 'alto', T1));
+		const second = unwrap(setAffectedGroupImpact(catalog, first, 'ag-1', 'alto', T2));
+		expect(second).toBe(first);
+	});
+
+	it('setAffectedGroupImpact/Frequency: erro affected_group_not_found para id inexistente', () => {
+		expect(setAffectedGroupImpact(catalog, freshState(), 'inexistente', 'alto', T1)).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_not_found' }
+		});
+		expect(setAffectedGroupFrequency(catalog, freshState(), 'inexistente', 'raro', T1)).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_not_found' }
+		});
+	});
+
+	it('removeAffectedGroup remove o grupo; erro affected_group_not_found para id inexistente', () => {
+		const added = unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Operação', T1));
+		const removed = unwrap(removeAffectedGroup(catalog, added, 'ag-1'));
+		expect(removed.affectedGroups).toEqual([]);
+		expect(removeAffectedGroup(catalog, removed, 'ag-1')).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_not_found' }
+		});
+	});
+
+	function fullyClassifiedState(): ProjectState {
+		let state = unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Operação', T1));
+		state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T1));
+		state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'constante', T1));
+		return state;
+	}
+
+	it('confirmAffectedGroups conclui "publico" quando o mapa está completo', () => {
+		const state = unwrap(confirmAffectedGroups(catalog, fullyClassifiedState(), T2));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'publico');
+		expect(progress?.status).toBe('concluída');
+	});
+
+	it('confirmAffectedGroups erro affected_group_confirmation_invalid quando incompleto', () => {
+		const result = confirmAffectedGroups(catalog, freshState(), T1);
+		expect(result).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_confirmation_invalid', issues: [{ kind: 'no_groups' }] }
+		});
+	});
+
+	it('confirmAffectedGroups erro transition_not_allowed se já concluída', () => {
+		const confirmed = unwrap(confirmAffectedGroups(catalog, fullyClassifiedState(), T1));
+		const result = confirmAffectedGroups(catalog, confirmed, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('confirmAffectedGroups resolve a PendingItem quando a atividade estava pulada', () => {
+		const skipped = unwrap(skipActivity(catalog, fullyClassifiedState(), 'publico', 'pend-publico', T1));
+		expect(skipped.pendingItems[0].status).toBe('aberta');
+		const confirmed = unwrap(confirmAffectedGroups(catalog, skipped, T2));
+		expect(confirmed.pendingItems[0]).toEqual({
+			id: 'pend-publico',
+			projectId: 'proj-1',
+			activityDefinitionId: 'publico',
+			status: 'resolvida',
+			createdAt: T1,
+			resolvedAt: T2
+		});
+	});
+
+	it('adicionar um novo grupo (ainda por classificar) depois de concluído reabre "publico" (mesmo espírito de invalidateScopeConfirmation)', () => {
+		const confirmed = unwrap(confirmAffectedGroups(catalog, fullyClassifiedState(), T1));
+		const withNewGroup = unwrap(addAffectedGroup(catalog, confirmed, 'ag-2', 'Fornecedores', T2));
+		const progress = withNewGroup.activityProgress.find((p) => p.activityDefinitionId === 'publico');
+		expect(progress?.status).toBe('em_andamento');
+	});
+
+	it('editar o mapa depois de concluído SEM torná-lo incompleto não reabre "publico"', () => {
+		const confirmed = unwrap(confirmAffectedGroups(catalog, fullyClassifiedState(), T1));
+		const stillComplete = unwrap(setAffectedGroupFrequency(catalog, confirmed, 'ag-1', 'raro', T2));
+		const progress = stillComplete.activityProgress.find((p) => p.activityDefinitionId === 'publico');
+		expect(progress?.status).toBe('concluída');
+	});
+
+	it('remover o único grupo depois de concluído reabre "publico"', () => {
+		const confirmed = unwrap(confirmAffectedGroups(catalog, fullyClassifiedState(), T1));
+		const removed = unwrap(removeAffectedGroup(catalog, confirmed, 'ag-1'));
+		const progress = removed.activityProgress.find((p) => p.activityDefinitionId === 'publico');
+		expect(progress?.status).toBe('em_andamento');
+	});
+
+	it('addAffectedGroup invalida o Resumo já concluído (mesma regra de answerActivity)', () => {
+		const withSummary = unwrap(confirmSummary(catalog, freshState()));
+		const added = unwrap(addAffectedGroup(catalog, withSummary, 'ag-1', 'Operação', T2));
+		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
+		expect(resumo?.status).toBe('em_andamento');
 	});
 });
 

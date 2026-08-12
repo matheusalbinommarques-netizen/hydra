@@ -51,19 +51,18 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 		expect(problema.chips).toBeUndefined();
 	});
 
-	it('bloco "Público afetado" só aparece quando publico_detail existe', () => {
-		const semResposta = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA);
-		expect(semResposta.overview.find((b) => b.activityId === 'publico')).toBeUndefined();
+	it('bloco "Quem é afetado" só aparece quando há AffectedGroup, nunca a partir de publico_detail', () => {
+		const semGrupos = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, []);
+		expect(semGrupos.overview.find((b) => b.activityId === 'publico')).toBeUndefined();
 
-		const comResposta = buildDiscoverySummaryView(
-			catalog,
-			{ publico_detail: 'Agentes de atendimento' },
-			ALL_NAO_INICIADA
-		);
-		const publico = comResposta.overview.find((b) => b.activityId === 'publico')!;
-		expect(publico.heading).toBe('Público afetado');
-		expect(publico.editLabel).toBe('Editar público');
-		expect(publico.value).toBe('Agentes de atendimento');
+		const comGrupos = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [
+			{ label: 'Agentes de atendimento', impact: 'alto' }
+		]);
+		const publico = comGrupos.overview.find((b) => b.activityId === 'publico')!;
+		expect(publico.heading).toBe('Quem é afetado');
+		expect(publico.editLabel).toBe('Editar quem é afetado');
+		expect(publico.value).toBe('Grupo afetado: Agentes de atendimento (Alto).');
+		expect(publico.chips).toEqual(['Agentes de atendimento']);
 	});
 
 	it('bloco "Estado atual" só aparece quando estado_atual_detail existe', () => {
@@ -96,11 +95,11 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 			{
 				situacao: 'Situação',
 				sinais_situacao: encodeMultiSelectValue(['rework']),
-				publico_detail: 'Público',
 				estado_atual_detail: 'Estado atual',
 				mudanca: 'Resultado'
 			},
-			ALL_NAO_INICIADA
+			ALL_NAO_INICIADA,
+			[{ label: 'Público', impact: 'alto' }]
 		);
 		expect(view.overview.map((b) => b.activityId)).toEqual(['problema', 'publico', 'estado_atual', 'resultado']);
 	});

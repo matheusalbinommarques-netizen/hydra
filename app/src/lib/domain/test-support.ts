@@ -7,11 +7,15 @@
 // espalhados pelos testes de orientation-engine.
 
 import {
+	addAffectedGroup,
 	addScopeItem,
 	answerActivity,
+	confirmAffectedGroups,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
+	setAffectedGroupFrequency,
+	setAffectedGroupImpact,
 	setHypothesis,
 	setScopeItemEffort,
 	skipActivity
@@ -98,10 +102,29 @@ export function confirmScopeVersionMinimally(
 }
 
 /**
+ * Confirma o Mapa de Impacto (`publico`, ETAPA 2 do rework) com o mínimo que
+ * satisfaz {@link getAffectedGroupConfirmationIssues}: um grupo com impact e
+ * frequency definidos — para quando o teste só precisa que `publico` fique
+ * `concluída`, sem se importar com o conteúdo do mapa.
+ */
+export function confirmAffectedGroupsMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	groupId: string,
+	occurredAt: string
+): ProjectState {
+	let next = unwrapResult(addAffectedGroup(catalog, state, groupId, 'Grupo de teste', occurredAt));
+	next = unwrapResult(setAffectedGroupImpact(catalog, next, groupId, 'alto', occurredAt));
+	next = unwrapResult(setAffectedGroupFrequency(catalog, next, groupId, 'constante', occurredAt));
+	return unwrapResult(confirmAffectedGroups(catalog, next, occurredAt));
+}
+
+/**
  * Completa todas as atividades de uma fase, na ordem do catálogo:
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
- * via `confirmSummary` (Resumo) ou `confirmPlanningPriority` (Priorizar
- * entregas, C5-01), `scope_confirmation` via {@link confirmScopeVersionMinimally}.
+ * via `confirmSummary` (Resumo), `confirmPlanningPriority` (Priorizar
+ * entregas, C5-01) ou {@link confirmAffectedGroupsMinimally} (Quem é afetado,
+ * ETAPA 2), `scope_confirmation` via {@link confirmScopeVersionMinimally}.
  */
 export function completePhase(catalog: Catalog, state: ProjectState, phaseId: string, occurredAt: string): ProjectState {
 	const phase = catalog.phases.find((p) => p.id === phaseId);
@@ -109,12 +132,14 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 	let next = state;
 	for (const activity of phase.activities) {
 		if (activity.completionMode === 'explicit_confirmation') {
-			// Duas atividades explicit_confirmation no catálogo (C5-01) — cada
-			// uma tem sua própria transição de confirmação, localizada por id
-			// explícito; nunca uma seleção genérica "a explicit_confirmation
+			// Três atividades explicit_confirmation no catálogo (C5-01 + ETAPA 2)
+			// — cada uma tem sua própria transição de confirmação, localizada por
+			// id explícito; nunca uma seleção genérica "a explicit_confirmation
 			// desta fase".
 			if (activity.id === 'priorizar_entregas') {
 				next = unwrapResult(confirmPlanningPriority(catalog, next, occurredAt));
+			} else if (activity.id === 'publico') {
+				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else {
 				next = unwrapResult(confirmSummary(catalog, next));
 			}

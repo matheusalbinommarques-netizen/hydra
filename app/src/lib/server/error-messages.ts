@@ -39,6 +39,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'A fase escolhida não existe mais no catálogo.';
 		case 'planning_no_items':
 			return 'Adicione ao menos uma parte em "Decompor o trabalho" antes de confirmar a prioridade.';
+		case 'affected_group_not_found':
+			return 'Grupo afetado não encontrado.';
+		case 'affected_group_confirmation_invalid':
+			return 'Adicione ao menos um grupo e classifique impacto e frequência antes de concluir o mapa.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

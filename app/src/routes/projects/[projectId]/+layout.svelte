@@ -6,15 +6,19 @@
 	let projectId = $derived(page.params.projectId);
 	let pathname = $derived(page.url.pathname);
 
-	// "Entender a situação" (Claude Design) é a única atividade já convergida
-	// para a identidade escura — o resto do shell continua papel/tinta/
-	// grafite. Em vez de uma "ilha escura" isolada dentro do card claro,
-	// aplicamos o tema escuro ao shell inteiro só quando esta é a atividade
-	// atual: os mesmos tokens --hydra-* já usados por todo o shell/página
-	// (header, nav, /now) são redefinidos num escopo (.dark-activity), sem
-	// tocar o markup ou o CSS de nenhuma outra atividade. Ao sair desta
-	// atividade, o shell volta ao normal — nenhuma outra tela foi redesenhada.
-	let isDarkActivity = $derived((page.data as { activity?: { id?: string } })?.activity?.id === 'problema');
+	// "Entender a situação" e "Quem é afetado" (Claude Design) são as
+	// atividades já convergidas para a identidade escura — o resto do shell
+	// continua papel/tinta/grafite. Em vez de uma "ilha escura" isolada dentro
+	// do card claro, aplicamos o tema escuro ao shell inteiro só quando uma
+	// destas é a atividade atual: os mesmos tokens --hydra-* já usados por
+	// todo o shell/página (header, nav, /now) são redefinidos num escopo
+	// (.dark-activity), sem tocar o markup ou o CSS de nenhuma outra
+	// atividade. Ao sair delas, o shell volta ao normal — nenhuma outra tela
+	// foi redesenhada.
+	const DARK_ACTIVITY_IDS = new Set(['problema', 'publico']);
+	let isDarkActivity = $derived(
+		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '')
+	);
 
 	// Ativo tanto na rota exata quanto em subrotas (ex.: /deliveries/x),
 	// com limite de segmento para não casar caminhos apenas parecidos

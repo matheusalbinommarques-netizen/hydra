@@ -30,6 +30,17 @@ describe('buildBancadaOverviewView', () => {
 		expect(problema.chips).toBeUndefined();
 	});
 
+	it('bloco "Quem é afetado" aparece a partir de affectedGroups, nunca de publico_detail', () => {
+		const withoutGroups = buildBancadaOverviewView(catalog, {}, []);
+		expect(withoutGroups.blocks.find((b) => b.activityId === 'publico')).toBeUndefined();
+
+		const withGroups = buildBancadaOverviewView(catalog, {}, [{ label: 'Operação', impact: 'alto' }]);
+		const publico = withGroups.blocks.find((b) => b.activityId === 'publico')!;
+		expect(publico.heading).toBe('Quem é afetado');
+		expect(publico.value).toBe('Grupo afetado: Operação (Alto).');
+		expect(publico.chips).toEqual(['Operação']);
+	});
+
 	it('bloco "Resultado desejado" usa mudanca, não beneficiario/percepcao', () => {
 		const view = buildBancadaOverviewView(catalog, {
 			mudanca: 'Solicitações centralizadas.',
@@ -205,22 +216,25 @@ describe('buildBancadaOverviewView', () => {
 	});
 
 	it('todos os blocos juntos, na ordem do catálogo (Descoberta, Definição, depois Estruturação)', () => {
-		const view = buildBancadaOverviewView(catalog, {
-			origem: 'Um problema',
-			situacao: 'Situação',
-			publico_detail: 'Público',
-			estado_atual_detail: 'Estado atual',
-			mudanca: 'Resultado',
-			usuario_principal: 'Usuário principal',
-			necessidade_central: 'Necessidade central',
-			sinais_sucesso: 'Sinais de sucesso',
-			objetivo_projeto: 'Objetivo',
-			partes_interessadas: 'Partes interessadas',
-			papeis_responsaveis: 'Papéis',
-			restricoes_projeto: 'Restrições',
-			riscos_identificados: 'Riscos',
-			forma_comunicacao: 'Comunicação'
-		});
+		const view = buildBancadaOverviewView(
+			catalog,
+			{
+				origem: 'Um problema',
+				situacao: 'Situação',
+				estado_atual_detail: 'Estado atual',
+				mudanca: 'Resultado',
+				usuario_principal: 'Usuário principal',
+				necessidade_central: 'Necessidade central',
+				sinais_sucesso: 'Sinais de sucesso',
+				objetivo_projeto: 'Objetivo',
+				partes_interessadas: 'Partes interessadas',
+				papeis_responsaveis: 'Papéis',
+				restricoes_projeto: 'Restrições',
+				riscos_identificados: 'Riscos',
+				forma_comunicacao: 'Comunicação'
+			},
+			[{ label: 'Operação', impact: 'alto' }]
+		);
 		expect(view.blocks.map((b) => b.activityId)).toEqual([
 			'origem',
 			'problema',

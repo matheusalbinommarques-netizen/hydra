@@ -33,7 +33,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const { overview, checklist, detailsOpenByDefault } = buildDiscoverySummaryView(
 		catalog,
 		view.answers,
-		view.activityStatuses
+		view.activityStatuses,
+		view.affectedGroups
 	);
 
 	const discoveryOpenPendingItems = filterDiscoveryOpenPendingItems(catalog, view.openPendingItems);

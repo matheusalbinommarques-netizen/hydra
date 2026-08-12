@@ -28,43 +28,12 @@ describe('computeFieldSuggestions', () => {
 		expect(computeFieldSuggestions(catalog, answers)).toEqual([]);
 	});
 
-	describe('publico_detail → beneficiario / usuario_principal', () => {
-		it('publico_detail respondido gera sugestão para os dois destinos, com texto e ajuda corretos', () => {
-			const answers = [
-				answer({
-					activityDefinitionId: 'publico',
-					fieldDefinitionId: 'publico_detail',
-					value: 'Agentes de atendimento'
-				})
-			];
-
-			const suggestions = computeFieldSuggestions(catalog, answers);
-			expect(suggestions.map((s) => s.fieldId).sort()).toEqual(['beneficiario', 'usuario_principal']);
-
-			const beneficiario = suggestionFor(suggestions, 'beneficiario')!;
-			expect(beneficiario.sourceValue).toBe('Agentes de atendimento');
-			expect(beneficiario.actionLabel).toBe('Usar Público afetado como ponto de partida');
-			expect(beneficiario.helpText.length).toBeGreaterThan(0);
-
-			const usuarioPrincipal = suggestionFor(suggestions, 'usuario_principal')!;
-			expect(usuarioPrincipal.sourceValue).toBe('Agentes de atendimento');
-			expect(usuarioPrincipal.actionLabel).toBe('Usar Público afetado como ponto de partida');
-		});
-
-		it('destino já respondido não aparece mais, o outro continua aparecendo', () => {
-			const answers = [
-				answer({
-					activityDefinitionId: 'publico',
-					fieldDefinitionId: 'publico_detail',
-					value: 'Agentes de atendimento'
-				}),
-				answer({ activityDefinitionId: 'resultado', fieldDefinitionId: 'beneficiario', value: 'Clientes finais' })
-			];
-
-			const suggestions = computeFieldSuggestions(catalog, answers);
-			expect(suggestions.map((s) => s.fieldId)).toEqual(['usuario_principal']);
-		});
-	});
+	// publico_detail → beneficiario/usuario_principal foi removido nesta
+	// suite: "Quem é afetado" deixou de ter um campo de texto livre (ETAPA 2
+	// do rework, ver catalog/discovery.ts) — os suggestedSource que apontavam
+	// para ele foram removidos do catálogo (beneficiario em
+	// catalog/discovery.ts, usuario_principal em catalog/product-definition.ts).
+	// AffectedGroup não alimenta este mecanismo de sugestão de texto.
 
 	describe('problema.situacao → visao_produto.necessidade_central', () => {
 		it('gera sugestão com texto e ajuda corretos', () => {
@@ -156,17 +125,16 @@ describe('computeFieldSuggestions', () => {
 		});
 	});
 
-	it('todas as origens preenchidas ao mesmo tempo geram as cinco sugestões, sem interferência entre pares', () => {
+	it('todas as origens preenchidas ao mesmo tempo geram as três sugestões restantes, sem interferência entre pares', () => {
 		const answers = [
 			answer({ activityDefinitionId: 'problema', fieldDefinitionId: 'situacao', value: 'Solicitações dispersas' }),
-			answer({ activityDefinitionId: 'publico', fieldDefinitionId: 'publico_detail', value: 'Agentes de atendimento' }),
 			answer({ activityDefinitionId: 'resultado', fieldDefinitionId: 'mudanca', value: 'Solicitações centralizadas' }),
 			answer({ activityDefinitionId: 'resultado', fieldDefinitionId: 'percepcao', value: 'Menos retrabalho' })
 		];
 
 		const suggestions = computeFieldSuggestions(catalog, answers);
 		expect(suggestions.map((s) => s.fieldId).sort()).toEqual(
-			['beneficiario', 'usuario_principal', 'necessidade_central', 'beneficio_central', 'sinais_sucesso'].sort()
+			['necessidade_central', 'beneficio_central', 'sinais_sucesso'].sort()
 		);
 	});
 });

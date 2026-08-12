@@ -12,6 +12,7 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		scopeItems: [],
 		scopeVersion: { projectId: 'p1', hypothesis: '', confirmedAt: null },
 		impediments: [],
+		affectedGroups: [],
 		...overrides
 	};
 }
@@ -178,8 +179,8 @@ describe('buildProjectView — pendingItemHistory', () => {
 		const publico = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.find((activity) => activity.id === 'publico');
-		if (!publico || publico.completionMode !== 'required_fields') {
-			throw new Error('fixture inválida: atividade "publico" precisa ser required_fields');
+		if (!publico || publico.completionMode !== 'explicit_confirmation') {
+			throw new Error('fixture inválida: atividade "publico" precisa ser explicit_confirmation');
 		}
 
 		const state = baseState({
@@ -225,7 +226,9 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'scopeSuggestions',
 				'fieldSuggestions',
 				'criteriaScopeConflict',
-				'impediments'
+				'impediments',
+				'affectedGroups',
+				'affectedGroupConfirmationIssues'
 			].sort()
 		);
 	});

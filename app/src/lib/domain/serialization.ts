@@ -6,6 +6,9 @@ import type { ActivityDefinition, Catalog } from './catalog-types';
 import type {
 	ActivityProgress,
 	ActivityStatus,
+	AffectedGroup,
+	AffectedGroupFrequency,
+	AffectedGroupImpact,
 	Answer,
 	Impediment,
 	ImpedimentType,
@@ -19,7 +22,8 @@ import type {
 	ScopeVersion
 } from './state-types';
 import type { Result } from './result';
-import { getScopeConfirmationIssues } from './transitions';
+import { isDeprecatedAnswerField } from './legacy-answers';
+import { getAffectedGroupConfirmationIssues, getScopeConfirmationIssues } from './transitions';
 
 export interface ExportedProjectState {
 	version: 1;
@@ -318,6 +322,52 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 	return { ok: true, value: result };
 }
 
+const AFFECTED_GROUP_IMPACTS: readonly string[] = ['alto', 'medio', 'baixo', 'desconhecido'];
+function isAffectedGroupImpactOrNull(value: unknown): value is AffectedGroupImpact | null {
+	return value === null || (typeof value === 'string' && AFFECTED_GROUP_IMPACTS.includes(value));
+}
+
+const AFFECTED_GROUP_FREQUENCIES: readonly string[] = ['constante', 'frequente', 'as_vezes', 'raro', 'desconhecido'];
+function isAffectedGroupFrequencyOrNull(value: unknown): value is AffectedGroupFrequency | null {
+	return value === null || (typeof value === 'string' && AFFECTED_GROUP_FREQUENCIES.includes(value));
+}
+
+function parseAffectedGroupList(value: unknown): Result<AffectedGroup[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('affectedGroups deve ser um array');
+	const result: AffectedGroup[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada AffectedGroup deve ser um objeto');
+		if (!isString(item.id)) return shapeError('AffectedGroup.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('AffectedGroup.projectId deve ser uma string');
+		if (!isString(item.label) || item.label.trim().length === 0) {
+			return shapeError('AffectedGroup.label deve ser uma string não vazia');
+		}
+		if (!isAffectedGroupImpactOrNull(item.impact)) {
+			return shapeError('AffectedGroup.impact deve ser um dos literais aprovados ou null');
+		}
+		if (!isAffectedGroupFrequencyOrNull(item.frequency)) {
+			return shapeError('AffectedGroup.frequency deve ser um dos literais aprovados ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('AffectedGroup.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (!isIsoDateString(item.updatedAt)) {
+			return shapeError('AffectedGroup.updatedAt deve ser uma data ISO 8601 válida');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			label: item.label,
+			impact: item.impact as AffectedGroupImpact | null,
+			frequency: item.frequency as AffectedGroupFrequency | null,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -338,7 +388,8 @@ function assembleProjectState(
 	rawPendingItems: RawPendingItem[],
 	scopeItems: ScopeItem[],
 	scopeVersion: ScopeVersion,
-	impediments: Impediment[]
+	impediments: Impediment[],
+	affectedGroups: AffectedGroup[]
 ): Result<ProjectState, ProjectStateParseError> {
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
@@ -404,6 +455,23 @@ function assembleProjectState(
 		if (answer.projectId !== project.id) {
 			return invariantError(`Answer do campo "${answer.fieldDefinitionId}" usa projectId diferente do Project`);
 		}
+
+		// READ-LEGACY (ver domain/legacy-answers.ts): um campo oficialmente
+		// deprecado (ex.: publico_detail, ETAPA 2 do rework) não é mais
+		// validado contra o catálogo atual — snapshots exportados antes da
+		// mudança continuam importáveis, com o dado preservado tal como
+		// estava. Ainda exige projectId correto (acima) e proíbe duplicata
+		// (abaixo); nunca é lido por nenhuma projeção nem convertido em
+		// nada automaticamente.
+		if (isDeprecatedAnswerField(answer.activityDefinitionId, answer.fieldDefinitionId)) {
+			const legacyKey = `${answer.activityDefinitionId}::${answer.fieldDefinitionId}`;
+			if (seenAnswerKeys.has(legacyKey)) {
+				return invariantError(`Answer duplicada para o campo "${answer.fieldDefinitionId}"`);
+			}
+			seenAnswerKeys.add(legacyKey);
+			continue;
+		}
+
 		const activity = findActivityDefinition(catalog, answer.activityDefinitionId);
 		if (!activity) {
 			return referenceError(
@@ -546,9 +614,46 @@ function assembleProjectState(
 		}
 	}
 
+	// referências + invariantes: AffectedGroup — ligado à atividade `publico`
+	// do catálogo (ao contrário de Impediment), mas sem activityDefinitionId
+	// próprio: a ligação é fixa (AFFECTED_GROUPS_ACTIVITY_ID em transitions.ts),
+	// não um dado armazenado por grupo.
+	const seenAffectedGroupIds = new Set<string>();
+	for (const group of affectedGroups) {
+		if (group.projectId !== project.id) {
+			return invariantError(`AffectedGroup "${group.id}" usa projectId diferente do Project`);
+		}
+		if (seenAffectedGroupIds.has(group.id)) {
+			return invariantError(`AffectedGroup.id duplicado: "${group.id}"`);
+		}
+		seenAffectedGroupIds.add(group.id);
+	}
+
+	// invariante: se "publico" está concluída, o mapa precisa atender aos
+	// critérios de confirmação (mesmo padrão de ScopeVersion.confirmedAt
+	// acima) — EXCETO quando a conclusão vem de um snapshot legado (Answer
+	// READ-LEGACY de publico_detail presente, ver domain/legacy-answers.ts):
+	// nesse caso "publico" foi concluída pelo mecanismo antigo
+	// (required_fields), antes de AffectedGroup existir, e não deve ser
+	// invalidada por não ter grupos — isso é exatamente a compatibilidade de
+	// import que esta exceção existe para preservar.
+	const hasLegacyPublicoDetail = answers.some(
+		(answer) => answer.activityDefinitionId === 'publico' && answer.fieldDefinitionId === 'publico_detail'
+	);
+	const publicoProgress = activityProgress.find((progress) => progress.activityDefinitionId === 'publico');
+	if (publicoProgress?.status === 'concluída' && !hasLegacyPublicoDetail) {
+		const issues = getAffectedGroupConfirmationIssues(affectedGroups);
+		if (issues.length > 0) {
+			const issueKinds = issues.map((issue) => issue.kind).join(', ');
+			return invariantError(
+				`Atividade "publico" está concluída mas o Mapa de Impacto não atende aos critérios de confirmação: ${issueKinds}`
+			);
+		}
+	}
+
 	return {
 		ok: true,
-		value: { project, activityProgress, answers, pendingItems, scopeItems, scopeVersion, impediments }
+		value: { project, activityProgress, answers, pendingItems, scopeItems, scopeVersion, impediments, affectedGroups }
 	};
 }
 
@@ -605,6 +710,9 @@ export function deserializeProjectState(
 	const impedimentsResult = parseImpedimentList(state.impediments);
 	if (!impedimentsResult.ok) return impedimentsResult;
 
+	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
+	if (!affectedGroupsResult.ok) return affectedGroupsResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
@@ -613,6 +721,7 @@ export function deserializeProjectState(
 		pendingItemsResult.value,
 		scopeItemsResult.value,
 		scopeVersionResult.value,
-		impedimentsResult.value
+		impedimentsResult.value,
+		affectedGroupsResult.value
 	);
 }

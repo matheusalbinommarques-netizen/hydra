@@ -206,7 +206,7 @@ describe('buildRecordsView', () => {
 		expect(result.resolvedPendingItems).toEqual([
 			{
 				id: 'pend-2',
-				activityTitle: 'Público afetado',
+				activityTitle: 'Quem é afetado',
 				label: 'Público afetado não foi detalhado',
 				detail: 'detalhe resolvida'
 			}
@@ -251,7 +251,7 @@ describe('buildRecordsView', () => {
 		expect(result.resolvedPendingItems).toEqual([
 			{
 				id: 'pend-1',
-				activityTitle: 'Público afetado',
+				activityTitle: 'Quem é afetado',
 				label: 'Público afetado não foi detalhado',
 				detail: 'detalhe resolvida'
 			}

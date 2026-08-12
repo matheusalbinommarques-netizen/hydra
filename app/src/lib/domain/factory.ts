@@ -27,6 +27,7 @@ export function createInitialProjectState(
 		pendingItems: [],
 		scopeItems: [],
 		scopeVersion: { projectId, hypothesis: '', confirmedAt: null },
-		impediments: []
+		impediments: [],
+		affectedGroups: []
 	};
 }

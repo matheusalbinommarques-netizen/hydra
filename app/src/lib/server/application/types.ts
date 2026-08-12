@@ -2,6 +2,9 @@
 
 import type {
 	ActivityStatus,
+	AffectedGroupConfirmationIssue,
+	AffectedGroupFrequency,
+	AffectedGroupImpact,
 	DomainTransitionError,
 	ImpedimentType,
 	ProjectStateParseError,
@@ -148,6 +151,16 @@ export interface ImpedimentView {
 	resolvedAt: string | null;
 }
 
+// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — view leve de
+// AffectedGroup, sem projectId/createdAt/updatedAt, que a interface não
+// precisa (mesmo padrão de ScopeItemView/ImpedimentView).
+export interface AffectedGroupView {
+	id: string;
+	label: string;
+	impact: AffectedGroupImpact | null;
+	frequency: AffectedGroupFrequency | null;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -191,6 +204,15 @@ export interface ProjectView {
 	// diretamente, sem campo derivado extra aqui (mesmo padrão de
 	// openPendingItems.length usado direto no template).
 	impediments: ImpedimentView[];
+	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — todos os grupos
+	// afetados do projeto; a interface (MapaDeImpacto.svelte) agrupa em faixas
+	// por `impact` (derivado, nunca persistido, ver
+	// catalog/affected-group.ts). Sempre computado (não só sob demanda) para a
+	// interface poder desabilitar "Concluir mapa" sem round-trip extra — mesma
+	// função pura usada pelo domínio na confirmação
+	// (getAffectedGroupConfirmationIssues).
+	affectedGroups: AffectedGroupView[];
+	affectedGroupConfirmationIssues: AffectedGroupConfirmationIssue[];
 }
 
 export type UseCaseError =
@@ -333,6 +355,35 @@ export interface ReopenImpedimentInput {
 	impedimentId: string;
 }
 
+// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
+// inputs de ScopeItem/Impediment: id gerado pelo caso de uso
+// (idGenerator), nunca recebido do cliente.
+export interface AddAffectedGroupInput {
+	projectId: string;
+	label: string;
+}
+
+export interface SetAffectedGroupImpactInput {
+	projectId: string;
+	groupId: string;
+	impact: AffectedGroupImpact;
+}
+
+export interface SetAffectedGroupFrequencyInput {
+	projectId: string;
+	groupId: string;
+	frequency: AffectedGroupFrequency;
+}
+
+export interface RemoveAffectedGroupInput {
+	projectId: string;
+	groupId: string;
+}
+
+export interface ConfirmAffectedGroupsInput {
+	projectId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
@@ -358,6 +409,11 @@ export interface ProjectUseCases {
 	setImpedimentNextAction(input: SetImpedimentNextActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	resolveImpediment(input: ResolveImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenImpediment(input: ReopenImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
+	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
+	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
+	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeAffectedGroup(input: RemoveAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmAffectedGroups(input: ConfirmAffectedGroupsInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

@@ -7,6 +7,7 @@ import type { Project, ProjectState } from '$lib/domain';
 import type { ProjectRepository } from './project-repository';
 import {
 	mapActivityProgressRow,
+	mapAffectedGroupRow,
 	mapAnswerRow,
 	mapImpedimentRow,
 	mapPendingItemRow,
@@ -14,6 +15,7 @@ import {
 	mapScopeItemRow,
 	mapScopeVersionRow,
 	type ActivityProgressRow,
+	type AffectedGroupRow,
 	type AnswerRow,
 	type ImpedimentRow,
 	type PendingItemRow,
@@ -117,6 +119,14 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		for (const impediment of state.impediments) {
 			insertImpediment.run(impediment);
 		}
+
+		const insertAffectedGroup = db.prepare(
+			`INSERT INTO affected_group (id, project_id, label, impact, frequency, created_at, updated_at)
+			 VALUES (@id, @projectId, @label, @impact, @frequency, @createdAt, @updatedAt)`
+		);
+		for (const group of state.affectedGroups) {
+			insertAffectedGroup.run(group);
+		}
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -151,6 +161,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM affected_group WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
 
@@ -209,6 +220,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as ImpedimentRow[];
 
+			const affectedGroupRows = db
+				.prepare(
+					`SELECT id, project_id, label, impact, frequency, created_at, updated_at
+					 FROM affected_group WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as AffectedGroupRow[];
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
@@ -216,7 +234,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				pendingItems: pendingItemRows.map(mapPendingItemRow),
 				scopeItems: scopeItemRows.map(mapScopeItemRow),
 				scopeVersion: mapScopeVersionRow(scopeVersionRow),
-				impediments: impedimentRows.map(mapImpedimentRow)
+				impediments: impedimentRows.map(mapImpedimentRow),
+				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow)
 			};
 		},
 

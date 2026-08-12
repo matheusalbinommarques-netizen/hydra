@@ -7,6 +7,8 @@
 
 import { decodeMultiSelectValue } from '$lib/domain';
 import type { Catalog } from '$lib/domain';
+import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
+import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
 
 export interface BancadaOverviewBlock {
 	activityId: string;
@@ -35,10 +37,13 @@ const BANCADA_PHASE_IDS = ['descoberta', 'definicao', 'estruturacao'];
 // restricoes_premissas), o campo escolhido é o que mais de perto responde
 // à mainQuestion da atividade — mesmo critério já usado em "resultado"
 // (mudanca, não beneficiario/percepcao).
+// `publico` não entra aqui — deixou de ser Answer-driven (ETAPA 2 do
+// rework, ver catalog/discovery.ts) e ganha tratamento próprio em
+// buildBancadaOverviewView a partir de AffectedGroup, não deste mapa
+// genérico de heading/valueFieldId.
 const BLOCK_SPECS: Record<string, { heading: string; valueFieldId: string; chipsFieldId?: string }> = {
 	origem: { heading: 'Origem do projeto', valueFieldId: 'origem' },
 	problema: { heading: 'Situação', valueFieldId: 'situacao', chipsFieldId: 'situacao_o_que' },
-	publico: { heading: 'Público afetado', valueFieldId: 'publico_detail' },
 	estado_atual: { heading: 'Estado atual', valueFieldId: 'estado_atual_detail' },
 	resultado: { heading: 'Resultado desejado', valueFieldId: 'mudanca' },
 	usuario_principal: { heading: 'Usuário principal', valueFieldId: 'usuario_principal' },
@@ -65,7 +70,11 @@ function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: 
 	return [];
 }
 
-export function buildBancadaOverviewView(catalog: Catalog, answers: Record<string, string>): BancadaOverviewView {
+export function buildBancadaOverviewView(
+	catalog: Catalog,
+	answers: Record<string, string>,
+	affectedGroups: AffectedGroupSummaryInput[] = []
+): BancadaOverviewView {
 	const blocks: BancadaOverviewBlock[] = [];
 
 	const phasesInOrder = [...catalog.phases]
@@ -75,6 +84,18 @@ export function buildBancadaOverviewView(catalog: Catalog, answers: Record<strin
 	for (const phase of phasesInOrder) {
 		const activitiesInOrder = [...phase.activities].sort((a, b) => a.order - b.order);
 		for (const activity of activitiesInOrder) {
+			if (activity.id === 'publico') {
+				if (affectedGroups.length > 0) {
+					blocks.push({
+						activityId: 'publico',
+						heading: 'Quem é afetado',
+						value: summarizeAffectedGroups(affectedGroups),
+						chips: affectedGroups.map((group) => group.label)
+					});
+				}
+				continue;
+			}
+
 			const spec = BLOCK_SPECS[activity.id];
 			if (!spec) continue;
 

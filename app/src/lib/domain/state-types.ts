@@ -119,6 +119,34 @@ export interface Impediment {
 	resolvedAt: string | null;
 }
 
+// Mapa de Impacto — Descoberta, "Quem é afetado" (ETAPA 2 do rework, ver
+// docs/core/HYDRA_PRODUCT_REWORK.md §32). Objeto vivo real: substitui o
+// texto livre antes capturado em `publico_detail` (Answer da atividade
+// `publico`) como fonte canônica do público afetado. Mesmo molde de
+// ScopeItem/Impediment (id próprio, projectId, createdAt/updatedAt), mas
+// ligado à atividade `publico` — ao contrário de Impediment, participa do
+// catálogo (completion da atividade deriva do estado dos grupos, ver
+// domain/transitions.ts, confirmAffectedGroups).
+//
+// impact/frequency ausente (null) e "desconhecido" (valor explícito) são
+// estados distintos e nunca devem ser confundidos: null = "por classificar"
+// (o usuário ainda não respondeu); 'desconhecido' = o usuário respondeu
+// explicitamente "Ainda não sabemos". Só null bloqueia a conclusão do mapa —
+// 'desconhecido' conta como resposta válida (ver
+// getAffectedGroupConfirmationIssues).
+export type AffectedGroupImpact = 'alto' | 'medio' | 'baixo' | 'desconhecido';
+export type AffectedGroupFrequency = 'constante' | 'frequente' | 'as_vezes' | 'raro' | 'desconhecido';
+
+export interface AffectedGroup {
+	id: string;
+	projectId: string;
+	label: string;
+	impact: AffectedGroupImpact | null;
+	frequency: AffectedGroupFrequency | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -127,4 +155,5 @@ export interface ProjectState {
 	scopeItems: ScopeItem[];
 	scopeVersion: ScopeVersion;
 	impediments: Impediment[];
+	affectedGroups: AffectedGroup[];
 }

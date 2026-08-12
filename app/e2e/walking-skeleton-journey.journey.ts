@@ -99,12 +99,16 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 	});
 
-	await test.step('Público afetado', async () => {
-		await expect(page.getByRole('heading', { name: 'Público afetado' })).toBeVisible();
-		await page
-			.getByLabel('Quem é afetado por esta situação, em detalhe?')
-			.fill('Agentes de atendimento e clientes internos.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await test.step('Quem é afetado (Mapa de Impacto)', async () => {
+		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
+		await page.getByRole('button', { name: '+ Adicionar grupo' }).click();
+		await page.getByRole('button', { name: 'Equipe interna', exact: true }).click();
+
+		// O grupo nasce aberto para classificação imediata.
+		await page.getByRole('button', { name: 'Alto', exact: true }).click();
+		await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
+
+		await page.getByRole('button', { name: 'Concluir mapa' }).click();
 	});
 
 	await test.step('Estado atual', async () => {
@@ -156,7 +160,10 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 			)
 		).toBeVisible();
 		await expect(overview.getByText('Existe muito retrabalho')).toBeVisible();
-		await expect(overview.getByText('Agentes de atendimento e clientes internos.')).toBeVisible();
+		// Síntese determinística do Mapa de Impacto (catalog/affected-group.ts),
+		// não texto livre — reflete o grupo adicionado e classificado no passo
+		// "Quem é afetado" acima.
+		await expect(overview.getByText('Grupo afetado: Equipe interna (Alto).')).toBeVisible();
 		await expect(overview.getByText('Cada time usa sua própria planilha, sem padrão.')).toBeVisible();
 		await expect(overview.getByText('Solicitações centralizadas, priorizadas e acompanháveis.')).toBeVisible();
 

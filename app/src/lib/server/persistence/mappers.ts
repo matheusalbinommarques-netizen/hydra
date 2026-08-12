@@ -5,6 +5,9 @@
 import type {
 	ActivityProgress,
 	ActivityStatus,
+	AffectedGroup,
+	AffectedGroupFrequency,
+	AffectedGroupImpact,
 	Answer,
 	Impediment,
 	ImpedimentType,
@@ -132,6 +135,28 @@ export function mapImpedimentRow(row: ImpedimentRow): Impediment {
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 		resolvedAt: row.resolved_at
+	};
+}
+
+export interface AffectedGroupRow {
+	id: string;
+	project_id: string;
+	label: string;
+	impact: AffectedGroupImpact | null;
+	frequency: AffectedGroupFrequency | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapAffectedGroupRow(row: AffectedGroupRow): AffectedGroup {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		label: row.label,
+		impact: row.impact,
+		frequency: row.frequency,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
 	};
 }
 

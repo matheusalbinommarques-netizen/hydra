@@ -2,7 +2,7 @@
 // interno; nunca expõe ProjectState bruto (ver contracts.md §10).
 
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
-import { getScopeConfirmationIssues } from '$lib/domain';
+import { getAffectedGroupConfirmationIssues, getScopeConfirmationIssues } from '$lib/domain';
 import {
 	computeCriteriaScopeConflict,
 	computeFieldSuggestions,
@@ -10,7 +10,7 @@ import {
 	computeScopeSuggestions,
 	computeSnapshot
 } from '$lib/orientation-engine';
-import type { ImpedimentView, PendingItemHistoryView, ProjectView, ScopeItemView } from './types';
+import type { AffectedGroupView, ImpedimentView, PendingItemHistoryView, ProjectView, ScopeItemView } from './types';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -86,6 +86,10 @@ function buildImpedimentView(impediment: ProjectState['impediments'][number]): I
 	};
 }
 
+function buildAffectedGroupView(group: ProjectState['affectedGroups'][number]): AffectedGroupView {
+	return { id: group.id, label: group.label, impact: group.impact, frequency: group.frequency };
+}
+
 export function buildProjectView(catalog: Catalog, state: ProjectState): ProjectView {
 	const snapshot = computeSnapshot(catalog, state);
 
@@ -119,6 +123,8 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		scopeSuggestions: computeScopeSuggestions(state.answers, state.scopeItems),
 		fieldSuggestions: computeFieldSuggestions(catalog, state.answers),
 		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems),
-		impediments: state.impediments.map(buildImpedimentView)
+		impediments: state.impediments.map(buildImpedimentView),
+		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
+		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups)
 	};
 }

@@ -5,9 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { catalog } from '../../catalog';
 import {
+	addAffectedGroup,
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
 	createInitialProjectState,
@@ -15,6 +17,8 @@ import {
 	moveScopeItem,
 	renameProject,
 	resolveImpediment,
+	setAffectedGroupFrequency,
+	setAffectedGroupImpact,
 	setHypothesis,
 	setImpedimentNextAction,
 	setRouteStartPhase,
@@ -78,8 +82,11 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(confirmSummary(catalog, state));
 	// invalida o Resumo editando uma resposta anterior
 	state = unwrap(answerActivity(catalog, state, 'estado_atual', { estado_atual_detail: 'y' }, T2));
-	// resolve a pendência de "publico"
-	state = unwrap(answerActivity(catalog, state, 'publico', { publico_detail: 'Clientes' }, T2));
+	// resolve a pendência de "publico" (Mapa de Impacto, ETAPA 2 do rework)
+	state = unwrap(addAffectedGroup(catalog, state, 'ag-1', 'Clientes', T2));
+	state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T2));
+	state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'constante', T2));
+	state = unwrap(confirmAffectedGroups(catalog, state, T2));
 
 	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
 	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'agora', T1));
@@ -429,14 +436,23 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 7 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 8 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
 		const found = await repo.findById(state.project.id);
 
 		expect(found && Object.keys(found).sort()).toEqual(
-			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion', 'impediments'].sort()
+			[
+				'project',
+				'activityProgress',
+				'answers',
+				'pendingItems',
+				'scopeItems',
+				'scopeVersion',
+				'impediments',
+				'affectedGroups'
+			].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');
 		expect(found).not.toHaveProperty('projectStatus');

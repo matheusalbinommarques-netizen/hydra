@@ -421,7 +421,12 @@ describe('createProjectUseCases — answerActivity', () => {
 			activityDefinitionId: 'problema',
 			values: { situacao: 'x', situacao_o_que: encodeMultiSelectValue(['prob_retrabalho']) }
 		});
-		await useCases.answerActivity({ projectId, activityDefinitionId: 'publico', values: { publico_detail: 'x' } });
+		const addedGroup = await useCases.addAffectedGroup({ projectId, label: 'Clientes' });
+		if (!addedGroup.ok) throw new Error('esperado ok');
+		const groupId = addedGroup.value.affectedGroups[0].id;
+		await useCases.setAffectedGroupImpact({ projectId, groupId, impact: 'alto' });
+		await useCases.setAffectedGroupFrequency({ projectId, groupId, frequency: 'constante' });
+		await useCases.confirmAffectedGroups({ projectId });
 		await useCases.answerActivity({
 			projectId,
 			activityDefinitionId: 'estado_atual',
@@ -437,11 +442,10 @@ describe('createProjectUseCases — answerActivity', () => {
 		expect(confirmed.value.activityStatuses.resumo).toBe('concluída');
 
 		clock.set('2026-01-02T00:00:00.000Z');
-		const edited = await useCases.answerActivity({
-			projectId,
-			activityDefinitionId: 'publico',
-			values: { publico_detail: 'y' }
-		});
+		// Reclassifica a frequência do grupo já existente — valor genuinamente
+		// diferente, sem tornar "Quem é afetado" incompleta de novo (senão
+		// reabriria "publico" e o teste estaria provando outra coisa).
+		const edited = await useCases.setAffectedGroupFrequency({ projectId, groupId, frequency: 'raro' });
 		if (!edited.ok) throw new Error('esperado ok');
 		expect(edited.value.activityStatuses.resumo).toBe('em_andamento');
 		expect(edited.value.nextActivity).toEqual({ kind: 'recommendation', activityDefinitionId: 'resumo' });
@@ -1217,7 +1221,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 });
 
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
-	it('o registro persistido contém só os 7 tipos de domínio', async () => {
+	it('o registro persistido contém só os 8 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1229,11 +1233,20 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 
 		const stored = await repo.findById(created.value.projectId);
 		expect(stored && Object.keys(stored).sort()).toEqual(
-			['project', 'activityProgress', 'answers', 'pendingItems', 'scopeItems', 'scopeVersion', 'impediments'].sort()
+			[
+				'project',
+				'activityProgress',
+				'answers',
+				'pendingItems',
+				'scopeItems',
+				'scopeVersion',
+				'impediments',
+				'affectedGroups'
+			].sort()
 		);
 	});
 
-	it('ProjectView contém só os 20 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 22 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1259,7 +1272,9 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'scopeSuggestions',
 				'fieldSuggestions',
 				'criteriaScopeConflict',
-				'impediments'
+				'impediments',
+				'affectedGroups',
+				'affectedGroupConfirmationIssues'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');
