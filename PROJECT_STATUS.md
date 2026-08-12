@@ -441,21 +441,38 @@ explícita de Matheus, fase a fase, não em lote). `hydra-verify fast` PASS
 (os 3 passos, síntese, "Etapa concluída", avanço para "Público afetado"
 com dado persistido em Bancada). Publicado no mesmo commit acima.
 
-Pendência real conhecida, ainda não resolvida: as jornadas e2e
-(`app/e2e/*.journey.ts`) ainda testam a UI antiga de `/projects/new`
-(diagnóstico de rota) e de "Problema ou oportunidade" (checkbox de
-sinais, campo de texto livre, sem a mecânica de "Documento do projeto") —
-`bancada-field-by-field`, `problema-optional-group`, `skip-activity`,
-`walking-skeleton-journey`. `hydra-verify full` não foi refeito desde que
-essas jornadas ficaram desatualizadas.
+Em 11/08/2026, Matheus conduziu uma auditoria arquitetural completa do
+repositório (Claude Code) para embasar uma direção de rework maior — o
+Hydra deixar de ser "onde o usuário preenche um projeto" e passar a
+construir objetos vivos reutilizáveis, projetados em múltiplas
+superfícies, com sinais e ações externas. A auditoria foi seguida por
+duas rodadas de revisão adversarial (ChatGPT redigiu o documento; Claude
+Code revisou contra o código real, sem implementar nada) até congelar
+`docs/core/HYDRA_PRODUCT_REWORK.md` v1.0 — constituição de produto e
+arquitetura do rework, com leis de produto, arquitetura conceitual alvo,
+regras explícitas de promoção de dado legado (`Answer` → objeto vivo) e
+uma sequência de etapas autorizadas corte a corte (ETAPA 0 a 17), cada
+uma exigindo autorização explícita antes de avançar para a seguinte.
 
-A próxima decisão real é de Matheus: (a) atualizar as quatro jornadas e2e
-pendentes para fechar `hydra-verify full`; (b) continuar o rework visual
-para as próximas atividades da Descoberta (Público afetado, Estado atual,
-Resultado desejado — hoje texto livre, sem chips, então a mecânica de
-"Documento do projeto" precisaria de uma variante própria) ou para a
-Biblioteca de projetos (`/projects`), ainda na identidade clara; ou (c)
-direcionar ao vivo outra coisa. Nenhuma das três foi decidida ainda.
+ETAPA 0 (recuperar baseline confiável) está **concluída e publicada**
+(commit `32f6c0e`, `main`/`origin/main`): as 10 jornadas e2e que ainda
+assumiam o fluxo antigo de criação de projeto (dropdown de origem,
+atividade "Contexto inicial", projeto sem nome) — `bancada-field-by-field`,
+`problema-optional-group`, `skip-activity`, `walking-skeleton-journey`,
+`criteria-scope-conflict`, `map-view`, `project-list`, `records-view`,
+`settings`, `summary-edit` — foram reescritas para o comportamento real e
+aprovado (nome/origem atômicos em `/projects/new`, D034; "Entender a
+situação" como primeira atividade efetiva). Nenhuma mudança de
+comportamento de produto, só expectativa de teste. `hydra-verify full`
+PASS (5/5 etapas, 18/18 jornadas). Dívida conhecida e deliberadamente não
+tratada: `optionalGroup`/`revealWhen` (catálogo) seguem sem uso em
+qualquer `ActivityDefinition` atual.
+
+A próxima decisão real é de Matheus: autorizar a ETAPA 1
+(`docs/core/HYDRA_PRODUCT_REWORK.md`, "Fundação visual mínima" —
+consolidar só o que já é comprovadamente comum entre Home, `/projects/new`
+e Entender a Situação, sem migrar automaticamente todas as telas) como
+próximo corte, ou direcionar ao vivo outra coisa. Não decidida ainda.
 
 ## Não fazer agora
 
