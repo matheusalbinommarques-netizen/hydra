@@ -1,11 +1,20 @@
-// Teste Playwright dedicado da seção expansível "Adicionar mais contexto" em
-// "Problema ou oportunidade" (Corte 2 da macroentrega de reaproveitamento),
-// adaptado à apresentação campo a campo da Bancada (Descoberta + Definição
-// do produto): "problema" agora decompõe seus dois campos obrigatórios
-// (situacao, sinais_situacao) em etapas separadas, e só depois libera uma
-// etapa opcional agrupada com os campos restantes — nunca mais um único
-// formulário com tudo junto. Roda via playwright.journey.config.ts (servidor
-// efêmero + banco temporário isolados) — ver e2e/helpers/ephemeral-server.ts.
+// Teste Playwright dedicado ao caráter opcional dos passos 2 e 3 ("Onde
+// isso aparece principalmente?" e "Qual é o peso disso hoje?") do wizard
+// "Entender a situação" (EntenderSituacao.svelte) e à preservação de valores
+// já respondidos ao reabrir a atividade. Roda via playwright.journey.config.ts
+// (servidor efêmero + banco temporário isolados) — ver
+// e2e/helpers/ephemeral-server.ts.
+//
+// Reescrito para o comportamento real e aprovado atual (Etapa 0,
+// docs/core/HYDRA_PRODUCT_REWORK.md): a seção expansível "Adicionar mais
+// contexto" (`details.optional-group`, catalog `optionalGroup`/`revealWhen`)
+// não é mais exercida por nenhuma atividade do catálogo atual — "problema"
+// deixou de usar o formulário genérico (ActivityForm.svelte) desde o
+// redesenho "Entender a situação" (D034, docs/07-management/decision-log.md),
+// e nenhum outro campo do catálogo declara `optionalGroup`/`revealWhen` hoje
+// (dívida conhecida, registrada — ver relatório da Etapa 0). O equivalente
+// real de "contexto opcional" para esta mesma atividade hoje é o par de
+// passos 2/3 do wizard, cada um com seu próprio "Pular esta pergunta".
 
 import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
@@ -41,86 +50,66 @@ test.afterAll(async () => {
 	}
 });
 
-async function createProjectAndReachProblema(page: import('@playwright/test').Page): Promise<string> {
-	const projectId = await createProject(page, server.baseUrl);
-
-	// Pula Origem e Contexto — não fazem parte deste teste.
-	for (let i = 0; i < 2; i++) {
-		await page.getByRole('button', { name: 'Pular etapa' }).click();
-		await page.getByRole('button', { name: 'Confirmar' }).click();
-	}
-
-	await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
-	return projectId;
-}
-
-test('seção "Adicionar mais contexto": recolhida por padrão, teclado, revealWhen resolvido estaticamente na etapa opcional, e valores preservados', async ({
+test('"Pular esta pergunta" nos passos 2 e 3: síntese sem eles, valor do passo 1 preservado ao reabrir', async ({
 	page
 }) => {
 	let projectId = '';
 
-	await test.step('criar projeto e chegar a "Problema ou oportunidade"', async () => {
-		projectId = await createProjectAndReachProblema(page);
+	await test.step('criar projeto: chega direto a "Entender a situação"', async () => {
+		projectId = await createProject(page, server.baseUrl);
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
 	});
 
-	await test.step('responder "situacao" (primeiro campo obrigatório)', async () => {
-		await page.getByLabel('Qual situação precisa mudar?').fill('As solicitações chegam sem padrão.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await test.step('passo 1: responder e continuar', async () => {
+		await page.getByRole('button', { name: 'Está demorando demais' }).click();
+		await page.getByRole('button', { name: 'Continuar' }).click();
 	});
 
-	await test.step('responder "sinais_situacao" com "Outro" marcado (último obrigatório)', async () => {
-		await expect(page.getByText('Quais sinais representam melhor a situação?')).toBeVisible();
-		await page.getByLabel('Outro', { exact: true }).check();
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await test.step('passo 2: pular sem selecionar nada', async () => {
+		await expect(page.getByRole('heading', { name: 'Onde isso aparece principalmente?' })).toBeVisible();
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
 	});
 
-	const summary = page.getByText('Adicionar mais contexto', { exact: false });
-	const details = page.locator('details.optional-group');
-
-	await test.step('etapa opcional: "Descreva o sinal Outro" já revelado (resolvido estaticamente, fora do grupo); grupo recolhido, sem contagem', async () => {
-		await expect(page.getByText('Mais contexto (opcional)')).toBeVisible();
-		await expect(page.getByLabel('Descreva o sinal "Outro"')).toBeVisible();
-		await expect(details).toBeVisible();
-		await expect(details).not.toHaveAttribute('open', '');
-		await expect(page.getByText(/informaç(ão|ões) adicionada/)).toHaveCount(0);
-		await expect(page.getByLabel('Evidências')).not.toBeVisible();
+	await test.step('passo 3: pular sem selecionar nada', async () => {
+		await expect(page.getByRole('heading', { name: 'Qual é o peso disso hoje?' })).toBeVisible();
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
 	});
 
-	await test.step('teclado abre a seção (Enter no summary)', async () => {
-		await summary.focus();
-		await summary.press('Enter');
-		await expect(details).toHaveAttribute('open', '');
-		await expect(page.getByLabel('Evidências')).toBeVisible();
-	});
+	await test.step('síntese reflete só o passo 1 respondido, confirmar avança', async () => {
+		await expect(page.getByRole('heading', { name: 'É mais ou menos isso?' })).toBeVisible();
+		await expect(page.locator('.es-synthesis-box')).toContainText('demora');
+		await page.getByRole('button', { name: 'Sim, continuar' }).click();
 
-	await test.step('preencher campos opcionais e salvar: etapa opcional sempre libera a próxima atividade', async () => {
-		await page.getByLabel('Descreva o sinal "Outro"').fill('Chegou por um canal informal.');
-		await page.getByLabel('Evidências').fill('Três reclamações registradas este mês.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
+		await expect(page.getByRole('heading', { name: 'Etapa concluída' })).toBeVisible();
+		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
 	});
 
-	await test.step('valores preservados exatamente como enviados, campo a campo', async () => {
-		await page.goto(`${server.baseUrl}/projects/${projectId}/now?activity=problema&from=summary`);
-		await expect(page.getByLabel('Qual situação precisa mudar?')).toHaveValue(
-			'As solicitações chegam sem padrão.'
-		);
-		await expect(page.getByLabel('Outro', { exact: true })).toBeChecked();
-		await expect(page.getByLabel('Descreva o sinal "Outro"')).toHaveValue('Chegou por um canal informal.');
-		await expect(page.getByLabel('Evidências')).toHaveValue('Três reclamações registradas este mês.');
+	await test.step('reabrir a partir de Registros: passo 1 preservado, passos 2 e 3 continuam vazios', async () => {
+		await page.goto(`${server.baseUrl}/projects/${projectId}/now?activity=problema&from=records`);
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Está demorando demais' })).toHaveClass(/selected/);
+
+		await page.getByRole('button', { name: 'Continuar' }).click();
+		await expect(page.getByRole('heading', { name: 'Onde isso aparece principalmente?' })).toBeVisible();
+		await expect(page.locator('.es-chip.selected')).toHaveCount(0);
+
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+		await expect(page.getByRole('heading', { name: 'Qual é o peso disso hoje?' })).toBeVisible();
+		await expect(page.locator('.es-row.selected')).toHaveCount(0);
 	});
 });
 
-test('seção "Adicionar mais contexto": aberta automaticamente quando já existe conteúdo persistido, com contagem correta', async ({
+test('Answers já persistidas fora da progressão normal pré-selecionam os chips ao abrir o wizard', async ({
 	page
 }) => {
 	let projectId = '';
-	await test.step('criar projeto e chegar a "Problema ou oportunidade"', async () => {
-		projectId = await createProjectAndReachProblema(page);
+	await test.step('criar projeto', async () => {
+		projectId = await createProject(page, server.baseUrl);
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
 	});
 
-	await test.step('semear Answers direto no banco: os dois obrigatórios (fora de ordem) + duas do grupo opcional (atalho de fixture já usado nesta suíte)', async () => {
+	await test.step('semear Answers direto no banco (atalho de fixture já usado nesta suíte), sem alterar activity_progress', async () => {
 		const db = new Database(dbPath);
 		try {
 			const now = new Date().toISOString();
@@ -128,29 +117,28 @@ test('seção "Adicionar mais contexto": aberta automaticamente quando já exist
 				`INSERT INTO answer (project_id, activity_definition_id, field_definition_id, value, created_at, updated_at)
 				 VALUES (?, 'problema', ?, ?, ?, ?)`
 			);
-			insert.run(projectId, 'situacao', 'Situação semeada direto no banco.', now, now);
-			insert.run(projectId, 'sinais_situacao', JSON.stringify(['rework']), now, now);
-			insert.run(projectId, 'consequencias', 'O retrabalho aumenta a cada mês.', now, now);
-			insert.run(projectId, 'observacoes', 'Levantado com o time de suporte.', now, now);
+			insert.run(projectId, 'situacao_o_que', JSON.stringify(['prob_retrabalho']), now, now);
+			insert.run(projectId, 'situacao_onde', JSON.stringify(['area_processo']), now, now);
+			insert.run(projectId, 'situacao_peso', 'É crítico', now, now);
 		} finally {
 			db.close();
 		}
 	});
 
-	await test.step('recarregar: obrigatórios já respondidos (fora da progressão normal) mostram o formulário inteiro, com a seção já aberta e a contagem correta', async () => {
-		// Os dois obrigatórios já têm Answer (semeados direto no banco, sem
-		// passar por activityProgress) — a progressão campo a campo não teria
-		// mais nenhum campo obrigatório pendente, então now/+page.server.ts usa
-		// o formulário inteiro como rede de segurança (ver comentário em
-		// now/+page.server.ts), que é exatamente o que este teste quer
-		// verificar: grupo aberto porque já existe conteúdo persistido.
+	await test.step('recarregar: os três passos já mostram a seleção persistida', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Existe muito retrabalho' })).toHaveClass(/selected/);
 
-		const details = page.locator('details.optional-group');
-		await expect(details).toHaveAttribute('open', '');
-		await expect(page.getByText('2 informações adicionadas')).toBeVisible();
-		await expect(page.getByLabel('Consequências de não agir')).toHaveValue('O retrabalho aumenta a cada mês.');
-		await expect(page.getByLabel('Observações')).toHaveValue('Levantado com o time de suporte.');
+		await page.getByRole('button', { name: 'Continuar' }).click();
+		await expect(page.getByRole('heading', { name: 'Onde isso aparece principalmente?' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Processo' })).toHaveClass(/selected/);
+
+		await page.getByRole('button', { name: 'Continuar' }).click();
+		await expect(page.getByRole('heading', { name: 'Qual é o peso disso hoje?' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'É crítico' })).toHaveClass(/selected/);
+
+		await page.getByRole('button', { name: 'Ver síntese' }).click();
+		await expect(page.locator('.es-synthesis-box')).toContainText('retrabalho');
 	});
 });

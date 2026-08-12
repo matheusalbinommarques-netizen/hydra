@@ -16,7 +16,6 @@ import {
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
-import { createProject } from './helpers/create-project';
 
 let tmpRoot: string;
 let serverA: EphemeralServer;
@@ -47,12 +46,27 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		await expect(page.getByRole('heading', { name: 'Você ainda não tem projetos' })).toBeVisible();
 	});
 
-	await test.step('criar projeto sem nome: aparece na página inicial como "Projeto sem nome"', async () => {
-		firstProjectId = await createProject(page, serverA.baseUrl);
+	// Nome é obrigatório em `/projects/new` (D034) — não é mais possível criar
+	// um projeto sem nome pela UI real. `createProject()` (helper
+	// compartilhado por várias jornadas) usa sempre o mesmo nome fixo, então
+	// os dois projetos deste teste são criados inline, com nomes distintos.
+	async function createNamedProject(name: string, origin: string): Promise<string> {
+		await page.goto(`${serverA.baseUrl}/projects/new`);
+		await page.getByPlaceholder('Ex.: Renovação do sistema de atendimento').fill(name);
+		await page.getByRole('button', { name: origin }).click();
+		await page.getByRole('button', { name: 'Criar projeto e começar' }).click();
+		await page.waitForURL(/\/projects\/[^/]+\/now$/);
+		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
+		if (!match) throw new Error('projectId não encontrado na URL após criar o projeto.');
+		return match[1];
+	}
+
+	await test.step('criar projeto sem nenhum trabalho realizado: aparece na página inicial pelo nome dado na criação', async () => {
+		firstProjectId = await createNamedProject('Projeto Recém-criado', 'Existe um problema');
 
 		await page.goto(serverA.baseUrl + '/');
 		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
-		await expect(featured.getByRole('heading', { name: 'Projeto sem nome', level: 2 })).toBeVisible();
+		await expect(featured.getByRole('heading', { name: 'Projeto Recém-criado', level: 2 })).toBeVisible();
 
 		// C6-01: com um único projeto (o próprio destaque), a seção "Meus
 		// projetos" abaixo não é renderizada vazia — o card de destaque já é
@@ -60,32 +74,24 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		await expect(page.locator('.hp-list-section')).toHaveCount(0);
 	});
 
-	await test.step('criar um segundo projeto com nome: o destaque é escolhido por movimentação real e nunca se duplica na lista (C6-01)', async () => {
-		secondProjectId = await createProject(page, serverA.baseUrl);
+	await test.step('criar um segundo projeto com trabalho real: o destaque é escolhido por movimentação real e nunca se duplica na lista (C6-01)', async () => {
+		secondProjectId = await createNamedProject('Level Me Up', 'Quero criar algo novo');
 
-		await page.getByLabel('O que deu origem a este projeto?').selectOption('Uma ideia de produto');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-		// "Contexto inicial" é decomposta campo a campo nesta rodada — um
-		// submit por campo.
-		await page.getByLabel('Nome provisório do projeto').fill('Level Me Up');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-		await page.getByLabel('Breve descrição').fill('Refatoração e evolução da baseline.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-		await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-		await page
-			.getByLabel('Qual seu nível de experiência com gestão de projetos?')
-			.selectOption('Experiente');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-		await page.getByLabel('Qual o estágio atual?').selectOption('Já em execução');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+		// Movimentação real mínima: pular "Entender a situação" cria uma
+		// pendência com createdAt (computeLastMovementAt), o suficiente para
+		// distinguir este projeto do primeiro, que não teve nenhuma interação
+		// além da criação.
+		await expect(page.getByRole('heading', { name: 'O que trouxe essa oportunidade?', exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Pular etapa' }).click();
+		await page.locator('dialog[open]').getByRole('button', { name: 'Confirmar' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${secondProjectId}/now`);
 
 		await page.goto(serverA.baseUrl + '/');
 
 		// C6-01: o destaque ("Continue de onde parou") é escolhido por
-		// movimentação real, não pela ordem de criação — "Level Me Up" tem
-		// respostas reais (Answer.updatedAt), "Projeto sem nome" nunca foi
-		// trabalhado, então "Level Me Up" vira o destaque.
+		// movimentação real, não pela ordem de criação — "Level Me Up" tem uma
+		// pendência real (PendingItem.createdAt), "Projeto Recém-criado" nunca
+		// foi trabalhado, então "Level Me Up" vira o destaque.
 		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
 		await expect(featured.getByRole('heading', { name: 'Level Me Up', level: 2 })).toBeVisible();
 
@@ -95,7 +101,7 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		// o próprio link (`.hp-row`), não um botão separado.
 		const projectRows = page.locator('.hp-row .col-name');
 		await expect(projectRows).toHaveCount(1);
-		await expect(projectRows.nth(0)).toHaveText('Projeto sem nome');
+		await expect(projectRows.nth(0)).toHaveText('Projeto Recém-criado');
 		await expect(page.locator('.hp-row', { hasText: 'Level Me Up' })).toHaveCount(0);
 
 		// Os dois projetos continuam acessíveis a partir da Home: o destaque
@@ -103,7 +109,7 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		await expect(
 			featured.getByRole('link', { name: /Começar projeto|Continuar projeto/ })
 		).toHaveAttribute('href', `/projects/${secondProjectId}/now`);
-		const otherRow = page.locator('.hp-row', { hasText: 'Projeto sem nome' });
+		const otherRow = page.locator('.hp-row', { hasText: 'Projeto Recém-criado' });
 		await expect(otherRow).toHaveAttribute('href', `/projects/${firstProjectId}/now`);
 	});
 
@@ -111,9 +117,9 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
 		await featured.getByRole('link', { name: /Começar projeto|Continuar projeto/ }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${secondProjectId}/now`);
-		await expect(
-			page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })
-		).toBeVisible();
+		// "Entender a situação" foi pulada — a atividade atual agora é
+		// "Público afetado".
+		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
 	});
 
 	await test.step('link "Projetos" no workspace leva à Biblioteca (não mais à Home)', async () => {
@@ -143,7 +149,10 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 
 	await test.step('acesso direto pela URL continua funcionando', async () => {
 		await page.goto(`${serverA.baseUrl}/projects/${firstProjectId}/now`);
-		await expect(page.getByRole('heading', { name: 'Origem do projeto', exact: true })).toBeVisible();
+		// "Origem do projeto" já foi respondida na criação (D034); a atividade
+		// atual é "Entender a situação" (origem "Existe um problema" — grupo
+		// problema, não oportunidade).
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
 	});
 
 	await test.step('importar projeto em cenário válido continua funcionando e aparece na lista do destino', async () => {
@@ -170,6 +179,6 @@ test('Página inicial: listar e reabrir projetos existentes', async ({ page }) =
 
 		await page.goto(serverB.baseUrl + '/');
 		const featured = page.getByRole('region', { name: 'Projeto em destaque' });
-		await expect(featured.getByRole('heading', { name: 'Projeto sem nome', level: 2 })).toBeVisible();
+		await expect(featured.getByRole('heading', { name: 'Projeto Recém-criado', level: 2 })).toBeVisible();
 	});
 });

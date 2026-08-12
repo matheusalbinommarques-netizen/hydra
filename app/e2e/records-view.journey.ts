@@ -25,11 +25,37 @@ import {
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
-import { createProject } from './helpers/create-project';
 
 let tmpRoot: string;
 let server: EphemeralServer;
 let dbPath: string;
+
+// Nome e origem são respondidos atomicamente em `/projects/new` (D034) —
+// hoje não existe caminho real de UI que deixe um projeto sem nenhuma
+// resposta. Para os cenários que precisam desse estado (Registros
+// verdadeiramente vazio), o projeto é criado direto no SQLite do servidor
+// efêmero, sem passar pelos use cases — mesma técnica de fixture já usada
+// neste arquivo para pendências.
+function createBareProject(name: string): string {
+	const projectId = randomUUID();
+	const db = new Database(dbPath);
+	try {
+		db.prepare('INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (?, ?, ?, NULL)').run(
+			projectId,
+			name,
+			new Date().toISOString()
+		);
+		// scope_version é 1:1 com project, sempre presente desde a criação real
+		// (ver sqlite-project-repository.ts) — sem esta linha, findById lança
+		// erro de violação de schema.
+		db.prepare("INSERT INTO scope_version (project_id, hypothesis, confirmed_at) VALUES (?, '', NULL)").run(
+			projectId
+		);
+	} finally {
+		db.close();
+	}
+	return projectId;
+}
 
 test.beforeAll(async () => {
 	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-records-'));
@@ -50,9 +76,10 @@ test.afterAll(async () => {
 test('Registros: respostas e histórico de pendências', async ({ page }) => {
 	let projectId = '';
 
-	await test.step('criar projeto e navegar a Registros pela navegação', async () => {
-		projectId = await createProject(page, server.baseUrl);
+	await test.step('criar projeto sem nenhuma resposta ainda e navegar a Registros pela navegação', async () => {
+		projectId = createBareProject('Projeto Registros E2E');
 
+		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 		await page.getByRole('link', { name: 'Registros' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/records`);
 		await expect(page.getByRole('heading', { name: 'Registros' })).toBeVisible();
@@ -65,7 +92,7 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 
 	await test.step('responder Origem pela UI e conferir em Registros, com link de revisão (atividade concluída da Descoberta)', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
-		await page.getByLabel('O que deu origem a este projeto?').selectOption('Um problema');
+		await page.getByLabel('O que deu origem a este projeto?').selectOption('Existe um problema');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
 		await page.getByRole('link', { name: 'Registros' }).click();
@@ -74,7 +101,7 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 		await expect(page.getByRole('heading', { name: 'Descoberta' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Origem do projeto' })).toBeVisible();
 		await expect(page.getByText('O que deu origem a este projeto?')).toBeVisible();
-		await expect(page.getByText('Um problema')).toBeVisible();
+		await expect(page.getByText('Existe um problema')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Revisar Origem do projeto na atividade/ })).toBeVisible();
 
 		// Índice mostra a fase com a contagem real de respostas.
@@ -98,7 +125,7 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 
 		// a resposta continua visível — o salvamento não alterou o valor
 		await expect(page.getByRole('heading', { name: 'Origem do projeto' })).toBeVisible();
-		await expect(page.getByText('Um problema')).toBeVisible();
+		await expect(page.getByText('Existe um problema')).toBeVisible();
 	});
 
 	await test.step('preparar uma pendência aberta e uma resolvida diretamente no banco (sem UI de pular)', async () => {
@@ -187,7 +214,7 @@ test('Registros: quarta combinação de estados — sem respostas, com pendênci
 	// acima, num projeto novo e sem nenhuma resposta, só para validar que a
 	// tela se comporta corretamente mesmo nesse estado (contrato defensivo,
 	// não um caminho real de uso).
-	const projectId = await createProject(page, server.baseUrl);
+	const projectId = createBareProject('Projeto Registros E2E — combinação 4');
 
 	const db = new Database(dbPath);
 	try {

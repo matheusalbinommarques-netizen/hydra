@@ -47,9 +47,9 @@ test('Configurações do projeto: navegação, edição, salvar, cancelar e erro
 		await expect(page.getByRole('heading', { name: 'Configurações do projeto', level: 1 })).toBeVisible();
 	});
 
-	await test.step('estado inicial: nome carregado, Salvar e Cancelar desabilitados, sem mensagem', async () => {
+	await test.step('estado inicial: nome carregado (o mesmo dado em /projects/new, D034), Salvar e Cancelar desabilitados, sem mensagem', async () => {
 		const nameField = page.getByLabel('Nome do projeto');
-		await expect(nameField).toHaveValue('');
+		await expect(nameField).toHaveValue('Projeto de teste');
 		await expect(page.getByRole('button', { name: 'Salvar alterações' })).toBeDisabled();
 		await expect(page.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
 		await expect(page.getByText('Alterações não salvas.')).toHaveCount(0);

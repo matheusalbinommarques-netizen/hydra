@@ -71,9 +71,16 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		// Marcador de atividade atual é o rótulo "Atual" dentro do próprio item
 		// da lista (displayStatusLabel em map/+page.svelte) — não há
 		// aria-current nesta tela, o texto real é o marcador estrutural.
+		// "Origem do projeto" já é respondida atomicamente em `/projects/new`
+		// (D034) — a atividade atual logo após criar o projeto é "Entender a
+		// situação" (id `problema`).
 		const originItem = page.locator('li', { hasText: 'Origem do projeto' });
 		await expect(originItem).toBeVisible();
-		await expect(originItem.getByText('Atual', { exact: true })).toBeVisible();
+		await expect(originItem.getByText('Concluída', { exact: true })).toBeVisible();
+
+		const situationItem = page.locator('li', { hasText: 'Entender a situação' });
+		await expect(situationItem).toBeVisible();
+		await expect(situationItem.getByText('Atual', { exact: true })).toBeVisible();
 	});
 
 	await test.step('todas as seis fases exibidas, cada uma com catálogo completo (jornada linear completa)', async () => {
@@ -114,41 +121,21 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Jornada', level: 1 })).toBeVisible();
 	});
 
-	await test.step('avançar as 36 atividades reais até catalog_limit_reached', async () => {
+	await test.step('avançar as 35 atividades reais até catalog_limit_reached', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 
-		await answerAndContinue(page, {
-			origem: { label: 'O que deu origem a este projeto?', value: 'Um problema', kind: 'select' }
-		});
-
-		// "Contexto inicial" é decomposta campo a campo nesta rodada — um
-		// submit por campo, na ordem do catálogo.
-		await answerAndContinue(page, { nome: { label: 'Nome provisório do projeto', value: 'Projeto Mapa E2E' } });
-		await answerAndContinue(page, {
-			descricao: { label: 'Breve descrição', value: 'Descrição breve para o teste do Mapa.' }
-		});
-		await answerAndContinue(page, {
-			modo: { label: 'Trabalho individual ou em equipe?', value: 'Individual', kind: 'select' }
-		});
-		await answerAndContinue(page, {
-			nivel: {
-				label: 'Qual seu nível de experiência com gestão de projetos?',
-				value: 'Intermediário',
-				kind: 'select'
-			}
-		});
-		await answerAndContinue(page, {
-			estagio: { label: 'Qual o estágio atual?', value: 'Em planejamento', kind: 'select' }
-		});
-
-		// "Problema ou oportunidade" idem — dois campos obrigatórios (situacao,
-		// sinais_situacao) campo a campo, depois etapa opcional agrupada, sem
-		// preencher nada.
-		await answerAndContinue(page, {
-			situacao: { label: 'Qual situação precisa mudar?', value: 'Situação de teste do Mapa.' }
-		});
-		await answerAndContinue(page, { sinais: { label: 'Informação duplicada', value: '', kind: 'check' } });
-		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
+		// "Origem do projeto" já foi respondida atomicamente em `/projects/new`
+		// (D034); "Contexto inicial" foi incorporada/removida do catálogo.
+		// "Entender a situação" (id `problema`) usa o wizard bespoke
+		// EntenderSituacao.svelte — ver skip-activity.journey.ts para a
+		// cobertura dedicada.
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Existe muito retrabalho' }).click();
+		await page.getByRole('button', { name: 'Continuar' }).click();
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+		await page.getByRole('button', { name: 'Sim, continuar' }).click();
+		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
 		await answerAndContinue(page, {
 			publico: { label: 'Quem é afetado por esta situação, em detalhe?', value: 'Público de teste do Mapa.' }

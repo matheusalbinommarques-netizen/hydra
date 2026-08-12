@@ -38,30 +38,21 @@ test.afterAll(async () => {
 });
 
 async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
+	// Nome e origem já são respondidos atomicamente em `/projects/new` (D034)
+	// — createProject() cobre isso. "Contexto inicial" foi incorporada/
+	// removida do catálogo. "Entender a situação" (id `problema`) usa o
+	// wizard bespoke EntenderSituacao.svelte — aqui os passos 2/3 (onde/peso)
+	// são pulados, para que o passo de edição abaixo tenha algo real para
+	// mudar.
 	const projectId = await createProject(page, server.baseUrl);
 
-	await page.getByLabel('O que deu origem a este projeto?').selectOption('Um problema');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-	// "Contexto inicial" e "Problema ou oportunidade" são decompostas campo a
-	// campo nesta rodada — um submit por campo, com a etapa opcional de
-	// "problema" dispensada via "Avançar sem preencher".
-	await page.getByLabel('Nome provisório do projeto').fill('Projeto Edição no Resumo');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Breve descrição').fill('Descrição breve do projeto.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Qual seu nível de experiência com gestão de projetos?').selectOption('Intermediário');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Qual o estágio atual?').selectOption('Em planejamento');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-	await page.getByLabel('Qual situação precisa mudar?').fill('Situação original do problema.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Informação duplicada', { exact: true }).check();
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
+	await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'Existe muito retrabalho' }).click();
+	await page.getByRole('button', { name: 'Continuar' }).click();
+	await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+	await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+	await page.getByRole('button', { name: 'Sim, continuar' }).click();
+	await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
 	await page.getByLabel('Quem é afetado por esta situação, em detalhe?').fill('Público original.');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
@@ -93,25 +84,38 @@ test('editar "problema" a partir do Resumo: reabre atividade concluída, carrega
 		await expect(page.getByRole('heading', { name: 'Definir usuário principal' })).toBeVisible();
 	});
 
-	await test.step('ir ao Resumo e clicar em "Editar problema"', async () => {
+	await test.step('ir ao Resumo e clicar em "Editar" no bloco Situação', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/summary`);
-		await page.getByRole('link', { name: 'Editar problema' }).click();
+		await page.getByRole('link', { name: 'Editar situação' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now?activity=problema&from=summary`);
 	});
 
-	await test.step('reabre a atividade concluída, com os valores persistidos carregados', async () => {
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
-		await expect(page.getByText('Editando a partir do Resumo da descoberta')).toBeVisible();
-		await expect(page.getByLabel('Qual situação precisa mudar?')).toHaveValue('Situação original do problema.');
-		await expect(page.getByLabel('Informação duplicada', { exact: true })).toBeChecked();
+	await test.step('reabre a atividade concluída (wizard "Entender a situação"), com o valor persistido pré-selecionado', async () => {
+		// EntenderSituacao.svelte não mostra "Editando a partir do Resumo" (esse
+		// texto só existe no ramo genérico de now/+page.svelte, que "problema"
+		// nunca usa) — a chip previamente escolhida vem pré-selecionada.
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Existe muito retrabalho' })).toHaveClass(/selected/);
 		await expect(page.getByRole('button', { name: 'Pular etapa' })).toHaveCount(0);
 	});
 
-	await test.step('editar e salvar retorna ao Resumo (não avança a jornada)', async () => {
-		await page.getByLabel('Qual situação precisa mudar?').fill('Situação revisada do problema.');
-		await page.getByRole('button', { name: 'Salvar e voltar ao Resumo' }).click();
+	await test.step('editar (adicionar outro sinal) e salvar retorna ao Resumo via "Etapa concluída" (não avança a jornada)', async () => {
+		await page.getByRole('button', { name: 'Está demorando demais' }).click();
+		await page.getByRole('button', { name: 'Continuar' }).click();
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+
+		await expect(page.locator('.es-synthesis-box')).toContainText('retrabalho');
+		await expect(page.locator('.es-synthesis-box')).toContainText('demora');
+		await page.getByRole('button', { name: 'Sim, continuar' }).click();
+
+		await expect(page.getByRole('heading', { name: 'Etapa concluída' })).toBeVisible();
+		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
+
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.locator('.overview').getByText('Situação revisada do problema.')).toBeVisible();
+		await expect(
+			page.locator('.overview .decision-value').getByText('Há um problema relacionado a retrabalho e demora.')
+		).toBeVisible();
 	});
 
 	await test.step('a edição invalidou a confirmação anterior do Resumo', async () => {

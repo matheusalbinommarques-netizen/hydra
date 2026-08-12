@@ -15,7 +15,6 @@ import {
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
-import { createProject } from './helpers/create-project';
 import { answerActivitiesGenerically } from './helpers/generic-activity';
 
 interface ExportedEnvelope {
@@ -63,51 +62,41 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 	let projectId = '';
 
-	await test.step('criar projeto', async () => {
-		projectId = await createProject(page, serverA.baseUrl);
-	});
-
-	await test.step('Origem do projeto', async () => {
-		await expect(page.getByRole('heading', { name: 'Origem do projeto' })).toBeVisible();
-		await page.getByLabel('O que deu origem a este projeto?').selectOption('Um problema');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	});
-
-	await test.step('Contexto inicial (campo a campo)', async () => {
-		await expect(page.getByRole('heading', { name: 'Contexto inicial' })).toBeVisible();
-		await page.getByLabel('Nome provisório do projeto').fill('Portal de Solicitações E2E');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-		await page.getByLabel('Breve descrição').fill('Descrição breve do projeto para o teste E2E.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-		await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
+	await test.step('criar projeto: nome e origem já respondidos em /projects/new (D034) — chega direto a "Entender a situação"', async () => {
+		await page.goto(`${serverA.baseUrl}/projects/new`);
 		await page
-			.getByLabel('Qual seu nível de experiência com gestão de projetos?')
-			.selectOption('Intermediário');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+			.getByPlaceholder('Ex.: Renovação do sistema de atendimento')
+			.fill('Portal de Solicitações E2E');
+		await page.getByRole('button', { name: 'Existe um problema' }).click();
+		await page.getByRole('button', { name: 'Criar projeto e começar' }).click();
 
-		await page.getByLabel('Qual o estágio atual?').selectOption('Em planejamento');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+		await page.waitForURL(/\/projects\/[^/]+\/now$/);
+		const match = page.url().match(/\/projects\/([^/]+)\/now$/);
+		if (!match) throw new Error('projectId não encontrado na URL após criar o projeto.');
+		projectId = match[1];
 	});
 
-	await test.step('Problema ou oportunidade (campo a campo, com etapa opcional)', async () => {
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade' })).toBeVisible();
-		await page
-			.getByLabel('Qual situação precisa mudar?')
-			.fill('As solicitações internas chegam sem padrão.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await test.step('Entender a situação (wizard "problema": o quê / onde / peso / síntese / confirmação)', async () => {
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Existe muito retrabalho' }).click();
+		await page.getByRole('button', { name: 'Continuar' }).click();
 
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade' })).toBeVisible();
-		await page.getByLabel('Informação duplicada').check();
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+		await expect(page.getByRole('heading', { name: 'Onde isso aparece principalmente?' })).toBeVisible();
+		await page.getByRole('button', { name: 'Processo' }).click();
+		await page.getByRole('button', { name: 'Continuar' }).click();
 
-		// Todos os obrigatórios respondidos — etapa opcional agrupada, avança
-		// sem preencher nada.
-		await expect(page.getByText('Mais contexto (opcional)')).toBeVisible();
-		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
+		await expect(page.getByRole('heading', { name: 'Qual é o peso disso hoje?' })).toBeVisible();
+		await page.getByRole('button', { name: 'É crítico' }).click();
+		await page.getByRole('button', { name: 'Ver síntese' }).click();
+
+		await expect(page.getByRole('heading', { name: 'É mais ou menos isso?' })).toBeVisible();
+		await expect(page.locator('.es-synthesis-box')).toContainText(
+			'Há um problema relacionado a retrabalho, percebido principalmente no processo, e é crítico hoje.'
+		);
+		await page.getByRole('button', { name: 'Sim, continuar' }).click();
+
+		await expect(page.getByRole('heading', { name: 'Etapa concluída' })).toBeVisible();
+		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 	});
 
 	await test.step('Público afetado', async () => {
@@ -157,10 +146,16 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 		// Visão geral (Corte 3) — só as Answers canônicas de problema/sinais/
 		// público/estado atual/resultado, sempre visíveis, escopadas a
-		// .overview para não colidir com a cópia integral em "detalhes".
+		// .overview para não colidir com a cópia integral em "detalhes". A
+		// síntese de "Entender a situação" é gerada deterministicamente
+		// (catalog/situation-synthesis.ts), não digitada pelo usuário.
 		const overview = page.locator('.overview');
-		await expect(overview.getByText('As solicitações internas chegam sem padrão.')).toBeVisible();
-		await expect(overview.getByText('Informação duplicada')).toBeVisible();
+		await expect(
+			overview.getByText(
+				'Há um problema relacionado a retrabalho, percebido principalmente no processo, e é crítico hoje.'
+			)
+		).toBeVisible();
+		await expect(overview.getByText('Existe muito retrabalho')).toBeVisible();
 		await expect(overview.getByText('Agentes de atendimento e clientes internos.')).toBeVisible();
 		await expect(overview.getByText('Cada time usa sua própria planilha, sem padrão.')).toBeVisible();
 		await expect(overview.getByText('Solicitações centralizadas, priorizadas e acompanháveis.')).toBeVisible();
@@ -178,14 +173,8 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByText('Ver todas as respostas da descoberta').click();
 		const details = page.locator('.full-details');
 
-		// Origem do projeto
-		await expect(details.getByText('Um problema')).toBeVisible();
-
-		// Contexto inicial
-		await expect(details.getByText('Descrição breve do projeto para o teste E2E.')).toBeVisible();
-		await expect(details.getByText('Individual', { exact: true })).toBeVisible();
-		await expect(details.getByText('Intermediário')).toBeVisible();
-		await expect(details.getByText('Em planejamento')).toBeVisible();
+		// Origem do projeto (respondida em /projects/new na criação)
+		await expect(details.getByText('Existe um problema')).toBeVisible();
 
 		// Resultado desejado — beneficiário e percepção não fazem parte da
 		// visão geral (só a mudança esperada), continuam nos detalhes.
@@ -353,15 +342,24 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		expect(exportedJson.state.activityProgress).toHaveLength(36);
+		// 35 atividades no catálogo atual (6 Descoberta + 4 Definição do produto +
+		// 6 Estruturação + 7 Planejamento + 6 Execução + 6 Validação) — "Contexto
+		// inicial" foi incorporada/removida do catálogo (D034), reduzindo de 36
+		// para 35.
+		expect(exportedJson.state.activityProgress).toHaveLength(35);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}
 
+		// Síntese determinística de "Entender a situação"
+		// (catalog/situation-synthesis.ts) — não é mais texto digitado pelo
+		// usuário, é composta a partir das seleções estruturadas.
 		const situacaoAnswer = exportedJson.state.answers.find(
 			(answer) => answer.fieldDefinitionId === 'situacao'
 		);
-		expect(situacaoAnswer?.value).toBe('As solicitações internas chegam sem padrão.');
+		expect(situacaoAnswer?.value).toBe(
+			'Há um problema relacionado a retrabalho, percebido principalmente no processo, e é crítico hoje.'
+		);
 
 		const usuarioPrincipalAnswer = exportedJson.state.answers.find(
 			(answer) => answer.fieldDefinitionId === 'usuario_principal'

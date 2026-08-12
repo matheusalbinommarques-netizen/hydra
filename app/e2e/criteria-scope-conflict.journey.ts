@@ -40,30 +40,18 @@ test.afterAll(async () => {
 	}
 });
 
-// "Problema ou oportunidade" tem um campo selecao_multipla (checkbox)
-// obrigatório — answerActivitiesGenerically (helpers/generic-activity.ts)
-// não marca checkboxes, então a Descoberta é preenchida manualmente aqui,
-// no mesmo padrão de e2e/summary-edit.journey.ts.
+// Nome e origem já são respondidos atomicamente em `/projects/new` (D034) —
+// createProject() já cobre isso. "Contexto inicial" foi incorporada/removida
+// do catálogo; "Entender a situação" (id `problema`) usa o wizard bespoke
+// EntenderSituacao.svelte, não o formulário genérico — ver
+// skip-activity.journey.ts para a cobertura dedicada desse wizard.
 async function completeDiscovery(page: Page): Promise<void> {
-	await page.getByLabel('O que deu origem a este projeto?').selectOption('Um problema');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-	await page.getByLabel('Nome provisório do projeto').fill('Projeto Conflito Critério × Escopo');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Breve descrição').fill('Descrição breve do projeto.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Trabalho individual ou em equipe?').selectOption('Individual');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Qual seu nível de experiência com gestão de projetos?').selectOption('Intermediário');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Qual o estágio atual?').selectOption('Em planejamento');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-	await page.getByLabel('Qual situação precisa mudar?').fill('Situação de teste do conflito.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByLabel('Informação duplicada', { exact: true }).check();
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-	await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
+	await page.getByRole('button', { name: 'Existe muito retrabalho' }).click();
+	await page.getByRole('button', { name: 'Continuar' }).click();
+	await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+	await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
+	await page.getByRole('button', { name: 'Sim, continuar' }).click();
+	await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
 
 	await page.getByLabel('Quem é afetado por esta situação, em detalhe?').fill('Público de teste.');
 	await page.getByRole('button', { name: 'Salvar e continuar' }).click();

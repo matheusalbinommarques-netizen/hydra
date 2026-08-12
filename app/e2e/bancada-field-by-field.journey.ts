@@ -1,14 +1,20 @@
 // Teste Playwright dedicado da apresentação "um campo por vez" da Bancada
-// (Descoberta + Definição do produto) em "Problema ou oportunidade" — a
-// única das três atividades decompostas nesta rodada com mistura de campo
-// obrigatório de texto, campo obrigatório de seleção múltipla e campos
-// opcionais agrupados, o que a torna o melhor caso de prova ponta a ponta.
-// Cobre: avanço campo a campo, painel lateral "O que já sabemos" crescendo a
-// cada resposta, etapa opcional agrupada (preenchida, não pulada) e
-// conclusão da atividade idêntica à de um envio único (mesmos valores
-// persistidos, mesma recomendação seguinte). Roda via
-// playwright.journey.config.ts (servidor efêmero + banco temporário
-// isolados) — ver e2e/helpers/ephemeral-server.ts.
+// (Descoberta + Definição do produto) — painel lateral "O que já sabemos"
+// crescendo a cada resposta, etapa opcional agrupada ao final e conclusão da
+// atividade idêntica à de um envio único. Roda via playwright.journey.config.ts
+// (servidor efêmero + banco temporário isolados) — ver
+// e2e/helpers/ephemeral-server.ts.
+//
+// Reescrito para o comportamento real e aprovado atual (Etapa 0,
+// docs/core/HYDRA_PRODUCT_REWORK.md): "problema" ("Entender a situação") não
+// usa mais a apresentação campo a campo genérica — tem componente bespoke
+// próprio (EntenderSituacao.svelte, ver skip-activity.journey.ts e
+// problema-optional-group.journey.ts para a cobertura dele). "visao_produto"
+// ("Definir visão do produto") é hoje a única atividade que ainda passa pela
+// apresentação campo a campo genérica com múltiplos campos obrigatórios de
+// texto e um campo opcional ao final (now/+page.server.ts,
+// DECOMPOSED_ACTIVITY_IDS) — é o melhor caso de prova real disponível hoje
+// para esse mecanismo.
 
 import { expect, test } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -41,19 +47,40 @@ test.afterAll(async () => {
 	}
 });
 
-test('Bancada: "Problema ou oportunidade" campo a campo, painel crescendo, etapa opcional e conclusão equivalente a envio único', async ({
+async function skipCurrentActivity(page: import('@playwright/test').Page): Promise<void> {
+	await page.getByRole('button', { name: 'Pular etapa' }).click();
+	await page.locator('dialog[open]').getByRole('button', { name: 'Confirmar' }).click();
+}
+
+test('Bancada: "Definir visão do produto" campo a campo, painel crescendo, etapa opcional e conclusão equivalente a envio único', async ({
 	page
 }) => {
-	let projectId = '';
+	await test.step('criar projeto e pular toda a Descoberta para chegar a "Definir visão do produto"', async () => {
+		await createProject(page, server.baseUrl);
 
-	await test.step('criar projeto e pular Origem e Contexto para chegar a "Problema ou oportunidade"', async () => {
-		projectId = await createProject(page, server.baseUrl);
+		// Entender a situação (wizard bespoke) tem seu próprio "Pular etapa".
+		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
+		await skipCurrentActivity(page);
 
-		for (let i = 0; i < 2; i++) {
-			await page.getByRole('button', { name: 'Pular etapa' }).click();
-			await page.getByRole('button', { name: 'Confirmar' }).click();
+		for (const heading of ['Público afetado', 'Estado atual', 'Resultado desejado']) {
+			await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+			await skipCurrentActivity(page);
 		}
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
+
+		await expect(page.getByRole('heading', { name: 'Resumo da descoberta', exact: true })).toBeVisible();
+		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
+		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
+		await page.waitForURL(/\/now$/);
+	});
+
+	await test.step('"Definir usuário principal" respondida de uma vez (não decomposta) para chegar a "Definir visão do produto"', async () => {
+		await expect(page.getByRole('heading', { name: 'Definir usuário principal', exact: true })).toBeVisible();
+		await page
+			.getByLabel('Quem é o usuário principal do produto?')
+			.fill('Analista de atendimento que registra e acompanha solicitações.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
+		await expect(page.getByRole('heading', { name: 'Definir visão do produto', exact: true })).toBeVisible();
 	});
 
 	// A `<aside>` externa é o complementary real ("Progresso e contexto");
@@ -61,67 +88,84 @@ test('Bancada: "Problema ou oportunidade" campo a campo, painel crescendo, etapa
 	// a ARIA mapeia para "region", não "complementary".
 	const panel = page.getByRole('region', { name: 'O que já sabemos até aqui' });
 
-	await test.step('layout de duas colunas ativo e painel vazio (Origem/Contexto foram pulados, sem Answer)', async () => {
+	await test.step('painel já não está vazio (Origem + Usuário principal já respondidos), mas ainda sem bloco "Visão do produto"', async () => {
 		await expect(panel).toBeVisible();
-		await expect(panel.getByText('Ainda não há respostas suficientes para mostrar aqui.')).toBeVisible();
+		await expect(panel.getByText('Ainda não há respostas suficientes para mostrar aqui.')).toHaveCount(0);
+		await expect(panel.getByText('Origem do projeto')).toBeVisible();
+		await expect(panel.getByText('Usuário principal')).toBeVisible();
+		await expect(panel.getByText('Visão do produto')).toHaveCount(0);
 	});
 
-	await test.step('primeiro campo: só "situacao" visível, não o restante da atividade', async () => {
-		await expect(page.getByLabel('Qual situação precisa mudar?')).toBeVisible();
-		await expect(page.getByText('Quais sinais representam melhor a situação?')).toHaveCount(0);
-		await expect(page.getByLabel('Evidências')).toHaveCount(0);
+	await test.step('primeiro campo: só "tipo_produto" visível', async () => {
+		await expect(page.getByLabel('Que tipo de produto será?')).toBeVisible();
+		await expect(page.getByLabel('Qual necessidade principal esse produto atende?')).toHaveCount(0);
+		await expect(page.getByLabel('Qual benefício principal o produto deve entregar?')).toHaveCount(0);
 	});
 
-	await test.step('responder "situacao": painel já mostra o bloco "Problema", ainda sem chips', async () => {
-		await page.getByLabel('Qual situação precisa mudar?').fill('As solicitações chegam sem padrão.');
+	await test.step('responder "tipo_produto": painel ainda sem bloco "Visão do produto" (depende de "necessidade_central")', async () => {
+		await page.getByLabel('Que tipo de produto será?').fill('Portal web de solicitações.');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
-		await expect(panel.getByText('Problema')).toBeVisible();
-		await expect(panel.getByText('As solicitações chegam sem padrão.')).toBeVisible();
-		await expect(panel.locator('.chip')).toHaveCount(0);
+		await expect(page.getByRole('heading', { name: 'Definir visão do produto', exact: true })).toBeVisible();
+		await expect(panel.getByText('Visão do produto')).toHaveCount(0);
 	});
 
-	await test.step('segundo campo: só "sinais_situacao" visível, "situacao" não é mais mostrado no formulário', async () => {
-		await expect(page.getByText('Quais sinais representam melhor a situação?')).toBeVisible();
-		await expect(page.getByLabel('Qual situação precisa mudar?')).toHaveCount(0);
+	await test.step('segundo campo: só "necessidade_central" visível, "tipo_produto" não é mais mostrado no formulário', async () => {
+		await expect(page.getByLabel('Qual necessidade principal esse produto atende?')).toBeVisible();
+		await expect(page.getByLabel('Que tipo de produto será?')).toHaveCount(0);
 	});
 
-	await test.step('responder "sinais_situacao" (último obrigatório): etapa opcional agrupada aparece, painel ganha chips', async () => {
-		await page.getByLabel('Retrabalho', { exact: true }).check();
+	await test.step('responder "necessidade_central": painel ganha o bloco "Visão do produto"', async () => {
+		await page
+			.getByLabel('Qual necessidade principal esse produto atende?')
+			.fill('Centralizar e priorizar solicitações internas.');
+		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
+		await expect(panel.getByText('Visão do produto')).toBeVisible();
+		await expect(panel.getByText('Centralizar e priorizar solicitações internas.')).toBeVisible();
+	});
+
+	await test.step('terceiro campo (último obrigatório): só "beneficio_central" visível', async () => {
+		await expect(page.getByLabel('Qual benefício principal o produto deve entregar?')).toBeVisible();
+		await expect(page.getByLabel('Qual necessidade principal esse produto atende?')).toHaveCount(0);
+	});
+
+	await test.step('responder "beneficio_central" (último obrigatório): etapa opcional aparece com só "diferencial"', async () => {
+		await page
+			.getByLabel('Qual benefício principal o produto deve entregar?')
+			.fill('Resposta mais rápida e menos retrabalho.');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
 		await expect(page.getByText('Mais contexto (opcional)')).toBeVisible();
-		// Grupo opcional recolhido por padrão (mesmo comportamento de
-		// problema-optional-group.journey.ts) — abre para responder.
-		await page.getByText('Adicionar mais contexto', { exact: false }).click();
-		await expect(page.getByLabel('Evidências')).toBeVisible();
+		await expect(page.getByLabel('O que diferencia essa proposta das alternativas atuais?')).toBeVisible();
 		// A etapa opcional não repete os campos já respondidos.
-		await expect(page.getByLabel('Qual situação precisa mudar?')).toHaveCount(0);
-		await expect(page.getByText('Quais sinais representam melhor a situação?')).toHaveCount(0);
-
-		await expect(panel.locator('.chip')).toHaveText(['Retrabalho']);
+		await expect(page.getByLabel('Que tipo de produto será?')).toHaveCount(0);
+		await expect(page.getByLabel('Qual necessidade principal esse produto atende?')).toHaveCount(0);
+		await expect(page.getByLabel('Qual benefício principal o produto deve entregar?')).toHaveCount(0);
 	});
 
-	await test.step('preencher um campo opcional e salvar (não pular) avança para a próxima atividade', async () => {
-		await page.getByLabel('Evidências').fill('Três reclamações registradas este mês.');
+	await test.step('preencher o campo opcional e salvar (não pular) avança para a próxima atividade', async () => {
+		await page
+			.getByLabel('O que diferencia essa proposta das alternativas atuais?')
+			.fill('Orientação contextual em vez de apenas ferramentas soltas.');
 		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
 
-		await expect(page.getByRole('heading', { name: 'Público afetado', exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Escolha o próximo foco', exact: true })).toBeVisible();
 	});
 
-	await test.step('conclusão equivalente a um envio único: valores persistidos, atividade concluída, recomendação avançou', async () => {
-		await page.goto(`${server.baseUrl}/projects/${projectId}/now?activity=problema&from=summary`);
-		await expect(page.getByRole('heading', { name: 'Problema ou oportunidade', exact: true })).toBeVisible();
-		await expect(page.getByText('Editando a partir do Resumo da descoberta')).toBeVisible();
+	await test.step('conclusão equivalente a um envio único: os quatro valores persistidos em Registros, campo a campo', async () => {
+		await page.getByRole('link', { name: 'Registros' }).click();
+		await page.waitForURL(/\/records$/);
 
-		// Edição a partir do Resumo mostra o formulário inteiro (não campo a
-		// campo) — os mesmos valores da progressão campo a campo, todos juntos,
-		// exatamente como se tivessem sido enviados de uma vez.
-		await expect(page.getByLabel('Qual situação precisa mudar?')).toHaveValue(
-			'As solicitações chegam sem padrão.'
-		);
-		await expect(page.getByLabel('Retrabalho', { exact: true })).toBeChecked();
-		await expect(page.getByLabel('Evidências')).toHaveValue('Três reclamações registradas este mês.');
+		const activity = page
+			.locator('.phase-card')
+			.filter({ hasText: 'Definição do produto' })
+			.locator('.activity')
+			.filter({ hasText: 'Definir visão do produto' });
+
+		await expect(activity.getByText('Portal web de solicitações.')).toBeVisible();
+		await expect(activity.getByText('Centralizar e priorizar solicitações internas.')).toBeVisible();
+		await expect(activity.getByText('Resposta mais rápida e menos retrabalho.')).toBeVisible();
+		await expect(activity.getByText('Orientação contextual em vez de apenas ferramentas soltas.')).toBeVisible();
 	});
 });
