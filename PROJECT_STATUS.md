@@ -468,11 +468,44 @@ PASS (5/5 etapas, 18/18 jornadas). Dívida conhecida e deliberadamente não
 tratada: `optionalGroup`/`revealWhen` (catálogo) seguem sem uso em
 qualquer `ActivityDefinition` atual.
 
-A próxima decisão real é de Matheus: autorizar a ETAPA 1
-(`docs/core/HYDRA_PRODUCT_REWORK.md`, "Fundação visual mínima" —
-consolidar só o que já é comprovadamente comum entre Home, `/projects/new`
-e Entender a Situação, sem migrar automaticamente todas as telas) como
-próximo corte, ou direcionar ao vivo outra coisa. Não decidida ainda.
+ETAPA 1 ("Fundação visual mínima") está **concluída e publicada** (commit
+`56d655b`, `main`/`origin/main`): tokens de cor/raio comprovadamente
+idênticos entre Home, `/projects/new` e "Entender a situação" passaram a
+ler de uma fonte única (`.hydra-dark-tokens`, `app.css`), eliminando os
+três sistemas de tokens dark paralelos (`--hp-*`, `--np-*`, `.dark-activity`
+redefinindo `--hydra-*`); cada tela manteve local só o que é realmente
+específico (nenhuma abstração prematura). Correção complementar no mesmo
+gate: Inter Variable passou a ser carregada de verdade (self-hosted via
+`@fontsource-variable/inter`) — antes as três telas declaravam a fonte sem
+nenhum arquivo carregado, caindo em `system-ui` silenciosamente.
+`hydra-verify full` PASS (5/5 etapas, 18/18 jornadas). Nenhuma mudança
+visual perceptível nas três telas aprovadas.
+
+ETAPA 2 ("Primeiro corte vertical de Descoberta: AffectedGroup") está
+**concluída e publicada** (commit `f2967c1`, `main`/`origin/main`), com
+Gate 2 aprovado por Matheus após dogfooding real: "Quem é afetado" (era
+"Público afetado") deixou de ser texto livre e passou a construir um Mapa
+de Impacto — `AffectedGroup` é o primeiro objeto vivo real do rework
+(persistido a cada interação, nunca staging local), com faixas derivadas
+de impacto, faixa "Ainda não sabemos" distinta de "por classificar", e a
+mesma síntese refletida sem redigitação em Agora, Resumo da descoberta e
+Documento do projeto. `publico` migrou de `required_fields` para
+`explicit_confirmation`; `publico_detail` não é mais escrito para
+projetos novos, mas snapshots exportados antes desta mudança continuam
+importáveis (`domain/legacy-answers.ts`, READ-LEGACY explícito e
+reaproveitável para futuros campos deprecados — sem dual-write, sem
+conversão automática de texto livre em objeto). `hydra-verify full` PASS
+(5/5 etapas, 18/18 jornadas, 534 testes unitários). Feedback de dogfooding
+de Matheus: experiência e simplicidade no nível esperado; melhorar
+sugestões/contextualização da engine, permitir voltar a etapa anterior e
+permitir deletar projetos são achados reais registrados para evolução
+futura, deliberadamente fora do escopo deste corte.
+
+A próxima decisão real é de Matheus: autorizar a ETAPA 3
+(`docs/core/HYDRA_PRODUCT_REWORK.md`, "Evidence + primeira External
+Action" — provar o loop Hydra → ação real → Hydra a partir de um
+AffectedGroup) como próximo corte, ou direcionar ao vivo outra coisa. Não
+decidida ainda.
 
 ## Não fazer agora
 

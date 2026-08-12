@@ -195,6 +195,15 @@
   estruturada em 3 passos (o quê/onde/peso) com síntese automática, no
   lugar de texto livre; taxonomia de opções varia conforme a origem do
   projeto (D034, `docs/07-management/decision-log.md`).
+- Rework (ETAPA 2, `docs/core/HYDRA_PRODUCT_REWORK.md`) — "Quem é afetado"
+  (era "Público afetado") deixa de ser texto livre e passa a construir um
+  Mapa de Impacto: adicionar um grupo cria um `AffectedGroup` real,
+  persistido a cada interação; classificar impacto/frequência move o grupo
+  entre faixas em tempo real; a mesma síntese aparece sem redigitação em
+  Agora, Resumo da descoberta e Documento do projeto. `publico_detail` não
+  é mais escrito para projetos novos; snapshots exportados antes desta
+  mudança continuam importáveis (dado legado preservado, nunca convertido
+  automaticamente em `AffectedGroup`).
 
 ### Alterado
 
@@ -439,6 +448,17 @@
   "Progresso da fase"/Bancada de `/now`; implementado local ao componente
   (`EntenderSituacao.svelte`), sem abstração compartilhada — extraída
   quando uma segunda atividade adotar a mesma mecânica, não antes.
+- Rework (ETAPA 1, `docs/core/HYDRA_PRODUCT_REWORK.md`) — fundação visual
+  mínima consolidada: tokens de cor/raio comprovadamente idênticos entre
+  Home, `/projects/new` e "Entender a situação" passam a ler de
+  `.hydra-dark-tokens` (`app.css`), eliminando três sistemas de tokens dark
+  paralelos; Inter Variable carregada de verdade (self-hosted,
+  `@fontsource-variable/inter`) como fonte real dessas três telas, em vez
+  de declarada sem efeito. Sem mudança visual perceptível nem de
+  comportamento — só consolidação de CSS.
+- "Quem é afetado" (Mapa de Impacto, ETAPA 2) reaproveita a mesma
+  identidade escura — tema escuro do shell (`[projectId]/+layout.svelte`)
+  estendido a essa atividade, junto com "Entender a situação".
 
 ### Reconciliado
 
