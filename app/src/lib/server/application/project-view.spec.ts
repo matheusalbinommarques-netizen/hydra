@@ -13,6 +13,8 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		scopeVersion: { projectId: 'p1', hypothesis: '', confirmedAt: null },
 		impediments: [],
 		affectedGroups: [],
+		externalActions: [],
+		evidences: [],
 		...overrides
 	};
 }
@@ -228,7 +230,9 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'criteriaScopeConflict',
 				'impediments',
 				'affectedGroups',
-				'affectedGroupConfirmationIssues'
+				'affectedGroupConfirmationIssues',
+				'externalActions',
+				'evidences'
 			].sort()
 		);
 	});

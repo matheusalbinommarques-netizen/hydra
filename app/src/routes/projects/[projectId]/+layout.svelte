@@ -1,10 +1,66 @@
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import { page } from '$app/state';
+	import { enhance } from '$app/forms';
 	import { projectStatusLabel } from '$lib/project-status-label';
+	import { EVIDENCE_OUTCOME_OPTIONS } from '$lib/catalog/external-action';
+	import {
+		EXTERNAL_ACTION_CAPTURE_CONTEXT_KEY,
+		type ExternalActionCaptureContext
+	} from '$lib/components/external-action-capture-context';
+	import type { EvidenceOutcome } from '$lib/domain';
 
 	let { data, children } = $props();
 	let projectId = $derived(page.params.projectId);
 	let pathname = $derived(page.url.pathname);
+
+	// Validação Externa (ETAPA 3 do rework, correção de UX pós-dogfooding) —
+	// faixa contextual "N ações em campo" visível em qualquer página interna
+	// do projeto (não só /now, onde a ExternalAction nasce), sem duplicar a
+	// lógica em cada rota: ProjectView já carrega externalActions/
+	// affectedGroups por inteiro (ver server/application/project-view.ts),
+	// então o shell só filtra e cruza os dois. A action do formulário de
+	// captura aponta explicitamente para
+	// `/projects/{id}/now?/completeExternalAction` — SvelteKit resolve
+	// actions pela URL do <form>, não pela rota atualmente renderizada, então
+	// isso funciona a partir de qualquer página sem precisar de uma action
+	// própria por rota (ver now/+page.server.ts).
+	let openExternalActions = $derived(
+		data.view.externalActions
+			.filter((action) => action.status === 'aberta')
+			.map((action) => ({
+				id: action.id,
+				objective: action.objective,
+				groupLabel: data.view.affectedGroups.find((group) => group.id === action.affectedGroupId)?.label ?? 'Grupo'
+			}))
+	);
+	let singleOpenAction = $derived(openExternalActions.length === 1 ? openExternalActions[0] : undefined);
+	let stripExpanded = $state(false);
+
+	let captureActionId = $state<string | null>(null);
+	let captureOutcome = $state<EvidenceOutcome | null>(null);
+	let captureLearning = $state('');
+	let captureAction = $derived(openExternalActions.find((action) => action.id === captureActionId));
+	let cannotSaveEvidence = $derived(!captureOutcome || captureLearning.trim().length === 0);
+
+	function openCapture(actionId: string) {
+		captureActionId = actionId;
+		captureOutcome = null;
+		captureLearning = '';
+		stripExpanded = false;
+	}
+
+	function closeCapture() {
+		captureActionId = null;
+	}
+
+	// Única fonte de estado de captura (§10 da correção de UX): qualquer
+	// descendente — hoje só MapaDeImpacto.svelte, a partir do próprio
+	// AffectedGroup — chama este contexto em vez de reimplementar o drawer
+	// ou o form action. "Registrar retorno" a partir do card, da faixa ou da
+	// lista expandida sempre abrem o mesmo painel, sobre o mesmo
+	// ExternalAction.id.
+	setContext<ExternalActionCaptureContext>(EXTERNAL_ACTION_CAPTURE_CONTEXT_KEY, { open: openCapture });
 
 	// "Entender a situação" e "Quem é afetado" (Claude Design) são as
 	// atividades já convergidas para a identidade escura — o resto do shell
@@ -182,6 +238,106 @@
 			</nav>
 		{/if}
 	</header>
+
+	{#if openExternalActions.length > 0}
+		<div class="external-actions-strip" aria-label="Ações em campo">
+			{#if singleOpenAction}
+				<div class="strip-row">
+					<div class="strip-status">
+						<span class="strip-dot" aria-hidden="true"></span>
+						<span>Ação em campo — {singleOpenAction.groupLabel}</span>
+					</div>
+					<button type="button" class="strip-action" onclick={() => openCapture(singleOpenAction.id)}>
+						Registrar retorno
+					</button>
+				</div>
+			{:else}
+				<div class="strip-row">
+					<div class="strip-status">
+						<span class="strip-dot" aria-hidden="true"></span>
+						<span>
+							{openExternalActions.length} ações em campo · {openExternalActions
+								.map((action) => action.groupLabel)
+								.join(' · ')}
+						</span>
+					</div>
+					<button
+						type="button"
+						class="strip-toggle"
+						aria-expanded={stripExpanded}
+						aria-controls="strip-action-list"
+						onclick={() => (stripExpanded = !stripExpanded)}
+					>
+						{stripExpanded ? 'Ocultar' : 'Ver ações'}
+					</button>
+				</div>
+				{#if stripExpanded}
+					<ul id="strip-action-list" class="strip-list">
+						{#each openExternalActions as action (action.id)}
+							<li class="strip-list-item">
+								<span>{action.groupLabel}</span>
+								<button type="button" class="strip-action strip-action-text" onclick={() => openCapture(action.id)}>
+									Registrar retorno
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			{/if}
+		</div>
+	{/if}
+
+	{#if captureActionId && captureAction}
+		<div class="capture-overlay" onclick={closeCapture} aria-hidden="true"></div>
+		<div class="capture-drawer" role="dialog" aria-label="Retorno da validação">
+			<div class="capture-header">
+				<p class="capture-eyebrow">Retorno da validação</p>
+				<p class="capture-group">{captureAction.groupLabel}</p>
+				<p class="capture-objective">{captureAction.objective}</p>
+			</div>
+			<div class="capture-choices">
+				{#each EVIDENCE_OUTCOME_OPTIONS as option (option.id)}
+					<button
+						type="button"
+						class="capture-choice"
+						class:selected={captureOutcome === option.id}
+						aria-pressed={captureOutcome === option.id}
+						onclick={() => (captureOutcome = option.id)}
+					>
+						{option.label}
+					</button>
+				{/each}
+			</div>
+			<form
+				method="POST"
+				action="/projects/{projectId}/now?/completeExternalAction"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						if (result.type === 'failure' || result.type === 'error') {
+							await update();
+							return;
+						}
+						await update();
+						closeCapture();
+					};
+				}}
+			>
+				<input type="hidden" name="actionId" value={captureActionId} />
+				<input type="hidden" name="outcome" value={captureOutcome ?? ''} />
+				<label class="capture-label" for="capture-learning">O que você aprendeu?</label>
+				<textarea
+					id="capture-learning"
+					name="learning"
+					bind:value={captureLearning}
+					placeholder="Uma frase curta já basta."
+				></textarea>
+				<div class="capture-actions">
+					<button type="button" class="capture-close" onclick={closeCapture}>Fechar</button>
+					<button type="submit" class="capture-save" disabled={cannotSaveEvidence}>Salvar evidência</button>
+				</div>
+			</form>
+		</div>
+	{/if}
 
 	<main class="container">
 		{@render children()}
@@ -416,6 +572,246 @@
 		font-weight: 700;
 	}
 
+	/* Faixa contextual de ações em campo (correção de UX pós-dogfooding) —
+	   presença TEMPORÁRIA, nunca uma central/backlog: existe só enquanto há
+	   ExternalAction aberta, some quando não há nenhuma. Full-bleed logo
+	   abaixo da navegação, para não competir com o conteúdo principal nem
+	   passar despercebida como os pills isolados anteriores. Indicador
+	   estático (sem pulse contínuo, §13 da correção) — o teal já diferencia
+	   visualmente sem parecer notificação piscando. */
+	.external-actions-strip {
+		background: rgba(45, 212, 196, 0.08);
+		border-bottom: 1px solid rgba(45, 212, 196, 0.35);
+		padding: var(--space-3) var(--space-5);
+	}
+
+	.strip-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
+		flex-wrap: wrap;
+	}
+
+	.strip-status {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--hydra-text);
+		min-width: 0;
+	}
+
+	.strip-status span:last-child {
+		overflow-wrap: break-word;
+	}
+
+	.strip-dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background: #2dd4c4;
+		flex-shrink: 0;
+	}
+
+	.strip-action,
+	.strip-toggle {
+		background: none;
+		border: 1px solid rgba(45, 212, 196, 0.45);
+		border-radius: var(--hydra-radius-pill, 999px);
+		color: var(--hydra-text);
+		font-size: 0.78125rem;
+		font-weight: 600;
+		font-family: inherit;
+		cursor: pointer;
+		padding: 0.375rem 0.875rem;
+		min-height: 2.25rem;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.strip-toggle {
+		border: none;
+		padding: 0;
+		color: #5be9d8;
+		text-decoration: underline;
+		min-height: auto;
+	}
+
+	.strip-list {
+		list-style: none;
+		margin: var(--space-3) 0 0;
+		padding-top: var(--space-3);
+		border-top: 1px solid rgba(45, 212, 196, 0.3);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.strip-list-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		font-size: 0.8125rem;
+		color: var(--hydra-text);
+		flex-wrap: wrap;
+	}
+
+	.strip-action-text {
+		border: none;
+		padding: 0;
+		color: #5be9d8;
+		text-decoration: underline;
+		min-height: auto;
+	}
+
+	/* Drawer de retorno (correção de UX pós-dogfooding) — substitui a caixa
+	   flutuante anterior por um painel de altura total com overlay,
+	   consistente com o handoff aprovado: o retorno passa a ser uma
+	   continuação clara de UMA ExternalAction específica (grupo + objetivo
+	   visíveis de cara), não um formulário genérico. */
+	.capture-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(5, 10, 16, 0.55);
+		z-index: 49;
+	}
+
+	.capture-drawer {
+		position: fixed;
+		top: 0;
+		right: 0;
+		height: 100%;
+		width: min(23.75rem, 100vw);
+		background: var(--hydra-surface-raised);
+		border-left: 1px solid var(--hydra-border);
+		padding: var(--space-6) var(--space-5);
+		box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+		z-index: 50;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		overflow-y: auto;
+		box-sizing: border-box;
+	}
+
+	.capture-header {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+	}
+
+	.capture-eyebrow {
+		margin: 0;
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--hydra-accent);
+	}
+
+	.capture-group {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: var(--hydra-text);
+	}
+
+	.capture-objective {
+		margin: 0;
+		font-size: 0.8125rem;
+		color: var(--hydra-muted);
+		line-height: 1.45;
+	}
+
+	.capture-choices {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.capture-choice {
+		text-align: left;
+		background: var(--hydra-surface);
+		border: 1px solid var(--hydra-border);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-3);
+		font-size: 0.8125rem;
+		font-family: inherit;
+		color: var(--hydra-text);
+		cursor: pointer;
+		min-height: 2.75rem;
+	}
+
+	.capture-choice.selected {
+		border-color: var(--hydra-accent);
+		background: rgba(45, 212, 196, 0.12);
+	}
+
+	.capture-drawer form {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		margin: 0;
+	}
+
+	.capture-label {
+		font-size: 0.75rem;
+		color: var(--hydra-muted);
+	}
+
+	.capture-drawer textarea {
+		width: 100%;
+		box-sizing: border-box;
+		font-family: inherit;
+		font-size: 0.8125rem;
+		color: var(--hydra-text);
+		background: var(--hydra-surface);
+		border: 1px solid var(--hydra-border);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-3);
+		min-height: 3.5rem;
+		resize: vertical;
+	}
+
+	.capture-actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		margin-top: auto;
+		padding-top: var(--space-3);
+	}
+
+	.capture-close {
+		background: none;
+		border: none;
+		color: var(--hydra-muted);
+		font-size: 0.8125rem;
+		cursor: pointer;
+		font-family: inherit;
+		padding: 0;
+	}
+
+	.capture-save {
+		background: var(--hydra-accent);
+		color: var(--hydra-bg, #04211f);
+		border: none;
+		border-radius: var(--hydra-radius);
+		padding: var(--space-2) var(--space-4);
+		font-weight: 700;
+		font-size: 0.8125rem;
+		cursor: pointer;
+		font-family: inherit;
+	}
+
+	.capture-save:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
 	@media (max-width: 860px) {
 		.header-desktop {
 			display: none;
@@ -428,6 +824,14 @@
 
 		.container {
 			padding: var(--space-4);
+		}
+
+		.external-actions-strip {
+			padding: var(--space-3) var(--space-4);
+		}
+
+		.strip-row {
+			align-items: flex-start;
 		}
 	}
 </style>

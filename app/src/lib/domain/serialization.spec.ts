@@ -6,9 +6,11 @@ import {
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	completeExternalAction,
 	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
+	prepareExternalAction,
 	resolveImpediment,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
@@ -815,5 +817,179 @@ describe('deserializeProjectState — AffectedGroup (ETAPA 2, "Quem é afetado")
 		const publico = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'publico')!;
 		publico.status = 'concluída';
 		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores à ETAPA 3 (sem externalActions/evidences)', () => {
+	it('trata externalActions/evidences ausentes como [] (envelope válido pré-ETAPA 3)', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		delete envelope.state.externalActions;
+		delete envelope.state.evidences;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.externalActions).toEqual([]);
+			expect(result.value.evidences).toEqual([]);
+		}
+	});
+
+	it('continua rejeitando externalActions/evidences: null', () => {
+		const withNullActions = baseEnvelope() as { state: Record<string, unknown> };
+		withNullActions.state.externalActions = null;
+		expectError(JSON.stringify(withNullActions), 'invalid_shape');
+
+		const withNullEvidences = baseEnvelope() as { state: Record<string, unknown> };
+		withNullEvidences.state.evidences = null;
+		expectError(JSON.stringify(withNullEvidences), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — ExternalAction / Evidence (ETAPA 3, "Validação Externa")', () => {
+	const preparation = {
+		objective: 'Confirmar.',
+		questions: ['Q1', 'Q2'],
+		informationToTake: ['Operação'],
+		expectedResult: 'Resultado esperado.'
+	};
+
+	function openActionState(): ProjectState {
+		let state = unwrap(
+			addAffectedGroup(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'ag-1', 'Operação', T1)
+		);
+		state = unwrap(prepareExternalAction(catalog, state, 'ea-1', 'ag-1', preparation, T1));
+		return state;
+	}
+
+	function completedActionState(): ProjectState {
+		return unwrap(completeExternalAction(catalog, openActionState(), 'ea-1', 'ev-1', 'confirmed', 'Aprendi.', T2));
+	}
+
+	it('roundtrip de uma ExternalAction aberta', () => {
+		const state = openActionState();
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('roundtrip de uma ExternalAction concluída + Evidence', () => {
+		const state = completedActionState();
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('rejeita ExternalAction.affectedGroupId referenciando grupo inexistente', () => {
+		const envelope = JSON.parse(serializeProjectState(openActionState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		envelope.state.externalActions[0].affectedGroupId = 'inexistente';
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('rejeita ExternalAction "aberta" com completedAt preenchido', () => {
+		const envelope = JSON.parse(serializeProjectState(openActionState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		envelope.state.externalActions[0].completedAt = T2;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ExternalAction "concluida" sem completedAt', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		envelope.state.externalActions[0].completedAt = null;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita duas ExternalActions abertas do mesmo tipo para o mesmo grupo', () => {
+		const envelope = JSON.parse(serializeProjectState(openActionState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		envelope.state.externalActions.push({ ...envelope.state.externalActions[0], id: 'ea-2' });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita Evidence.externalActionId referenciando ação inexistente', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { evidences: Array<Record<string, unknown>> };
+		};
+		envelope.state.evidences[0].externalActionId = 'inexistente';
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('rejeita Evidence referenciando uma ExternalAction ainda aberta', () => {
+		const envelope = JSON.parse(serializeProjectState(openActionState())) as {
+			state: { externalActions: Array<Record<string, unknown>>; evidences: Array<Record<string, unknown>> };
+		};
+		// Estado impossível: ação nunca foi concluída (ainda "aberta"), mas o
+		// payload tenta introduzir uma Evidence relacionada a ela mesmo assim.
+		envelope.state.evidences.push({
+			id: 'ev-1',
+			projectId: 'proj-1',
+			externalActionId: 'ea-1',
+			affectedGroupId: 'ag-1',
+			kind: 'conversation',
+			outcome: 'confirmed',
+			learning: 'Aprendi.',
+			createdAt: T1
+		});
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita Evidence.affectedGroupId divergente do affectedGroupId da própria ExternalAction', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: {
+				affectedGroups: Array<Record<string, unknown>>;
+				evidences: Array<Record<string, unknown>>;
+			};
+		};
+		envelope.state.affectedGroups.push({ ...envelope.state.affectedGroups[0], id: 'ag-2', label: 'Outro' });
+		envelope.state.evidences[0].affectedGroupId = 'ag-2';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita duas Evidence para a mesma ExternalAction', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { evidences: Array<Record<string, unknown>> };
+		};
+		envelope.state.evidences.push({ ...envelope.state.evidences[0], id: 'ev-2' });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita ExternalAction "concluida" sem nenhuma Evidence correspondente', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { evidences: unknown[] };
+		};
+		envelope.state.evidences = [];
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita Evidence.outcome fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { evidences: Array<Record<string, unknown>> };
+		};
+		envelope.state.evidences[0].outcome = 'inventado';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita Evidence.learning vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { evidences: Array<Record<string, unknown>> };
+		};
+		envelope.state.evidences[0].learning = '   ';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita ExternalAction/Evidence com projectId diferente do Project', () => {
+		const withWrongAction = JSON.parse(serializeProjectState(openActionState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		withWrongAction.state.externalActions[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(withWrongAction), 'invariant_violation');
+
+		const withWrongEvidence = JSON.parse(serializeProjectState(completedActionState())) as {
+			state: { evidences: Array<Record<string, unknown>> };
+		};
+		withWrongEvidence.state.evidences[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(withWrongEvidence), 'invariant_violation');
 	});
 });

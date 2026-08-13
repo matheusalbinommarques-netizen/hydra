@@ -43,6 +43,16 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Grupo afetado não encontrado.';
 		case 'affected_group_confirmation_invalid':
 			return 'Adicione ao menos um grupo e classifique impacto e frequência antes de concluir o mapa.';
+		case 'affected_group_has_references':
+			return 'Este grupo tem uma validação ou evidência relacionada e não pode ser removido.';
+		case 'external_action_not_found':
+			return 'Ação externa não encontrada.';
+		case 'external_action_duplicate_open':
+			return 'Já existe uma validação em campo para este grupo.';
+		case 'external_action_not_open':
+			return 'Esta ação já foi concluída.';
+		case 'evidence_learning_required':
+			return 'Descreva o que você aprendeu antes de salvar a evidência.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

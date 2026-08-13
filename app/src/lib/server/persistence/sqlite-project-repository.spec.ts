@@ -9,12 +9,14 @@ import {
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	completeExternalAction,
 	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
 	createInitialProjectState,
 	encodeMultiSelectValue,
 	moveScopeItem,
+	prepareExternalAction,
 	renameProject,
 	resolveImpediment,
 	setAffectedGroupFrequency,
@@ -87,6 +89,20 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T2));
 	state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'constante', T2));
 	state = unwrap(confirmAffectedGroups(catalog, state, T2));
+
+	// ExternalAction/Evidence (ETAPA 3 do rework) — uma ação concluída com
+	// Evidence (ag-1) e outra ainda aberta (ag-2, grupo novo), para exercitar
+	// o roundtrip completo dos dois estados do lifecycle.
+	const preparation = {
+		objective: 'Confirmar como isso aparece para Clientes.',
+		questions: ['Quando acontece?', 'O que você faz?'],
+		informationToTake: ['Clientes', 'Impacto: Alto', 'Frequência: Constantemente'],
+		expectedResult: 'Tente voltar sabendo se isso realmente acontece dessa forma.'
+	};
+	state = unwrap(prepareExternalAction(catalog, state, 'ea-1', 'ag-1', preparation, T2));
+	state = unwrap(completeExternalAction(catalog, state, 'ea-1', 'ev-1', 'partially_confirmed', 'Confirma em parte.', T2));
+	state = unwrap(addAffectedGroup(catalog, state, 'ag-2', 'Operação', T2));
+	state = unwrap(prepareExternalAction(catalog, state, 'ea-2', 'ag-2', preparation, T2));
 
 	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
 	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'agora', T1));
@@ -451,7 +467,9 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 				'scopeItems',
 				'scopeVersion',
 				'impediments',
-				'affectedGroups'
+				'affectedGroups',
+				'externalActions',
+				'evidences'
 			].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');

@@ -1241,7 +1241,9 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'scopeItems',
 				'scopeVersion',
 				'impediments',
-				'affectedGroups'
+				'affectedGroups',
+				'externalActions',
+				'evidences'
 			].sort()
 		);
 	});
@@ -1274,7 +1276,9 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'criteriaScopeConflict',
 				'impediments',
 				'affectedGroups',
-				'affectedGroupConfirmationIssues'
+				'affectedGroupConfirmationIssues',
+				'externalActions',
+				'evidences'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');
@@ -1409,5 +1413,147 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 		expect(
 			await useCases.addImpediment({ projectId: 'nao-existe', text: 'x', tipo: 'outro' })
 		).toEqual({ ok: false, error: { kind: 'project_not_found' } });
+	});
+});
+
+describe('createProjectUseCases — Validação Externa (ETAPA 3, ExternalAction/Evidence)', () => {
+	async function projectWithGroup(clock = '2026-01-01T00:00:00.000Z') {
+		const ctx = setup(clock);
+		const created = await ctx.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const withGroup = await ctx.useCases.addAffectedGroup({ projectId, label: 'Operação' });
+		if (!withGroup.ok) throw new Error('esperado ok');
+		const withImpact = await ctx.useCases.setAffectedGroupImpact({
+			projectId,
+			groupId: withGroup.value.affectedGroups[0].id,
+			impact: 'alto'
+		});
+		if (!withImpact.ok) throw new Error('esperado ok');
+		return { ...ctx, projectId, groupId: withImpact.value.affectedGroups[0].id };
+	}
+
+	it('prepareExternalAction cria a ExternalAction, com a preparação derivada do AffectedGroup atual (label e impacto)', async () => {
+		const { useCases, projectId, groupId } = await projectWithGroup();
+
+		const result = await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.externalActions).toHaveLength(1);
+		const action = result.value.externalActions[0];
+		expect(action.affectedGroupId).toBe(groupId);
+		expect(action.status).toBe('aberta');
+		expect(action.objective).toContain('Operação');
+		expect(action.informationToTake).toContain('Operação');
+		expect(action.informationToTake).toContain('Impacto: Alto');
+		expect(action.questions.length).toBeGreaterThan(0);
+	});
+
+	it('prepareExternalAction: affected_group_not_found para grupo inexistente', async () => {
+		const { useCases, projectId } = await projectWithGroup();
+		expect(await useCases.prepareExternalAction({ projectId, affectedGroupId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_not_found' }
+		});
+	});
+
+	it('prepareExternalAction: external_action_duplicate_open ao tentar preparar duas vezes para o mesmo grupo', async () => {
+		const { useCases, projectId, groupId } = await projectWithGroup();
+		const first = await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId });
+		expect(first.ok).toBe(true);
+
+		expect(await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId })).toEqual({
+			ok: false,
+			error: { kind: 'external_action_duplicate_open' }
+		});
+	});
+
+	it('project_not_found quando o projeto não existe (prepareExternalAction)', async () => {
+		const { useCases } = setup();
+		expect(await useCases.prepareExternalAction({ projectId: 'nao-existe', affectedGroupId: 'ag-1' })).toEqual({
+			ok: false,
+			error: { kind: 'project_not_found' }
+		});
+	});
+
+	it('completeExternalAction cria a Evidence, conclui a ação e o grupo passa a mostrar a evidência', async () => {
+		const { useCases, clock, projectId, groupId } = await projectWithGroup();
+		const prepared = await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId });
+		if (!prepared.ok) throw new Error('esperado ok');
+		const actionId = prepared.value.externalActions[0].id;
+
+		clock.set('2026-01-02T00:00:00.000Z');
+		const completed = await useCases.completeExternalAction({
+			projectId,
+			actionId,
+			outcome: 'confirmed',
+			learning: 'A operação confirma o retrabalho.'
+		});
+		expect(completed.ok).toBe(true);
+		if (!completed.ok) return;
+
+		expect(completed.value.externalActions[0]).toMatchObject({
+			id: actionId,
+			status: 'concluida'
+		});
+		expect(completed.value.evidences).toEqual([
+			{
+				id: expect.any(String),
+				externalActionId: actionId,
+				affectedGroupId: groupId,
+				outcome: 'confirmed',
+				learning: 'A operação confirma o retrabalho.',
+				createdAt: '2026-01-02T00:00:00.000Z'
+			}
+		]);
+	});
+
+	it('completeExternalAction: evidence_learning_required quando learning é vazio/só espaços', async () => {
+		const { useCases, projectId, groupId } = await projectWithGroup();
+		const prepared = await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId });
+		if (!prepared.ok) throw new Error('esperado ok');
+		const actionId = prepared.value.externalActions[0].id;
+
+		expect(
+			await useCases.completeExternalAction({ projectId, actionId, outcome: 'confirmed', learning: '   ' })
+		).toEqual({ ok: false, error: { kind: 'evidence_learning_required' } });
+	});
+
+	it('completeExternalAction: external_action_not_found para id inexistente', async () => {
+		const { useCases, projectId } = await projectWithGroup();
+		expect(
+			await useCases.completeExternalAction({
+				projectId,
+				actionId: 'nao-existe',
+				outcome: 'confirmed',
+				learning: 'x'
+			})
+		).toEqual({ ok: false, error: { kind: 'external_action_not_found' } });
+	});
+
+	it('completeExternalAction: external_action_not_open ao concluir duas vezes', async () => {
+		const { useCases, projectId, groupId } = await projectWithGroup();
+		const prepared = await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId });
+		if (!prepared.ok) throw new Error('esperado ok');
+		const actionId = prepared.value.externalActions[0].id;
+
+		const first = await useCases.completeExternalAction({ projectId, actionId, outcome: 'confirmed', learning: 'x' });
+		expect(first.ok).toBe(true);
+
+		expect(
+			await useCases.completeExternalAction({ projectId, actionId, outcome: 'contradicted', learning: 'y' })
+		).toEqual({ ok: false, error: { kind: 'external_action_not_open' } });
+	});
+
+	it('removeAffectedGroup: affected_group_has_references quando o grupo tem ExternalAction/Evidence relacionada', async () => {
+		const { useCases, projectId, groupId } = await projectWithGroup();
+		const prepared = await useCases.prepareExternalAction({ projectId, affectedGroupId: groupId });
+		if (!prepared.ok) throw new Error('esperado ok');
+
+		expect(await useCases.removeAffectedGroup({ projectId, groupId })).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_has_references' }
+		});
 	});
 });

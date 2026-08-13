@@ -9,6 +9,7 @@ import { decodeMultiSelectValue } from '$lib/domain';
 import type { Catalog } from '$lib/domain';
 import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
 import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
+import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
 
 export interface BancadaOverviewBlock {
 	activityId: string;
@@ -73,7 +74,8 @@ function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: 
 export function buildBancadaOverviewView(
 	catalog: Catalog,
 	answers: Record<string, string>,
-	affectedGroups: AffectedGroupSummaryInput[] = []
+	affectedGroups: AffectedGroupSummaryInput[] = [],
+	evidences: readonly { affectedGroupId: string }[] = []
 ): BancadaOverviewView {
 	const blocks: BancadaOverviewBlock[] = [];
 
@@ -86,10 +88,19 @@ export function buildBancadaOverviewView(
 		for (const activity of activitiesInOrder) {
 			if (activity.id === 'publico') {
 				if (affectedGroups.length > 0) {
+					const evidenceCounts = new Map<string, number>();
+					for (const evidence of evidences) {
+						evidenceCounts.set(evidence.affectedGroupId, (evidenceCounts.get(evidence.affectedGroupId) ?? 0) + 1);
+					}
+					const evidenceSummary = summarizeAffectedGroupEvidences(
+						affectedGroups.map((group) => ({ label: group.label, count: evidenceCounts.get(group.id) ?? 0 }))
+					);
 					blocks.push({
 						activityId: 'publico',
 						heading: 'Quem é afetado',
-						value: summarizeAffectedGroups(affectedGroups),
+						value: evidenceSummary
+							? `${summarizeAffectedGroups(affectedGroups)} ${evidenceSummary}`
+							: summarizeAffectedGroups(affectedGroups),
 						chips: affectedGroups.map((group) => group.label)
 					});
 				}

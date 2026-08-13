@@ -59,6 +59,20 @@
 								{/each}
 							</ul>
 						{/if}
+						{#if block.evidenceItems && block.evidenceItems.length > 0}
+							<div class="evidence-block">
+								<p class="evidence-heading">Evidências</p>
+								<ul class="evidence-list">
+									{#each block.evidenceItems as item, itemIndex (itemIndex)}
+										<li class="evidence-item">
+											<span class="evidence-group">{item.groupLabel}</span>
+											<span class="evidence-outcome">{item.outcomeLabel}</span>
+											<span class="evidence-learning">"{item.learning}"</span>
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</section>
@@ -183,6 +197,53 @@
 		border-radius: var(--hydra-radius-pill);
 		border: 1px solid var(--hydra-border);
 		color: var(--hydra-muted);
+	}
+
+	.evidence-block {
+		margin: var(--space-4) 0 0;
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--hydra-border);
+	}
+
+	.evidence-heading {
+		margin: 0 0 var(--space-2);
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--hydra-muted);
+	}
+
+	.evidence-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.evidence-item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0 0.5rem;
+		font-size: var(--font-size-body);
+		line-height: 1.55;
+	}
+
+	.evidence-group {
+		font-weight: 700;
+	}
+
+	.evidence-outcome {
+		color: var(--hydra-editorial-accent);
+		font-weight: 600;
+	}
+
+	.evidence-learning {
+		color: var(--hydra-muted);
+		overflow-wrap: break-word;
 	}
 
 	@media (max-width: 860px) {

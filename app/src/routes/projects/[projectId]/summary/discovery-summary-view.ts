@@ -9,6 +9,7 @@ import type { ActivityStatus, Catalog } from '$lib/domain';
 import type { PendingItemView } from '$lib/orientation-engine';
 import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
 import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
+import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
 
 export interface DiscoveryOverviewBlock {
 	activityId: string;
@@ -51,7 +52,8 @@ export function buildDiscoverySummaryView(
 	catalog: Catalog,
 	answers: Record<string, string>,
 	activityStatuses: Record<string, ActivityStatus>,
-	affectedGroups: AffectedGroupSummaryInput[] = []
+	affectedGroups: AffectedGroupSummaryInput[] = [],
+	evidences: readonly { affectedGroupId: string }[] = []
 ): DiscoverySummaryView {
 	const overview: DiscoveryOverviewBlock[] = [];
 
@@ -68,11 +70,21 @@ export function buildDiscoverySummaryView(
 	}
 
 	if (affectedGroups.length > 0) {
+		// Evidência (ETAPA 3 do rework) — síntese curta anexada ao mesmo bloco,
+		// sem redigitação e sem despejar a preparação/resultado inteiros (ver
+		// HYDRA_PRODUCT_REWORK.md §33, "Resumo da descoberta").
+		const evidenceCounts = new Map<string, number>();
+		for (const evidence of evidences) {
+			evidenceCounts.set(evidence.affectedGroupId, (evidenceCounts.get(evidence.affectedGroupId) ?? 0) + 1);
+		}
+		const evidenceSummary = summarizeAffectedGroupEvidences(
+			affectedGroups.map((group) => ({ label: group.label, count: evidenceCounts.get(group.id) ?? 0 }))
+		);
 		overview.push({
 			activityId: 'publico',
 			heading: 'Quem é afetado',
 			editLabel: 'Editar quem é afetado',
-			value: summarizeAffectedGroups(affectedGroups),
+			value: evidenceSummary ? `${summarizeAffectedGroups(affectedGroups)} ${evidenceSummary}` : summarizeAffectedGroups(affectedGroups),
 			chips: affectedGroups.map((group) => group.label)
 		});
 	}

@@ -34,7 +34,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 		catalog,
 		view.answers,
 		view.activityStatuses,
-		view.affectedGroups
+		view.affectedGroups,
+		view.evidences
 	);
 
 	const discoveryOpenPendingItems = filterDiscoveryOpenPendingItems(catalog, view.openPendingItems);

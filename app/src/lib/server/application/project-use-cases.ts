@@ -10,6 +10,7 @@ import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	answerActivity as answerActivityInDomain,
+	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
@@ -17,6 +18,7 @@ import {
 	createInitialProjectState,
 	deserializeProjectState,
 	moveScopeItem as moveScopeItemInDomain,
+	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	renameProject as renameProjectInDomain,
@@ -35,6 +37,7 @@ import {
 	setScopeItemText as setScopeItemTextInDomain,
 	skipActivity as skipActivityInDomain
 } from '$lib/domain';
+import { buildExternalActionPreparation } from '$lib/catalog/external-action';
 import type { ProjectRepository } from '../persistence';
 import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
@@ -43,12 +46,14 @@ import type {
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AnswerActivityInput,
+	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
 	CreateConfiguredProjectInput,
 	MoveScopeItemInput,
+	PrepareExternalActionInput,
 	ProjectListItem,
 	ProjectUseCases,
 	RemoveAffectedGroupInput,
@@ -143,6 +148,13 @@ function computeLastMovementAt(state: ProjectState): string | null {
 	for (const item of state.scopeItems) timestamps.push(item.updatedAt);
 	for (const impediment of state.impediments) timestamps.push(impediment.updatedAt);
 	for (const group of state.affectedGroups) timestamps.push(group.updatedAt);
+	// Validação Externa (ETAPA 3 do rework) — preparar, concluir uma
+	// ExternalAction e criar Evidence também representam movimento real do
+	// projeto (ver HYDRA_PRODUCT_REWORK.md §33, "Movimento do projeto").
+	// Extensão pequena e coerente do mecanismo existente, não um Signal
+	// Engine novo.
+	for (const action of state.externalActions) timestamps.push(action.updatedAt);
+	for (const evidence of state.evidences) timestamps.push(evidence.createdAt);
 	for (const pending of state.pendingItems) {
 		timestamps.push(pending.createdAt);
 		if (pending.status === 'resolvida') timestamps.push(pending.resolvedAt);
@@ -581,6 +593,58 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmAffectedGroupsInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Validação Externa (ETAPA 3 do rework) — a preparação é derivada aqui,
+		// a partir do AffectedGroup atual, e passada já pronta para o domínio
+		// (que só valida + persiste, sem depender de catalog/, ver
+		// domain/transitions.ts). Isso garante que o texto persistido seja
+		// exatamente o que a interface pré-visualizou (mesma função pura dos
+		// dois lados), nunca recalculado depois se o grupo mudar.
+		async prepareExternalAction(input: PrepareExternalActionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const group = state.affectedGroups.find((g) => g.id === input.affectedGroupId);
+			if (!group) return { ok: false, error: { kind: 'affected_group_not_found' } };
+
+			const preparation = buildExternalActionPreparation({
+				groupLabel: group.label,
+				impact: group.impact,
+				frequency: group.frequency
+			});
+
+			const result = prepareExternalActionInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.affectedGroupId,
+				preparation,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async completeExternalAction(input: CompleteExternalActionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = completeExternalActionInDomain(
+				catalog,
+				state,
+				input.actionId,
+				idGenerator.generate(),
+				input.outcome,
+				input.learning,
+				clock.now()
+			);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

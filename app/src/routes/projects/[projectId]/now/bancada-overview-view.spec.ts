@@ -34,11 +34,22 @@ describe('buildBancadaOverviewView', () => {
 		const withoutGroups = buildBancadaOverviewView(catalog, {}, []);
 		expect(withoutGroups.blocks.find((b) => b.activityId === 'publico')).toBeUndefined();
 
-		const withGroups = buildBancadaOverviewView(catalog, {}, [{ label: 'Operação', impact: 'alto' }]);
+		const withGroups = buildBancadaOverviewView(catalog, {}, [{ id: 'ag-1', label: 'Operação', impact: 'alto' }]);
 		const publico = withGroups.blocks.find((b) => b.activityId === 'publico')!;
 		expect(publico.heading).toBe('Quem é afetado');
 		expect(publico.value).toBe('Grupo afetado: Operação (Alto).');
 		expect(publico.chips).toEqual(['Operação']);
+	});
+
+	it('bloco "Quem é afetado" reflete Evidence (ETAPA 3 do rework), reaproveitado por /now e /document', () => {
+		const withEvidence = buildBancadaOverviewView(
+			catalog,
+			{},
+			[{ id: 'ag-1', label: 'Operação', impact: 'alto' }],
+			[{ affectedGroupId: 'ag-1' }, { affectedGroupId: 'ag-1' }]
+		);
+		const publico = withEvidence.blocks.find((b) => b.activityId === 'publico')!;
+		expect(publico.value).toBe('Grupo afetado: Operação (Alto). Evidências: Operação (2 evidências).');
 	});
 
 	it('bloco "Resultado desejado" usa mudanca, não beneficiario/percepcao', () => {
@@ -233,7 +244,7 @@ describe('buildBancadaOverviewView', () => {
 				riscos_identificados: 'Riscos',
 				forma_comunicacao: 'Comunicação'
 			},
-			[{ label: 'Operação', impact: 'alto' }]
+			[{ id: 'ag-1', label: 'Operação', impact: 'alto' }]
 		);
 		expect(view.blocks.map((b) => b.activityId)).toEqual([
 			'origem',

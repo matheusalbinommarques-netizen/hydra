@@ -9,6 +9,11 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	Answer,
+	Evidence,
+	EvidenceOutcome,
+	ExternalAction,
+	ExternalActionKind,
+	ExternalActionStatus,
 	Impediment,
 	ImpedimentType,
 	PendingItem,
@@ -157,6 +162,66 @@ export function mapAffectedGroupRow(row: AffectedGroupRow): AffectedGroup {
 		frequency: row.frequency,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
+	};
+}
+
+export interface ExternalActionRow {
+	id: string;
+	project_id: string;
+	kind: ExternalActionKind;
+	affected_group_id: string;
+	status: ExternalActionStatus;
+	objective: string;
+	// questions/information_to_take: JSON array em TEXT — mesmo padrão de
+	// codificação de PlanningItem (domain/planning-items.ts), aqui aplicado
+	// diretamente no mapper por não haver formulário que precise conhecer o
+	// encoding (a UI recebe/envia arrays já decodificados via ProjectView).
+	questions: string;
+	information_to_take: string;
+	expected_result: string;
+	created_at: string;
+	updated_at: string;
+	completed_at: string | null;
+}
+
+export function mapExternalActionRow(row: ExternalActionRow): ExternalAction {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		kind: row.kind,
+		affectedGroupId: row.affected_group_id,
+		status: row.status,
+		objective: row.objective,
+		questions: JSON.parse(row.questions) as string[],
+		informationToTake: JSON.parse(row.information_to_take) as string[],
+		expectedResult: row.expected_result,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+		completedAt: row.completed_at
+	};
+}
+
+export interface EvidenceRow {
+	id: string;
+	project_id: string;
+	external_action_id: string;
+	affected_group_id: string;
+	kind: 'conversation';
+	outcome: EvidenceOutcome;
+	learning: string;
+	created_at: string;
+}
+
+export function mapEvidenceRow(row: EvidenceRow): Evidence {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		externalActionId: row.external_action_id,
+		affectedGroupId: row.affected_group_id,
+		kind: row.kind,
+		outcome: row.outcome,
+		learning: row.learning,
+		createdAt: row.created_at
 	};
 }
 

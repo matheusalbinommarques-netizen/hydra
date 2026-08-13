@@ -6,6 +6,7 @@ import {
 	addImpediment,
 	addScopeItem,
 	answerActivity,
+	completeExternalAction,
 	confirmAffectedGroups,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -14,6 +15,7 @@ import {
 	getScopeConfirmationIssues,
 	isActivityFieldsValid,
 	moveScopeItem,
+	prepareExternalAction,
 	removeAffectedGroup,
 	removeScopeItem,
 	renameProject,
@@ -519,6 +521,157 @@ describe('AffectedGroup / Mapa de Impacto (ETAPA 2 — "Quem é afetado")', () =
 		const added = unwrap(addAffectedGroup(catalog, withSummary, 'ag-1', 'Operação', T2));
 		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
+	});
+});
+
+describe('ExternalAction / Evidence (ETAPA 3 — "Evidence + primeira External Action")', () => {
+	const preparation = {
+		objective: 'Confirmar como essa situação aparece para Operação.',
+		questions: ['Quando isso costuma acontecer?', 'O que você faz quando acontece?'],
+		informationToTake: ['Operação', 'Impacto: Alto'],
+		expectedResult: 'Tente voltar sabendo se isso realmente acontece dessa forma.'
+	};
+
+	function stateWithGroup(): ProjectState {
+		return unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Operação', T1));
+	}
+
+	it('prepareExternalAction cria a ação aberta, com a preparação recebida e timestamps = occurredAt', () => {
+		const state = unwrap(prepareExternalAction(catalog, stateWithGroup(), 'ea-1', 'ag-1', preparation, T1));
+		expect(state.externalActions).toEqual([
+			{
+				id: 'ea-1',
+				projectId: 'proj-1',
+				kind: 'validate_affected_group',
+				affectedGroupId: 'ag-1',
+				status: 'aberta',
+				...preparation,
+				createdAt: T1,
+				updatedAt: T1,
+				completedAt: null
+			}
+		]);
+	});
+
+	it('prepareExternalAction erro affected_group_not_found para grupo inexistente', () => {
+		expect(prepareExternalAction(catalog, freshState(), 'ea-1', 'inexistente', preparation, T1)).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_not_found' }
+		});
+	});
+
+	it('prepareExternalAction erro external_action_duplicate_open para o mesmo grupo, mas permite grupo diferente', () => {
+		let state = stateWithGroup();
+		state = unwrap(addAffectedGroup(catalog, state, 'ag-2', 'Clientes', T1));
+		state = unwrap(prepareExternalAction(catalog, state, 'ea-1', 'ag-1', preparation, T1));
+
+		expect(prepareExternalAction(catalog, state, 'ea-2', 'ag-1', preparation, T1)).toEqual({
+			ok: false,
+			error: { kind: 'external_action_duplicate_open' }
+		});
+
+		const withSecondGroup = unwrap(prepareExternalAction(catalog, state, 'ea-2', 'ag-2', preparation, T1));
+		expect(withSecondGroup.externalActions.map((a) => a.id)).toEqual(['ea-1', 'ea-2']);
+	});
+
+	function stateWithOpenAction(): ProjectState {
+		return unwrap(prepareExternalAction(catalog, stateWithGroup(), 'ea-1', 'ag-1', preparation, T1));
+	}
+
+	it('completeExternalAction cria a Evidence, conclui a ação (completedAt = occurredAt) e mantém o preparo capturado intacto', () => {
+		const state = unwrap(
+			completeExternalAction(catalog, stateWithOpenAction(), 'ea-1', 'ev-1', 'partially_confirmed', '  Aprendi algo real.  ', T2)
+		);
+		expect(state.externalActions).toEqual([
+			{
+				id: 'ea-1',
+				projectId: 'proj-1',
+				kind: 'validate_affected_group',
+				affectedGroupId: 'ag-1',
+				status: 'concluida',
+				...preparation,
+				createdAt: T1,
+				updatedAt: T2,
+				completedAt: T2
+			}
+		]);
+		expect(state.evidences).toEqual([
+			{
+				id: 'ev-1',
+				projectId: 'proj-1',
+				externalActionId: 'ea-1',
+				affectedGroupId: 'ag-1',
+				kind: 'conversation',
+				outcome: 'partially_confirmed',
+				// learning é aparado (trim) antes de persistir.
+				learning: 'Aprendi algo real.',
+				createdAt: T2
+			}
+		]);
+	});
+
+	it('completeExternalAction erro external_action_not_found para id inexistente', () => {
+		expect(completeExternalAction(catalog, freshState(), 'inexistente', 'ev-1', 'confirmed', 'Aprendi.', T1)).toEqual({
+			ok: false,
+			error: { kind: 'external_action_not_found' }
+		});
+	});
+
+	it('completeExternalAction erro external_action_not_open ao tentar concluir duas vezes', () => {
+		const completed = unwrap(
+			completeExternalAction(catalog, stateWithOpenAction(), 'ea-1', 'ev-1', 'confirmed', 'Aprendi.', T2)
+		);
+		expect(completeExternalAction(catalog, completed, 'ea-1', 'ev-2', 'confirmed', 'De novo.', T2)).toEqual({
+			ok: false,
+			error: { kind: 'external_action_not_open' }
+		});
+	});
+
+	it('completeExternalAction erro evidence_learning_required para texto vazio ou só espaços — não cria Evidence nem conclui a ação', () => {
+		const state = stateWithOpenAction();
+		for (const learning of ['', '   ']) {
+			const result = completeExternalAction(catalog, state, 'ea-1', 'ev-1', 'confirmed', learning, T2);
+			expect(result).toEqual({ ok: false, error: { kind: 'evidence_learning_required' } });
+		}
+	});
+
+	it('os quatro outcomes são aceitos e persistidos', () => {
+		const outcomes = ['confirmed', 'partially_confirmed', 'contradicted', 'new_discovery'] as const;
+		let state = stateWithGroup();
+		outcomes.forEach((outcome, index) => {
+			const actionId = `ea-${index}`;
+			state = unwrap(prepareExternalAction(catalog, state, actionId, 'ag-1', preparation, T1));
+			state = unwrap(completeExternalAction(catalog, state, actionId, `ev-${index}`, outcome, 'Aprendi.', T2));
+		});
+		expect(state.evidences.map((e) => e.outcome)).toEqual(outcomes);
+	});
+
+	it('uma nova validação do mesmo grupo é permitida depois que a anterior foi concluída (AffectedGroup nunca fica "validado")', () => {
+		const completed = unwrap(
+			completeExternalAction(catalog, stateWithOpenAction(), 'ea-1', 'ev-1', 'confirmed', 'Aprendi.', T2)
+		);
+		const reopened = unwrap(prepareExternalAction(catalog, completed, 'ea-2', 'ag-1', preparation, T2));
+		expect(reopened.externalActions.map((a) => ({ id: a.id, status: a.status }))).toEqual([
+			{ id: 'ea-1', status: 'concluida' },
+			{ id: 'ea-2', status: 'aberta' }
+		]);
+	});
+
+	it('removeAffectedGroup é bloqueado quando o grupo tem ExternalAction relacionada (aberta)', () => {
+		expect(removeAffectedGroup(catalog, stateWithOpenAction(), 'ag-1')).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_has_references' }
+		});
+	});
+
+	it('removeAffectedGroup é bloqueado quando o grupo tem Evidence relacionada (ação já concluída)', () => {
+		const completed = unwrap(
+			completeExternalAction(catalog, stateWithOpenAction(), 'ea-1', 'ev-1', 'confirmed', 'Aprendi.', T2)
+		);
+		expect(removeAffectedGroup(catalog, completed, 'ag-1')).toEqual({
+			ok: false,
+			error: { kind: 'affected_group_has_references' }
+		});
 	});
 });
 

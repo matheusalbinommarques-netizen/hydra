@@ -10,6 +10,11 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	Answer,
+	Evidence,
+	EvidenceOutcome,
+	ExternalAction,
+	ExternalActionKind,
+	ExternalActionStatus,
 	Impediment,
 	ImpedimentType,
 	PendingItem,
@@ -368,6 +373,99 @@ function parseAffectedGroupList(value: unknown): Result<AffectedGroup[], Project
 	return { ok: true, value: result };
 }
 
+function isStringArray(value: unknown): value is string[] {
+	return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+const EXTERNAL_ACTION_KINDS: readonly string[] = ['validate_affected_group'];
+function isExternalActionKind(value: unknown): value is ExternalActionKind {
+	return typeof value === 'string' && EXTERNAL_ACTION_KINDS.includes(value);
+}
+
+const EXTERNAL_ACTION_STATUSES: readonly string[] = ['aberta', 'concluida'];
+function isExternalActionStatus(value: unknown): value is ExternalActionStatus {
+	return typeof value === 'string' && EXTERNAL_ACTION_STATUSES.includes(value);
+}
+
+const EVIDENCE_OUTCOMES: readonly string[] = ['confirmed', 'partially_confirmed', 'contradicted', 'new_discovery'];
+function isEvidenceOutcome(value: unknown): value is EvidenceOutcome {
+	return typeof value === 'string' && EVIDENCE_OUTCOMES.includes(value);
+}
+
+function parseExternalActionList(value: unknown): Result<ExternalAction[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('externalActions deve ser um array');
+	const result: ExternalAction[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada ExternalAction deve ser um objeto');
+		if (!isString(item.id)) return shapeError('ExternalAction.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('ExternalAction.projectId deve ser uma string');
+		if (!isExternalActionKind(item.kind)) return shapeError('ExternalAction.kind deve ser um dos literais aprovados');
+		if (!isString(item.affectedGroupId)) return shapeError('ExternalAction.affectedGroupId deve ser uma string');
+		if (!isExternalActionStatus(item.status)) return shapeError('ExternalAction.status deve ser "aberta" ou "concluida"');
+		if (!isString(item.objective) || item.objective.trim().length === 0) {
+			return shapeError('ExternalAction.objective deve ser uma string não vazia');
+		}
+		if (!isStringArray(item.questions)) return shapeError('ExternalAction.questions deve ser um array de strings');
+		if (!isStringArray(item.informationToTake)) {
+			return shapeError('ExternalAction.informationToTake deve ser um array de strings');
+		}
+		if (!isString(item.expectedResult) || item.expectedResult.trim().length === 0) {
+			return shapeError('ExternalAction.expectedResult deve ser uma string não vazia');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('ExternalAction.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('ExternalAction.updatedAt deve ser uma data ISO 8601 válida');
+		if (item.completedAt !== null && !isIsoDateString(item.completedAt)) {
+			return shapeError('ExternalAction.completedAt deve ser uma data ISO 8601 válida ou null');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			kind: item.kind,
+			affectedGroupId: item.affectedGroupId,
+			status: item.status,
+			objective: item.objective,
+			questions: item.questions,
+			informationToTake: item.informationToTake,
+			expectedResult: item.expectedResult,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt,
+			completedAt: item.completedAt as string | null
+		});
+	}
+	return { ok: true, value: result };
+}
+
+function parseEvidenceList(value: unknown): Result<Evidence[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('evidences deve ser um array');
+	const result: Evidence[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Evidence deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Evidence.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Evidence.projectId deve ser uma string');
+		if (!isString(item.externalActionId)) return shapeError('Evidence.externalActionId deve ser uma string');
+		if (!isString(item.affectedGroupId)) return shapeError('Evidence.affectedGroupId deve ser uma string');
+		if (item.kind !== 'conversation') return shapeError('Evidence.kind deve ser "conversation"');
+		if (!isEvidenceOutcome(item.outcome)) return shapeError('Evidence.outcome deve ser um dos literais aprovados');
+		if (!isString(item.learning) || item.learning.trim().length === 0) {
+			return shapeError('Evidence.learning deve ser uma string não vazia');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Evidence.createdAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			externalActionId: item.externalActionId,
+			affectedGroupId: item.affectedGroupId,
+			kind: 'conversation',
+			outcome: item.outcome,
+			learning: item.learning,
+			createdAt: item.createdAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -389,7 +487,9 @@ function assembleProjectState(
 	scopeItems: ScopeItem[],
 	scopeVersion: ScopeVersion,
 	impediments: Impediment[],
-	affectedGroups: AffectedGroup[]
+	affectedGroups: AffectedGroup[],
+	externalActions: ExternalAction[],
+	evidences: Evidence[]
 ): Result<ProjectState, ProjectStateParseError> {
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
@@ -651,9 +751,97 @@ function assembleProjectState(
 		}
 	}
 
+	// referências + invariantes: ExternalAction (ETAPA 3 do rework) —
+	// affectedGroupId precisa referenciar um AffectedGroup existente; no
+	// máximo uma ExternalAction aberta de `validate_affected_group` por
+	// grupo (mesma regra de domain/transitions.ts, prepareExternalAction);
+	// lifecycle coerente: 'aberta' nunca tem completedAt, 'concluida' sempre
+	// tem.
+	const affectedGroupIds = new Set(affectedGroups.map((group) => group.id));
+	const seenExternalActionIds = new Set<string>();
+	const openActionAffectedGroupIds = new Set<string>();
+	for (const action of externalActions) {
+		if (action.projectId !== project.id) {
+			return invariantError(`ExternalAction "${action.id}" usa projectId diferente do Project`);
+		}
+		if (seenExternalActionIds.has(action.id)) {
+			return invariantError(`ExternalAction.id duplicado: "${action.id}"`);
+		}
+		seenExternalActionIds.add(action.id);
+		if (!affectedGroupIds.has(action.affectedGroupId)) {
+			return referenceError(
+				`ExternalAction "${action.id}" referencia affectedGroupId "${action.affectedGroupId}", que não existe`
+			);
+		}
+		if (action.status === 'aberta') {
+			if (action.completedAt !== null) {
+				return invariantError(`ExternalAction "${action.id}" está aberta mas possui completedAt`);
+			}
+			const key = `${action.kind}::${action.affectedGroupId}`;
+			if (openActionAffectedGroupIds.has(key)) {
+				return invariantError(
+					`Mais de uma ExternalAction aberta de "${action.kind}" para o grupo "${action.affectedGroupId}"`
+				);
+			}
+			openActionAffectedGroupIds.add(key);
+		} else if (action.completedAt === null) {
+			return invariantError(`ExternalAction "${action.id}" está concluída mas não possui completedAt`);
+		}
+	}
+
+	// referências + invariantes: Evidence — externalActionId precisa
+	// referenciar uma ExternalAction concluída (nunca aberta: Evidence só
+	// nasce junto da conclusão, ver completeExternalAction), affectedGroupId
+	// precisa bater com o da própria ExternalAction (nunca divergir), e cada
+	// ExternalAction concluída precisa ter exatamente uma Evidence — nunca
+	// zero (ação concluída sem Evidence) nem duas (mesmo clique/retry).
+	const seenEvidenceIds = new Set<string>();
+	const evidenceByExternalActionId = new Map<string, Evidence>();
+	for (const evidence of evidences) {
+		if (evidence.projectId !== project.id) {
+			return invariantError(`Evidence "${evidence.id}" usa projectId diferente do Project`);
+		}
+		if (seenEvidenceIds.has(evidence.id)) {
+			return invariantError(`Evidence.id duplicado: "${evidence.id}"`);
+		}
+		seenEvidenceIds.add(evidence.id);
+		const action = externalActions.find((item) => item.id === evidence.externalActionId);
+		if (!action) {
+			return referenceError(
+				`Evidence "${evidence.id}" referencia externalActionId "${evidence.externalActionId}", que não existe`
+			);
+		}
+		if (action.status !== 'concluida') {
+			return invariantError(`Evidence "${evidence.id}" referencia uma ExternalAction que não está concluída`);
+		}
+		if (evidence.affectedGroupId !== action.affectedGroupId) {
+			return invariantError(`Evidence "${evidence.id}" tem affectedGroupId diferente da sua ExternalAction`);
+		}
+		if (evidenceByExternalActionId.has(evidence.externalActionId)) {
+			return invariantError(`Mais de uma Evidence para a mesma ExternalAction "${evidence.externalActionId}"`);
+		}
+		evidenceByExternalActionId.set(evidence.externalActionId, evidence);
+	}
+	for (const action of externalActions) {
+		if (action.status === 'concluida' && !evidenceByExternalActionId.has(action.id)) {
+			return invariantError(`ExternalAction "${action.id}" está concluída mas não possui Evidence correspondente`);
+		}
+	}
+
 	return {
 		ok: true,
-		value: { project, activityProgress, answers, pendingItems, scopeItems, scopeVersion, impediments, affectedGroups }
+		value: {
+			project,
+			activityProgress,
+			answers,
+			pendingItems,
+			scopeItems,
+			scopeVersion,
+			impediments,
+			affectedGroups,
+			externalActions,
+			evidences
+		}
 	};
 }
 
@@ -713,6 +901,12 @@ export function deserializeProjectState(
 	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
 	if (!affectedGroupsResult.ok) return affectedGroupsResult;
 
+	const externalActionsResult = parseExternalActionList(state.externalActions);
+	if (!externalActionsResult.ok) return externalActionsResult;
+
+	const evidencesResult = parseEvidenceList(state.evidences);
+	if (!evidencesResult.ok) return evidencesResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
@@ -722,6 +916,8 @@ export function deserializeProjectState(
 		scopeItemsResult.value,
 		scopeVersionResult.value,
 		impedimentsResult.value,
-		affectedGroupsResult.value
+		affectedGroupsResult.value,
+		externalActionsResult.value,
+		evidencesResult.value
 	);
 }

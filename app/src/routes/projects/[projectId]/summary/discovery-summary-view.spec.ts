@@ -56,13 +56,31 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 		expect(semGrupos.overview.find((b) => b.activityId === 'publico')).toBeUndefined();
 
 		const comGrupos = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [
-			{ label: 'Agentes de atendimento', impact: 'alto' }
+			{ id: 'ag-1', label: 'Agentes de atendimento', impact: 'alto' }
 		]);
 		const publico = comGrupos.overview.find((b) => b.activityId === 'publico')!;
 		expect(publico.heading).toBe('Quem é afetado');
 		expect(publico.editLabel).toBe('Editar quem é afetado');
 		expect(publico.value).toBe('Grupo afetado: Agentes de atendimento (Alto).');
 		expect(publico.chips).toEqual(['Agentes de atendimento']);
+	});
+
+	it('bloco "Quem é afetado" reflete Evidence (ETAPA 3 do rework) sem redigitação, discretamente anexada ao mesmo bloco', () => {
+		const semEvidencia = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [
+			{ id: 'ag-1', label: 'Operação', impact: 'alto' }
+		]);
+		const publicoSemEvidencia = semEvidencia.overview.find((b) => b.activityId === 'publico')!;
+		expect(publicoSemEvidencia.value).toBe('Grupo afetado: Operação (Alto).');
+
+		const comEvidencia = buildDiscoverySummaryView(
+			catalog,
+			{},
+			ALL_NAO_INICIADA,
+			[{ id: 'ag-1', label: 'Operação', impact: 'alto' }],
+			[{ affectedGroupId: 'ag-1' }]
+		);
+		const publicoComEvidencia = comEvidencia.overview.find((b) => b.activityId === 'publico')!;
+		expect(publicoComEvidencia.value).toBe('Grupo afetado: Operação (Alto). Evidências: Operação (1 evidência).');
 	});
 
 	it('bloco "Estado atual" só aparece quando estado_atual_detail existe', () => {
@@ -99,7 +117,7 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 				mudanca: 'Resultado'
 			},
 			ALL_NAO_INICIADA,
-			[{ label: 'Público', impact: 'alto' }]
+			[{ id: 'ag-1', label: 'Público', impact: 'alto' }]
 		);
 		expect(view.overview.map((b) => b.activityId)).toEqual(['problema', 'publico', 'estado_atual', 'resultado']);
 	});

@@ -8,6 +8,9 @@ import type {
 	AffectedGroup,
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
+	Evidence,
+	EvidenceOutcome,
+	ExternalAction,
 	Impediment,
 	ImpedimentType,
 	PendingItem,
@@ -49,7 +52,12 @@ export type DomainTransitionError =
 	| { kind: 'phase_not_found' }
 	| { kind: 'planning_no_items' }
 	| { kind: 'affected_group_not_found' }
-	| { kind: 'affected_group_confirmation_invalid'; issues: AffectedGroupConfirmationIssue[] };
+	| { kind: 'affected_group_confirmation_invalid'; issues: AffectedGroupConfirmationIssue[] }
+	| { kind: 'affected_group_has_references' }
+	| { kind: 'external_action_not_found' }
+	| { kind: 'external_action_duplicate_open' }
+	| { kind: 'external_action_not_open' }
+	| { kind: 'evidence_learning_required' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -931,6 +939,19 @@ export function setAffectedGroupFrequency(
 	return { ok: true, value: next };
 }
 
+// ExternalAction/Evidence passam a poder referenciar AffectedGroup (ETAPA 3
+// do rework, §17) — perda silenciosa dessas relações não é permitida. Regra
+// mínima segura: um grupo referenciado por qualquer ExternalAction ou
+// Evidence não pode ser removido (sem cascade, sem apagar conhecimento real
+// do projeto). Checagem por igualdade de id, não por índice — nenhuma das
+// duas coleções guarda uma contagem própria de referências.
+function isAffectedGroupReferenced(state: ProjectState, groupId: string): boolean {
+	return (
+		state.externalActions.some((action) => action.affectedGroupId === groupId) ||
+		state.evidences.some((evidence) => evidence.affectedGroupId === groupId)
+	);
+}
+
 export function removeAffectedGroup(
 	catalog: Catalog,
 	state: ProjectState,
@@ -938,6 +959,9 @@ export function removeAffectedGroup(
 ): Result<ProjectState, DomainTransitionError> {
 	const group = findAffectedGroup(state, groupId);
 	if (!group) return { ok: false, error: { kind: 'affected_group_not_found' } };
+	if (isAffectedGroupReferenced(state, groupId)) {
+		return { ok: false, error: { kind: 'affected_group_has_references' } };
+	}
 
 	const next = afterAffectedGroupsMutation(catalog, {
 		...state,
@@ -972,4 +996,121 @@ export function confirmAffectedGroups(
 		next = resolvePendingItem(next, activity.id, occurredAt);
 	}
 	return { ok: true, value: next };
+}
+
+// --- ExternalAction / Evidence (ETAPA 3 do rework, "Evidence + primeira
+// External Action") ---------------------------------------------------------
+//
+// Independente do catálogo/jornada guiada: não cria ActivityProgress, não
+// gera PendingItem, não altera nenhuma atividade. A preparação
+// (objective/questions/informationToTake/expectedResult) chega já pronta —
+// domain/ não depende de catalog/ (ver catalog/external-action.ts,
+// buildExternalActionPreparation, chamada pela camada de aplicação antes de
+// invocar prepareExternalAction).
+
+function findExternalAction(state: ProjectState, actionId: string): ExternalAction | undefined {
+	return state.externalActions.find((action) => action.id === actionId);
+}
+
+export interface ExternalActionPreparationValues {
+	objective: string;
+	questions: string[];
+	informationToTake: string[];
+	expectedResult: string;
+}
+
+/**
+ * Cria a ExternalAction só quando o usuário confirma "Pronto para
+ * conversar" — abrir a preparação sozinho não persiste nada (ver
+ * HYDRA_PRODUCT_REWORK.md §33, "quando a ExternalAction nasce"). Bloqueia
+ * duplicata: no máximo uma ExternalAction aberta de `validate_affected_group`
+ * por AffectedGroup — uma ação já concluída não impede uma nova validação
+ * futura do mesmo grupo (ver getAffectedGroupConfirmationIssues para o
+ * paralelo de "issues" que aqui não se aplica: não há confirmação de mapa
+ * envolvida).
+ */
+export function prepareExternalAction(
+	catalog: Catalog,
+	state: ProjectState,
+	actionId: string,
+	affectedGroupId: string,
+	preparation: ExternalActionPreparationValues,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!findAffectedGroup(state, affectedGroupId)) {
+		return { ok: false, error: { kind: 'affected_group_not_found' } };
+	}
+
+	const hasOpenAction = state.externalActions.some(
+		(action) =>
+			action.affectedGroupId === affectedGroupId &&
+			action.kind === 'validate_affected_group' &&
+			action.status === 'aberta'
+	);
+	if (hasOpenAction) return { ok: false, error: { kind: 'external_action_duplicate_open' } };
+
+	const action: ExternalAction = {
+		id: actionId,
+		projectId: state.project.id,
+		kind: 'validate_affected_group',
+		affectedGroupId,
+		status: 'aberta',
+		objective: preparation.objective,
+		questions: preparation.questions,
+		informationToTake: preparation.informationToTake,
+		expectedResult: preparation.expectedResult,
+		createdAt: occurredAt,
+		updatedAt: occurredAt,
+		completedAt: null
+	};
+
+	return { ok: true, value: { ...state, externalActions: [...state.externalActions, action] } };
+}
+
+/**
+ * Transição atômica única: valida outcome + `learning.trim()` não vazio,
+ * confirma que a ação pertence ao projeto e está aberta, cria a Evidence e
+ * conclui a ExternalAction — nunca uma ação concluída sem Evidence, nunca
+ * duas Evidence pela mesma chamada (ver HYDRA_PRODUCT_REWORK.md §33 e §15).
+ * `learning` chega já validado como não-vazio pela camada de aplicação
+ * (mesmo padrão de outros textos livres do domínio), mas a checagem também
+ * existe aqui — não confiar só no botão desabilitado da UI.
+ */
+export function completeExternalAction(
+	catalog: Catalog,
+	state: ProjectState,
+	actionId: string,
+	evidenceId: string,
+	outcome: EvidenceOutcome,
+	learning: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const action = findExternalAction(state, actionId);
+	if (!action) return { ok: false, error: { kind: 'external_action_not_found' } };
+	if (action.status !== 'aberta') return { ok: false, error: { kind: 'external_action_not_open' } };
+	if (learning.trim().length === 0) return { ok: false, error: { kind: 'evidence_learning_required' } };
+
+	const evidence: Evidence = {
+		id: evidenceId,
+		projectId: state.project.id,
+		externalActionId: action.id,
+		affectedGroupId: action.affectedGroupId,
+		kind: 'conversation',
+		outcome,
+		learning: learning.trim(),
+		createdAt: occurredAt
+	};
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			evidences: [...state.evidences, evidence],
+			externalActions: state.externalActions.map((item) =>
+				item.id === actionId
+					? { ...item, status: 'concluida', updatedAt: occurredAt, completedAt: occurredAt }
+					: item
+			)
+		}
+	};
 }

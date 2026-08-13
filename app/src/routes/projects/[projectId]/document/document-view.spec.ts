@@ -100,3 +100,40 @@ describe('buildDocumentView', () => {
 		expect(allBlocks.every((b) => b.editable === false)).toBe(true);
 	});
 });
+
+describe('buildDocumentView — Evidence (ETAPA 3 do rework, "Validação Externa")', () => {
+	const blocks: BancadaOverviewBlock[] = [
+		{ activityId: 'origem', heading: 'Origem do projeto', value: 'Origem' },
+		{ activityId: 'publico', heading: 'Quem é afetado', value: 'Grupo afetado: Operação (Alto).', chips: ['Operação'] }
+	];
+
+	it('sem evidenceItems, o bloco "publico" não ganha a propriedade', () => {
+		const view = buildDocumentView(catalog, blocks, []);
+		const publico = view.sections[0].blocks.find((b) => b.activityId === 'publico')!;
+		expect(publico.evidenceItems).toBeUndefined();
+	});
+
+	it('evidenceItems é anexado só ao bloco "publico" — outros blocos da mesma seção não são afetados', () => {
+		const view = buildDocumentView(catalog, blocks, [
+			{ groupLabel: 'Operação', outcomeLabel: 'Confirmou parcialmente', learning: 'O retrabalho ocorre em picos.' }
+		]);
+		const origem = view.sections[0].blocks.find((b) => b.activityId === 'origem')!;
+		const publico = view.sections[0].blocks.find((b) => b.activityId === 'publico')!;
+		expect(origem.evidenceItems).toBeUndefined();
+		expect(publico.evidenceItems).toEqual([
+			{ groupLabel: 'Operação', outcomeLabel: 'Confirmou parcialmente', learning: 'O retrabalho ocorre em picos.' }
+		]);
+	});
+
+	it('preserva múltiplas Evidence do mesmo ou de grupos diferentes, na ordem recebida — sem roteiro/perguntas/preparation', () => {
+		const view = buildDocumentView(catalog, blocks, [
+			{ groupLabel: 'Operação', outcomeLabel: 'Confirmou parcialmente', learning: 'Aprendizado 1.' },
+			{ groupLabel: 'Clientes finais', outcomeLabel: 'Contradisse', learning: 'Aprendizado 2.' }
+		]);
+		const publico = view.sections[0].blocks.find((b) => b.activityId === 'publico')!;
+		expect(publico.evidenceItems).toEqual([
+			{ groupLabel: 'Operação', outcomeLabel: 'Confirmou parcialmente', learning: 'Aprendizado 1.' },
+			{ groupLabel: 'Clientes finais', outcomeLabel: 'Contradisse', learning: 'Aprendizado 2.' }
+		]);
+	});
+});

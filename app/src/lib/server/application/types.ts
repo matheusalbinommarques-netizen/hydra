@@ -6,6 +6,8 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	DomainTransitionError,
+	EvidenceOutcome,
+	ExternalActionStatus,
 	ImpedimentType,
 	ProjectStateParseError,
 	Result,
@@ -161,6 +163,30 @@ export interface AffectedGroupView {
 	frequency: AffectedGroupFrequency | null;
 }
 
+// Validação Externa (ETAPA 3 do rework) — view leve de ExternalAction, sem
+// projectId/kind (só um kind existe nesta versão — a interface não precisa
+// distingui-lo). questions/informationToTake chegam já decodificados (a
+// interface nunca precisa conhecer o encoding JSON usado na persistência).
+export interface ExternalActionView {
+	id: string;
+	affectedGroupId: string;
+	status: ExternalActionStatus;
+	objective: string;
+	questions: string[];
+	informationToTake: string[];
+	expectedResult: string;
+}
+
+// View leve de Evidence, sem projectId (a interface não precisa).
+export interface EvidenceView {
+	id: string;
+	externalActionId: string;
+	affectedGroupId: string;
+	outcome: EvidenceOutcome;
+	learning: string;
+	createdAt: string;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -213,6 +239,12 @@ export interface ProjectView {
 	// (getAffectedGroupConfirmationIssues).
 	affectedGroups: AffectedGroupView[];
 	affectedGroupConfirmationIssues: AffectedGroupConfirmationIssue[];
+	// Validação Externa (ETAPA 3 do rework) — todas as ExternalActions e
+	// Evidences do projeto; a interface filtra por status/affectedGroupId
+	// diretamente (mesmo padrão de impediments acima), sem campo derivado
+	// extra aqui.
+	externalActions: ExternalActionView[];
+	evidences: EvidenceView[];
 }
 
 export type UseCaseError =
@@ -384,6 +416,25 @@ export interface ConfirmAffectedGroupsInput {
 	projectId: string;
 }
 
+// Validação Externa (ETAPA 3 do rework) — mesmo padrão dos inputs acima: id
+// gerado pelo caso de uso, nunca recebido do cliente. A preparação
+// (objective/questions/informationToTake/expectedResult) é derivada dentro
+// do próprio caso de uso, a partir do AffectedGroup atual (ver
+// catalog/external-action.ts) — não recebida do cliente, para que o texto
+// persistido seja sempre o que o Hydra realmente conhece do projeto no
+// momento da confirmação, nunca algo que o cliente poderia forjar.
+export interface PrepareExternalActionInput {
+	projectId: string;
+	affectedGroupId: string;
+}
+
+export interface CompleteExternalActionInput {
+	projectId: string;
+	actionId: string;
+	outcome: EvidenceOutcome;
+	learning: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
@@ -414,6 +465,8 @@ export interface ProjectUseCases {
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeAffectedGroup(input: RemoveAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmAffectedGroups(input: ConfirmAffectedGroupsInput): Promise<UseCaseOutcome<ProjectView>>;
+	prepareExternalAction(input: PrepareExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
+	completeExternalAction(input: CompleteExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

@@ -91,6 +91,7 @@ export function isDuplicateAffectedGroupLabel(label: string, existingLabels: rea
 }
 
 export interface AffectedGroupSummaryInput {
+	id: string;
 	label: string;
 	impact: AffectedGroupImpact | null;
 }

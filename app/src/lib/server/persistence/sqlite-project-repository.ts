@@ -9,6 +9,8 @@ import {
 	mapActivityProgressRow,
 	mapAffectedGroupRow,
 	mapAnswerRow,
+	mapEvidenceRow,
+	mapExternalActionRow,
 	mapImpedimentRow,
 	mapPendingItemRow,
 	mapProjectRow,
@@ -17,6 +19,8 @@ import {
 	type ActivityProgressRow,
 	type AffectedGroupRow,
 	type AnswerRow,
+	type EvidenceRow,
+	type ExternalActionRow,
 	type ImpedimentRow,
 	type PendingItemRow,
 	type ProjectRow,
@@ -127,6 +131,30 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		for (const group of state.affectedGroups) {
 			insertAffectedGroup.run(group);
 		}
+
+		// external_action depende de affected_group (FK), evidence depende de
+		// external_action e affected_group — ordem de insert importa com
+		// foreign_keys = ON (checagem imediata, não deferida).
+		const insertExternalAction = db.prepare(
+			`INSERT INTO external_action
+			   (id, project_id, kind, affected_group_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at)
+			 VALUES (@id, @projectId, @kind, @affectedGroupId, @status, @objective, @questions, @informationToTake, @expectedResult, @createdAt, @updatedAt, @completedAt)`
+		);
+		for (const action of state.externalActions) {
+			insertExternalAction.run({
+				...action,
+				questions: JSON.stringify(action.questions),
+				informationToTake: JSON.stringify(action.informationToTake)
+			});
+		}
+
+		const insertEvidence = db.prepare(
+			`INSERT INTO evidence (id, project_id, external_action_id, affected_group_id, kind, outcome, learning, created_at)
+			 VALUES (@id, @projectId, @externalActionId, @affectedGroupId, @kind, @outcome, @learning, @createdAt)`
+		);
+		for (const evidence of state.evidences) {
+			insertEvidence.run(evidence);
+		}
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -161,6 +189,10 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
+		// evidence/external_action apagados antes de affected_group — ambos
+		// referenciam affected_group (FK sem ON DELETE, checagem imediata).
+		db.prepare('DELETE FROM evidence WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM external_action WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM affected_group WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
@@ -227,6 +259,20 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as AffectedGroupRow[];
 
+			const externalActionRows = db
+				.prepare(
+					`SELECT id, project_id, kind, affected_group_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at
+					 FROM external_action WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as ExternalActionRow[];
+
+			const evidenceRows = db
+				.prepare(
+					`SELECT id, project_id, external_action_id, affected_group_id, kind, outcome, learning, created_at
+					 FROM evidence WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as EvidenceRow[];
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
@@ -235,7 +281,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				scopeItems: scopeItemRows.map(mapScopeItemRow),
 				scopeVersion: mapScopeVersionRow(scopeVersionRow),
 				impediments: impedimentRows.map(mapImpedimentRow),
-				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow)
+				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
+				externalActions: externalActionRows.map(mapExternalActionRow),
+				evidences: evidenceRows.map(mapEvidenceRow)
 			};
 		},
 

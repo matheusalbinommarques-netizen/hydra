@@ -212,6 +212,8 @@
 			activity={data.activity}
 			affectedGroups={view.affectedGroups}
 			affectedGroupConfirmationIssues={view.affectedGroupConfirmationIssues}
+			externalActions={view.externalActions}
+			evidences={view.evidences}
 			reviewOrigin={data.reviewOrigin ?? undefined}
 			phaseProgress={data.phaseProgress}
 			projectName={view.projectName}

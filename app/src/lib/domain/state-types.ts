@@ -147,6 +147,55 @@ export interface AffectedGroup {
 	updatedAt: string;
 }
 
+// ExternalAction / Evidence — ETAPA 3 do rework ("Evidence + primeira
+// External Action", docs/core/HYDRA_PRODUCT_REWORK.md §33). Primeiro corte
+// suporta só um tipo de ação: validar um AffectedGroup fora do Hydra.
+// Lifecycle mínimo (aberta/concluída, mesmo vocabulário de status de
+// Impediment) — sem scheduled/overdue/cancelled/paused/assigned/blocked
+// nesta rodada.
+//
+// A preparação (objective/questions/informationToTake/expectedResult) é
+// capturada no momento em que o usuário confirma "Pronto para conversar" e
+// nunca recalculada depois — o projeto vivo pode mudar (o AffectedGroup pode
+// ser reclassificado), mas o que o Hydra preparou para ESTA ação permanece
+// identificável (ver catalog/external-action.ts, buildExternalActionPreparation).
+// Independente do catálogo/jornada guiada: não gera ActivityProgress nem
+// PendingItem, não bloqueia nenhuma atividade.
+export type ExternalActionKind = 'validate_affected_group';
+export type ExternalActionStatus = 'aberta' | 'concluida';
+
+export interface ExternalAction {
+	id: string;
+	projectId: string;
+	kind: ExternalActionKind;
+	affectedGroupId: string;
+	status: ExternalActionStatus;
+	objective: string;
+	questions: string[];
+	informationToTake: string[];
+	expectedResult: string;
+	createdAt: string;
+	updatedAt: string;
+	completedAt: string | null;
+}
+
+// Quatro outcomes fixos (ver catalog/external-action.ts,
+// EVIDENCE_OUTCOME_OPTIONS). "Tem evidência" nunca significa "está
+// validado": uma evidência pode confirmar, contradizer ou trazer algo novo —
+// por isso não existe `AffectedGroup.validationStatus`.
+export type EvidenceOutcome = 'confirmed' | 'partially_confirmed' | 'contradicted' | 'new_discovery';
+
+export interface Evidence {
+	id: string;
+	projectId: string;
+	externalActionId: string;
+	affectedGroupId: string;
+	kind: 'conversation';
+	outcome: EvidenceOutcome;
+	learning: string;
+	createdAt: string;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -156,4 +205,6 @@ export interface ProjectState {
 	scopeVersion: ScopeVersion;
 	impediments: Impediment[];
 	affectedGroups: AffectedGroup[];
+	externalActions: ExternalAction[];
+	evidences: Evidence[];
 }

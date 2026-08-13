@@ -137,7 +137,7 @@ function resolveOptionalFields(activity: RequiredFieldsActivity, view: ProjectVi
 
 export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const { view } = await parent();
-	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers, view.affectedGroups);
+	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers, view.affectedGroups, view.evidences);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 	const phaseProgress = buildPhaseProgress(catalog, view);
 
@@ -496,5 +496,53 @@ export const actions: Actions = {
 		// recomputa a atividade recomendada, que já avançou para a próxima da
 		// jornada agora que "publico" está concluída.
 		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// Validação Externa (ETAPA 3 do rework) — "Validar com essas pessoas"
+	// dentro do Mapa de Impacto: cria a ExternalAction só quando o usuário
+	// confirma "Pronto para conversar" (a pré-visualização da preparação é
+	// puramente client-side, ver MapaDeImpacto.svelte). Não redireciona —
+	// mesmo padrão das demais actions do Mapa de Impacto.
+	prepareExternalAction: async ({ request, params }) => {
+		const formData = await request.formData();
+		const affectedGroupId = formData.get('affectedGroupId');
+		if (typeof affectedGroupId !== 'string' || !affectedGroupId) {
+			return fail(400, { message: 'Grupo inválido.' });
+		}
+
+		const result = await getProjectUseCases().prepareExternalAction({ projectId: params.projectId, affectedGroupId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	// Retorno/captura de uma ExternalAction "Em campo" (ETAPA 3 do rework) —
+	// acionada tanto pelo Mapa de Impacto quanto pelo pill do shell do
+	// projeto em qualquer página (`[projectId]/+layout.svelte`, action
+	// apontando explicitamente para "?/completeExternalAction" nesta rota;
+	// SvelteKit resolve a action pela URL do <form>, não pela página atual).
+	completeExternalAction: async ({ request, params }) => {
+		const formData = await request.formData();
+		const actionId = formData.get('actionId');
+		const outcome = formData.get('outcome');
+		const learning = formData.get('learning');
+		if (typeof actionId !== 'string' || !actionId) return fail(400, { message: 'Ação inválida.' });
+		if (
+			typeof outcome !== 'string' ||
+			!(['confirmed', 'partially_confirmed', 'contradicted', 'new_discovery'] as const).includes(outcome as never)
+		) {
+			return fail(400, { message: 'Escolha um resultado.' });
+		}
+		if (typeof learning !== 'string' || learning.trim().length === 0) {
+			return fail(400, { message: 'Descreva o que você aprendeu.' });
+		}
+
+		const result = await getProjectUseCases().completeExternalAction({
+			projectId: params.projectId,
+			actionId,
+			outcome: outcome as 'confirmed' | 'partially_confirmed' | 'contradicted' | 'new_discovery',
+			learning
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
 	}
 };

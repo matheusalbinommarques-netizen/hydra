@@ -118,3 +118,46 @@ CREATE TABLE IF NOT EXISTS affected_group (
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL
 );
+
+-- ExternalAction / Evidence (ETAPA 3 do rework, "Evidence + primeira
+-- External Action") — ver app/src/lib/domain/state-types.ts. affected_group_id
+-- não usa ON DELETE CASCADE/SET NULL: a referência bloqueia a remoção do
+-- grupo (aplicado em domain/transitions.ts, removeAffectedGroup, antes de
+-- qualquer SQL rodar) — o padrão NO ACTION do SQLite aqui é só defesa em
+-- profundidade, nunca o mecanismo primário. questions/information_to_take
+-- guardam um array JSON em TEXT (mesmo espírito de PlanningItem dentro de
+-- Answer.value, aqui decodificado no mapper em vez de domain/).
+CREATE TABLE IF NOT EXISTS external_action (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	kind TEXT NOT NULL CHECK (kind IN ('validate_affected_group')),
+	affected_group_id TEXT NOT NULL REFERENCES affected_group (id),
+	status TEXT NOT NULL CHECK (status IN ('aberta', 'concluida')),
+	objective TEXT NOT NULL,
+	questions TEXT NOT NULL,
+	information_to_take TEXT NOT NULL,
+	expected_result TEXT NOT NULL,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	completed_at TEXT,
+	CHECK (
+		(status = 'aberta' AND completed_at IS NULL) OR
+		(status = 'concluida' AND completed_at IS NOT NULL)
+	)
+);
+
+-- kind fixo 'conversation' nesta primeira versão (sem taxonomia genérica de
+-- Evidence, ver HYDRA_PRODUCT_REWORK.md §33/§20). Sem ON DELETE em
+-- external_action_id/affected_group_id pelo mesmo motivo de external_action
+-- acima — a integridade real é garantida pelo domínio (completeExternalAction
+-- é a única transição que cria uma linha aqui).
+CREATE TABLE IF NOT EXISTS evidence (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	external_action_id TEXT NOT NULL REFERENCES external_action (id),
+	affected_group_id TEXT NOT NULL REFERENCES affected_group (id),
+	kind TEXT NOT NULL CHECK (kind IN ('conversation')),
+	outcome TEXT NOT NULL CHECK (outcome IN ('confirmed', 'partially_confirmed', 'contradicted', 'new_discovery')),
+	learning TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);
