@@ -1,68 +1,49 @@
-# Base Metodológica
+# Fontes, Pesquisa e Independência Metodológica
 
-A baseline do Hydra foi estruturada principalmente a partir das seguintes fontes disponibilizadas ao projeto.
+Esta é uma política de uso de fontes, não um mapa de origem da metodologia do Hydra.
 
-## PMBOK® Guide — 7ª edição
+## Princípio central
 
-Aplicações no Hydra:
+O Hydra possui metodologia própria. Referências externas servem para pesquisa, aprendizado, comparação e ampliação de repertório profissional — não como especificação do produto.
 
-- foco em resultados e valor, não apenas em artefatos;
-- adaptação deliberada da abordagem, governança e processos ao contexto;
-- integração entre stakeholders, equipe, abordagem, planejamento, trabalho, entrega, medição e incerteza;
-- melhoria contínua do próprio processo de gerenciamento;
-- uso de artefatos conforme sua utilidade.
+Nenhuma fonte isolada define, por si só, uma decisão de produto do Hydra. Toda feature precisa ser justificada pelo problema que resolve no Hydra, não pela existência de um conceito equivalente em alguma publicação.
 
-## Agile Practice Guide
+## Como fontes são usadas
 
-Aplicações no Hydra:
+- Conceitos amplamente adotados em gestão de projetos, produto, software e métodos ágeis (risco, stakeholder, dependência, backlog, incerteza, feedback, iteração, entre outros) podem informar decisões — são vocabulário comum do campo, não propriedade de uma única fonte.
+- Estruturas, textos, tabelas, taxonomias distintivas ou qualquer outro conteúdo protegido de uma publicação não devem ser reproduzidos mecanicamente, resumidos seção a seção, nem usados como molde direto de tela, artefato ou fluxo do Hydra.
+- Quando houver pesquisa metodológica, preferir múltiplas fontes e triangulação, em vez de derivar uma decisão de uma única publicação.
+- Fontes públicas e acadêmicas são preferíveis para embasar a elaboração da metodologia própria do Hydra.
+- Materiais privados ou licenciados (cursos, plataformas fechadas, apostilas de acesso restrito) não devem se tornar corpus operacional do produto — não entram em runtime, não viram base de prompt, não são citados como especificação de feature.
+- Output de ferramentas proprietárias (assistentes, geradores, plataformas de terceiros) não deve ser tratado como especificação pronta para incorporar ao Hydra — ver política sobre PMI Infinity abaixo.
 
-- preparação e refinamento progressivo do backlog;
-- entrega incremental;
-- reviews e demonstrações;
-- retrospectivas;
-- resposta a mudanças;
-- priorização de software funcionando sobre documentação excessiva;
-- documentação suficiente para permitir decisão e execução.
+## Fluxo desejado de pesquisa
 
-## The PMI Guide to Business Analysis e Business Analysis for Practitioners
+problema do Hydra → pesquisa pública/múltiplas fontes → repertório profissional → hipótese própria → design → dogfooding → decisão Hydra
 
-Aplicações no Hydra:
+Evitar: capítulo/framework/output específico de uma fonte → paráfrase → feature Hydra.
 
-- identificação do problema ou oportunidade;
-- avaliação do estado atual;
-- definição do estado futuro;
-- identificação de capacidades necessárias;
-- análise de alternativas;
-- Business Case;
-- roadmap;
-- Charter;
-- rastreabilidade de requisitos;
-- validação da solução.
+## PMI Infinity
 
-## Effective Project Management — Robert K. Wysocki
+**Permitido:** usar o PMI Infinity (ou ferramenta equivalente) para estudo pessoal de gestão de projetos, esclarecimento de conceitos e desenvolvimento de repertório profissional.
 
-Aplicações no Hydra:
+**Não permitido:** tratar output do Infinity como especificação direta de feature, requisito de produto, metodologia pronta, texto a parafrasear em documentação, corpus/RAG, ou input automático para gerar a metodologia do Hydra.
 
-- escolha da abordagem conforme incerteza, complexidade, tecnologia e estabilidade dos requisitos;
-- combinação de componentes tradicionais e adaptativos;
-- utilização de ciclos de vida adequados ao contexto;
-- planejamento progressivo;
-- foco em projeto de software e envolvimento do usuário.
+Fluxo esperado: Infinity → aprendizado pessoal → questão do Hydra → pesquisa independente em fontes públicas/confiáveis → comparação → hipótese própria → dogfooding.
 
-## Apostilas FGV
+## Referências bibliográficas consultadas
 
-Aplicações no Hydra:
+Publicações e materiais consultados durante a pesquisa do Hydra, mantidos aqui por transparência de provenance — não é uma lista de dependências normativas:
 
-- integração entre escopo, requisitos e qualidade;
-- identificação e tratamento contínuo de riscos;
-- clareza de responsabilidades;
-- planejamento proporcional à capacidade;
-- critérios de conclusão e controle;
-- documentação de decisões e mudanças.
+- PMBOK® Guide (PMI)
+- Agile Practice Guide (PMI)
+- The PMI Guide to Business Analysis e Business Analysis for Practitioners (PMI)
+- Effective Project Management — Robert K. Wysocki
+- Apostilas FGV
 
-## Regra de uso
+## Contexto de adaptação
 
-As fontes orientam a metodologia, mas não serão reproduzidas mecanicamente. Todo processo, regra e artefato deverá ser adaptado ao contexto de:
+Qualquer princípio de qualquer fonte, quando adotado, é sempre adaptado ao contexto real do Hydra:
 
 - produto digital;
 - desenvolvimento individual;

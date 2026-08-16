@@ -376,97 +376,35 @@ E também:
 
 ---
 
-# 7. Alinhamento com a base de conhecimento
+# 7. Princípios adotados pelo Hydra
 
-Este rework é compatível com os princípios principais da base metodológica disponível.
+Estes princípios foram formados a partir de repertório de mercado (gestão de projetos, produto, métodos ágeis, benchmarking de ferramentas) e adaptados às decisões de produto do Hydra. Eles não substituem, nem dependem estruturalmente de nenhuma publicação específica — a política de uso de fontes está em `docs/00-governance/source-basis.md`.
 
-## PMI Guide to Business Analysis
+## Descoberta não deve saltar para a solução
 
-A Descoberta segue a lógica:
+A Descoberta deve aprofundar progressivamente o entendimento da situação antes de orientar respostas. Contexto, pessoas afetadas, funcionamento atual, causas, resultado desejado e evidências devem reduzir incerteza antes que o Hydra conduza o usuário para decisões de solução.
 
-- problema/oportunidade;
-- estado atual;
-- estado futuro;
-- opções;
-- recomendação;
-- evidência e elicitação.
+O nível de detalhe dos artefatos e informações varia conforme contexto, risco, valor, regulação e necessidades das partes envolvidas.
 
-A análise não deve saltar prematuramente para solução.
+## Contexto orienta a abordagem
 
-O nível de detalhe dos artefatos e informações deve variar conforme contexto, risco, valor, regulação e necessidades dos stakeholders.
+Nem todo projeto precisa dos mesmos processos, ferramentas, artefatos ou nível de formalidade. O Hydra seleciona capacidades conforme o contexto, otimizando fluxo e tornando o trabalho visível, sem exigir que o usuário escolha um rótulo metodológico antecipadamente (ver Leis L7 e L11, e Tailoring Engine, seção 22).
 
-## PMBOK / Tailoring
+## Risco é contínuo
 
-Nem todo projeto precisa dos mesmos processos, ferramentas, artefatos ou nível de formalidade.
+Risco não deve existir apenas como atividade inicial. Riscos precisam poder ser identificados, avaliados, respondidos, monitorados, revisados e surgir ao longo do ciclo. A intensidade do gerenciamento de risco se adequa ao projeto.
 
-O Hydra deve selecionar capacidades conforme contexto.
+## Mudança relevante precisa de rastro
 
-## Disciplined Agile / Choose Your WoW
+Mudança relevante precisa de identificação, rastreabilidade, impacto, histórico, aprovação quando aplicável e verificação. O Hydra preserva o estado atual e, progressivamente, registra como mudanças relevantes aconteceram.
 
-Princípios especialmente alinhados:
+## Entrega não é adoção
 
-- contexto conta;
-- ser pragmático;
-- ter opções é bom;
-- otimizar fluxo;
-- tornar trabalho e fluxo visíveis;
-- validar aprendizado;
-- melhorar continuamente;
-- adequar o modo de trabalhar.
+Entrega não é igual a adoção ou valor realizado. Encerramento deve considerar transição, uso, aceitação, resultado e sustentação.
 
-## Risk Management Practice Guide
+## EVM exige base confiável
 
-Risco é contínuo.
-
-Não deve existir apenas como atividade inicial.
-
-Riscos precisam poder:
-
-- ser identificados;
-- avaliados;
-- respondidos;
-- monitorados;
-- revisados;
-- surgir ao longo do ciclo.
-
-A intensidade do gerenciamento de risco deve se adequar ao projeto.
-
-## Configuration Management
-
-Mudança relevante precisa de:
-
-- identificação;
-- rastreabilidade;
-- impacto;
-- histórico;
-- aprovação quando aplicável;
-- verificação.
-
-O Hydra deve preservar estado atual e, progressivamente, registrar como mudanças relevantes aconteceram.
-
-## Managing Change in Organizations
-
-Entrega não é igual a adoção ou valor realizado.
-
-Encerramento deve considerar:
-
-- transição;
-- uso;
-- aceitação;
-- resultado;
-- sustentação.
-
-## EVM
-
-EVM só faz sentido quando houver:
-
-- baseline;
-- escopo estruturado;
-- cronograma confiável;
-- custo;
-- progresso mensurável.
-
-Não ativar precisão falsa.
+EVM só faz sentido quando houver baseline, escopo estruturado, cronograma confiável, custo e progresso mensurável. Não ativar precisão falsa.
 
 ---
 
@@ -2443,9 +2381,13 @@ A partir desta versão:
 - o documento não autoriza execução automática das etapas seguintes;
 - divergências reais entre documento e repositório devem ser sinalizadas antes de implementação.
 
-# 55. Referências conceituais usadas
+# 55. Referências conceituais consultadas
 
-Base interna de conhecimento:
+Estas publicações e ferramentas foram consultadas como repertório de pesquisa durante a elaboração deste documento. A política de uso de fontes está em `docs/00-governance/source-basis.md`.
+
+Elas são referências de leitura e comparação — não uma base normativa da qual o Hydra deriva, e nenhuma delas define isoladamente uma decisão de produto.
+
+Publicações consultadas:
 
 - PMBOK Guide — 8th Edition
 - PMI Guide to Business Analysis
@@ -2458,7 +2400,7 @@ Base interna de conhecimento:
 - Standard for Program Management
 - PMI Standard for AI in PPPM
 
-Benchmarking complementar:
+Benchmarking complementar (produtos, não publicações):
 
 - Jira
 - Jira Product Discovery
@@ -2473,6 +2415,6 @@ Benchmarking complementar:
 - Wrike
 - Motion
 
-A referência metodológica serve como fundamento e biblioteca de opções.
+A referência metodológica serve como repertório de pesquisa, não como especificação.
 
-Ela **não deve ser traduzida 1:1 para telas**.
+Ela **não deve ser traduzida 1:1 para telas, processos ou artefatos**.
