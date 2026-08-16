@@ -41,6 +41,31 @@ describe('buildBancadaOverviewView', () => {
 		expect(publico.chips).toEqual(['Operação']);
 	});
 
+	it('bloco "Como é tratado hoje" aparece a partir de TreatmentStep, nunca de estado_atual_detail', () => {
+		const withoutSteps = buildBancadaOverviewView(catalog, {}, [], [], { noTreatment: false }, []);
+		expect(withoutSteps.blocks.find((b) => b.activityId === 'estado_atual')).toBeUndefined();
+
+		const withSteps = buildBancadaOverviewView(
+			catalog,
+			{},
+			[],
+			[],
+			{ noTreatment: false },
+			[{ whatHappens: 'Financeiro confere manualmente', actors: [], medium: null, frictions: [] }]
+		);
+		const estadoAtual = withSteps.blocks.find((b) => b.activityId === 'estado_atual')!;
+		expect(estadoAtual.heading).toBe('Como é tratado hoje');
+		expect(estadoAtual.value).toContain('1 etapa descrita');
+		expect(estadoAtual.value).toContain('Financeiro confere manualmente');
+	});
+
+	it('bloco "Como é tratado hoje" também aparece com noTreatment, mesmo sem passos', () => {
+		const view = buildBancadaOverviewView(catalog, {}, [], [], { noTreatment: true }, []);
+		const estadoAtual = view.blocks.find((b) => b.activityId === 'estado_atual')!;
+		expect(estadoAtual.value).toContain('Sem tratamento definido hoje');
+		expect(estadoAtual.value).toContain('Hoje não existe um tratamento definido.');
+	});
+
 	it('bloco "Quem é afetado" reflete Evidence (ETAPA 3 do rework), reaproveitado por /now e /document', () => {
 		const withEvidence = buildBancadaOverviewView(
 			catalog,
@@ -232,7 +257,6 @@ describe('buildBancadaOverviewView', () => {
 			{
 				origem: 'Um problema',
 				situacao: 'Situação',
-				estado_atual_detail: 'Estado atual',
 				mudanca: 'Resultado',
 				usuario_principal: 'Usuário principal',
 				necessidade_central: 'Necessidade central',
@@ -244,7 +268,10 @@ describe('buildBancadaOverviewView', () => {
 				riscos_identificados: 'Riscos',
 				forma_comunicacao: 'Comunicação'
 			},
-			[{ id: 'ag-1', label: 'Operação', impact: 'alto' }]
+			[{ id: 'ag-1', label: 'Operação', impact: 'alto' }],
+			[],
+			{ noTreatment: false },
+			[{ whatHappens: 'Financeiro confere manualmente', actors: [], medium: null, frictions: [] }]
 		);
 		expect(view.blocks.map((b) => b.activityId)).toEqual([
 			'origem',

@@ -196,6 +196,58 @@ export interface Evidence {
 	createdAt: string;
 }
 
+// Tratamento atual — Descoberta, "Como é tratado hoje" (Stage 4A do rework,
+// ver docs/core/HYDRA_PRODUCT_REWORK.md §34). Objeto vivo real: substitui o
+// texto livre antes capturado em `estado_atual_detail` (Answer da atividade
+// `estado_atual`) como fonte canônica do tratamento atual. Mesmo espírito de
+// AffectedGroup (ligado a uma atividade específica do catálogo, participa da
+// conclusão), mas com dois formatos mutuamente exclusivos: uma cadeia
+// ordenada de TreatmentStep, ou `noTreatment: true` ("hoje não existe um
+// tratamento definido"). CurrentTreatment é 1:1 com o projeto (mesmo molde
+// de ScopeVersion) — o cabeçalho que guarda esse flag; TreatmentStep é a
+// coleção ordenada (mesmo molde de ScopeItem, com `order` próprio).
+//
+// Invariante canônica (validada em domain/serialization.ts e reforçada pelas
+// próprias transições abaixo, nunca só na interface): o estado persistido
+// nunca tem `noTreatment: true` e `treatmentSteps` não vazio ao mesmo tempo.
+// addTreatmentStep sempre desliga noTreatment (adicionar um passo real é a
+// prova de que existe tratamento); setTreatmentNoTreatment(true) sempre
+// remove os passos existentes — sem estado "esquecido" implícito.
+export interface CurrentTreatment {
+	projectId: string;
+	noTreatment: boolean;
+	updatedAt: string;
+}
+
+// Taxonomia fixa de fricção (ver docs/core/HYDRA_PRODUCT_REWORK.md §34) —
+// descreve COMO o tratamento atual funciona, nunca por que o problema
+// existe (isso é causa, fora deste corte) e nunca carrega peso/severidade/
+// score: é só um rótulo, sem cálculo algum sobre ele.
+export type TreatmentFriction = 'espera' | 'retrabalho' | 'improviso' | 'trava';
+
+export interface TreatmentStep {
+	id: string;
+	projectId: string;
+	// Posição na cadeia, 0-based e contígua (mesma regra de ScopeItem.order
+	// para "agora") — reordenação (moveTreatmentStep) troca só o `order` de
+	// dois passos adjacentes, nunca reescreve a lista inteira.
+	order: number;
+	// Único dado obrigatório do passo — "o que acontece naquele momento".
+	whatHappens: string;
+	// Quem atua — contexto opcional, múltiplos atores permitidos. Texto
+	// livre curto (rótulo), nunca um vínculo a AffectedGroup: Actor ≠
+	// AffectedGroup semanticamente (ver HYDRA_PRODUCT_REWORK.md §34) — o
+	// catálogo de sugestões pode usar AffectedGroup como fonte de rótulos,
+	// mas o dado persistido aqui é sempre texto solto, sem id nem FK.
+	actors: string[];
+	// Meio ou ferramenta — contexto opcional, um único valor (texto livre
+	// curto, ou uma das sugestões).
+	medium: string | null;
+	frictions: TreatmentFriction[];
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -207,4 +259,6 @@ export interface ProjectState {
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];
+	currentTreatment: CurrentTreatment;
+	treatmentSteps: TreatmentStep[];
 }

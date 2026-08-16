@@ -83,16 +83,27 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 		expect(publicoComEvidencia.value).toBe('Grupo afetado: Operação (Alto). Evidências: Operação (1 evidência).');
 	});
 
-	it('bloco "Estado atual" só aparece quando estado_atual_detail existe', () => {
+	it('bloco "Como é tratado hoje" só aparece quando há TreatmentStep ou noTreatment, nunca a partir de estado_atual_detail', () => {
+		const semNada = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: false }, []);
+		expect(semNada.overview.find((b) => b.activityId === 'estado_atual')).toBeUndefined();
+
 		const view = buildDiscoverySummaryView(
 			catalog,
-			{ estado_atual_detail: 'Cada time usa sua planilha.' },
-			ALL_NAO_INICIADA
+			{},
+			ALL_NAO_INICIADA,
+			[],
+			[],
+			{ noTreatment: false },
+			[{ whatHappens: 'Cada time usa sua planilha.', actors: [], medium: null, frictions: [] }]
 		);
 		const estadoAtual = view.overview.find((b) => b.activityId === 'estado_atual')!;
-		expect(estadoAtual.heading).toBe('Estado atual');
-		expect(estadoAtual.editLabel).toBe('Editar estado atual');
-		expect(estadoAtual.value).toBe('Cada time usa sua planilha.');
+		expect(estadoAtual.heading).toBe('Como é tratado hoje');
+		expect(estadoAtual.editLabel).toBe('Editar como é tratado hoje');
+		expect(estadoAtual.value).toBe('1 etapa descrita. Quando isso aparece, Cada time usa sua planilha..');
+
+		const semTratamento = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: true }, []);
+		const bloco = semTratamento.overview.find((b) => b.activityId === 'estado_atual')!;
+		expect(bloco.value).toBe('Sem tratamento definido hoje. Hoje não existe um tratamento definido.');
 	});
 
 	it('bloco "Resultado desejado" só aparece quando mudanca existe (usa mudanca, não beneficiario/percepcao)', () => {
@@ -113,11 +124,13 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 			{
 				situacao: 'Situação',
 				sinais_situacao: encodeMultiSelectValue(['rework']),
-				estado_atual_detail: 'Estado atual',
 				mudanca: 'Resultado'
 			},
 			ALL_NAO_INICIADA,
-			[{ id: 'ag-1', label: 'Público', impact: 'alto' }]
+			[{ id: 'ag-1', label: 'Público', impact: 'alto' }],
+			[],
+			{ noTreatment: false },
+			[{ whatHappens: 'Estado atual', actors: [], medium: null, frictions: [] }]
 		);
 		expect(view.overview.map((b) => b.activityId)).toEqual(['problema', 'publico', 'estado_atual', 'resultado']);
 	});
@@ -139,7 +152,7 @@ describe('buildDiscoverySummaryView — conferência (checklist)', () => {
 		expect(view.checklist.map((item) => item.label)).toEqual([
 			'Problema definido',
 			'Público definido',
-			'Estado atual definido',
+			'Como é tratado hoje definido',
 			'Resultado definido'
 		]);
 	});

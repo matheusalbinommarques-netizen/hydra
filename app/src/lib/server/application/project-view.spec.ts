@@ -15,6 +15,8 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],
+		currentTreatment: { projectId: 'p1', noTreatment: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+		treatmentSteps: [],
 		...overrides
 	};
 }
@@ -232,7 +234,10 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',
-				'evidences'
+				'evidences',
+				'currentTreatment',
+				'treatmentSteps',
+				'treatmentConfirmationIssues'
 			].sort()
 		);
 	});

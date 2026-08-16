@@ -140,11 +140,12 @@ describe('catalog', () => {
 		expect(priorizar?.pendingItemDetail).toBeTruthy();
 	});
 
-	it('há exatamente três atividades explicit_confirmation, com allowsSkip diferentes', () => {
+	it('há exatamente quatro atividades explicit_confirmation, com allowsSkip diferentes', () => {
 		const explicitConfirmationActivities = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.completionMode === 'explicit_confirmation');
 		expect(explicitConfirmationActivities.map((activity) => activity.id).sort()).toEqual([
+			'estado_atual',
 			'priorizar_entregas',
 			'publico',
 			'resumo'
@@ -153,6 +154,7 @@ describe('catalog', () => {
 		expect(byId.resumo.allowsSkip).toBe(false);
 		expect(byId.priorizar_entregas.allowsSkip).toBe(true);
 		expect(byId.publico.allowsSkip).toBe(true);
+		expect(byId.estado_atual.allowsSkip).toBe(true);
 	});
 
 	it('ETAPA 2: "Quem é afetado" (publico) é explicit_confirmation, allowsSkip true, sem fields, com pendingItemLabel/Detail', () => {

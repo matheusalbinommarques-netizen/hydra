@@ -6,7 +6,14 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { view } = await parent();
-	const { blocks } = buildBancadaOverviewView(catalog, view.answers, view.affectedGroups, view.evidences);
+	const { blocks } = buildBancadaOverviewView(
+		catalog,
+		view.answers,
+		view.affectedGroups,
+		view.evidences,
+		view.currentTreatment,
+		view.treatmentSteps
+	);
 
 	// Evidence no Documento (ETAPA 3 do rework) — projeção determinística
 	// direta de Evidence: outcome em linguagem de UI + learning, na ordem em

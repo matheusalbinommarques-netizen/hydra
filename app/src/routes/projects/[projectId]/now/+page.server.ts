@@ -73,14 +73,16 @@ function findActivityDefinition(activityId: string): ActivityDefinition | undefi
 // tipo "editableAfterConclusion"), não a adição de outro id aqui.
 const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set(['decompor_trabalho']);
 
-// "Quem é afetado" (publico) é a única exceção não required_fields: o Mapa
-// de Impacto (MapaDeImpacto.svelte, ETAPA 2 do rework) é editável diretamente
-// mesmo depois de concluído — adicionar/remover/reclassificar grupo depois da
-// confirmação reabre a atividade automaticamente quando o mapa fica
-// incompleto (ver domain/transitions.ts, confirmAffectedGroups). Sem esta
-// exceção, não haveria como retomar o Mapa após concluí-lo — `?activity=`
-// só chega aqui via este mecanismo de revisão.
-const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico']);
+// "Quem é afetado" (publico) e "Como é tratado hoje" (estado_atual) são as
+// exceções não required_fields: o Mapa de Impacto (MapaDeImpacto.svelte,
+// ETAPA 2 do rework) e "Como é tratado hoje" (ComoETratadoHoje.svelte, Stage
+// 4A do rework) são editáveis diretamente mesmo depois de concluídos —
+// adicionar/remover/reclassificar depois da confirmação reabre a atividade
+// automaticamente quando o estado fica incompleto (ver domain/transitions.ts,
+// confirmAffectedGroups/confirmTreatment). Sem esta exceção, não haveria como
+// retomar a tela após concluí-la — `?activity=` só chega aqui via este
+// mecanismo de revisão.
+const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico', 'estado_atual']);
 
 function findReviewableConcludedActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
 	const activity = findActivityDefinition(activityId);
@@ -137,7 +139,14 @@ function resolveOptionalFields(activity: RequiredFieldsActivity, view: ProjectVi
 
 export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const { view } = await parent();
-	const bancadaOverview = buildBancadaOverviewView(catalog, view.answers, view.affectedGroups, view.evidences);
+	const bancadaOverview = buildBancadaOverviewView(
+		catalog,
+		view.answers,
+		view.affectedGroups,
+		view.evidences,
+		view.currentTreatment,
+		view.treatmentSteps
+	);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 	const phaseProgress = buildPhaseProgress(catalog, view);
 
@@ -544,5 +553,120 @@ export const actions: Actions = {
 		});
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
+	},
+
+	// "Como é tratado hoje" (Stage 4A do rework) — mesmo padrão do Mapa de
+	// Impacto: cada interação persiste imediatamente, sem redirecionar;
+	// ComoETratadoHoje.svelte permanece na mesma tela após cada ação.
+	addTreatmentStep: async ({ request, params }) => {
+		const formData = await request.formData();
+		const whatHappens = formData.get('whatHappens');
+		if (typeof whatHappens !== 'string' || whatHappens.trim().length === 0) {
+			return fail(400, { message: 'Descreva o que acontece nesse passo.' });
+		}
+
+		const result = await getProjectUseCases().addTreatmentStep({
+			projectId: params.projectId,
+			whatHappens: whatHappens.trim()
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	removeTreatmentStep: async ({ request, params }) => {
+		const formData = await request.formData();
+		const stepId = formData.get('stepId');
+		if (typeof stepId !== 'string' || !stepId) return fail(400, { message: 'Passo inválido.' });
+
+		const result = await getProjectUseCases().removeTreatmentStep({ projectId: params.projectId, stepId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	moveTreatmentStep: async ({ request, params }) => {
+		const formData = await request.formData();
+		const stepId = formData.get('stepId');
+		const direction = formData.get('direction');
+		if (typeof stepId !== 'string' || !stepId) return fail(400, { message: 'Passo inválido.' });
+		if (direction !== '-1' && direction !== '1') return fail(400, { message: 'Direção inválida.' });
+
+		const result = await getProjectUseCases().moveTreatmentStep({
+			projectId: params.projectId,
+			stepId,
+			direction: direction === '-1' ? -1 : 1
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setTreatmentStepActors: async ({ request, params }) => {
+		const formData = await request.formData();
+		const stepId = formData.get('stepId');
+		if (typeof stepId !== 'string' || !stepId) return fail(400, { message: 'Passo inválido.' });
+		const actors = formData.getAll('actor').filter((v): v is string => typeof v === 'string');
+
+		const result = await getProjectUseCases().setTreatmentStepActors({ projectId: params.projectId, stepId, actors });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setTreatmentStepMedium: async ({ request, params }) => {
+		const formData = await request.formData();
+		const stepId = formData.get('stepId');
+		const medium = formData.get('medium');
+		if (typeof stepId !== 'string' || !stepId) return fail(400, { message: 'Passo inválido.' });
+
+		const result = await getProjectUseCases().setTreatmentStepMedium({
+			projectId: params.projectId,
+			stepId,
+			medium: typeof medium === 'string' && medium.trim().length > 0 ? medium.trim() : null
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	toggleTreatmentStepFriction: async ({ request, params }) => {
+		const formData = await request.formData();
+		const stepId = formData.get('stepId');
+		const friction = formData.get('friction');
+		if (typeof stepId !== 'string' || !stepId) return fail(400, { message: 'Passo inválido.' });
+		if (
+			typeof friction !== 'string' ||
+			!(['espera', 'retrabalho', 'improviso', 'trava'] as const).includes(friction as never)
+		) {
+			return fail(400, { message: 'Fricção inválida.' });
+		}
+
+		const result = await getProjectUseCases().toggleTreatmentStepFriction({
+			projectId: params.projectId,
+			stepId,
+			friction: friction as 'espera' | 'retrabalho' | 'improviso' | 'trava'
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setTreatmentNoTreatment: async ({ request, params }) => {
+		const formData = await request.formData();
+		const noTreatment = formData.get('noTreatment');
+		if (noTreatment !== 'true' && noTreatment !== 'false') {
+			return fail(400, { message: 'Valor inválido.' });
+		}
+
+		const result = await getProjectUseCases().setTreatmentNoTreatment({
+			projectId: params.projectId,
+			noTreatment: noTreatment === 'true'
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	confirmTreatment: async ({ params }) => {
+		const result = await getProjectUseCases().confirmTreatment({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		// Mesmo padrão de confirmAffectedGroups: a rota canônica de Agora
+		// recomputa a atividade recomendada, que já avançou para a próxima da
+		// jornada agora que "estado_atual" está concluída.
+		redirect(303, `/projects/${params.projectId}/now`);
 	}
 };

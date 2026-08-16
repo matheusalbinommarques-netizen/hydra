@@ -45,11 +45,15 @@ function createBareProject(name: string): string {
 			name,
 			new Date().toISOString()
 		);
-		// scope_version é 1:1 com project, sempre presente desde a criação real
-		// (ver sqlite-project-repository.ts) — sem esta linha, findById lança
-		// erro de violação de schema.
+		// scope_version e current_treatment são 1:1 com project, sempre
+		// presentes desde a criação real (ver sqlite-project-repository.ts) —
+		// sem essas linhas, findById lança erro de violação de schema.
 		db.prepare("INSERT INTO scope_version (project_id, hypothesis, confirmed_at) VALUES (?, '', NULL)").run(
 			projectId
+		);
+		db.prepare('INSERT INTO current_treatment (project_id, no_treatment, updated_at) VALUES (?, 0, ?)').run(
+			projectId,
+			new Date().toISOString()
 		);
 	} finally {
 		db.close();
@@ -144,16 +148,11 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 				 VALUES (?, ?, 'publico', 'aberta', ?, NULL)`
 			).run(randomUUID(), projectId, now);
 
-			// "Estado atual" foi pulada e depois respondida — pendência resolvida.
+			// "Como é tratado hoje" foi pulada e depois concluída — pendência resolvida.
 			db.prepare(
 				`UPDATE activity_progress SET status = 'concluída'
 				 WHERE project_id = ? AND activity_definition_id = 'estado_atual'`
 			).run(projectId);
-			db.prepare(
-				`INSERT INTO answer
-				   (project_id, activity_definition_id, field_definition_id, value, created_at, updated_at)
-				 VALUES (?, 'estado_atual', 'estado_atual_detail', ?, ?, ?)`
-			).run(projectId, 'Estado atual respondido depois de pulado.', earlier, now);
 			db.prepare(
 				`INSERT INTO pending_item (id, project_id, activity_definition_id, status, created_at, resolved_at)
 				 VALUES (?, ?, 'estado_atual', 'resolvida', ?, ?)`
@@ -170,12 +169,8 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 	});
 
 	await test.step('Registros reflete a pendência resolvida, sem data (dado não exibido nesta projeção)', async () => {
-		await expect(page.getByText('Estado atual não foi detalhado')).toBeVisible();
-		await expect(page.getByText('Atividade: Estado atual · Resolvida')).toBeVisible();
-
-		// a resposta que resolveu a pendência também aparece em Respostas
-		await expect(page.getByRole('heading', { name: 'Estado atual', exact: true })).toBeVisible();
-		await expect(page.getByText('Estado atual respondido depois de pulado.')).toBeVisible();
+		await expect(page.getByText('Como é tratado hoje não foi mapeado')).toBeVisible();
+		await expect(page.getByText('Atividade: Como é tratado hoje · Resolvida')).toBeVisible();
 	});
 
 	await test.step('navegação entre Agora, Mapa, Registros e Resumo', async () => {

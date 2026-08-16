@@ -14,7 +14,9 @@ import type {
 	ScopeBucket,
 	ScopeConfirmationIssue,
 	ScopeEffort,
-	ScopeExecutionStatus
+	ScopeExecutionStatus,
+	TreatmentConfirmationIssue,
+	TreatmentFriction
 } from '$lib/domain';
 import type {
 	CriteriaScopeConflict,
@@ -187,6 +189,22 @@ export interface EvidenceView {
 	createdAt: string;
 }
 
+// "Como é tratado hoje" (Stage 4A do rework) — view leve de TreatmentStep,
+// sem projectId/createdAt/updatedAt, que a interface não precisa (mesmo
+// padrão de AffectedGroupView).
+export interface TreatmentStepView {
+	id: string;
+	order: number;
+	whatHappens: string;
+	actors: string[];
+	medium: string | null;
+	frictions: TreatmentFriction[];
+}
+
+export interface CurrentTreatmentView {
+	noTreatment: boolean;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -245,6 +263,13 @@ export interface ProjectView {
 	// extra aqui.
 	externalActions: ExternalActionView[];
 	evidences: EvidenceView[];
+	// "Como é tratado hoje" (Stage 4A do rework) — cadeia ordenada de passos
+	// e o cabeçalho noTreatment; a interface (ComoETratadoHoje.svelte)
+	// desabilita "Continuar" sem round-trip extra, mesma função pura usada
+	// pelo domínio na confirmação (getTreatmentConfirmationIssues).
+	currentTreatment: CurrentTreatmentView;
+	treatmentSteps: TreatmentStepView[];
+	treatmentConfirmationIssues: TreatmentConfirmationIssue[];
 }
 
 export type UseCaseError =
@@ -435,6 +460,52 @@ export interface CompleteExternalActionInput {
 	learning: string;
 }
 
+// "Como é tratado hoje" (Stage 4A do rework) — mesmo padrão dos inputs de
+// AffectedGroup: id gerado pelo caso de uso (idGenerator), nunca recebido do
+// cliente.
+export interface AddTreatmentStepInput {
+	projectId: string;
+	whatHappens: string;
+}
+
+export interface RemoveTreatmentStepInput {
+	projectId: string;
+	stepId: string;
+}
+
+export interface MoveTreatmentStepInput {
+	projectId: string;
+	stepId: string;
+	direction: -1 | 1;
+}
+
+export interface SetTreatmentStepActorsInput {
+	projectId: string;
+	stepId: string;
+	actors: string[];
+}
+
+export interface SetTreatmentStepMediumInput {
+	projectId: string;
+	stepId: string;
+	medium: string | null;
+}
+
+export interface ToggleTreatmentStepFrictionInput {
+	projectId: string;
+	stepId: string;
+	friction: TreatmentFriction;
+}
+
+export interface SetTreatmentNoTreatmentInput {
+	projectId: string;
+	noTreatment: boolean;
+}
+
+export interface ConfirmTreatmentInput {
+	projectId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
@@ -467,6 +538,14 @@ export interface ProjectUseCases {
 	confirmAffectedGroups(input: ConfirmAffectedGroupsInput): Promise<UseCaseOutcome<ProjectView>>;
 	prepareExternalAction(input: PrepareExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	completeExternalAction(input: CompleteExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
+	addTreatmentStep(input: AddTreatmentStepInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeTreatmentStep(input: RemoveTreatmentStepInput): Promise<UseCaseOutcome<ProjectView>>;
+	moveTreatmentStep(input: MoveTreatmentStepInput): Promise<UseCaseOutcome<ProjectView>>;
+	setTreatmentStepActors(input: SetTreatmentStepActorsInput): Promise<UseCaseOutcome<ProjectView>>;
+	setTreatmentStepMedium(input: SetTreatmentStepMediumInput): Promise<UseCaseOutcome<ProjectView>>;
+	toggleTreatmentStepFriction(input: ToggleTreatmentStepFrictionInput): Promise<UseCaseOutcome<ProjectView>>;
+	setTreatmentNoTreatment(input: SetTreatmentNoTreatmentInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmTreatment(input: ConfirmTreatmentInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

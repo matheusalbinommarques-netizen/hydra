@@ -5,19 +5,24 @@ import {
 	addAffectedGroup,
 	addImpediment,
 	addScopeItem,
+	addTreatmentStep,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
+	confirmTreatment,
 	getAffectedGroupConfirmationIssues,
 	getScopeConfirmationIssues,
+	getTreatmentConfirmationIssues,
 	isActivityFieldsValid,
 	moveScopeItem,
+	moveTreatmentStep,
 	prepareExternalAction,
 	removeAffectedGroup,
 	removeScopeItem,
+	removeTreatmentStep,
 	renameProject,
 	reopenImpediment,
 	reorderAgoraItems,
@@ -31,8 +36,12 @@ import {
 	setScopeItemEffort,
 	setScopeItemExecutionStatus,
 	setScopeItemText,
+	setTreatmentNoTreatment,
+	setTreatmentStepActors,
+	setTreatmentStepMedium,
 	shouldInvalidateSummary,
-	skipActivity
+	skipActivity,
+	toggleTreatmentStepFriction
 } from './transitions';
 import { encodePlanningItems } from './planning-items';
 import type { Catalog, RequiredFieldsActivity } from './catalog-types';
@@ -201,14 +210,12 @@ describe('answerActivity', () => {
 	});
 
 	it('campo answer gera uma Answer nova, com createdAt e updatedAt = occurredAt', () => {
-		const state = unwrap(
-			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
-		);
-		const answer = state.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail');
+		const state = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
+		const answer = state.answers.find((a) => a.fieldDefinitionId === 'mudanca');
 		expect(answer).toEqual({
 			projectId: 'proj-1',
-			activityDefinitionId: 'estado_atual',
-			fieldDefinitionId: 'estado_atual_detail',
+			activityDefinitionId: 'resultado',
+			fieldDefinitionId: 'mudanca',
 			value: 'Clientes',
 			createdAt: T1,
 			updatedAt: T1
@@ -216,28 +223,22 @@ describe('answerActivity', () => {
 	});
 
 	it('resposta idêntica não altera timestamps nem cria uma segunda Answer', () => {
-		const first = unwrap(
-			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
-		);
-		const second = unwrap(
-			answerActivity(catalog, first, 'estado_atual', { estado_atual_detail: 'Clientes' }, T2)
-		);
+		const first = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
+		const second = unwrap(answerActivity(catalog, first, 'resultado', { mudanca: 'Clientes' }, T2));
 		expect(second.answers).toEqual(first.answers); // updatedAt continua T1, não vira T2
 		expect(second.answers).toHaveLength(1);
 	});
 
 	it('resposta diferente atualiza updatedAt mas preserva createdAt', () => {
-		const first = unwrap(
-			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
-		);
+		const first = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
 		const second = unwrap(
-			answerActivity(catalog, first, 'estado_atual', { estado_atual_detail: 'Clientes e atendentes' }, T2)
+			answerActivity(catalog, first, 'resultado', { mudanca: 'Clientes e atendentes' }, T2)
 		);
-		const answer = second.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail');
+		const answer = second.answers.find((a) => a.fieldDefinitionId === 'mudanca');
 		expect(answer).toEqual({
 			projectId: 'proj-1',
-			activityDefinitionId: 'estado_atual',
-			fieldDefinitionId: 'estado_atual_detail',
+			activityDefinitionId: 'resultado',
+			fieldDefinitionId: 'mudanca',
 			value: 'Clientes e atendentes',
 			createdAt: T1,
 			updatedAt: T2
@@ -292,20 +293,16 @@ describe('answerActivity', () => {
 
 	it('mudança real em atividade anterior invalida o Resumo já concluída', () => {
 		const withSummary = unwrap(confirmSummary(catalog, freshState()));
-		const answered = unwrap(
-			answerActivity(catalog, withSummary, 'estado_atual', { estado_atual_detail: 'Clientes' }, T2)
-		);
+		const answered = unwrap(answerActivity(catalog, withSummary, 'resultado', { mudanca: 'Clientes' }, T2));
 		const resumo = answered.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
 	});
 
 	it('mudança repetindo o mesmo valor não invalida o Resumo já concluída', () => {
-		const answered = unwrap(
-			answerActivity(catalog, freshState(), 'estado_atual', { estado_atual_detail: 'Clientes' }, T1)
-		);
+		const answered = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
 		const withSummary = unwrap(confirmSummary(catalog, answered));
 		const reanswered = unwrap(
-			answerActivity(catalog, withSummary, 'estado_atual', { estado_atual_detail: 'Clientes' }, T2)
+			answerActivity(catalog, withSummary, 'resultado', { mudanca: 'Clientes' }, T2)
 		);
 		const resumo = reanswered.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('concluída');
@@ -1334,5 +1331,190 @@ describe('resolveImpediment / reopenImpediment', () => {
 			ok: false,
 			error: { kind: 'impediment_not_found' }
 		});
+	});
+});
+
+describe('CurrentTreatment / TreatmentStep (Stage 4A — "Como é tratado hoje")', () => {
+	it('addTreatmentStep cria um passo com order/whatHappens/timestamps corretos e desliga noTreatment', () => {
+		const state = unwrap(addTreatmentStep(catalog, freshState(), 'ts-1', '  Financeiro confere a planilha  ', T1));
+		expect(state.treatmentSteps).toEqual([
+			{
+				id: 'ts-1',
+				projectId: 'proj-1',
+				order: 0,
+				whatHappens: 'Financeiro confere a planilha',
+				actors: [],
+				medium: null,
+				frictions: [],
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+		expect(state.currentTreatment.noTreatment).toBe(false);
+	});
+
+	it('addTreatmentStep rejeita whatHappens vazio/só espaços', () => {
+		expect(addTreatmentStep(catalog, freshState(), 'ts-1', '   ', T1)).toEqual({
+			ok: false,
+			error: { kind: 'invalid_field_value', fieldDefinitionId: 'whatHappens' }
+		});
+	});
+
+	it('addTreatmentStep desliga noTreatment quando estava true (voltar a descrever)', () => {
+		const none = unwrap(setTreatmentNoTreatment(catalog, freshState(), true, T1));
+		const added = unwrap(addTreatmentStep(catalog, none, 'ts-1', 'Passo novo', T2));
+		expect(added.currentTreatment.noTreatment).toBe(false);
+		expect(added.treatmentSteps).toHaveLength(1);
+	});
+
+	it('getTreatmentConfirmationIssues: no_steps quando não há passos nem noTreatment; vazio quando noTreatment true', () => {
+		expect(getTreatmentConfirmationIssues(false, [])).toEqual([{ kind: 'no_steps' }]);
+		expect(getTreatmentConfirmationIssues(true, [])).toEqual([]);
+	});
+
+	function twoSteps(): ProjectState {
+		let state = unwrap(addTreatmentStep(catalog, freshState(), 'ts-1', 'Primeiro passo', T1));
+		state = unwrap(addTreatmentStep(catalog, state, 'ts-2', 'Segundo passo', T1));
+		return state;
+	}
+
+	it('segundo passo entra com order 1, ao final da cadeia', () => {
+		const state = twoSteps();
+		expect(state.treatmentSteps.map((s) => ({ id: s.id, order: s.order }))).toEqual([
+			{ id: 'ts-1', order: 0 },
+			{ id: 'ts-2', order: 1 }
+		]);
+	});
+
+	it('removeTreatmentStep remove o passo e reindexa order dos restantes; erro treatment_step_not_found para id inexistente', () => {
+		let state = twoSteps();
+		state = unwrap(addTreatmentStep(catalog, state, 'ts-3', 'Terceiro passo', T1));
+		const removed = unwrap(removeTreatmentStep(catalog, state, 'ts-1', T2));
+		expect(removed.treatmentSteps.map((s) => ({ id: s.id, order: s.order }))).toEqual([
+			{ id: 'ts-2', order: 0 },
+			{ id: 'ts-3', order: 1 }
+		]);
+		expect(removeTreatmentStep(catalog, removed, 'ts-1', T2)).toEqual({
+			ok: false,
+			error: { kind: 'treatment_step_not_found' }
+		});
+	});
+
+	it('moveTreatmentStep troca order com o vizinho; nos limites é no-op', () => {
+		const state = twoSteps();
+		const moved = unwrap(moveTreatmentStep(catalog, state, 'ts-2', -1, T2));
+		// A coleção mantém a ordem de inserção — só o campo `order` troca; quem
+		// ordena por `order` para exibição é a camada de projeção (ProjectView).
+		expect(moved.treatmentSteps.map((s) => ({ id: s.id, order: s.order }))).toEqual([
+			{ id: 'ts-1', order: 1 },
+			{ id: 'ts-2', order: 0 }
+		]);
+
+		const noopFirst = unwrap(moveTreatmentStep(catalog, state, 'ts-1', -1, T2));
+		expect(noopFirst).toBe(state);
+		const noopLast = unwrap(moveTreatmentStep(catalog, state, 'ts-2', 1, T2));
+		expect(noopLast).toBe(state);
+	});
+
+	it('moveTreatmentStep: erro treatment_step_not_found para id inexistente', () => {
+		expect(moveTreatmentStep(catalog, freshState(), 'inexistente', 1, T1)).toEqual({
+			ok: false,
+			error: { kind: 'treatment_step_not_found' }
+		});
+	});
+
+	it('setTreatmentStepActors define a lista, remove espaços/vazios; erro treatment_step_not_found para id inexistente', () => {
+		const state = unwrap(addTreatmentStep(catalog, freshState(), 'ts-1', 'Passo', T1));
+		const withActors = unwrap(
+			setTreatmentStepActors(catalog, state, 'ts-1', [' Financeiro ', '', 'Gestor'], T2)
+		);
+		expect(withActors.treatmentSteps[0].actors).toEqual(['Financeiro', 'Gestor']);
+		expect(setTreatmentStepActors(catalog, freshState(), 'inexistente', ['x'], T1)).toEqual({
+			ok: false,
+			error: { kind: 'treatment_step_not_found' }
+		});
+	});
+
+	it('setTreatmentStepMedium define/limpa o valor (string vazia ou null viram null)', () => {
+		const state = unwrap(addTreatmentStep(catalog, freshState(), 'ts-1', 'Passo', T1));
+		const withMedium = unwrap(setTreatmentStepMedium(catalog, state, 'ts-1', 'Planilha', T2));
+		expect(withMedium.treatmentSteps[0].medium).toBe('Planilha');
+		const cleared = unwrap(setTreatmentStepMedium(catalog, withMedium, 'ts-1', '', T2));
+		expect(cleared.treatmentSteps[0].medium).toBeNull();
+	});
+
+	it('toggleTreatmentStepFriction alterna a presença da fricção; erro treatment_step_not_found para id inexistente', () => {
+		const state = unwrap(addTreatmentStep(catalog, freshState(), 'ts-1', 'Passo', T1));
+		const withFriction = unwrap(toggleTreatmentStepFriction(catalog, state, 'ts-1', 'espera', T2));
+		expect(withFriction.treatmentSteps[0].frictions).toEqual(['espera']);
+		const removed = unwrap(toggleTreatmentStepFriction(catalog, withFriction, 'ts-1', 'espera', T2));
+		expect(removed.treatmentSteps[0].frictions).toEqual([]);
+		expect(toggleTreatmentStepFriction(catalog, freshState(), 'inexistente', 'trava', T1)).toEqual({
+			ok: false,
+			error: { kind: 'treatment_step_not_found' }
+		});
+	});
+
+	it('setTreatmentNoTreatment(true) remove todos os passos existentes (invariante: nunca os dois)', () => {
+		const state = twoSteps();
+		const none = unwrap(setTreatmentNoTreatment(catalog, state, true, T2));
+		expect(none.currentTreatment.noTreatment).toBe(true);
+		expect(none.treatmentSteps).toEqual([]);
+	});
+
+	it('setTreatmentNoTreatment: valor repetido é no-op (não altera updatedAt)', () => {
+		const first = unwrap(setTreatmentNoTreatment(catalog, freshState(), true, T1));
+		const second = unwrap(setTreatmentNoTreatment(catalog, first, true, T2));
+		expect(second).toBe(first);
+	});
+
+	it('confirmTreatment conclui "estado_atual" com passos ou com noTreatment', () => {
+		const withSteps = unwrap(confirmTreatment(catalog, twoSteps(), T2));
+		expect(withSteps.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual')?.status).toBe('concluída');
+
+		const none = unwrap(setTreatmentNoTreatment(catalog, freshState(), true, T1));
+		const confirmedNone = unwrap(confirmTreatment(catalog, none, T2));
+		expect(confirmedNone.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual')?.status).toBe(
+			'concluída'
+		);
+	});
+
+	it('confirmTreatment erro treatment_confirmation_invalid quando vazio e não noTreatment', () => {
+		expect(confirmTreatment(catalog, freshState(), T1)).toEqual({
+			ok: false,
+			error: { kind: 'treatment_confirmation_invalid', issues: [{ kind: 'no_steps' }] }
+		});
+	});
+
+	it('confirmTreatment erro transition_not_allowed se já concluída', () => {
+		const confirmed = unwrap(confirmTreatment(catalog, twoSteps(), T1));
+		expect(confirmTreatment(catalog, confirmed, T2)).toEqual({
+			ok: false,
+			error: { kind: 'transition_not_allowed', from: 'concluída' }
+		});
+	});
+
+	it('adicionar um novo passo depois de concluído não reabre "estado_atual" (continua com passos)', () => {
+		const confirmed = unwrap(confirmTreatment(catalog, twoSteps(), T1));
+		const withNewStep = unwrap(addTreatmentStep(catalog, confirmed, 'ts-3', 'Terceiro passo', T2));
+		expect(withNewStep.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual')?.status).toBe(
+			'concluída'
+		);
+	});
+
+	it('remover o único passo depois de concluído reabre "estado_atual"', () => {
+		let state = unwrap(addTreatmentStep(catalog, freshState(), 'ts-1', 'Único passo', T1));
+		state = unwrap(confirmTreatment(catalog, state, T1));
+		const removed = unwrap(removeTreatmentStep(catalog, state, 'ts-1', T2));
+		expect(removed.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual')?.status).toBe(
+			'em_andamento'
+		);
+	});
+
+	it('addTreatmentStep invalida o Resumo já concluído (mesma regra de answerActivity/addAffectedGroup)', () => {
+		const withSummary = unwrap(confirmSummary(catalog, freshState()));
+		const added = unwrap(addTreatmentStep(catalog, withSummary, 'ts-1', 'Novo passo', T2));
+		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
+		expect(resumo?.status).toBe('em_andamento');
 	});
 });

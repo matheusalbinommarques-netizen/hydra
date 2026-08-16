@@ -19,7 +19,14 @@ export const DEPRECATED_ANSWER_FIELDS: readonly DeprecatedAnswerField[] = [
 	// não é mais fonte de verdade (AffectedGroup é, ver
 	// domain/state-types.ts). Snapshots exportados antes dessa mudança ainda
 	// carregam essa Answer — ela continua legível, nunca reescrita.
-	{ activityDefinitionId: 'publico', fieldDefinitionId: 'publico_detail' }
+	{ activityDefinitionId: 'publico', fieldDefinitionId: 'publico_detail' },
+	// "Como é tratado hoje" (Stage 4A do rework, ver catalog/discovery.ts) —
+	// a atividade `estado_atual` deixou de ser required_fields;
+	// `estado_atual_detail` não é mais fonte de verdade (CurrentTreatment/
+	// TreatmentStep são, ver domain/state-types.ts). Snapshots exportados
+	// antes dessa mudança ainda carregam essa Answer — ela continua legível,
+	// nunca reescrita.
+	{ activityDefinitionId: 'estado_atual', fieldDefinitionId: 'estado_atual_detail' }
 ];
 
 export function isDeprecatedAnswerField(activityDefinitionId: string, fieldDefinitionId: string): boolean {

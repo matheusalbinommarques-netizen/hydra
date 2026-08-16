@@ -427,11 +427,8 @@ describe('createProjectUseCases — answerActivity', () => {
 		await useCases.setAffectedGroupImpact({ projectId, groupId, impact: 'alto' });
 		await useCases.setAffectedGroupFrequency({ projectId, groupId, frequency: 'constante' });
 		await useCases.confirmAffectedGroups({ projectId });
-		await useCases.answerActivity({
-			projectId,
-			activityDefinitionId: 'estado_atual',
-			values: { estado_atual_detail: 'x' }
-		});
+		await useCases.addTreatmentStep({ projectId, whatHappens: 'x' });
+		await useCases.confirmTreatment({ projectId });
 		await useCases.answerActivity({
 			projectId,
 			activityDefinitionId: 'resultado',
@@ -1221,7 +1218,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 });
 
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
-	it('o registro persistido contém só os 8 tipos de domínio', async () => {
+	it('o registro persistido contém só os 10 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1243,12 +1240,14 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'impediments',
 				'affectedGroups',
 				'externalActions',
-				'evidences'
+				'evidences',
+				'currentTreatment',
+				'treatmentSteps'
 			].sort()
 		);
 	});
 
-	it('ProjectView contém só os 22 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 25 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1278,7 +1277,10 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',
-				'evidences'
+				'evidences',
+				'currentTreatment',
+				'treatmentSteps',
+				'treatmentConfirmationIssues'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');
@@ -1554,6 +1556,111 @@ describe('createProjectUseCases — Validação Externa (ETAPA 3, ExternalAction
 		expect(await useCases.removeAffectedGroup({ projectId, groupId })).toEqual({
 			ok: false,
 			error: { kind: 'affected_group_has_references' }
+		});
+	});
+});
+
+describe('createProjectUseCases — "Como é tratado hoje" (Stage 4A do rework)', () => {
+	async function newProject(clock = '2026-01-01T00:00:00.000Z') {
+		const ctx = setup(clock);
+		const created = await ctx.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		return { ...ctx, projectId: created.value.projectId };
+	}
+
+	it('addTreatmentStep cria um passo e reflete em ProjectView.treatmentSteps/treatmentConfirmationIssues', async () => {
+		const { useCases, projectId } = await newProject();
+		const result = await useCases.addTreatmentStep({ projectId, whatHappens: 'Financeiro confere manualmente' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.treatmentSteps).toEqual([
+			{
+				id: expect.any(String),
+				order: 0,
+				whatHappens: 'Financeiro confere manualmente',
+				actors: [],
+				medium: null,
+				frictions: []
+			}
+		]);
+		expect(result.value.currentTreatment).toEqual({ noTreatment: false });
+		expect(result.value.treatmentConfirmationIssues).toEqual([]);
+	});
+
+	it('setTreatmentStepActors/Medium/toggleTreatmentStepFriction refletem em ProjectView', async () => {
+		const { useCases, projectId } = await newProject();
+		const added = await useCases.addTreatmentStep({ projectId, whatHappens: 'Passo' });
+		if (!added.ok) throw new Error('esperado ok');
+		const stepId = added.value.treatmentSteps[0].id;
+
+		const withActors = await useCases.setTreatmentStepActors({ projectId, stepId, actors: ['Financeiro', 'Gestor'] });
+		if (!withActors.ok) throw new Error('esperado ok');
+		expect(withActors.value.treatmentSteps[0].actors).toEqual(['Financeiro', 'Gestor']);
+
+		const withMedium = await useCases.setTreatmentStepMedium({ projectId, stepId, medium: 'Planilha' });
+		if (!withMedium.ok) throw new Error('esperado ok');
+		expect(withMedium.value.treatmentSteps[0].medium).toBe('Planilha');
+
+		const withFriction = await useCases.toggleTreatmentStepFriction({ projectId, stepId, friction: 'espera' });
+		if (!withFriction.ok) throw new Error('esperado ok');
+		expect(withFriction.value.treatmentSteps[0].frictions).toEqual(['espera']);
+	});
+
+	it('moveTreatmentStep/removeTreatmentStep reordenam e removem a cadeia', async () => {
+		const { useCases, projectId } = await newProject();
+		const first = await useCases.addTreatmentStep({ projectId, whatHappens: 'Primeiro' });
+		if (!first.ok) throw new Error('esperado ok');
+		const second = await useCases.addTreatmentStep({ projectId, whatHappens: 'Segundo' });
+		if (!second.ok) throw new Error('esperado ok');
+		const [firstId, secondId] = second.value.treatmentSteps.map((s) => s.id);
+
+		const moved = await useCases.moveTreatmentStep({ projectId, stepId: secondId, direction: -1 });
+		if (!moved.ok) throw new Error('esperado ok');
+		expect(moved.value.treatmentSteps.map((s) => s.id)).toEqual([secondId, firstId]);
+
+		const removed = await useCases.removeTreatmentStep({ projectId, stepId: firstId });
+		if (!removed.ok) throw new Error('esperado ok');
+		expect(removed.value.treatmentSteps.map((s) => s.id)).toEqual([secondId]);
+	});
+
+	it('setTreatmentNoTreatment(true) limpa os passos existentes; confirmTreatment conclui "estado_atual"', async () => {
+		const { useCases, projectId } = await newProject();
+		const added = await useCases.addTreatmentStep({ projectId, whatHappens: 'Passo' });
+		if (!added.ok) throw new Error('esperado ok');
+
+		const none = await useCases.setTreatmentNoTreatment({ projectId, noTreatment: true });
+		if (!none.ok) throw new Error('esperado ok');
+		expect(none.value.currentTreatment).toEqual({ noTreatment: true });
+		expect(none.value.treatmentSteps).toEqual([]);
+
+		const confirmed = await useCases.confirmTreatment({ projectId });
+		expect(confirmed.ok).toBe(true);
+		if (!confirmed.ok) return;
+		expect(confirmed.value.activityStatuses.estado_atual).toBe('concluída');
+	});
+
+	it('confirmTreatment: treatment_confirmation_invalid quando vazio e não noTreatment', async () => {
+		const { useCases, projectId } = await newProject();
+		expect(await useCases.confirmTreatment({ projectId })).toEqual({
+			ok: false,
+			error: { kind: 'treatment_confirmation_invalid', issues: [{ kind: 'no_steps' }] }
+		});
+	});
+
+	it('removeTreatmentStep: treatment_step_not_found para id inexistente', async () => {
+		const { useCases, projectId } = await newProject();
+		expect(await useCases.removeTreatmentStep({ projectId, stepId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'treatment_step_not_found' }
+		});
+	});
+
+	it('project_not_found quando o projeto não existe (addTreatmentStep)', async () => {
+		const { useCases } = setup();
+		expect(await useCases.addTreatmentStep({ projectId: 'nao-existe', whatHappens: 'x' })).toEqual({
+			ok: false,
+			error: { kind: 'project_not_found' }
 		});
 	});
 });

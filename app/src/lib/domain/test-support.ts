@@ -9,11 +9,13 @@
 import {
 	addAffectedGroup,
 	addScopeItem,
+	addTreatmentStep,
 	answerActivity,
 	confirmAffectedGroups,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
+	confirmTreatment,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
 	setHypothesis,
@@ -120,6 +122,23 @@ export function confirmAffectedGroupsMinimally(
 }
 
 /**
+ * Confirma "Como é tratado hoje" (`estado_atual`, Stage 4A do rework) com o
+ * mínimo que satisfaz {@link getTreatmentConfirmationIssues}: um passo com
+ * `whatHappens` preenchido — para quando o teste só precisa que
+ * `estado_atual` fique `concluída`, sem se importar com o conteúdo da
+ * cadeia.
+ */
+export function confirmTreatmentMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	occurredAt: string
+): ProjectState {
+	const next = unwrapResult(addTreatmentStep(catalog, state, stepId, 'Passo de teste', occurredAt));
+	return unwrapResult(confirmTreatment(catalog, next, occurredAt));
+}
+
+/**
  * Completa todas as atividades de uma fase, na ordem do catálogo:
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
  * via `confirmSummary` (Resumo), `confirmPlanningPriority` (Priorizar
@@ -140,6 +159,8 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				next = unwrapResult(confirmPlanningPriority(catalog, next, occurredAt));
 			} else if (activity.id === 'publico') {
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
+			} else if (activity.id === 'estado_atual') {
+				next = confirmTreatmentMinimally(catalog, next, `${activity.id}-treatment-step-1`, occurredAt);
 			} else {
 				next = unwrapResult(confirmSummary(catalog, next));
 			}

@@ -30,6 +30,8 @@ export function createInitialProjectState(
 		impediments: [],
 		affectedGroups: [],
 		externalActions: [],
-		evidences: []
+		evidences: [],
+		currentTreatment: { projectId, noTreatment: false, updatedAt: createdAt },
+		treatmentSteps: []
 	};
 }

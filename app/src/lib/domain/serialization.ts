@@ -10,6 +10,7 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	Answer,
+	CurrentTreatment,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -24,11 +25,17 @@ import type {
 	ScopeEffort,
 	ScopeExecutionStatus,
 	ScopeItem,
-	ScopeVersion
+	ScopeVersion,
+	TreatmentFriction,
+	TreatmentStep
 } from './state-types';
 import type { Result } from './result';
 import { isDeprecatedAnswerField } from './legacy-answers';
-import { getAffectedGroupConfirmationIssues, getScopeConfirmationIssues } from './transitions';
+import {
+	getAffectedGroupConfirmationIssues,
+	getScopeConfirmationIssues,
+	getTreatmentConfirmationIssues
+} from './transitions';
 
 export interface ExportedProjectState {
 	version: 1;
@@ -466,6 +473,62 @@ function parseEvidenceList(value: unknown): Result<Evidence[], ProjectStateParse
 	return { ok: true, value: result };
 }
 
+function parseCurrentTreatment(value: unknown): Result<CurrentTreatment, ProjectStateParseError> {
+	if (!isRecord(value)) return shapeError('currentTreatment deve ser um objeto');
+	if (!isString(value.projectId)) return shapeError('CurrentTreatment.projectId deve ser uma string');
+	if (typeof value.noTreatment !== 'boolean') return shapeError('CurrentTreatment.noTreatment deve ser um booleano');
+	if (!isIsoDateString(value.updatedAt)) {
+		return shapeError('CurrentTreatment.updatedAt deve ser uma data ISO 8601 válida');
+	}
+	return { ok: true, value: { projectId: value.projectId, noTreatment: value.noTreatment, updatedAt: value.updatedAt } };
+}
+
+const TREATMENT_FRICTIONS: readonly string[] = ['espera', 'retrabalho', 'improviso', 'trava'];
+function isTreatmentFriction(value: unknown): value is TreatmentFriction {
+	return typeof value === 'string' && TREATMENT_FRICTIONS.includes(value);
+}
+function isTreatmentFrictionArray(value: unknown): value is TreatmentFriction[] {
+	return Array.isArray(value) && value.every(isTreatmentFriction);
+}
+
+function parseTreatmentStepList(value: unknown): Result<TreatmentStep[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('treatmentSteps deve ser um array');
+	const result: TreatmentStep[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada TreatmentStep deve ser um objeto');
+		if (!isString(item.id)) return shapeError('TreatmentStep.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('TreatmentStep.projectId deve ser uma string');
+		if (typeof item.order !== 'number' || !Number.isInteger(item.order) || item.order < 0) {
+			return shapeError('TreatmentStep.order deve ser um inteiro não negativo');
+		}
+		if (!isString(item.whatHappens) || item.whatHappens.trim().length === 0) {
+			return shapeError('TreatmentStep.whatHappens deve ser uma string não vazia');
+		}
+		if (!isStringArray(item.actors)) return shapeError('TreatmentStep.actors deve ser um array de strings');
+		if (item.medium !== null && !isString(item.medium)) {
+			return shapeError('TreatmentStep.medium deve ser string ou null');
+		}
+		if (!isTreatmentFrictionArray(item.frictions)) {
+			return shapeError('TreatmentStep.frictions deve ser um array dos literais aprovados');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('TreatmentStep.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('TreatmentStep.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			order: item.order,
+			whatHappens: item.whatHappens,
+			actors: item.actors,
+			medium: item.medium as string | null,
+			frictions: item.frictions,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -489,7 +552,9 @@ function assembleProjectState(
 	impediments: Impediment[],
 	affectedGroups: AffectedGroup[],
 	externalActions: ExternalAction[],
-	evidences: Evidence[]
+	evidences: Evidence[],
+	currentTreatment: CurrentTreatment,
+	treatmentSteps: TreatmentStep[]
 ): Result<ProjectState, ProjectStateParseError> {
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
@@ -828,6 +893,59 @@ function assembleProjectState(
 		}
 	}
 
+	// referência + invariante: CurrentTreatment — 1:1 com Project (mesmo
+	// padrão de ScopeVersion).
+	if (currentTreatment.projectId !== project.id) {
+		return invariantError('CurrentTreatment usa projectId diferente do Project');
+	}
+
+	// referências + invariantes: TreatmentStep — order 0-based contíguo
+	// (mesma regra dos itens de "agora" em ScopeItem acima).
+	const seenTreatmentStepIds = new Set<string>();
+	for (const step of treatmentSteps) {
+		if (step.projectId !== project.id) {
+			return invariantError(`TreatmentStep "${step.id}" usa projectId diferente do Project`);
+		}
+		if (seenTreatmentStepIds.has(step.id)) {
+			return invariantError(`TreatmentStep.id duplicado: "${step.id}"`);
+		}
+		seenTreatmentStepIds.add(step.id);
+	}
+	const treatmentStepOrders = treatmentSteps.map((step) => step.order).sort((a, b) => a - b);
+	for (let i = 0; i < treatmentStepOrders.length; i++) {
+		if (treatmentStepOrders[i] !== i) {
+			return invariantError('Os passos de treatmentSteps não têm order contíguo começando em 0');
+		}
+	}
+
+	// invariante canônica crítica (HYDRA_PRODUCT_REWORK.md §34): o estado
+	// persistido nunca tem noTreatment=true com passos ativos ao mesmo
+	// tempo — nunca os dois.
+	if (currentTreatment.noTreatment && treatmentSteps.length > 0) {
+		return invariantError('CurrentTreatment.noTreatment é true mas existem treatmentSteps ativos — mutuamente exclusivos');
+	}
+
+	// invariante: se "estado_atual" está concluída, o tratamento precisa
+	// atender aos critérios de confirmação (mesmo padrão de
+	// ScopeVersion.confirmedAt/AffectedGroup acima) — EXCETO quando a
+	// conclusão vem de um snapshot legado (Answer READ-LEGACY de
+	// estado_atual_detail presente): nesse caso "estado_atual" foi
+	// concluída pelo mecanismo antigo (required_fields), antes de
+	// CurrentTreatment existir.
+	const hasLegacyEstadoAtualDetail = answers.some(
+		(answer) => answer.activityDefinitionId === 'estado_atual' && answer.fieldDefinitionId === 'estado_atual_detail'
+	);
+	const estadoAtualProgress = activityProgress.find((progress) => progress.activityDefinitionId === 'estado_atual');
+	if (estadoAtualProgress?.status === 'concluída' && !hasLegacyEstadoAtualDetail) {
+		const issues = getTreatmentConfirmationIssues(currentTreatment.noTreatment, treatmentSteps);
+		if (issues.length > 0) {
+			const issueKinds = issues.map((issue) => issue.kind).join(', ');
+			return invariantError(
+				`Atividade "estado_atual" está concluída mas "Como é tratado hoje" não atende aos critérios de confirmação: ${issueKinds}`
+			);
+		}
+	}
+
 	return {
 		ok: true,
 		value: {
@@ -840,7 +958,9 @@ function assembleProjectState(
 			impediments,
 			affectedGroups,
 			externalActions,
-			evidences
+			evidences,
+			currentTreatment,
+			treatmentSteps
 		}
 	};
 }
@@ -907,6 +1027,24 @@ export function deserializeProjectState(
 	const evidencesResult = parseEvidenceList(state.evidences);
 	if (!evidencesResult.ok) return evidencesResult;
 
+	// currentTreatment é 1:1 com o projeto, mas não existia antes do Stage 4A
+	// do rework — snapshots exportados antes dessa mudança não têm essa
+	// chave. Mesmo espírito de READ-LEGACY: um snapshot antigo é
+	// reconstruído com o mesmo estado inicial que createInitialProjectState
+	// sempre produziu (noTreatment: false, sem passos), nunca inferido do
+	// conteúdo do snapshot.
+	const currentTreatmentResult =
+		state.currentTreatment === undefined
+			? ({
+					ok: true,
+					value: { projectId: projectResult.value.id, noTreatment: false, updatedAt: projectResult.value.createdAt }
+				} as const)
+			: parseCurrentTreatment(state.currentTreatment);
+	if (!currentTreatmentResult.ok) return currentTreatmentResult;
+
+	const treatmentStepsResult = parseTreatmentStepList(state.treatmentSteps);
+	if (!treatmentStepsResult.ok) return treatmentStepsResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
@@ -918,6 +1056,8 @@ export function deserializeProjectState(
 		impedimentsResult.value,
 		affectedGroupsResult.value,
 		externalActionsResult.value,
-		evidencesResult.value
+		evidencesResult.value,
+		currentTreatmentResult.value,
+		treatmentStepsResult.value
 	);
 }

@@ -9,18 +9,22 @@ import {
 	addAffectedGroup as addAffectedGroupInDomain,
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
+	addTreatmentStep as addTreatmentStepInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
+	confirmTreatment as confirmTreatmentInDomain,
 	createInitialProjectState,
 	deserializeProjectState,
 	moveScopeItem as moveScopeItemInDomain,
+	moveTreatmentStep as moveTreatmentStepInDomain,
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeScopeItem as removeScopeItemInDomain,
+	removeTreatmentStep as removeTreatmentStepInDomain,
 	renameProject as renameProjectInDomain,
 	reopenImpediment as reopenImpedimentInDomain,
 	reorderAgoraItems as reorderAgoraItemsInDomain,
@@ -35,7 +39,11 @@ import {
 	setScopeItemEffort as setScopeItemEffortInDomain,
 	setScopeItemExecutionStatus as setScopeItemExecutionStatusInDomain,
 	setScopeItemText as setScopeItemTextInDomain,
-	skipActivity as skipActivityInDomain
+	setTreatmentNoTreatment as setTreatmentNoTreatmentInDomain,
+	setTreatmentStepActors as setTreatmentStepActorsInDomain,
+	setTreatmentStepMedium as setTreatmentStepMediumInDomain,
+	skipActivity as skipActivityInDomain,
+	toggleTreatmentStepFriction as toggleTreatmentStepFrictionInDomain
 } from '$lib/domain';
 import { buildExternalActionPreparation } from '$lib/catalog/external-action';
 import type { ProjectRepository } from '../persistence';
@@ -45,19 +53,23 @@ import type {
 	AddAffectedGroupInput,
 	AddImpedimentInput,
 	AddScopeItemInput,
+	AddTreatmentStepInput,
 	AnswerActivityInput,
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
+	ConfirmTreatmentInput,
 	CreateConfiguredProjectInput,
 	MoveScopeItemInput,
+	MoveTreatmentStepInput,
 	PrepareExternalActionInput,
 	ProjectListItem,
 	ProjectUseCases,
 	RemoveAffectedGroupInput,
 	RemoveScopeItemInput,
+	RemoveTreatmentStepInput,
 	RenameProjectInput,
 	ReopenImpedimentInput,
 	ReorderAgoraItemsInput,
@@ -71,7 +83,11 @@ import type {
 	SetScopeItemEffortInput,
 	SetScopeItemExecutionStatusInput,
 	SetScopeItemTextInput,
+	SetTreatmentNoTreatmentInput,
+	SetTreatmentStepActorsInput,
+	SetTreatmentStepMediumInput,
 	SkipActivityInput,
+	ToggleTreatmentStepFrictionInput,
 	UseCaseOutcome
 } from './types';
 import type { ProjectView } from './types';
@@ -155,6 +171,16 @@ function computeLastMovementAt(state: ProjectState): string | null {
 	// Engine novo.
 	for (const action of state.externalActions) timestamps.push(action.updatedAt);
 	for (const evidence of state.evidences) timestamps.push(evidence.createdAt);
+	// "Como é tratado hoje" (Stage 4A do rework) — mesma extensão pequena e
+	// coerente já aplicada à Validação Externa acima: mutações reais do
+	// tratamento atual também são movimento do projeto. currentTreatment é
+	// 1:1 com o projeto e updatedAt já vem preenchido desde a criação (mesmo
+	// molde de ScopeVersion) — só entra aqui quando noTreatment é `true`
+	// (ação explícita do usuário); com passos, o timestamp de cada
+	// TreatmentStep abaixo já cobre o movimento, sem duplicar o mesmo
+	// instante.
+	if (state.currentTreatment.noTreatment) timestamps.push(state.currentTreatment.updatedAt);
+	for (const step of state.treatmentSteps) timestamps.push(step.updatedAt);
 	for (const pending of state.pendingItems) {
 		timestamps.push(pending.createdAt);
 		if (pending.status === 'resolvida') timestamps.push(pending.resolvedAt);
@@ -645,6 +671,96 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				input.learning,
 				clock.now()
 			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// "Como é tratado hoje" (Stage 4A do rework) — mesmo padrão dos casos de
+		// uso do Mapa de Impacto: cada interação persiste imediatamente.
+		async addTreatmentStep(input: AddTreatmentStepInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addTreatmentStepInDomain(catalog, state, idGenerator.generate(), input.whatHappens, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeTreatmentStep(input: RemoveTreatmentStepInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeTreatmentStepInDomain(catalog, state, input.stepId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async moveTreatmentStep(input: MoveTreatmentStepInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = moveTreatmentStepInDomain(catalog, state, input.stepId, input.direction, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setTreatmentStepActors(input: SetTreatmentStepActorsInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setTreatmentStepActorsInDomain(catalog, state, input.stepId, input.actors, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setTreatmentStepMedium(input: SetTreatmentStepMediumInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setTreatmentStepMediumInDomain(catalog, state, input.stepId, input.medium, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async toggleTreatmentStepFriction(input: ToggleTreatmentStepFrictionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = toggleTreatmentStepFrictionInDomain(catalog, state, input.stepId, input.friction, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setTreatmentNoTreatment(input: SetTreatmentNoTreatmentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setTreatmentNoTreatmentInDomain(catalog, state, input.noTreatment, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmTreatment(input: ConfirmTreatmentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmTreatmentInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

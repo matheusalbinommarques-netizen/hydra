@@ -146,9 +146,12 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
 		await page.getByRole('button', { name: 'Concluir mapa' }).click();
 
-		await answerAndContinue(page, {
-			estado: { label: 'Como a situação é tratada hoje, em detalhe?', value: 'Estado atual de teste do Mapa.' }
-		});
+		// "Como é tratado hoje" (Stage 4A do rework) também não é mais
+		// required_fields — não passa por answerAndContinue.
+		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
+		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Estado atual de teste do Mapa.');
+		await page.getByRole('button', { name: 'Adicionar' }).click();
+		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
 		await answerAndContinue(page, {
 			mudanca: {

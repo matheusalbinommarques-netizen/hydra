@@ -59,8 +59,9 @@ async function completeDiscovery(page: Page): Promise<void> {
 	await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
 	await page.getByRole('button', { name: 'Concluir mapa' }).click();
 
-	await page.getByLabel('Como a situação é tratada hoje, em detalhe?').fill('Estado atual de teste.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByPlaceholder('Descrever em poucas palavras…').fill('Estado atual de teste.');
+	await page.getByRole('button', { name: 'Adicionar' }).click();
+	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
 	await page.getByLabel('O que deverá estar diferente quando este projeto tiver sucesso?').fill('Resultado de teste.');
 	await page.getByLabel('Quem é o principal beneficiário?').fill('Beneficiário de teste.');

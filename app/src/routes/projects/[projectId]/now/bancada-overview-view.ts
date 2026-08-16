@@ -10,6 +10,8 @@ import type { Catalog } from '$lib/domain';
 import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
 import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
 import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
+import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
+import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
 
 export interface BancadaOverviewBlock {
 	activityId: string;
@@ -38,14 +40,14 @@ const BANCADA_PHASE_IDS = ['descoberta', 'definicao', 'estruturacao'];
 // restricoes_premissas), o campo escolhido é o que mais de perto responde
 // à mainQuestion da atividade — mesmo critério já usado em "resultado"
 // (mudanca, não beneficiario/percepcao).
-// `publico` não entra aqui — deixou de ser Answer-driven (ETAPA 2 do
-// rework, ver catalog/discovery.ts) e ganha tratamento próprio em
-// buildBancadaOverviewView a partir de AffectedGroup, não deste mapa
-// genérico de heading/valueFieldId.
+// `publico`/`estado_atual` não entram aqui — deixaram de ser Answer-driven
+// (ETAPA 2 e Stage 4A do rework, ver catalog/discovery.ts) e ganham
+// tratamento próprio em buildBancadaOverviewView a partir de
+// AffectedGroup/CurrentTreatment, não deste mapa genérico de
+// heading/valueFieldId.
 const BLOCK_SPECS: Record<string, { heading: string; valueFieldId: string; chipsFieldId?: string }> = {
 	origem: { heading: 'Origem do projeto', valueFieldId: 'origem' },
 	problema: { heading: 'Situação', valueFieldId: 'situacao', chipsFieldId: 'situacao_o_que' },
-	estado_atual: { heading: 'Estado atual', valueFieldId: 'estado_atual_detail' },
 	resultado: { heading: 'Resultado desejado', valueFieldId: 'mudanca' },
 	usuario_principal: { heading: 'Usuário principal', valueFieldId: 'usuario_principal' },
 	visao_produto: { heading: 'Visão do produto', valueFieldId: 'necessidade_central' },
@@ -75,7 +77,9 @@ export function buildBancadaOverviewView(
 	catalog: Catalog,
 	answers: Record<string, string>,
 	affectedGroups: AffectedGroupSummaryInput[] = [],
-	evidences: readonly { affectedGroupId: string }[] = []
+	evidences: readonly { affectedGroupId: string }[] = [],
+	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
+	treatmentSteps: TreatmentStepSynthesisInput[] = []
 ): BancadaOverviewView {
 	const blocks: BancadaOverviewBlock[] = [];
 
@@ -102,6 +106,17 @@ export function buildBancadaOverviewView(
 							? `${summarizeAffectedGroups(affectedGroups)} ${evidenceSummary}`
 							: summarizeAffectedGroups(affectedGroups),
 						chips: affectedGroups.map((group) => group.label)
+					});
+				}
+				continue;
+			}
+
+			if (activity.id === 'estado_atual') {
+				if (currentTreatment.noTreatment || treatmentSteps.length > 0) {
+					blocks.push({
+						activityId: 'estado_atual',
+						heading: 'Como é tratado hoje',
+						value: `${treatmentStepCountLabel(currentTreatment.noTreatment, treatmentSteps.length)}. ${summarizeCurrentTreatment(currentTreatment.noTreatment, treatmentSteps)}`.trim()
 					});
 				}
 				continue;

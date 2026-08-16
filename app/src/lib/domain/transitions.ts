@@ -8,6 +8,7 @@ import type {
 	AffectedGroup,
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
+	CurrentTreatment,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -19,7 +20,9 @@ import type {
 	ScopeEffort,
 	ScopeExecutionStatus,
 	ScopeItem,
-	ScopeVersion
+	ScopeVersion,
+	TreatmentFriction,
+	TreatmentStep
 } from './state-types';
 import type { Result } from './result';
 import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
@@ -57,7 +60,9 @@ export type DomainTransitionError =
 	| { kind: 'external_action_not_found' }
 	| { kind: 'external_action_duplicate_open' }
 	| { kind: 'external_action_not_open' }
-	| { kind: 'evidence_learning_required' };
+	| { kind: 'evidence_learning_required' }
+	| { kind: 'treatment_step_not_found' }
+	| { kind: 'treatment_confirmation_invalid'; issues: TreatmentConfirmationIssue[] };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -1113,4 +1118,263 @@ export function completeExternalAction(
 			)
 		}
 	};
+}
+
+// --- CurrentTreatment / TreatmentStep — "Como é tratado hoje" (Stage 4A do
+// rework, ver docs/core/HYDRA_PRODUCT_REWORK.md §34) ------------------------
+//
+// Mesmo espírito de AffectedGroup: ligada à atividade `estado_atual` do
+// catálogo (completionMode explicit_confirmation) — qualquer mutação que
+// torne o tratamento novamente incompleto reabre a atividade se ela já
+// estava concluída, e invalida o Resumo da descoberta já confirmado (mesmo
+// afterAffectedGroupsMutation acima).
+
+export type TreatmentConfirmationIssue = { kind: 'no_steps' };
+
+const CURRENT_TREATMENT_ACTIVITY_ID = 'estado_atual';
+
+/**
+ * Retorna os motivos pelos quais "Como é tratado hoje" ainda não pode ser
+ * concluída (array vazio = pode concluir). `noTreatment: true` sempre
+ * satisfaz (é um estado terminal legítimo, não uma ausência de resposta);
+ * caso contrário exige pelo menos um passo — um passo vazio nunca existe no
+ * estado persistido (whatHappens é validado não-vazio em addTreatmentStep),
+ * então "passo vazio não conta" já é garantido estruturalmente, sem checagem
+ * extra aqui.
+ */
+export function getTreatmentConfirmationIssues(
+	noTreatment: boolean,
+	steps: readonly TreatmentStep[]
+): TreatmentConfirmationIssue[] {
+	if (noTreatment) return [];
+	return steps.length === 0 ? [{ kind: 'no_steps' }] : [];
+}
+
+function findTreatmentStep(state: ProjectState, stepId: string): TreatmentStep | undefined {
+	return state.treatmentSteps.find((step) => step.id === stepId);
+}
+
+function invalidateTreatmentConfirmation(catalog: Catalog, state: ProjectState): ProjectState {
+	const activity = findActivityDefinition(catalog, CURRENT_TREATMENT_ACTIVITY_ID);
+	if (!activity) return state;
+	const progress = findActivityProgress(state, activity.id);
+	if (progress?.status !== 'concluída') return state;
+	if (getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps).length === 0) {
+		return state;
+	}
+	return setActivityStatus(state, activity.id, 'em_andamento');
+}
+
+function afterTreatmentMutation(catalog: Catalog, state: ProjectState): ProjectState {
+	let next = invalidateTreatmentConfirmation(catalog, state);
+	if (shouldInvalidateSummary(catalog, next, { kind: 'answer', activityDefinitionId: CURRENT_TREATMENT_ACTIVITY_ID })) {
+		next = invalidateSummary(catalog, next);
+	}
+	return next;
+}
+
+/**
+ * Adiciona um passo ao final da cadeia (order = length atual) e desliga
+ * `noTreatment` na mesma transição — invariante canônica garantida aqui, sem
+ * depender da UI enviar um toggle separado (ver CurrentTreatment em
+ * state-types.ts). `whatHappens` vazio é rejeitado (único dado obrigatório
+ * do passo).
+ */
+export function addTreatmentStep(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	whatHappens: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const trimmed = whatHappens.trim();
+	if (trimmed.length === 0) return { ok: false, error: { kind: 'invalid_field_value', fieldDefinitionId: 'whatHappens' } };
+
+	const step: TreatmentStep = {
+		id: stepId,
+		projectId: state.project.id,
+		order: state.treatmentSteps.length,
+		whatHappens: trimmed,
+		actors: [],
+		medium: null,
+		frictions: [],
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	const next = afterTreatmentMutation(catalog, {
+		...state,
+		currentTreatment: { ...state.currentTreatment, noTreatment: false, updatedAt: occurredAt },
+		treatmentSteps: [...state.treatmentSteps, step]
+	});
+	return { ok: true, value: next };
+}
+
+export function removeTreatmentStep(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const step = findTreatmentStep(state, stepId);
+	if (!step) return { ok: false, error: { kind: 'treatment_step_not_found' } };
+
+	const remaining = state.treatmentSteps
+		.filter((item) => item.id !== stepId)
+		.sort((a, b) => a.order - b.order)
+		.map((item, index) => (item.order === index ? item : { ...item, order: index, updatedAt: occurredAt }));
+
+	const next = afterTreatmentMutation(catalog, { ...state, treatmentSteps: remaining });
+	return { ok: true, value: next };
+}
+
+/**
+ * Move um passo uma posição para cima (-1) ou para baixo (+1) — troca de
+ * `order` com o vizinho adjacente, nunca reescreve a lista inteira. Fora dos
+ * limites (primeiro subindo, último descendo) é um no-op silencioso, mesmo
+ * espírito de moveScopeItem/moveImpediment não existirem — a interface já
+ * desabilita o botão nesses casos (isFirst/isLast).
+ */
+export function moveTreatmentStep(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	direction: -1 | 1,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const step = findTreatmentStep(state, stepId);
+	if (!step) return { ok: false, error: { kind: 'treatment_step_not_found' } };
+
+	const targetOrder = step.order + direction;
+	const neighbor = state.treatmentSteps.find((item) => item.order === targetOrder);
+	if (!neighbor) return { ok: true, value: state };
+
+	const next = afterTreatmentMutation(catalog, {
+		...state,
+		treatmentSteps: state.treatmentSteps.map((item) => {
+			if (item.id === step.id) return { ...item, order: targetOrder, updatedAt: occurredAt };
+			if (item.id === neighbor.id) return { ...item, order: step.order, updatedAt: occurredAt };
+			return item;
+		})
+	});
+	return { ok: true, value: next };
+}
+
+export function setTreatmentStepActors(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	actors: string[],
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const step = findTreatmentStep(state, stepId);
+	if (!step) return { ok: false, error: { kind: 'treatment_step_not_found' } };
+
+	const cleaned = actors.map((actor) => actor.trim()).filter((actor) => actor.length > 0);
+	const next = afterTreatmentMutation(catalog, {
+		...state,
+		treatmentSteps: state.treatmentSteps.map((item) =>
+			item.id === stepId ? { ...item, actors: cleaned, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function setTreatmentStepMedium(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	medium: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const step = findTreatmentStep(state, stepId);
+	if (!step) return { ok: false, error: { kind: 'treatment_step_not_found' } };
+
+	const cleaned = medium && medium.trim().length > 0 ? medium.trim() : null;
+	const next = afterTreatmentMutation(catalog, {
+		...state,
+		treatmentSteps: state.treatmentSteps.map((item) =>
+			item.id === stepId ? { ...item, medium: cleaned, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function toggleTreatmentStepFriction(
+	catalog: Catalog,
+	state: ProjectState,
+	stepId: string,
+	friction: TreatmentFriction,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const step = findTreatmentStep(state, stepId);
+	if (!step) return { ok: false, error: { kind: 'treatment_step_not_found' } };
+
+	const next = afterTreatmentMutation(catalog, {
+		...state,
+		treatmentSteps: state.treatmentSteps.map((item) =>
+			item.id === stepId
+				? {
+						...item,
+						frictions: item.frictions.includes(friction)
+							? item.frictions.filter((f) => f !== friction)
+							: [...item.frictions, friction],
+						updatedAt: occurredAt
+					}
+				: item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+/**
+ * Liga/desliga "Hoje não existe um tratamento definido". Ligar (`true`)
+ * remove todos os passos existentes na mesma transição — a invariante
+ * canônica (nunca noTreatment=true com passos ativos) nunca fica pendente de
+ * um segundo passo separado; desligar (`false`) só limpa o flag, os passos
+ * continuam vazios (o usuário descreve de novo, ver
+ * HYDRA_PRODUCT_REWORK.md §34, "voltar e descrever").
+ */
+export function setTreatmentNoTreatment(
+	catalog: Catalog,
+	state: ProjectState,
+	noTreatment: boolean,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (state.currentTreatment.noTreatment === noTreatment) return { ok: true, value: state };
+
+	const next = afterTreatmentMutation(catalog, {
+		...state,
+		currentTreatment: { ...state.currentTreatment, noTreatment, updatedAt: occurredAt },
+		treatmentSteps: noTreatment ? [] : state.treatmentSteps
+	});
+	return { ok: true, value: next };
+}
+
+export function confirmTreatment(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, CURRENT_TREATMENT_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	const issues = getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps);
+	if (issues.length > 0) {
+		return { ok: false, error: { kind: 'treatment_confirmation_invalid', issues } };
+	}
+
+	let next = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		next = resolvePendingItem(next, activity.id, occurredAt);
+	}
+	return { ok: true, value: next };
 }

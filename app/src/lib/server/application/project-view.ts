@@ -2,7 +2,7 @@
 // interno; nunca expõe ProjectState bruto (ver contracts.md §10).
 
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
-import { getAffectedGroupConfirmationIssues, getScopeConfirmationIssues } from '$lib/domain';
+import { getAffectedGroupConfirmationIssues, getScopeConfirmationIssues, getTreatmentConfirmationIssues } from '$lib/domain';
 import {
 	computeCriteriaScopeConflict,
 	computeFieldSuggestions,
@@ -12,12 +12,14 @@ import {
 } from '$lib/orientation-engine';
 import type {
 	AffectedGroupView,
+	CurrentTreatmentView,
 	EvidenceView,
 	ExternalActionView,
 	ImpedimentView,
 	PendingItemHistoryView,
 	ProjectView,
-	ScopeItemView
+	ScopeItemView,
+	TreatmentStepView
 } from './types';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
@@ -110,6 +112,21 @@ function buildExternalActionView(action: ProjectState['externalActions'][number]
 	};
 }
 
+function buildTreatmentStepView(step: ProjectState['treatmentSteps'][number]): TreatmentStepView {
+	return {
+		id: step.id,
+		order: step.order,
+		whatHappens: step.whatHappens,
+		actors: step.actors,
+		medium: step.medium,
+		frictions: step.frictions
+	};
+}
+
+function buildCurrentTreatmentView(currentTreatment: ProjectState['currentTreatment']): CurrentTreatmentView {
+	return { noTreatment: currentTreatment.noTreatment };
+}
+
 function buildEvidenceView(evidence: ProjectState['evidences'][number]): EvidenceView {
 	return {
 		id: evidence.id,
@@ -158,6 +175,9 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
 		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups),
 		externalActions: state.externalActions.map(buildExternalActionView),
-		evidences: state.evidences.map(buildEvidenceView)
+		evidences: state.evidences.map(buildEvidenceView),
+		currentTreatment: buildCurrentTreatmentView(state.currentTreatment),
+		treatmentSteps: state.treatmentSteps.map(buildTreatmentStepView).sort((a, b) => a.order - b.order),
+		treatmentConfirmationIssues: getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps)
 	};
 }

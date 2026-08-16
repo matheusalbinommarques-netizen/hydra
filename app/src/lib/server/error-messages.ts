@@ -53,6 +53,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Esta ação já foi concluída.';
 		case 'evidence_learning_required':
 			return 'Descreva o que você aprendeu antes de salvar a evidência.';
+		case 'treatment_step_not_found':
+			return 'Passo não encontrado.';
+		case 'treatment_confirmation_invalid':
+			return 'Adicione ao menos um passo ou marque "Hoje não existe um tratamento definido" antes de continuar.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

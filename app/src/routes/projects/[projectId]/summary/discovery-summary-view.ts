@@ -10,6 +10,8 @@ import type { PendingItemView } from '$lib/orientation-engine';
 import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
 import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
 import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
+import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
+import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
 
 export interface DiscoveryOverviewBlock {
 	activityId: string;
@@ -53,7 +55,9 @@ export function buildDiscoverySummaryView(
 	answers: Record<string, string>,
 	activityStatuses: Record<string, ActivityStatus>,
 	affectedGroups: AffectedGroupSummaryInput[] = [],
-	evidences: readonly { affectedGroupId: string }[] = []
+	evidences: readonly { affectedGroupId: string }[] = [],
+	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
+	treatmentSteps: TreatmentStepSynthesisInput[] = []
 ): DiscoverySummaryView {
 	const overview: DiscoveryOverviewBlock[] = [];
 
@@ -89,13 +93,12 @@ export function buildDiscoverySummaryView(
 		});
 	}
 
-	const estadoAtualDetail = answers['estado_atual_detail'];
-	if (estadoAtualDetail) {
+	if (currentTreatment.noTreatment || treatmentSteps.length > 0) {
 		overview.push({
 			activityId: 'estado_atual',
-			heading: 'Estado atual',
-			editLabel: 'Editar estado atual',
-			value: estadoAtualDetail
+			heading: 'Como é tratado hoje',
+			editLabel: 'Editar como é tratado hoje',
+			value: `${treatmentStepCountLabel(currentTreatment.noTreatment, treatmentSteps.length)}. ${summarizeCurrentTreatment(currentTreatment.noTreatment, treatmentSteps)}`.trim()
 		});
 	}
 
@@ -112,7 +115,7 @@ export function buildDiscoverySummaryView(
 	const checklist: DiscoveryChecklistItem[] = [
 		{ label: 'Problema definido', complete: activityStatuses['problema'] === 'concluída' },
 		{ label: 'Público definido', complete: activityStatuses['publico'] === 'concluída' },
-		{ label: 'Estado atual definido', complete: activityStatuses['estado_atual'] === 'concluída' },
+		{ label: 'Como é tratado hoje definido', complete: activityStatuses['estado_atual'] === 'concluída' },
 		{ label: 'Resultado definido', complete: activityStatuses['resultado'] === 'concluída' }
 	];
 

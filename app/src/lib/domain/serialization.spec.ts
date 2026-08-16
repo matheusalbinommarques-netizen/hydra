@@ -5,11 +5,13 @@ import {
 	addAffectedGroup,
 	addImpediment,
 	addScopeItem,
+	addTreatmentStep,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
+	confirmTreatment,
 	prepareExternalAction,
 	resolveImpediment,
 	setAffectedGroupFrequency,
@@ -18,6 +20,7 @@ import {
 	setImpedimentNextAction,
 	setRouteStartPhase,
 	setScopeItemEffort,
+	setTreatmentNoTreatment,
 	skipActivity
 } from './transitions';
 import { deserializeProjectState, serializeProjectState } from './serialization';
@@ -81,6 +84,8 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T2));
 	state = unwrap(setAffectedGroupFrequency(catalog, state, 'ag-1', 'constante', T2));
 	state = unwrap(confirmAffectedGroups(catalog, state, T2));
+	state = unwrap(addTreatmentStep(catalog, state, 'ts-1', 'Financeiro confere manualmente', T2));
+	state = unwrap(confirmTreatment(catalog, state, T2));
 	state = unwrap(confirmSummary(catalog, state));
 	state = unwrap(addScopeItem(catalog, state, 'scope-1', 'Criar projeto', 'agora', T1));
 	state = unwrap(addScopeItem(catalog, state, 'scope-2', 'Relatórios avançados', 'depois', T1));
@@ -991,5 +996,226 @@ describe('deserializeProjectState — ExternalAction / Evidence (ETAPA 3, "Valid
 		};
 		withWrongEvidence.state.evidences[0].projectId = 'outro-projeto';
 		expectError(JSON.stringify(withWrongEvidence), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores ao Stage 4A (sem currentTreatment/treatmentSteps)', () => {
+	it('trata state.currentTreatment ausente como { noTreatment: false } e treatmentSteps ausente como []', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		delete envelope.state.currentTreatment;
+		delete envelope.state.treatmentSteps;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.currentTreatment).toEqual({
+			projectId: result.value.project.id,
+			noTreatment: false,
+			updatedAt: result.value.project.createdAt
+		});
+		expect(result.value.treatmentSteps).toEqual([]);
+	});
+
+	it('continua rejeitando state.treatmentSteps: null', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		envelope.state.treatmentSteps = null;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — READ-LEGACY de estado_atual_detail (snapshot exportado antes do Stage 4A)', () => {
+	// Mesmo espírito do bloco publico_detail acima: simula um export legítimo
+	// feito ANTES do Stage 4A — "estado_atual" era required_fields, o usuário
+	// respondeu estado_atual_detail e a atividade ficou concluída por esse
+	// mecanismo, sem nenhum TreatmentStep (que não existia ainda).
+	function legacyEnvelopeWithEstadoAtualDetail(): {
+		state: {
+			project: { id: string };
+			answers: Array<Record<string, unknown>>;
+			activityProgress: Array<Record<string, unknown>>;
+			treatmentSteps: unknown[];
+		};
+	} {
+		const envelope = baseEnvelope() as {
+			state: {
+				project: { id: string };
+				answers: Array<Record<string, unknown>>;
+				activityProgress: Array<Record<string, unknown>>;
+				treatmentSteps: unknown[];
+			};
+		};
+		envelope.state.answers.push({
+			projectId: envelope.state.project.id,
+			activityDefinitionId: 'estado_atual',
+			fieldDefinitionId: 'estado_atual_detail',
+			value: 'Cada time mantém sua própria planilha.',
+			createdAt: T1,
+			updatedAt: T1
+		});
+		const estadoAtualProgress = envelope.state.activityProgress.find(
+			(p) => p.activityDefinitionId === 'estado_atual'
+		)!;
+		estadoAtualProgress.status = 'concluída';
+		return envelope;
+	}
+
+	it('export/snapshot legado com estado_atual_detail importa com sucesso (não invalida o projeto inteiro)', () => {
+		const envelope = legacyEnvelopeWithEstadoAtualDetail();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+	});
+
+	it('o dado legado é preservado (READ-LEGACY) mas não cria nenhum TreatmentStep automaticamente', () => {
+		const envelope = legacyEnvelopeWithEstadoAtualDetail();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const legacyAnswer = result.value.answers.find(
+			(a) => a.activityDefinitionId === 'estado_atual' && a.fieldDefinitionId === 'estado_atual_detail'
+		);
+		expect(legacyAnswer?.value).toBe('Cada time mantém sua própria planilha.');
+
+		expect(result.value.treatmentSteps).toEqual([]);
+		expect(result.value.currentTreatment.noTreatment).toBe(false);
+
+		const estadoAtualProgress = result.value.activityProgress.find(
+			(p) => p.activityDefinitionId === 'estado_atual'
+		);
+		expect(estadoAtualProgress?.status).toBe('concluída');
+	});
+
+	it('o fluxo novo a partir desse estado usa só TreatmentStep — estado_atual_detail nunca é reescrita nem lida por nenhuma projeção', () => {
+		const envelope = legacyEnvelopeWithEstadoAtualDetail();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const withStep = unwrap(addTreatmentStep(catalog, result.value, 'ts-legacy', 'Novo passo real', T2));
+		expect(withStep.treatmentSteps).toEqual([
+			{
+				id: 'ts-legacy',
+				projectId: result.value.project.id,
+				order: 0,
+				whatHappens: 'Novo passo real',
+				actors: [],
+				medium: null,
+				frictions: [],
+				createdAt: T2,
+				updatedAt: T2
+			}
+		]);
+		const legacyAnswerStillThere = withStep.answers.find(
+			(a) => a.activityDefinitionId === 'estado_atual' && a.fieldDefinitionId === 'estado_atual_detail'
+		);
+		expect(legacyAnswerStillThere?.value).toBe('Cada time mantém sua própria planilha.');
+		expect(legacyAnswerStillThere?.updatedAt).toBe(T1); // nunca reescrita
+
+		// "estado_atual" permanece concluída (adicionar um passo não a torna
+		// incompleta — mesmo espírito do teste equivalente de AffectedGroup).
+		const estadoAtualProgress = withStep.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual');
+		expect(estadoAtualProgress?.status).toBe('concluída');
+	});
+
+	it('rejeita estado_atual_detail com projectId diferente do Project', () => {
+		const envelope = legacyEnvelopeWithEstadoAtualDetail();
+		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail')!;
+		legacyAnswer.projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita estado_atual_detail duplicada', () => {
+		const envelope = legacyEnvelopeWithEstadoAtualDetail();
+		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail')!;
+		envelope.state.answers.push({ ...legacyAnswer });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — CurrentTreatment / TreatmentStep (Stage 4A, "Como é tratado hoje")', () => {
+	function treatmentState(): ProjectState {
+		return unwrap(
+			addTreatmentStep(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'ts-1', 'Financeiro confere', T1)
+		);
+	}
+
+	it('rejeita TreatmentStep.whatHappens vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { treatmentSteps: Array<Record<string, unknown>> };
+		};
+		envelope.state.treatmentSteps[0].whatHappens = '   ';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita TreatmentStep.frictions com literal fora da união aprovada', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { treatmentSteps: Array<Record<string, unknown>> };
+		};
+		envelope.state.treatmentSteps[0].frictions = ['inventado'];
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita TreatmentStep com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { treatmentSteps: Array<Record<string, unknown>> };
+		};
+		envelope.state.treatmentSteps[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita TreatmentStep.id duplicado', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { treatmentSteps: unknown[] };
+		};
+		envelope.state.treatmentSteps.push(envelope.state.treatmentSteps[0]);
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita treatmentSteps sem order contíguo começando em 0', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { treatmentSteps: Array<Record<string, unknown>> };
+		};
+		envelope.state.treatmentSteps[0].order = 3;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita currentTreatment.noTreatment true com treatmentSteps ativos (invariante mutuamente exclusiva)', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { currentTreatment: Record<string, unknown> };
+		};
+		envelope.state.currentTreatment.noTreatment = true;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita currentTreatment com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(treatmentState())) as {
+			state: { currentTreatment: Record<string, unknown> };
+		};
+		envelope.state.currentTreatment.projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('aceita "estado_atual" concluída quando o tratamento atende aos critérios de confirmação (passos ou noTreatment)', () => {
+		const state = unwrap(confirmTreatment(catalog, treatmentState(), T2));
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+
+		const noneState = unwrap(
+			confirmTreatment(
+				catalog,
+				unwrap(setTreatmentNoTreatment(catalog, createInitialProjectState(catalog, 'proj-2', T1), true, T1)),
+				T2
+			)
+		);
+		const noneResult = deserializeProjectState(serializeProjectState(noneState), catalog);
+		expect(noneResult).toEqual({ ok: true, value: noneState });
+	});
+
+	it('rejeita "estado_atual" concluída quando o tratamento não atende aos critérios de confirmação', () => {
+		const envelope = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: { activityProgress: Array<Record<string, unknown>> };
+		};
+		const estadoAtual = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual')!;
+		estadoAtual.status = 'concluída';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 });

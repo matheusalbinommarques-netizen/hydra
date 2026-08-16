@@ -8,11 +8,13 @@ import {
 	addAffectedGroup,
 	addImpediment,
 	addScopeItem,
+	addTreatmentStep,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
+	confirmTreatment,
 	createInitialProjectState,
 	encodeMultiSelectValue,
 	moveScopeItem,
@@ -77,13 +79,14 @@ function nonTrivialState(): ProjectState {
 		)
 	);
 	state = unwrap(skipActivity(catalog, state, 'publico', 'pend-1', T1));
-	state = unwrap(answerActivity(catalog, state, 'estado_atual', { estado_atual_detail: 'x' }, T1));
+	state = unwrap(addTreatmentStep(catalog, state, 'ts-1', 'Financeiro confere manualmente', T1));
+	state = unwrap(confirmTreatment(catalog, state, T1));
 	state = unwrap(
 		answerActivity(catalog, state, 'resultado', { mudanca: 'x', beneficiario: 'y', percepcao: 'z' }, T1)
 	);
 	state = unwrap(confirmSummary(catalog, state));
-	// invalida o Resumo editando uma resposta anterior
-	state = unwrap(answerActivity(catalog, state, 'estado_atual', { estado_atual_detail: 'y' }, T2));
+	// invalida o Resumo mutando "Como é tratado hoje" (novo passo) depois da confirmação
+	state = unwrap(addTreatmentStep(catalog, state, 'ts-2', 'Depois disso, é arquivado', T2));
 	// resolve a pendência de "publico" (Mapa de Impacto, ETAPA 2 do rework)
 	state = unwrap(addAffectedGroup(catalog, state, 'ag-1', 'Clientes', T2));
 	state = unwrap(setAffectedGroupImpact(catalog, state, 'ag-1', 'alto', T2));
@@ -229,6 +232,84 @@ describe('createSqliteProjectRepository — schema', () => {
 		);
 		await repo.insert(state);
 		await expect(repo.findById('proj-2')).resolves.toEqual(state);
+	});
+
+	it('abre um banco pré-Stage 4A (sem a tabela current_treatment) e faz backfill de uma linha por projeto existente, sem inventar TreatmentStep nem tocar Answer legada', async () => {
+		const filePath = tempFilePath();
+
+		// Simula um banco criado antes do Stage 4A ("Como é tratado hoje"):
+		// current_treatment/treatment_step não existem ainda — só as tabelas já
+		// presentes desde antes desse corte, incluindo scope_version (1:1 com
+		// project desde sempre) e uma Answer legada de estado_atual_detail
+		// (era required_fields antes da ETAPA correspondente).
+		const legacyDb = new Database(filePath);
+		legacyDb.exec(
+			'CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL, route_start_phase_id TEXT)'
+		);
+		legacyDb.exec(
+			'CREATE TABLE scope_version (project_id TEXT PRIMARY KEY, hypothesis TEXT NOT NULL, confirmed_at TEXT)'
+		);
+		legacyDb.exec(
+			`CREATE TABLE answer (
+				project_id TEXT NOT NULL,
+				activity_definition_id TEXT NOT NULL,
+				field_definition_id TEXT NOT NULL,
+				value TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`
+		);
+		legacyDb
+			.prepare('INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (?, ?, ?, NULL)')
+			.run('legacy-1', 'Projeto pré-Stage-4A', T1);
+		legacyDb.prepare("INSERT INTO scope_version (project_id, hypothesis, confirmed_at) VALUES ('legacy-1', '', NULL)").run();
+		legacyDb
+			.prepare(
+				`INSERT INTO answer (project_id, activity_definition_id, field_definition_id, value, created_at, updated_at)
+				 VALUES ('legacy-1', 'estado_atual', 'estado_atual_detail', ?, ?, ?)`
+			)
+			.run('Cada time usa sua própria planilha, sem padrão.', T1, T1);
+		legacyDb.close();
+
+		// Abrir com o repositório atual aplica 0001_init.sql (cria
+		// current_treatment/treatment_step, ambas vazias) e o backfill de
+		// current_treatment deve preencher a linha que faltava para "legacy-1".
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const found = await repo.findById('legacy-1');
+		expect(found).not.toBeNull();
+		if (!found) return;
+
+		// CurrentTreatment inicial: exatamente o mesmo estado que
+		// createInitialProjectState produz para um projeto novo — nunca
+		// interpretado a partir de estado_atual_detail.
+		expect(found.currentTreatment).toEqual({ projectId: 'legacy-1', noTreatment: false, updatedAt: T1 });
+		expect(found.treatmentSteps).toEqual([]);
+
+		// A Answer legada permanece exatamente como estava — nunca lida para
+		// gerar TreatmentStep, nunca reescrita (sem dual-write).
+		const legacyAnswer = found.answers.find(
+			(a) => a.activityDefinitionId === 'estado_atual' && a.fieldDefinitionId === 'estado_atual_detail'
+		);
+		expect(legacyAnswer?.value).toBe('Cada time usa sua própria planilha, sem padrão.');
+		expect(legacyAnswer?.updatedAt).toBe(T1);
+
+		// Reabrir a mesma conexão/arquivo não duplica a linha nem falha
+		// (idempotência, mesmo padrão das duas ensure* acima).
+		repo.close();
+		openRepos.length = 0;
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('legacy-1')).resolves.toEqual(found);
+
+		// Um novo projeto, inserido normalmente pelo repositório já migrado,
+		// continua funcionando sem alteração de contrato.
+		const state = unwrap(
+			addTreatmentStep(catalog, createInitialProjectState(catalog, 'proj-novo', T1), 'ts-1', 'Passo real', T1)
+		);
+		await repo2.insert(state);
+		await expect(repo2.findById('proj-novo')).resolves.toEqual(state);
 	});
 });
 
@@ -452,7 +533,7 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 8 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 10 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
@@ -469,7 +550,9 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 				'impediments',
 				'affectedGroups',
 				'externalActions',
-				'evidences'
+				'evidences',
+				'currentTreatment',
+				'treatmentSteps'
 			].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');

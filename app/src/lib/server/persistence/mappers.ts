@@ -9,6 +9,7 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	Answer,
+	CurrentTreatment,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -22,7 +23,9 @@ import type {
 	ScopeEffort,
 	ScopeExecutionStatus,
 	ScopeItem,
-	ScopeVersion
+	ScopeVersion,
+	TreatmentFriction,
+	TreatmentStep
 } from '$lib/domain';
 
 export interface ProjectRow {
@@ -222,6 +225,44 @@ export function mapEvidenceRow(row: EvidenceRow): Evidence {
 		outcome: row.outcome,
 		learning: row.learning,
 		createdAt: row.created_at
+	};
+}
+
+export interface CurrentTreatmentRow {
+	project_id: string;
+	no_treatment: 0 | 1;
+	updated_at: string;
+}
+
+export function mapCurrentTreatmentRow(row: CurrentTreatmentRow): CurrentTreatment {
+	return { projectId: row.project_id, noTreatment: row.no_treatment === 1, updatedAt: row.updated_at };
+}
+
+export interface TreatmentStepRow {
+	id: string;
+	project_id: string;
+	step_order: number;
+	what_happens: string;
+	// actors/frictions: JSON array em TEXT — mesmo padrão de
+	// ExternalActionRow.questions/information_to_take acima.
+	actors: string;
+	medium: string | null;
+	frictions: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapTreatmentStepRow(row: TreatmentStepRow): TreatmentStep {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		order: row.step_order,
+		whatHappens: row.what_happens,
+		actors: JSON.parse(row.actors) as string[],
+		medium: row.medium,
+		frictions: JSON.parse(row.frictions) as TreatmentFriction[],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
 	};
 }
 

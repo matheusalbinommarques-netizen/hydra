@@ -253,31 +253,31 @@ const publico: ActivityDefinition = {
 	pendingItemDetail: 'Impacta decisões de priorização e critérios de aceitação.'
 };
 
+// "Como é tratado hoje" (era "Estado atual") — Stage 4A do rework (Claude
+// Design, "Como e Tratado Hoje - Refinado.dc.html"): substitui o texto livre
+// de `estado_atual_detail` por uma cadeia ordenada de TreatmentStep reais
+// (ver domain/state-types.ts e domain/transitions.ts, confirmTreatment).
+// completionMode passa de required_fields para explicit_confirmation — a
+// conclusão deriva do estado estruturado (pelo menos um passo, ou
+// `noTreatment: true`, "hoje não existe um tratamento definido"), nunca de
+// uma Answer. `estado_atual_detail` deixa de ser escrito para projetos
+// novos (ver CurrentTreatment/TreatmentStep como fonte canônica); Answers
+// legadas desse campo, se existirem em projetos antigos, permanecem no
+// banco sem uso (mesmo tratamento já dado a `publico_detail`) — não há
+// dual-write nem conversão automática de texto livre em passos.
 const estadoAtual: ActivityDefinition = {
 	id: 'estado_atual',
 	phaseId: 'descoberta',
 	order: 4,
-	title: 'Estado atual',
-	mainQuestion: 'Como a situação é tratada hoje, em detalhe?',
-	why: 'Entender o estado atual em detalhe ajuda a dimensionar o esforço da mudança necessária.',
-	example: 'Cada atendente mantém sua própria planilha, sem padrão entre times.',
-	completionCriteria: 'O estado atual foi descrito com detalhe suficiente para orientar a próxima atividade.',
-	completionMode: 'required_fields',
+	title: 'Como é tratado hoje',
+	mainQuestion: 'O que acontece quando isso aparece?',
+	why: 'Entender o tratamento atual ajuda a dimensionar o esforço da mudança necessária.',
+	example: 'Financeiro percebe o atraso, reenvia a planilha por e-mail, e o gestor aprova manualmente.',
+	completionCriteria: 'Pelo menos um passo do tratamento atual foi descrito, ou "sem tratamento definido" foi escolhido.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'Estado atual não foi detalhado',
-	pendingItemDetail: 'Impacta o quão precisas serão as recomendações sobre a solução.',
-	fields: [
-		{
-			id: 'estado_atual_detail',
-			activityId: 'estado_atual',
-			label: 'Como a situação é tratada hoje, em detalhe?',
-			required: true,
-			help: 'Descreva o processo, ferramentas e pessoas envolvidas.',
-			placeholder: 'Descreva o estado atual em detalhe...',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'Como é tratado hoje não foi mapeado',
+	pendingItemDetail: 'Impacta o quão precisas serão as recomendações sobre a solução.'
 };
 
 const resultado: ActivityDefinition = {

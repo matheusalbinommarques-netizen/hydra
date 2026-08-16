@@ -60,8 +60,9 @@ async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
 	await page.getByRole('button', { name: 'Concluir mapa' }).click();
 
-	await page.getByLabel('Como a situação é tratada hoje, em detalhe?').fill('Estado atual original.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByPlaceholder('Descrever em poucas palavras…').fill('Estado atual original.');
+	await page.getByRole('button', { name: 'Adicionar' }).click();
+	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
 	await page.getByLabel('O que deverá estar diferente quando este projeto tiver sucesso?').fill('Resultado original.');
 	await page.getByLabel('Quem é o principal beneficiário?').fill('Beneficiário original.');

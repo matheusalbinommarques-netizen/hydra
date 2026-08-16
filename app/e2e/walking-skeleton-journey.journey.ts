@@ -111,12 +111,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Concluir mapa' }).click();
 	});
 
-	await test.step('Estado atual', async () => {
-		await expect(page.getByRole('heading', { name: 'Estado atual' })).toBeVisible();
-		await page
-			.getByLabel('Como a situação é tratada hoje, em detalhe?')
-			.fill('Cada time usa sua própria planilha, sem padrão.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await test.step('Como é tratado hoje', async () => {
+		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
+		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Cada time usa sua própria planilha, sem padrão.');
+		await page.getByRole('button', { name: 'Adicionar' }).click();
+		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 	});
 
 	await test.step('Resultado desejado', async () => {
@@ -171,7 +170,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		// nesta jornada, então os quatro itens aparecem marcados.
 		await expect(page.getByText('Problema definido')).toBeVisible();
 		await expect(page.getByText('Público definido')).toBeVisible();
-		await expect(page.getByText('Estado atual definido')).toBeVisible();
+		await expect(page.getByText('Como é tratado hoje definido')).toBeVisible();
 		await expect(page.getByText('Resultado definido')).toBeVisible();
 
 		// "Ver todas as respostas da descoberta" recolhida por padrão (todas as

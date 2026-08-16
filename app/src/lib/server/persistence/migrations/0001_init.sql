@@ -161,3 +161,27 @@ CREATE TABLE IF NOT EXISTS evidence (
 	learning TEXT NOT NULL,
 	created_at TEXT NOT NULL
 );
+
+-- Tratamento atual — Descoberta, "Como é tratado hoje" (Stage 4A do rework,
+-- ver app/src/lib/domain/state-types.ts). 1:1 com project (mesmo molde de
+-- scope_version): o cabeçalho que guarda noTreatment; a cadeia ordenada de
+-- passos vive em treatment_step, abaixo.
+CREATE TABLE IF NOT EXISTS current_treatment (
+	project_id TEXT PRIMARY KEY REFERENCES project (id) ON DELETE CASCADE,
+	no_treatment INTEGER NOT NULL CHECK (no_treatment IN (0, 1)),
+	updated_at TEXT NOT NULL
+);
+
+-- actors/frictions: JSON array em TEXT — mesmo padrão de encoding já usado
+-- por external_action.questions/information_to_take (ver mappers.ts).
+CREATE TABLE IF NOT EXISTS treatment_step (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	step_order INTEGER NOT NULL,
+	what_happens TEXT NOT NULL,
+	actors TEXT NOT NULL,
+	medium TEXT,
+	frictions TEXT NOT NULL,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);

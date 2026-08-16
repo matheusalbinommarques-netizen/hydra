@@ -9,6 +9,7 @@ import {
 	mapActivityProgressRow,
 	mapAffectedGroupRow,
 	mapAnswerRow,
+	mapCurrentTreatmentRow,
 	mapEvidenceRow,
 	mapExternalActionRow,
 	mapImpedimentRow,
@@ -16,16 +17,19 @@ import {
 	mapProjectRow,
 	mapScopeItemRow,
 	mapScopeVersionRow,
+	mapTreatmentStepRow,
 	type ActivityProgressRow,
 	type AffectedGroupRow,
 	type AnswerRow,
+	type CurrentTreatmentRow,
 	type EvidenceRow,
 	type ExternalActionRow,
 	type ImpedimentRow,
 	type PendingItemRow,
 	type ProjectRow,
 	type ScopeItemRow,
-	type ScopeVersionRow
+	type ScopeVersionRow,
+	type TreatmentStepRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
 
@@ -61,12 +65,47 @@ function ensureScopeItemExecutionStatusColumn(db: Database.Database): void {
 	}
 }
 
+// Terceira evolução do schema desde 0001_init.sql (Stage 4A do rework,
+// "Como é tratado hoje") — diferente de D023/D025 acima, current_treatment é
+// uma TABELA nova 1:1 com project (mesmo molde de scope_version), não uma
+// coluna adicionada a uma tabela existente: `CREATE TABLE IF NOT EXISTS`
+// cria a tabela vazia num banco já existente, mas não gera automaticamente
+// uma linha por projeto já cadastrado — ao contrário de `ALTER TABLE ... ADD
+// COLUMN ... DEFAULT`, que preenche todas as linhas existentes sozinho. Sem
+// este backfill, findById() lança "violação do schema" para todo projeto
+// criado antes deste corte (bug real encontrado em dogfooding). Idempotente
+// (INSERT ... SELECT só dos projetos ainda sem linha) e isolado da
+// inicialização, mesmo espírito das duas funções acima — primeira vez que o
+// Hydra precisa fazer backfill de uma tabela nova (não de uma coluna); não
+// existe um mecanismo canônico anterior para isso além do padrão geral
+// "idempotente, fora do CRUD, uma vez por conexão, antes de qualquer
+// insert/save/findById".
+//
+// Estado inicial escrito é sempre o mesmo que createInitialProjectState
+// produziria para um projeto novo (noTreatment: false, sem passos) — nunca
+// interpreta `estado_atual_detail` legado (READ-LEGACY, ver
+// domain/legacy-answers.ts): esse dado continua intocado, sem dual-write,
+// sem conversão automática de texto em passos. `updated_at` usa
+// `project.created_at` como timestamp coerente, mesmo padrão de
+// scopeVersion inicial (`{ hypothesis: '', confirmedAt: null }`) não ter um
+// timestamp próprio a inventar.
+function ensureCurrentTreatmentRows(db: Database.Database): void {
+	db.prepare(
+		`INSERT INTO current_treatment (project_id, no_treatment, updated_at)
+		 SELECT p.id, 0, p.created_at
+		 FROM project p
+		 LEFT JOIN current_treatment ct ON ct.project_id = p.id
+		 WHERE ct.project_id IS NULL`
+	).run();
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
 	db.exec(initSql);
 	ensureRouteStartPhaseColumn(db);
 	ensureScopeItemExecutionStatusColumn(db);
+	ensureCurrentTreatmentRows(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(
@@ -155,6 +194,27 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		for (const evidence of state.evidences) {
 			insertEvidence.run(evidence);
 		}
+
+		db.prepare(
+			`INSERT INTO current_treatment (project_id, no_treatment, updated_at)
+			 VALUES (@projectId, @noTreatment, @updatedAt)`
+		).run({
+			projectId: state.currentTreatment.projectId,
+			noTreatment: state.currentTreatment.noTreatment ? 1 : 0,
+			updatedAt: state.currentTreatment.updatedAt
+		});
+
+		const insertTreatmentStep = db.prepare(
+			`INSERT INTO treatment_step (id, project_id, step_order, what_happens, actors, medium, frictions, created_at, updated_at)
+			 VALUES (@id, @projectId, @order, @whatHappens, @actors, @medium, @frictions, @createdAt, @updatedAt)`
+		);
+		for (const step of state.treatmentSteps) {
+			insertTreatmentStep.run({
+				...step,
+				actors: JSON.stringify(step.actors),
+				frictions: JSON.stringify(step.frictions)
+			});
+		}
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -194,6 +254,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM evidence WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM external_action WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM affected_group WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM treatment_step WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM current_treatment WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
 
@@ -273,6 +335,20 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as EvidenceRow[];
 
+			const currentTreatmentRow = db
+				.prepare('SELECT project_id, no_treatment, updated_at FROM current_treatment WHERE project_id = ?')
+				.get(projectId) as CurrentTreatmentRow | undefined;
+			if (!currentTreatmentRow) {
+				throw new Error(`Projeto "${projectId}" não tem current_treatment (violação do schema — 1:1 com project)`);
+			}
+
+			const treatmentStepRows = db
+				.prepare(
+					`SELECT id, project_id, step_order, what_happens, actors, medium, frictions, created_at, updated_at
+					 FROM treatment_step WHERE project_id = ? ORDER BY step_order`
+				)
+				.all(projectId) as TreatmentStepRow[];
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
@@ -283,7 +359,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				impediments: impedimentRows.map(mapImpedimentRow),
 				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
 				externalActions: externalActionRows.map(mapExternalActionRow),
-				evidences: evidenceRows.map(mapEvidenceRow)
+				evidences: evidenceRows.map(mapEvidenceRow),
+				currentTreatment: mapCurrentTreatmentRow(currentTreatmentRow),
+				treatmentSteps: treatmentStepRows.map(mapTreatmentStepRow)
 			};
 		},
 

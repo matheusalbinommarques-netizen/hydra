@@ -71,7 +71,7 @@
 	// (.dark-activity), sem tocar o markup ou o CSS de nenhuma outra
 	// atividade. Ao sair delas, o shell volta ao normal — nenhuma outra tela
 	// foi redesenhada.
-	const DARK_ACTIVITY_IDS = new Set(['problema', 'publico']);
+	const DARK_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual']);
 	let isDarkActivity = $derived(
 		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '')
 	);
