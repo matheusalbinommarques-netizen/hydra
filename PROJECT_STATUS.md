@@ -1,6 +1,6 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 04/08/2026
+**Data de referência:** 16/08/2026
 
 **Versão da baseline:** 0.4.0
 
@@ -370,6 +370,12 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
+Estado atual do rework: ETAPA 3 concluída (commit `ceadf4c`); Stage 4A
+("Como é tratado hoje") concluído e entregue em `c1e6c7b` (base
+`61e5c3b` + refinamento visual/síntese aprovado por dogfooding). Próximo
+corte da Discovery — Etapa 4B ("Causas/hipóteses", "Entender as causas")
+ou 4C — ainda não implementado nem decidido; decisão de Matheus.
+
 As etapas 1 a 7 do roadmap (`docs/03-product/product-roadmap.md`) estão
 concluídas. A etapa 7, "Convergência da experiência e das telas",
 encerrou-se com a subetapa 7.7 (Revisão final): auditoria realizada em
@@ -501,11 +507,63 @@ sugestões/contextualização da engine, permitir voltar a etapa anterior e
 permitir deletar projetos são achados reais registrados para evolução
 futura, deliberadamente fora do escopo deste corte.
 
-A próxima decisão real é de Matheus: autorizar a ETAPA 3
-(`docs/core/HYDRA_PRODUCT_REWORK.md`, "Evidence + primeira External
-Action" — provar o loop Hydra → ação real → Hydra a partir de um
-AffectedGroup) como próximo corte, ou direcionar ao vivo outra coisa. Não
-decidida ainda.
+ETAPA 3 ("Evidence + primeira External Action") está **concluída e
+publicada** (commit `ceadf4c`): prova o loop Hydra → ação real → Hydra a
+partir de um `AffectedGroup` já classificado. "Validar com este grupo"
+prepara deterministicamente (sem IA, `catalog/external-action.ts`)
+objetivo, perguntas fixas, informação a levar (derivada só do que o Hydra
+já sabe do grupo — label, impacto, frequência) e resultado esperado; o
+usuário realiza a conversa fora do produto e retorna um de quatro
+resultados (`EvidenceOutcome`: confirmou, confirmou parcialmente,
+contradisse, descobriu algo novo), criando uma `Evidence` ligada ao
+`AffectedGroup` de origem, refletida sem redigitação nas projeções
+existentes (Mapa de Impacto, Resumo). Nenhuma rota nova — a mecânica vive
+dentro de `MapaDeImpacto.svelte`.
+
+Em 16/08/2026, `docs/00-governance/source-basis.md` e as seções 7/55 de
+`docs/core/HYDRA_PRODUCT_REWORK.md` foram reescritas (commit `e5e1933`)
+para deixar de mapear fonte metodológica → parte específica da
+metodologia Hydra, registrando em vez disso uma política de pesquisa e
+independência metodológica e a regra de uso do PMI Infinity — nenhuma
+decisão de produto, domínio, catálogo ou roadmap foi alterada.
+
+Etapa 4A ("Como é tratado hoje", `docs/core/HYDRA_PRODUCT_REWORK.md` §34)
+está **concluída e publicada** (commit `61e5c3b`, `main`/`origin/main`):
+`estado_atual_detail` (texto livre) é substituído por uma cadeia ordenada
+de `TreatmentStep` reais (`CurrentTreatment`/`TreatmentStep`), mesma
+mecânica de objeto vivo de `AffectedGroup`/ETAPA 2 — persistido a cada
+interação, síntese derivada determinística, estado canônico "sem
+tratamento definido", e READ-LEGACY explícito para o dado antigo em
+snapshots já exportados. A entrega inclui a correção de um bug bloqueante
+achado em dogfooding real: bancos SQLite existentes ficavam sem a linha
+1:1 de `current_treatment` depois da migração, porque, diferente das duas
+evoluções de schema anteriores, esta é uma tabela nova, não uma coluna com
+`DEFAULT` — corrigido com backfill idempotente na inicialização do
+repositório, sem tocar `Answer`s legadas nem inventar passos.
+
+Em 16/08/2026, um corte de refinamento fechou tecnicamente o Stage 4A
+(commit `c1e6c7b`, `main`/`origin/main`), aprovado por dogfooding visual
+real de Matheus: a cadeia de `TreatmentStep` passou a usar a composição
+"1A — cadeia vertical contínua" aprovada no Claude Design ("Como e
+Tratado Hoje - Refinamento Visual.dc.html") — nós circulares numerados
+ligados por um trilho vertical, com a síntese derivada pendurada do mesmo
+trilho, sem superfície de card própria. A síntese determinística
+(`summarizeTreatmentSteps`, `catalog/current-treatment.ts`) deixou de
+quase serializar cada passo (passo + ator + meio + fricção) e passou a
+contar o fluxo reduzido — "Primeiro"/"Depois"/"Por fim" (ausente com um
+único passo), sem reinjetar ator ou meio/ferramenta na frase, com as
+fricções de todos os passos consolidadas ao final, sem duplicatas.
+`hydra-verify full` PASS (5/5 etapas, 22/22 jornadas). Com este corte, o
+Stage 4A está integralmente concluído — nenhuma alteração adicional
+prevista para ele.
+
+A próxima decisão real é de Matheus: autorizar a Etapa 4B ("Causas /
+hipóteses", também chamada "Entender as causas") — ainda um problema de
+produto a decidir, não uma implementação já autorizada —, a Etapa 4C
+("Resultado desejado") ou outro corte do rework
+(`docs/core/HYDRA_PRODUCT_REWORK.md`) como próximo passo, ou direcionar ao
+vivo outra coisa. Não decidida ainda; nenhum desses cortes foi
+implementado.
 
 ## Não fazer agora
 

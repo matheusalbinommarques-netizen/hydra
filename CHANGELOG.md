@@ -4,6 +4,25 @@
 
 ### Adicionado
 
+- Rework, Etapa 4A ("Como é tratado hoje") — `estado_atual_detail`
+  (texto livre) dá lugar a uma cadeia ordenada de passos de tratamento
+  reais, com meio/ferramenta, fricção e observação; síntese derivada
+  determinística e estado "sem tratamento definido" reaproveitados nas
+  mesmas superfícies de leitura. Corrige também um bug de migração
+  SQLite que deixava bancos existentes sem a linha de tratamento atual.
+  Fechada com um corte de refinamento (aprovado por dogfooding visual):
+  a cadeia passa a ser uma corrente vertical contínua de nós numerados
+  ligados por um trilho, com a síntese pendurada do mesmo trilho, sem
+  card próprio; a síntese deixa de serializar ator/meio/fricção por
+  passo e passa a contar o fluxo reduzido ("Primeiro"/"Depois"/"Por
+  fim"), com as fricções de todos os passos consolidadas ao final, sem
+  duplicatas.
+- Rework, ETAPA 3 ("Evidence + primeira External Action") — a partir de
+  um grupo afetado já classificado, "Validar com este grupo" prepara
+  objetivo, perguntas, informação a levar e resultado esperado sem
+  digitação nova; o retorno da conversa real (confirmou, confirmou
+  parcialmente, contradisse, descobriu algo novo) cria uma evidência
+  ligada ao grupo, visível no Mapa de Impacto e no Resumo.
 - Ciclo 5, C5-01 — "Decompor o trabalho" (Planejamento da entrega) deixa
   de ser um campo de texto livre e passa a criar uma coleção de partes do
   trabalho: adicionar uma parte por vez, renomear e remover, sempre com
