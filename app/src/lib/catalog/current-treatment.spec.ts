@@ -13,50 +13,80 @@ describe('summarizeTreatmentSteps — síntese determinística ("Como funciona h
 		expect(summarizeTreatmentSteps([])).toBe('');
 	});
 
-	it('um único passo sem contexto', () => {
+	it('um único passo não finge sequência — sem marcador "Primeiro"', () => {
 		const text = summarizeTreatmentSteps([
 			{ whatHappens: 'Financeiro percebe o atraso', actors: [], medium: null, frictions: [] }
 		]);
-		expect(text).toBe('Quando isso aparece, Financeiro percebe o atraso.');
+		expect(text).toBe('Financeiro percebe o atraso.');
 	});
 
-	it('usa "Em seguida" no segundo passo e "Depois" a partir do terceiro', () => {
+	it('dois passos usam "Primeiro"/"Depois", sem "Por fim"', () => {
+		const text = summarizeTreatmentSteps([
+			{ whatHappens: 'Financeiro percebe o atraso', actors: [], medium: null, frictions: [] },
+			{ whatHappens: 'gestor aprova manualmente', actors: [], medium: null, frictions: [] }
+		]);
+		expect(text).toBe('Primeiro: Financeiro percebe o atraso. Depois: gestor aprova manualmente.');
+	});
+
+	it('três passos usam "Primeiro"/"Depois"/"Por fim"', () => {
 		const text = summarizeTreatmentSteps([
 			{ whatHappens: 'Financeiro percebe o atraso', actors: [], medium: null, frictions: [] },
 			{ whatHappens: 'confere informações em uma planilha', actors: [], medium: null, frictions: [] },
 			{ whatHappens: 'gestor aprova manualmente', actors: [], medium: null, frictions: [] }
 		]);
 		expect(text).toBe(
-			'Quando isso aparece, Financeiro percebe o atraso. Em seguida, confere informações em uma planilha. Depois, gestor aprova manualmente.'
+			'Primeiro: Financeiro percebe o atraso. Depois: confere informações em uma planilha. Por fim: gestor aprova manualmente.'
 		);
 	});
 
-	it('incorpora atores e meio entre parênteses quando presentes', () => {
+	it('quatro ou mais passos repetem "Depois" nas etapas intermediárias, sem virar parágrafo complexo', () => {
+		const text = summarizeTreatmentSteps([
+			{ whatHappens: 'A', actors: [], medium: null, frictions: [] },
+			{ whatHappens: 'B', actors: [], medium: null, frictions: [] },
+			{ whatHappens: 'C', actors: [], medium: null, frictions: [] },
+			{ whatHappens: 'D', actors: [], medium: null, frictions: [] }
+		]);
+		expect(text).toBe('Primeiro: A. Depois: B. Depois: C. Por fim: D.');
+	});
+
+	it('não injeta ator nem meio/ferramenta na síntese — só a cadeia mostra esses detalhes', () => {
 		const text = summarizeTreatmentSteps([
 			{ whatHappens: 'Gestor aprova', actors: ['Financeiro', 'Gestor direto'], medium: 'E-mail', frictions: [] }
 		]);
-		expect(text).toBe('Quando isso aparece, Gestor aprova (Financeiro e Gestor direto, usando E-mail).');
+		expect(text).toBe('Gestor aprova.');
 	});
 
-	it('incorpora fricções como sufixo em minúsculas, separadas por vírgula', () => {
+	it('consolida fricções de todos os passos ao final, sem duplicatas, na ordem de primeira aparição', () => {
 		const text = summarizeTreatmentSteps([
-			{ whatHappens: 'Aprovação demora', actors: [], medium: null, frictions: ['espera', 'retrabalho'] }
-		]);
-		expect(text).toBe('Quando isso aparece, Aprovação demora — fricção: espera, retrabalho.');
-	});
-
-	it('combina contexto e fricção no mesmo passo, mantendo a frase natural', () => {
-		const text = summarizeTreatmentSteps([
-			{
-				whatHappens: 'Dados são copiados para outra planilha',
-				actors: ['Equipe interna'],
-				medium: 'Planilha',
-				frictions: ['retrabalho']
-			}
+			{ whatHappens: 'A', actors: [], medium: null, frictions: ['improviso'] },
+			{ whatHappens: 'B', actors: [], medium: null, frictions: ['trava', 'improviso'] },
+			{ whatHappens: 'C', actors: [], medium: null, frictions: ['retrabalho'] }
 		]);
 		expect(text).toBe(
-			'Quando isso aparece, Dados são copiados para outra planilha (Equipe interna, usando Planilha) — fricção: retrabalho.'
+			'Primeiro: A. Depois: B. Por fim: C. Fricções observadas: improviso, trava e retrabalho.'
 		);
+	});
+
+	it('sem nenhuma fricção em nenhum passo, não mostra a seção de fricções', () => {
+		const text = summarizeTreatmentSteps([
+			{ whatHappens: 'A', actors: [], medium: null, frictions: [] },
+			{ whatHappens: 'B', actors: [], medium: null, frictions: [] }
+		]);
+		expect(text).toBe('Primeiro: A. Depois: B.');
+	});
+
+	it('uma única fricção não usa conector "e"', () => {
+		const text = summarizeTreatmentSteps([
+			{ whatHappens: 'A', actors: [], medium: null, frictions: ['espera'] }
+		]);
+		expect(text).toBe('A. Fricções observadas: espera.');
+	});
+
+	it('duas fricções usam "e" sem vírgula', () => {
+		const text = summarizeTreatmentSteps([
+			{ whatHappens: 'A', actors: [], medium: null, frictions: ['espera', 'trava'] }
+		]);
+		expect(text).toBe('A. Fricções observadas: espera e trava.');
 	});
 });
 

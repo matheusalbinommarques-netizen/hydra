@@ -228,183 +228,204 @@
 			<button type="submit" class="cet-ghost-affordance">Na verdade, existe algo — quero descrever</button>
 		</form>
 	{:else}
-		{#each steps as step, index (step.id)}
-			{@const currentActors = pendingActorsByStep[step.id] ?? step.actors}
-			<div class="cet-step-card" class:cet-step-pulse={justAdded === step.id}>
-				<div class="cet-step-head">
-					<div class="cet-step-num-label">
-						<span class="cet-step-num">{index + 1}.</span>
-						<span class="cet-step-label">{step.whatHappens}</span>
+		<div class="cet-chain">
+			{#each steps as step, index (step.id)}
+				{@const currentActors = pendingActorsByStep[step.id] ?? step.actors}
+				<div class="cet-node-row">
+					<div class="cet-rail-col">
+						<div class="cet-node-circle cet-node-circle-num" class:cet-node-pulse={justAdded === step.id}>
+							{index + 1}
+						</div>
 					</div>
-					<div class="cet-step-actions">
-						<form method="POST" action="?/moveTreatmentStep" use:enhance={handleGenericSubmit}>
-							<input type="hidden" name="stepId" value={step.id} />
-							<input type="hidden" name="direction" value="-1" />
-							<button type="submit" class="cet-icon-btn" disabled={index === 0} aria-label="Mover para cima"
-								>↑</button
-							>
-						</form>
-						<form method="POST" action="?/moveTreatmentStep" use:enhance={handleGenericSubmit}>
-							<input type="hidden" name="stepId" value={step.id} />
-							<input type="hidden" name="direction" value="1" />
-							<button
-								type="submit"
-								class="cet-icon-btn"
-								disabled={index === steps.length - 1}
-								aria-label="Mover para baixo">↓</button
-							>
-						</form>
-						<form method="POST" action="?/removeTreatmentStep" use:enhance={() => handleRemoveSubmit(step.id)}>
-							<input type="hidden" name="stepId" value={step.id} />
-							<button type="submit" class="cet-icon-btn" aria-label="Remover passo">×</button>
-						</form>
-					</div>
-				</div>
+					<div class="cet-node-content">
+						<div class="cet-step-head">
+							<span class="cet-step-label">{step.whatHappens}</span>
+							<div class="cet-step-actions">
+								<form method="POST" action="?/moveTreatmentStep" use:enhance={handleGenericSubmit}>
+									<input type="hidden" name="stepId" value={step.id} />
+									<input type="hidden" name="direction" value="-1" />
+									<button type="submit" class="cet-icon-btn" disabled={index === 0} aria-label="Mover para cima"
+										>↑</button
+									>
+								</form>
+								<form method="POST" action="?/moveTreatmentStep" use:enhance={handleGenericSubmit}>
+									<input type="hidden" name="stepId" value={step.id} />
+									<input type="hidden" name="direction" value="1" />
+									<button
+										type="submit"
+										class="cet-icon-btn"
+										disabled={index === steps.length - 1}
+										aria-label="Mover para baixo">↓</button
+									>
+								</form>
+								<form method="POST" action="?/removeTreatmentStep" use:enhance={() => handleRemoveSubmit(step.id)}>
+									<input type="hidden" name="stepId" value={step.id} />
+									<button type="submit" class="cet-icon-btn" aria-label="Remover passo">×</button>
+								</form>
+							</div>
+						</div>
 
-				{#if step.actors.length > 0 || step.medium || step.frictions.length > 0}
-					<div class="cet-summary-tags">
-						{#each step.actors as actor (actor)}
-							<span class="cet-tag cet-tag-actor">{actor}</span>
-						{/each}
-						{#if step.medium}
-							<span class="cet-tag cet-tag-medium">{step.medium}</span>
+						{#if step.actors.length > 0 || step.medium || step.frictions.length > 0}
+							<div class="cet-summary-tags">
+								{#each step.actors as actor (actor)}
+									<span class="cet-tag cet-tag-actor">{actor}</span>
+								{/each}
+								{#if step.medium}
+									<span class="cet-tag cet-tag-medium">{step.medium}</span>
+								{/if}
+								{#each step.frictions as friction (friction)}
+									<span class="cet-tag cet-tag-friction"
+										>{TREATMENT_FRICTION_OPTIONS.find((f) => f.id === friction)?.label ?? friction}</span
+									>
+								{/each}
+							</div>
 						{/if}
-						{#each step.frictions as friction (friction)}
-							<span class="cet-tag cet-tag-friction"
-								>{TREATMENT_FRICTION_OPTIONS.find((f) => f.id === friction)?.label ?? friction}</span
-							>
-						{/each}
-					</div>
-				{/if}
 
-				<button type="button" class="cet-ghost-affordance cet-compact" onclick={() => toggleExpand(step.id)}>
-					{expandedStepId === step.id ? 'Ocultar contexto e fricções' : '+ Adicionar contexto e fricções'}
-				</button>
+						<button type="button" class="cet-ghost-affordance cet-compact" onclick={() => toggleExpand(step.id)}>
+							{expandedStepId === step.id ? 'Ocultar contexto e fricções' : '+ Adicionar contexto e fricções'}
+						</button>
 
-				{#if expandedStepId === step.id}
-					<div class="cet-step-detail">
-						<div>
-							<p class="cet-subtle-label">Quem atua aqui? (opcional)</p>
-							<div class="cet-chip-row">
-								{#each excludeUsedLabels(
-									affectedGroups.map((g) => g.label),
-									currentActors
-								) as label (label)}
-									<button type="button" class="cet-plain-chip" onclick={() => toggleActor(step.id, currentActors, label)}
-										>{label}</button
-									>
-								{/each}
-								{#each currentActors as actor (actor)}
-									<button
-										type="button"
-										class="cet-plain-chip cet-selected"
-										onclick={() => toggleActor(step.id, currentActors, actor)}>{actor} ×</button
-									>
-								{/each}
-								<button type="button" class="cet-plain-chip" onclick={() => (actorCustomOpenStepId = step.id)}
-									>+ outro</button
-								>
-							</div>
-							{#if actorCustomOpenStepId === step.id}
-								<div class="cet-custom-form">
-									<input
-										type="text"
-										placeholder="Nomear quem atua…"
-										bind:value={actorCustomValue}
-										onkeydown={(e) => e.key === 'Enter' && submitCustomActor(step.id, currentActors)}
-									/>
-									<button type="button" onclick={() => submitCustomActor(step.id, currentActors)}>OK</button>
-								</div>
-							{/if}
-							<form
-								method="POST"
-								action="?/setTreatmentStepActors"
-								use:enhance={handleGenericSubmit}
-								bind:this={actorsFormRefs[step.id]}
-							>
-								<input type="hidden" name="stepId" value={step.id} />
-								{#each pendingActorsByStep[step.id] ?? [] as actor (actor)}
-									<input type="hidden" name="actor" value={actor} />
-								{/each}
-							</form>
-						</div>
-
-						<div>
-							<p class="cet-subtle-label">Meio ou ferramenta usado (opcional)</p>
-							<div class="cet-chip-row">
-								{#each TREATMENT_MEDIUM_SUGGESTIONS as label (label)}
-									<button
-										type="button"
-										class="cet-plain-chip"
-										class:cet-selected={step.medium === label}
-										onclick={() => setMedium(step.id, step.medium === label ? '' : label)}>{label}</button
-									>
-								{/each}
-								<button type="button" class="cet-plain-chip" onclick={() => (mediumCustomOpenStepId = step.id)}
-									>+ outro</button
-								>
-							</div>
-							{#if mediumCustomOpenStepId === step.id}
-								<div class="cet-custom-form">
-									<input
-										type="text"
-										placeholder="Nomear a ferramenta…"
-										bind:value={mediumCustomValue}
-										onkeydown={(e) => e.key === 'Enter' && submitCustomMedium(step.id)}
-									/>
-									<button type="button" onclick={() => submitCustomMedium(step.id)}>OK</button>
-								</div>
-							{/if}
-							<form
-								method="POST"
-								action="?/setTreatmentStepMedium"
-								use:enhance={handleGenericSubmit}
-								bind:this={mediumFormRefs[step.id]}
-							>
-								<input type="hidden" name="stepId" value={step.id} />
-								<input type="hidden" name="medium" value={pendingMediumByStep[step.id] ?? ''} />
-							</form>
-						</div>
-
-						<div>
-							<p class="cet-subtle-label">Fricção neste momento (opcional) — pode marcar mais de uma</p>
-							<div class="cet-chip-row">
-								{#each TREATMENT_FRICTION_OPTIONS as option (option.id)}
-									<form method="POST" action="?/toggleTreatmentStepFriction" use:enhance={handleGenericSubmit}>
-										<input type="hidden" name="stepId" value={step.id} />
-										<input type="hidden" name="friction" value={option.id} />
-										<button
-											type="submit"
-											class="cet-friction-pill"
-											class:cet-selected={step.frictions.includes(option.id)}>{option.label}</button
+						{#if expandedStepId === step.id}
+							<div class="cet-step-detail">
+								<div>
+									<p class="cet-subtle-label">Quem atua aqui? (opcional)</p>
+									<div class="cet-chip-row">
+										{#each excludeUsedLabels(
+											affectedGroups.map((g) => g.label),
+											currentActors
+										) as label (label)}
+											<button
+												type="button"
+												class="cet-plain-chip"
+												onclick={() => toggleActor(step.id, currentActors, label)}>{label}</button
+											>
+										{/each}
+										{#each currentActors as actor (actor)}
+											<button
+												type="button"
+												class="cet-plain-chip cet-selected"
+												onclick={() => toggleActor(step.id, currentActors, actor)}>{actor} ×</button
+											>
+										{/each}
+										<button type="button" class="cet-plain-chip" onclick={() => (actorCustomOpenStepId = step.id)}
+											>+ outro</button
 										>
+									</div>
+									{#if actorCustomOpenStepId === step.id}
+										<div class="cet-custom-form">
+											<input
+												type="text"
+												placeholder="Nomear quem atua…"
+												bind:value={actorCustomValue}
+												onkeydown={(e) => e.key === 'Enter' && submitCustomActor(step.id, currentActors)}
+											/>
+											<button type="button" onclick={() => submitCustomActor(step.id, currentActors)}>OK</button>
+										</div>
+									{/if}
+									<form
+										method="POST"
+										action="?/setTreatmentStepActors"
+										use:enhance={handleGenericSubmit}
+										bind:this={actorsFormRefs[step.id]}
+									>
+										<input type="hidden" name="stepId" value={step.id} />
+										{#each pendingActorsByStep[step.id] ?? [] as actor (actor)}
+											<input type="hidden" name="actor" value={actor} />
+										{/each}
 									</form>
-								{/each}
-							</div>
-						</div>
-					</div>
-				{/if}
-			</div>
-		{/each}
+								</div>
 
-		<div class="cet-add-section">
-			<p class="cet-prompt-question">{promptQuestion}</p>
-			<form method="POST" action="?/addTreatmentStep" use:enhance={handleAddStepSubmit} bind:this={addStepFormEl}>
-				<div class="cet-custom-form">
-					<input type="text" name="whatHappens" placeholder="Descrever em poucas palavras…" bind:value={newStepValue} />
-					<button type="submit" disabled={newStepTrimmed.length === 0}>Adicionar</button>
+								<div>
+									<p class="cet-subtle-label">Meio ou ferramenta usado (opcional)</p>
+									<div class="cet-chip-row">
+										{#each TREATMENT_MEDIUM_SUGGESTIONS as label (label)}
+											<button
+												type="button"
+												class="cet-plain-chip"
+												class:cet-selected={step.medium === label}
+												onclick={() => setMedium(step.id, step.medium === label ? '' : label)}>{label}</button
+											>
+										{/each}
+										<button type="button" class="cet-plain-chip" onclick={() => (mediumCustomOpenStepId = step.id)}
+											>+ outro</button
+										>
+									</div>
+									{#if mediumCustomOpenStepId === step.id}
+										<div class="cet-custom-form">
+											<input
+												type="text"
+												placeholder="Nomear a ferramenta…"
+												bind:value={mediumCustomValue}
+												onkeydown={(e) => e.key === 'Enter' && submitCustomMedium(step.id)}
+											/>
+											<button type="button" onclick={() => submitCustomMedium(step.id)}>OK</button>
+										</div>
+									{/if}
+									<form
+										method="POST"
+										action="?/setTreatmentStepMedium"
+										use:enhance={handleGenericSubmit}
+										bind:this={mediumFormRefs[step.id]}
+									>
+										<input type="hidden" name="stepId" value={step.id} />
+										<input type="hidden" name="medium" value={pendingMediumByStep[step.id] ?? ''} />
+									</form>
+								</div>
+
+								<div>
+									<p class="cet-subtle-label">Fricção neste momento (opcional) — pode marcar mais de uma</p>
+									<div class="cet-chip-row">
+										{#each TREATMENT_FRICTION_OPTIONS as option (option.id)}
+											<form method="POST" action="?/toggleTreatmentStepFriction" use:enhance={handleGenericSubmit}>
+												<input type="hidden" name="stepId" value={step.id} />
+												<input type="hidden" name="friction" value={option.id} />
+												<button
+													type="submit"
+													class="cet-friction-pill"
+													class:cet-selected={step.frictions.includes(option.id)}>{option.label}</button
+												>
+											</form>
+										{/each}
+									</div>
+								</div>
+							</div>
+						{/if}
+					</div>
 				</div>
-			</form>
-			<form method="POST" action="?/setTreatmentNoTreatment" use:enhance={handleGenericSubmit}>
-				<input type="hidden" name="noTreatment" value="true" />
-				<button type="submit" class="cet-ghost-affordance">Hoje não existe um tratamento definido</button>
-			</form>
+			{/each}
+
+			<div class="cet-node-row cet-node-row-add">
+				<div class="cet-rail-col">
+					<div class="cet-node-circle cet-node-circle-dashed" aria-hidden="true">+</div>
+				</div>
+				<div class="cet-node-content">
+					<p class="cet-prompt-question">{promptQuestion}</p>
+					<form method="POST" action="?/addTreatmentStep" use:enhance={handleAddStepSubmit} bind:this={addStepFormEl}>
+						<div class="cet-custom-form">
+							<input
+								type="text"
+								name="whatHappens"
+								placeholder="Descrever em poucas palavras…"
+								bind:value={newStepValue}
+							/>
+							<button type="submit" disabled={newStepTrimmed.length === 0}>Adicionar</button>
+						</div>
+					</form>
+					<form method="POST" action="?/setTreatmentNoTreatment" use:enhance={handleGenericSubmit}>
+						<input type="hidden" name="noTreatment" value="true" />
+						<button type="submit" class="cet-ghost-affordance">Hoje não existe um tratamento definido</button>
+					</form>
+				</div>
+			</div>
 		</div>
 
 		{#if steps.length > 0}
-			<div class="cet-synthesis">
-				<p class="cet-eyebrow">Como funciona hoje</p>
-				<p class="cet-synthesis-text">{synthesis}</p>
+			<div class="cet-synthesis-row">
+				<div class="cet-rail-col"><div class="cet-rail-solo"></div></div>
+				<div class="cet-synthesis">
+					<p class="cet-eyebrow cet-eyebrow-muted">↳ Como funciona hoje</p>
+					<p class="cet-synthesis-text">{synthesis}</p>
+				</div>
 			</div>
 		{/if}
 	{/if}
@@ -533,15 +554,75 @@
 		margin-bottom: 0.875rem;
 	}
 
-	.cet-step-card {
-		background: var(--hydra-surface);
-		border: 1px solid var(--hydra-border);
-		border-radius: 0.75rem;
-		padding: 0.875rem 1rem;
-		margin-bottom: 0.625rem;
+	/* Cadeia vertical contínua (Claude Design, "Como e Tratado Hoje -
+	   Refinamento Visual.dc.html", alternativa 1A, Visual Gate deste corte):
+	   cada passo é um nó circular numerado ligado ao próximo por um trilho
+	   vertical; o nó "+" (tracejado, sem trilho de entrada) representa o
+	   próximo passo ainda não construído. `.cet-rail-col` empilha via flex
+	   (não posicionamento absoluto sobre a lista inteira) para acompanhar
+	   naturalmente altura dinâmica de conteúdo, reordenar, expandir/
+	   recolher e adicionar/remover passos sem recalcular offsets. */
+	.cet-chain {
+		display: flex;
+		flex-direction: column;
 	}
 
-	.cet-step-pulse {
+	.cet-node-row {
+		display: flex;
+		gap: 0.875rem;
+		padding-bottom: 1.375rem;
+	}
+
+	.cet-node-row:last-child {
+		padding-bottom: 0;
+	}
+
+	.cet-rail-col {
+		width: 1.875rem;
+		flex-shrink: 0;
+		display: flex;
+		justify-content: center;
+		position: relative;
+	}
+
+	.cet-node-row:not(:last-child) .cet-rail-col::before {
+		content: '';
+		position: absolute;
+		top: 1.875rem;
+		bottom: 0;
+		left: 50%;
+		width: 2px;
+		transform: translateX(-50%);
+		background: var(--hydra-border);
+	}
+
+	.cet-node-circle {
+		width: 1.875rem;
+		height: 1.875rem;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.75rem;
+		font-weight: 700;
+		flex-shrink: 0;
+		background: var(--hydra-bg);
+		position: relative;
+		z-index: 1;
+	}
+
+	.cet-node-circle-num {
+		border: 2px solid var(--hydra-accent);
+		color: var(--hydra-accent);
+	}
+
+	.cet-node-circle-dashed {
+		border: 2px dashed var(--hydra-border);
+		color: var(--hydra-muted);
+		font-size: 0.875rem;
+	}
+
+	.cet-node-pulse {
 		animation: cet-pulse-glow 1.4s ease;
 	}
 
@@ -557,6 +638,16 @@
 		}
 	}
 
+	.cet-node-content {
+		min-width: 0;
+		flex: 1;
+		padding-top: 0.1875rem;
+	}
+
+	.cet-node-row-add .cet-node-content {
+		padding-top: 0.25rem;
+	}
+
 	.cet-step-head {
 		display: flex;
 		justify-content: space-between;
@@ -564,26 +655,12 @@
 		gap: 0.625rem;
 	}
 
-	.cet-step-num-label {
-		display: flex;
-		gap: 0.625rem;
-		align-items: flex-start;
-		min-width: 0;
-	}
-
-	.cet-step-num {
-		font-size: 0.8125rem;
-		font-weight: 700;
-		color: var(--hydra-accent);
-		flex-shrink: 0;
-		line-height: 1.5;
-	}
-
 	.cet-step-label {
 		font-size: 0.90625rem;
 		color: var(--hydra-text);
 		font-weight: 600;
 		line-height: 1.5;
+		min-width: 0;
 	}
 
 	.cet-step-actions {
@@ -766,10 +843,6 @@
 		color: #fca5a5;
 	}
 
-	.cet-add-section {
-		margin-top: 0.25rem;
-	}
-
 	.cet-prompt-question {
 		font-size: 0.84375rem;
 		font-weight: 600;
@@ -777,20 +850,47 @@
 		margin: 0 0 0.625rem;
 	}
 
-	.cet-add-section > form:last-of-type {
+	.cet-node-row-add form:last-of-type {
 		margin-top: 0.625rem;
 	}
 
+	/* Trilho residual que leva da corrente até a síntese — mesma coluna de
+	   30px dos nós, sem círculo, indicando que "Como funciona hoje" pendura
+	   do mesmo trilho em vez de flutuar como um bloco à parte. */
+	.cet-synthesis-row {
+		display: flex;
+		gap: 0.875rem;
+		margin-top: 0.375rem;
+	}
+
+	.cet-rail-solo {
+		width: 2px;
+		height: 100%;
+		min-height: 1.25rem;
+		background: var(--hydra-border);
+		opacity: 0.6;
+	}
+
+	/* Leitura derivada, não um card a gerenciar: sem superfície nem borda —
+	   só recuo e itálico, pendurados no mesmo trilho (cet-rail-solo) que já
+	   liga a síntese à cadeia. */
 	.cet-synthesis {
-		margin-top: 1.75rem;
-		background: var(--hydra-surface);
-		border: 1px solid var(--hydra-border);
-		border-radius: 0.75rem;
-		padding: 1rem 1.25rem;
+		flex: 1;
+		min-width: 0;
+		padding: 0.125rem 0 0;
+	}
+
+	.cet-eyebrow-muted {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		color: var(--hydra-muted);
+		opacity: 0.85;
 	}
 
 	.cet-synthesis-text {
 		font-size: 0.84375rem;
+		font-style: italic;
 		color: var(--hydra-muted);
 		line-height: 1.7;
 		margin: 0;
@@ -813,5 +913,32 @@
 		font-family: inherit;
 		padding: 0.75rem 1.125rem;
 		cursor: pointer;
+	}
+
+	/* Compacta o trilho na largura mobile do frame 1A (260px) — mesma
+	   proporção de redução (30px → 24px) usada no artefato aprovado. */
+	@media (max-width: 30rem) {
+		.cet-rail-col {
+			width: 1.5rem;
+		}
+
+		.cet-node-circle {
+			width: 1.5rem;
+			height: 1.5rem;
+			font-size: 0.6875rem;
+		}
+
+		.cet-node-row:not(:last-child) .cet-rail-col::before {
+			top: 1.5rem;
+		}
+
+		.cet-node-row {
+			gap: 0.625rem;
+			padding-bottom: 1.125rem;
+		}
+
+		.cet-synthesis-row {
+			gap: 0.625rem;
+		}
 	}
 </style>

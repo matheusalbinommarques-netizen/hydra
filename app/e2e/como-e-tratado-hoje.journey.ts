@@ -68,8 +68,8 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Financeiro percebe o atraso');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
 
-		await expect(page.locator('.cet-step-card')).toHaveCount(1);
-		await expect(page.locator('.cet-step-card').getByText('Financeiro percebe o atraso')).toBeVisible();
+		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
+		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)').getByText('Financeiro percebe o atraso')).toBeVisible();
 	});
 
 	await test.step('segundo passo: prompt vira "E depois?"', async () => {
@@ -77,14 +77,14 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Gestor aprova manualmente');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
 
-		await expect(page.locator('.cet-step-card')).toHaveCount(2);
-		const cards = page.locator('.cet-step-card');
+		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(2);
+		const cards = page.locator('.cet-node-row:not(.cet-node-row-add)');
 		await expect(cards.nth(0)).toContainText('Financeiro percebe o atraso');
 		await expect(cards.nth(1)).toContainText('Gestor aprova manualmente');
 	});
 
 	await test.step('reordenar: mover o segundo passo para cima troca a ordem exibida', async () => {
-		const cards = page.locator('.cet-step-card');
+		const cards = page.locator('.cet-node-row:not(.cet-node-row-add)');
 		await cards.nth(1).getByRole('button', { name: 'Mover para cima' }).click();
 
 		await expect(cards.nth(0)).toContainText('Gestor aprova manualmente');
@@ -96,7 +96,7 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	});
 
 	await test.step('contexto e fricções ficam atrás de uma affordance secundária, fechada por padrão', async () => {
-		const firstCard = page.locator('.cet-step-card').nth(0);
+		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
 		await expect(firstCard.getByText('Quem atua aqui?')).toHaveCount(0);
 
 		await firstCard.getByRole('button', { name: '+ Adicionar contexto e fricções' }).click();
@@ -104,44 +104,44 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	});
 
 	await test.step('quem atua: sugestão vem do AffectedGroup real do projeto (Financeiro)', async () => {
-		const firstCard = page.locator('.cet-step-card').nth(0);
+		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
 		await firstCard.getByRole('button', { name: 'Financeiro', exact: true }).click();
 		await expect(firstCard.locator('.cet-tag-actor', { hasText: 'Financeiro' })).toBeVisible();
 	});
 
 	await test.step('meio/ferramenta: seleciona uma sugestão genérica', async () => {
-		const firstCard = page.locator('.cet-step-card').nth(0);
+		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
 		await firstCard.getByRole('button', { name: 'Planilha', exact: true }).click();
 		await expect(firstCard.locator('.cet-tag-medium', { hasText: 'Planilha' })).toBeVisible();
 	});
 
 	await test.step('fricção: pode marcar mais de uma', async () => {
-		const firstCard = page.locator('.cet-step-card').nth(0);
+		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
 		await firstCard.getByRole('button', { name: 'Espera', exact: true }).click();
 		await firstCard.getByRole('button', { name: 'Retrabalho', exact: true }).click();
 		await expect(firstCard.locator('.cet-tag-friction')).toHaveCount(2);
 	});
 
-	await test.step('síntese derivada ("Como funciona hoje") reflete os passos, sem ser editável', async () => {
+	await test.step('síntese derivada ("Como funciona hoje") lê a sequência reduzida (Primeiro/Depois), sem ator/meio, com fricções consolidadas', async () => {
 		const synthesis = page.locator('.cet-synthesis');
 		await expect(synthesis.getByText('Como funciona hoje')).toBeVisible();
-		await expect(synthesis).toContainText('Financeiro percebe o atraso');
-		await expect(synthesis).toContainText('Financeiro');
-		await expect(synthesis).toContainText('Planilha');
-		await expect(synthesis).toContainText('espera');
-		await expect(synthesis).toContainText('Gestor aprova manualmente');
+		await expect(synthesis.locator('.cet-synthesis-text')).toHaveText(
+			'Primeiro: Financeiro percebe o atraso. Depois: Gestor aprova manualmente. Fricções observadas: espera e retrabalho.'
+		);
+		// ator e meio ficam só na cadeia — não são reinjetados na síntese.
+		await expect(synthesis).not.toContainText('Planilha');
 	});
 
 	await test.step('remover um passo: cadeia volta a ter 1 passo', async () => {
-		const cards = page.locator('.cet-step-card');
+		const cards = page.locator('.cet-node-row:not(.cet-node-row-add)');
 		await cards.nth(1).getByRole('button', { name: 'Remover passo' }).click();
-		await expect(page.locator('.cet-step-card')).toHaveCount(1);
+		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
 	});
 
 	await test.step('"Hoje não existe um tratamento definido": alterna o estado e permite voltar', async () => {
 		await page.getByRole('button', { name: 'Hoje não existe um tratamento definido' }).click();
 		await expect(page.getByText('Hoje não existe um tratamento definido. Quando isso aparece')).toBeVisible();
-		await expect(page.locator('.cet-step-card')).toHaveCount(0);
+		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(0);
 
 		// voltar a descrever
 		await page.getByRole('button', { name: 'Na verdade, existe algo — quero descrever' }).click();
@@ -151,7 +151,7 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	await test.step('adicionar um passo de novo e concluir a atividade', async () => {
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Financeiro percebe o atraso');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-		await expect(page.locator('.cet-step-card')).toHaveCount(1);
+		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
 
 		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 		await expect(page.getByRole('heading', { name: 'Resultado desejado' })).toBeVisible();
@@ -202,7 +202,7 @@ test('Como é tratado hoje — viewport 375px: sem overflow horizontal na cadeia
 		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Financeiro percebe o atraso');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-		await page.locator('.cet-step-card').getByRole('button', { name: '+ Adicionar contexto e fricções' }).click();
+		await page.locator('.cet-node-row:not(.cet-node-row-add)').getByRole('button', { name: '+ Adicionar contexto e fricções' }).click();
 	});
 
 	await test.step('sem overflow horizontal', async () => {

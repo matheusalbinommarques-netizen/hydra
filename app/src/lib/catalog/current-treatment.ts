@@ -54,33 +54,60 @@ export interface TreatmentStepSynthesisInput {
 	frictions: readonly TreatmentFriction[];
 }
 
+/** "Primeiro"/"Depois"/"Por fim" — null quando há um único passo (nada a sequenciar). */
+function sequenceStepMarker(index: number, total: number): string | null {
+	if (total <= 1) return null;
+	if (index === 0) return 'Primeiro';
+	if (index === total - 1 && total > 2) return 'Por fim';
+	return 'Depois';
+}
+
+/** Fricções presentes na cadeia, sem duplicatas, na ordem em que aparecem pela primeira vez. */
+function consolidateFrictions(steps: readonly TreatmentStepSynthesisInput[]): TreatmentFriction[] {
+	const seen = new Set<TreatmentFriction>();
+	const result: TreatmentFriction[] = [];
+	for (const step of steps) {
+		for (const friction of step.frictions) {
+			if (!seen.has(friction)) {
+				seen.add(friction);
+				result.push(friction);
+			}
+		}
+	}
+	return result;
+}
+
+function joinWithAnd(items: readonly string[]): string {
+	if (items.length <= 1) return items.join('');
+	if (items.length === 2) return items.join(' e ');
+	return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+}
+
 /**
- * Síntese determinística de "Como funciona hoje" — uma frase por passo,
- * concatenadas ("Quando isso aparece, … Em seguida, … Depois, …"), incorpora
- * contexto/fricção só quando a frase continua natural. Nunca editável, nunca
- * source of truth (ver HYDRA_PRODUCT_REWORK.md §34, "Síntese derivada").
- * `noTreatment: true` tem sua própria frase fixa — não passa por aqui.
+ * Síntese determinística de "Como funciona hoje" — uma leitura reduzida do
+ * fluxo, não uma serialização de cada TreatmentStep: um marcador de sequência
+ * por passo ("Primeiro"/"Depois"/"Por fim", ausente com um único passo) mais
+ * o que acontece, e as fricções da cadeia consolidadas ao final, sem
+ * duplicatas. Ator e meio/ferramenta ficam só na cadeia (cet-step-card),
+ * nunca repetidos aqui. Nunca editável, nunca source of truth (ver
+ * HYDRA_PRODUCT_REWORK.md §34, "Síntese derivada"). `noTreatment: true` tem
+ * sua própria frase fixa — não passa por aqui.
  */
 export function summarizeTreatmentSteps(steps: readonly TreatmentStepSynthesisInput[]): string {
 	if (steps.length === 0) return '';
 
-	return steps
+	const sequence = steps
 		.map((step, index) => {
-			const prefix = index === 0 ? 'Quando isso aparece, ' : index === 1 ? 'Em seguida, ' : 'Depois, ';
-			let clause = prefix + step.whatHappens;
-
-			const extras: string[] = [];
-			if (step.actors.length > 0) extras.push(step.actors.join(' e '));
-			if (step.medium) extras.push(`usando ${step.medium}`);
-			if (extras.length > 0) clause += ` (${extras.join(', ')})`;
-
-			if (step.frictions.length > 0) {
-				clause += ` — fricção: ${step.frictions.map((f) => treatmentFrictionLabel(f).toLowerCase()).join(', ')}`;
-			}
-
-			return `${clause}.`;
+			const marker = sequenceStepMarker(index, steps.length);
+			return marker ? `${marker}: ${step.whatHappens}.` : `${step.whatHappens}.`;
 		})
 		.join(' ');
+
+	const frictions = consolidateFrictions(steps);
+	if (frictions.length === 0) return sequence;
+
+	const frictionLabels = frictions.map((f) => treatmentFrictionLabel(f).toLowerCase());
+	return `${sequence} Fricções observadas: ${joinWithAnd(frictionLabels)}.`;
 }
 
 export const NO_TREATMENT_SYNTHESIS = 'Hoje não existe um tratamento definido.';

@@ -99,7 +99,7 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 		const estadoAtual = view.overview.find((b) => b.activityId === 'estado_atual')!;
 		expect(estadoAtual.heading).toBe('Como é tratado hoje');
 		expect(estadoAtual.editLabel).toBe('Editar como é tratado hoje');
-		expect(estadoAtual.value).toBe('1 etapa descrita. Quando isso aparece, Cada time usa sua planilha..');
+		expect(estadoAtual.value).toBe('1 etapa descrita. Cada time usa sua planilha..');
 
 		const semTratamento = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: true }, []);
 		const bloco = semTratamento.overview.find((b) => b.activityId === 'estado_atual')!;
