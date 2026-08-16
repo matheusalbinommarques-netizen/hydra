@@ -74,6 +74,12 @@ test('Bancada: "Definir visão do produto" campo a campo, painel crescendo, etap
 		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
 		await skipCurrentActivity(page);
 
+		// "Entender as causas" (Stage 4B do rework) também tem componente
+		// bespoke próprio (EntenderCausas.svelte) — heading próprio, fora do
+		// loop genérico abaixo.
+		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
+		await skipCurrentActivity(page);
+
 		for (const heading of ['Resultado desejado']) {
 			await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
 			await skipCurrentActivity(page);

@@ -55,6 +55,13 @@ function createBareProject(name: string): string {
 			projectId,
 			new Date().toISOString()
 		);
+		// cause_exploration é 1:1 com project (Stage 4B do rework), mesmo padrão
+		// de current_treatment acima — sem essa linha, findById lança erro de
+		// violação de schema.
+		db.prepare('INSERT INTO cause_exploration (project_id, still_unknown, updated_at) VALUES (?, 0, ?)').run(
+			projectId,
+			new Date().toISOString()
+		);
 	} finally {
 		db.close();
 	}

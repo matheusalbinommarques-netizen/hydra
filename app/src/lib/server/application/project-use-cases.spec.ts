@@ -429,6 +429,7 @@ describe('createProjectUseCases — answerActivity', () => {
 		await useCases.confirmAffectedGroups({ projectId });
 		await useCases.addTreatmentStep({ projectId, whatHappens: 'x' });
 		await useCases.confirmTreatment({ projectId });
+		await useCases.confirmCauseHypotheses({ projectId });
 		await useCases.answerActivity({
 			projectId,
 			activityDefinitionId: 'resultado',
@@ -1218,7 +1219,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 });
 
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
-	it('o registro persistido contém só os 10 tipos de domínio', async () => {
+	it('o registro persistido contém só os 12 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1242,12 +1243,14 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'externalActions',
 				'evidences',
 				'currentTreatment',
-				'treatmentSteps'
+				'treatmentSteps',
+				'causeExploration',
+				'causeHypotheses'
 			].sort()
 		);
 	});
 
-	it('ProjectView contém só os 25 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 30 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1280,7 +1283,10 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'evidences',
 				'currentTreatment',
 				'treatmentSteps',
-				'treatmentConfirmationIssues'
+				'treatmentConfirmationIssues',
+				'causeExploration',
+				'causeHypotheses',
+				'causeHypothesisConfirmationIssues'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');
@@ -1659,6 +1665,128 @@ describe('createProjectUseCases — "Como é tratado hoje" (Stage 4A do rework)'
 	it('project_not_found quando o projeto não existe (addTreatmentStep)', async () => {
 		const { useCases } = setup();
 		expect(await useCases.addTreatmentStep({ projectId: 'nao-existe', whatHappens: 'x' })).toEqual({
+			ok: false,
+			error: { kind: 'project_not_found' }
+		});
+	});
+});
+
+describe('createProjectUseCases — "Entender as causas" (Stage 4B do rework)', () => {
+	async function newProject(clock = '2026-01-01T00:00:00.000Z') {
+		const ctx = setup(clock);
+		const created = await ctx.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		return { ...ctx, projectId: created.value.projectId };
+	}
+
+	it('addCauseHypothesis cria uma hipótese e reflete em ProjectView.causeHypotheses; nunca bloqueia confirmCauseHypotheses', async () => {
+		const { useCases, projectId } = await newProject();
+		const result = await useCases.addCauseHypothesis({
+			projectId,
+			title: 'O aprovador só revisa a planilha uma vez por semana',
+			origin: 'Fricção observada'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.causeHypotheses).toEqual([
+			{
+				id: expect.any(String),
+				title: 'O aprovador só revisa a planilha uma vez por semana',
+				origin: 'Fricção observada',
+				expectedIfTrue: null,
+				whatWeakensIt: null,
+				evidenceIds: []
+			}
+		]);
+		expect(result.value.causeExploration).toEqual({ stillUnknown: false });
+		expect(result.value.causeHypothesisConfirmationIssues).toEqual([]);
+
+		const confirmed = await useCases.confirmCauseHypotheses({ projectId });
+		expect(confirmed.ok).toBe(true);
+		if (!confirmed.ok) return;
+		expect(confirmed.value.activityStatuses.entender_causas).toBe('concluída');
+	});
+
+	it('confirmCauseHypotheses conclui mesmo sem nenhuma hipótese registrada (nunca bloqueada)', async () => {
+		const { useCases, projectId } = await newProject();
+		const confirmed = await useCases.confirmCauseHypotheses({ projectId });
+		expect(confirmed.ok).toBe(true);
+		if (!confirmed.ok) return;
+		expect(confirmed.value.activityStatuses.entender_causas).toBe('concluída');
+	});
+
+	it('setCauseHypothesisExpectedIfTrue/WhatWeakensIt refletem em ProjectView', async () => {
+		const { useCases, projectId } = await newProject();
+		const added = await useCases.addCauseHypothesis({ projectId, title: 'Hipótese' });
+		if (!added.ok) throw new Error('esperado ok');
+		const hypothesisId = added.value.causeHypotheses[0].id;
+
+		const withExpected = await useCases.setCauseHypothesisExpectedIfTrue({
+			projectId,
+			hypothesisId,
+			value: 'Atrasos concentrados numa janela'
+		});
+		if (!withExpected.ok) throw new Error('esperado ok');
+		expect(withExpected.value.causeHypotheses[0].expectedIfTrue).toBe('Atrasos concentrados numa janela');
+
+		const withWeakens = await useCases.setCauseHypothesisWhatWeakensIt({
+			projectId,
+			hypothesisId,
+			value: 'Atrasos distribuídos ao longo da semana'
+		});
+		if (!withWeakens.ok) throw new Error('esperado ok');
+		expect(withWeakens.value.causeHypotheses[0].whatWeakensIt).toBe('Atrasos distribuídos ao longo da semana');
+	});
+
+	it('removeCauseHypothesis remove a hipótese', async () => {
+		const { useCases, projectId } = await newProject();
+		const added = await useCases.addCauseHypothesis({ projectId, title: 'Hipótese' });
+		if (!added.ok) throw new Error('esperado ok');
+		const hypothesisId = added.value.causeHypotheses[0].id;
+
+		const removed = await useCases.removeCauseHypothesis({ projectId, hypothesisId });
+		if (!removed.ok) throw new Error('esperado ok');
+		expect(removed.value.causeHypotheses).toEqual([]);
+	});
+
+	it('markCauseExplorationUnknown define stillUnknown; rejeita com hipóteses existentes; undo desliga', async () => {
+		const { useCases, projectId } = await newProject();
+		const marked = await useCases.markCauseExplorationUnknown({ projectId });
+		if (!marked.ok) throw new Error('esperado ok');
+		expect(marked.value.causeExploration).toEqual({ stillUnknown: true });
+
+		const undone = await useCases.undoCauseExplorationUnknown({ projectId });
+		if (!undone.ok) throw new Error('esperado ok');
+		expect(undone.value.causeExploration).toEqual({ stillUnknown: false });
+
+		const added = await useCases.addCauseHypothesis({ projectId, title: 'Hipótese' });
+		if (!added.ok) throw new Error('esperado ok');
+		expect(await useCases.markCauseExplorationUnknown({ projectId })).toEqual({
+			ok: false,
+			error: { kind: 'cause_exploration_has_hypotheses' }
+		});
+	});
+
+	it('addCauseHypothesis: invalid_field_value para título vazio', async () => {
+		const { useCases, projectId } = await newProject();
+		expect(await useCases.addCauseHypothesis({ projectId, title: '   ' })).toEqual({
+			ok: false,
+			error: { kind: 'invalid_field_value', fieldDefinitionId: 'title' }
+		});
+	});
+
+	it('removeCauseHypothesis: cause_hypothesis_not_found para id inexistente', async () => {
+		const { useCases, projectId } = await newProject();
+		expect(await useCases.removeCauseHypothesis({ projectId, hypothesisId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'cause_hypothesis_not_found' }
+		});
+	});
+
+	it('project_not_found quando o projeto não existe (addCauseHypothesis)', async () => {
+		const { useCases } = setup();
+		expect(await useCases.addCauseHypothesis({ projectId: 'nao-existe', title: 'x' })).toEqual({
 			ok: false,
 			error: { kind: 'project_not_found' }
 		});

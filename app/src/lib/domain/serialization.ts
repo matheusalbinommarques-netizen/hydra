@@ -10,6 +10,8 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	Answer,
+	CauseExploration,
+	CauseHypothesis,
 	CurrentTreatment,
 	Evidence,
 	EvidenceOutcome,
@@ -529,6 +531,65 @@ function parseTreatmentStepList(value: unknown): Result<TreatmentStep[], Project
 	return { ok: true, value: result };
 }
 
+function parseCauseExploration(value: unknown): Result<CauseExploration, ProjectStateParseError> {
+	if (!isRecord(value)) return shapeError('causeExploration deve ser um objeto');
+	if (!isString(value.projectId)) return shapeError('CauseExploration.projectId deve ser uma string');
+	if (typeof value.stillUnknown !== 'boolean') {
+		return shapeError('CauseExploration.stillUnknown deve ser um booleano');
+	}
+	if (!isIsoDateString(value.updatedAt)) {
+		return shapeError('CauseExploration.updatedAt deve ser uma data ISO 8601 válida');
+	}
+	return {
+		ok: true,
+		value: { projectId: value.projectId, stillUnknown: value.stillUnknown, updatedAt: value.updatedAt }
+	};
+}
+
+function parseCauseHypothesisList(value: unknown): Result<CauseHypothesis[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('causeHypotheses deve ser um array');
+	const result: CauseHypothesis[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada CauseHypothesis deve ser um objeto');
+		if (!isString(item.id)) return shapeError('CauseHypothesis.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('CauseHypothesis.projectId deve ser uma string');
+		if (!isString(item.title) || item.title.trim().length === 0) {
+			return shapeError('CauseHypothesis.title deve ser uma string não vazia');
+		}
+		if (item.origin !== null && !isString(item.origin)) {
+			return shapeError('CauseHypothesis.origin deve ser string ou null');
+		}
+		if (item.expectedIfTrue !== null && !isString(item.expectedIfTrue)) {
+			return shapeError('CauseHypothesis.expectedIfTrue deve ser string ou null');
+		}
+		if (item.whatWeakensIt !== null && !isString(item.whatWeakensIt)) {
+			return shapeError('CauseHypothesis.whatWeakensIt deve ser string ou null');
+		}
+		if (!isStringArray(item.evidenceIds)) {
+			return shapeError('CauseHypothesis.evidenceIds deve ser um array de strings');
+		}
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('CauseHypothesis.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (!isIsoDateString(item.updatedAt)) {
+			return shapeError('CauseHypothesis.updatedAt deve ser uma data ISO 8601 válida');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			title: item.title,
+			origin: item.origin as string | null,
+			expectedIfTrue: item.expectedIfTrue as string | null,
+			whatWeakensIt: item.whatWeakensIt as string | null,
+			evidenceIds: item.evidenceIds,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -554,7 +615,9 @@ function assembleProjectState(
 	externalActions: ExternalAction[],
 	evidences: Evidence[],
 	currentTreatment: CurrentTreatment,
-	treatmentSteps: TreatmentStep[]
+	treatmentSteps: TreatmentStep[],
+	causeExploration: CauseExploration,
+	causeHypotheses: CauseHypothesis[]
 ): Result<ProjectState, ProjectStateParseError> {
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
@@ -946,6 +1009,42 @@ function assembleProjectState(
 		}
 	}
 
+	// referência + invariante: CauseExploration — 1:1 com Project (mesmo
+	// padrão de CurrentTreatment).
+	if (causeExploration.projectId !== project.id) {
+		return invariantError('CauseExploration usa projectId diferente do Project');
+	}
+
+	// referências + invariantes: CauseHypothesis — ligada à atividade
+	// `entender_causas` do catálogo, mas sem activityDefinitionId próprio
+	// (mesmo padrão de AffectedGroup). evidenceIds referencia Evidence real do
+	// mesmo projeto — relação opcional, nunca um novo tipo de evidência.
+	const seenCauseHypothesisIds = new Set<string>();
+	const evidenceIdsInProject = new Set(evidences.map((evidence) => evidence.id));
+	for (const hypothesis of causeHypotheses) {
+		if (hypothesis.projectId !== project.id) {
+			return invariantError(`CauseHypothesis "${hypothesis.id}" usa projectId diferente do Project`);
+		}
+		if (seenCauseHypothesisIds.has(hypothesis.id)) {
+			return invariantError(`CauseHypothesis.id duplicado: "${hypothesis.id}"`);
+		}
+		seenCauseHypothesisIds.add(hypothesis.id);
+		for (const evidenceId of hypothesis.evidenceIds) {
+			if (!evidenceIdsInProject.has(evidenceId)) {
+				return referenceError(
+					`CauseHypothesis "${hypothesis.id}" referencia evidenceId "${evidenceId}", que não existe`
+				);
+			}
+		}
+	}
+
+	// Nenhum invariante de conclusão a checar aqui — diferente de
+	// AffectedGroup/CurrentTreatment, "entender_causas" nunca bloqueia
+	// conclusão por estado incompleto (getCauseHypothesesConfirmationIssues é
+	// sempre []), então não existe combinação de activityProgress +
+	// causeHypotheses/causeExploration que viole uma invariante de
+	// confirmação.
+
 	return {
 		ok: true,
 		value: {
@@ -960,7 +1059,9 @@ function assembleProjectState(
 			externalActions,
 			evidences,
 			currentTreatment,
-			treatmentSteps
+			treatmentSteps,
+			causeExploration,
+			causeHypotheses
 		}
 	};
 }
@@ -1045,6 +1146,23 @@ export function deserializeProjectState(
 	const treatmentStepsResult = parseTreatmentStepList(state.treatmentSteps);
 	if (!treatmentStepsResult.ok) return treatmentStepsResult;
 
+	// causeExploration é 1:1 com o projeto, mas não existia antes do Stage 4B
+	// do rework — mesmo espírito de currentTreatment acima: um snapshot antigo
+	// é reconstruído com o mesmo estado inicial que createInitialProjectState
+	// sempre produziu (stillUnknown: false), nunca inferido do conteúdo do
+	// snapshot.
+	const causeExplorationResult =
+		state.causeExploration === undefined
+			? ({
+					ok: true,
+					value: { projectId: projectResult.value.id, stillUnknown: false, updatedAt: projectResult.value.createdAt }
+				} as const)
+			: parseCauseExploration(state.causeExploration);
+	if (!causeExplorationResult.ok) return causeExplorationResult;
+
+	const causeHypothesesResult = parseCauseHypothesisList(state.causeHypotheses);
+	if (!causeHypothesesResult.ok) return causeHypothesesResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
@@ -1058,6 +1176,8 @@ export function deserializeProjectState(
 		externalActionsResult.value,
 		evidencesResult.value,
 		currentTreatmentResult.value,
-		treatmentStepsResult.value
+		treatmentStepsResult.value,
+		causeExplorationResult.value,
+		causeHypothesesResult.value
 	);
 }

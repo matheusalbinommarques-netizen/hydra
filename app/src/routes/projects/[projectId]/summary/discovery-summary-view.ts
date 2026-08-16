@@ -12,6 +12,7 @@ import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
 import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
 import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
 import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
+import { causeHypothesisCountLabel } from '$lib/catalog/cause-hypothesis';
 
 export interface DiscoveryOverviewBlock {
 	activityId: string;
@@ -35,7 +36,14 @@ export interface DiscoverySummaryView {
 	detailsOpenByDefault: boolean;
 }
 
-const DISCOVERY_REQUIRED_FIELDS_ACTIVITY_IDS = ['origem', 'problema', 'publico', 'estado_atual', 'resultado'];
+const DISCOVERY_REQUIRED_FIELDS_ACTIVITY_IDS = [
+	'origem',
+	'problema',
+	'publico',
+	'estado_atual',
+	'entender_causas',
+	'resultado'
+];
 
 function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: string, encodedValue: string): string[] {
 	for (const phase of catalog.phases) {
@@ -57,7 +65,9 @@ export function buildDiscoverySummaryView(
 	affectedGroups: AffectedGroupSummaryInput[] = [],
 	evidences: readonly { affectedGroupId: string }[] = [],
 	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
-	treatmentSteps: TreatmentStepSynthesisInput[] = []
+	treatmentSteps: TreatmentStepSynthesisInput[] = [],
+	causeExploration: { stillUnknown: boolean } = { stillUnknown: false },
+	causeHypotheses: readonly { title: string }[] = []
 ): DiscoverySummaryView {
 	const overview: DiscoveryOverviewBlock[] = [];
 
@@ -102,6 +112,16 @@ export function buildDiscoverySummaryView(
 		});
 	}
 
+	if (causeExploration.stillUnknown || causeHypotheses.length > 0) {
+		overview.push({
+			activityId: 'entender_causas',
+			heading: 'Hipóteses de causa',
+			editLabel: 'Editar hipóteses de causa',
+			value: causeHypothesisCountLabel(causeExploration.stillUnknown, causeHypotheses.length),
+			chips: causeHypotheses.length > 0 ? causeHypotheses.map((hypothesis) => hypothesis.title) : undefined
+		});
+	}
+
 	const mudanca = answers['mudanca'];
 	if (mudanca) {
 		overview.push({
@@ -116,6 +136,7 @@ export function buildDiscoverySummaryView(
 		{ label: 'Problema definido', complete: activityStatuses['problema'] === 'concluída' },
 		{ label: 'Público definido', complete: activityStatuses['publico'] === 'concluída' },
 		{ label: 'Como é tratado hoje definido', complete: activityStatuses['estado_atual'] === 'concluída' },
+		{ label: 'Causas exploradas', complete: activityStatuses['entender_causas'] === 'concluída' },
 		{ label: 'Resultado definido', complete: activityStatuses['resultado'] === 'concluída' }
 	];
 

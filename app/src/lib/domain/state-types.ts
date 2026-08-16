@@ -248,6 +248,57 @@ export interface TreatmentStep {
 	updatedAt: string;
 }
 
+// Hipóteses de causa — Descoberta, "Entender as causas" (Stage 4B do rework,
+// Claude Design, "Entender as Causas - 1A Refinada.dc.html"). Objeto vivo
+// real, mesmo espírito de AffectedGroup: coleção ligada a uma atividade do
+// catálogo (completion deriva do estado estruturado), mas — ao contrário de
+// AffectedGroup/CurrentTreatment — a conclusão nunca é bloqueada por estado
+// incompleto (ver getCauseHypothesesConfirmationIssues em transitions.ts):
+// "ainda não sabemos o que está por trás disso" é um resultado legítimo, não
+// uma resposta pendente. Nome deliberadamente `CauseHypothesis`, não
+// `Hypothesis` — esse nome já é usado por orientation-engine/hypotheses.ts
+// para hipóteses de escopo/solução (campo `hipotese_opt`), um conceito
+// diferente; reaproveitar o nome causaria ambiguidade.
+//
+// `origin` — proveniência/contexto de onde a hipótese surgiu (rótulo do
+// "cartão de contexto" usado como ponto de partida, ex.: "Fricção
+// observada", ou "Sugestão do Hydra" quando aceita a partir de uma sugestão
+// condicional), nunca evidência causal — é só texto de apoio, sem relação
+// com Evidence.evidenceIds abaixo.
+//
+// `evidenceIds` — relação opcional com Evidence já existente (ETAPA 3 do
+// rework), nunca um novo tipo de evidência: array de ids (mesmo padrão de
+// TreatmentStep.actors/frictions, JSON em TEXT na persistência), validado em
+// domain/serialization.ts contra as Evidence reais do projeto. Uma mesma
+// Evidence pode ser relacionada a mais de uma hipótese (checkbox
+// independente por hipótese no Design Gate, não seleção exclusiva).
+//
+// `expectedIfTrue`/`whatWeakensIt` — aprofundamento opcional, sempre
+// null até o usuário preencher; nunca aparecem como requisito de conclusão.
+export interface CauseExploration {
+	projectId: string;
+	// Estado explícito "ainda não sabemos o que está por trás disso" — nunca
+	// alcançável (ver markCauseExplorationUnknown em transitions.ts) enquanto
+	// existir qualquer CauseHypothesis, mesma regra já aplicada pela
+	// interface no Design Gate (o link só aparece com zero hipóteses): evita
+	// a ambiguidade de o que fazer com hipóteses existentes ao ligar este
+	// estado, sem precisar de uma transição destrutiva.
+	stillUnknown: boolean;
+	updatedAt: string;
+}
+
+export interface CauseHypothesis {
+	id: string;
+	projectId: string;
+	title: string;
+	origin: string | null;
+	expectedIfTrue: string | null;
+	whatWeakensIt: string | null;
+	evidenceIds: string[];
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -261,4 +312,6 @@ export interface ProjectState {
 	evidences: Evidence[];
 	currentTreatment: CurrentTreatment;
 	treatmentSteps: TreatmentStep[];
+	causeExploration: CauseExploration;
+	causeHypotheses: CauseHypothesis[];
 }

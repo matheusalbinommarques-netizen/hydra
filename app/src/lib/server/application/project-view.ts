@@ -2,7 +2,12 @@
 // interno; nunca expõe ProjectState bruto (ver contracts.md §10).
 
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
-import { getAffectedGroupConfirmationIssues, getScopeConfirmationIssues, getTreatmentConfirmationIssues } from '$lib/domain';
+import {
+	getAffectedGroupConfirmationIssues,
+	getCauseHypothesesConfirmationIssues,
+	getScopeConfirmationIssues,
+	getTreatmentConfirmationIssues
+} from '$lib/domain';
 import {
 	computeCriteriaScopeConflict,
 	computeFieldSuggestions,
@@ -12,6 +17,8 @@ import {
 } from '$lib/orientation-engine';
 import type {
 	AffectedGroupView,
+	CauseExplorationView,
+	CauseHypothesisView,
 	CurrentTreatmentView,
 	EvidenceView,
 	ExternalActionView,
@@ -127,6 +134,21 @@ function buildCurrentTreatmentView(currentTreatment: ProjectState['currentTreatm
 	return { noTreatment: currentTreatment.noTreatment };
 }
 
+function buildCauseHypothesisView(hypothesis: ProjectState['causeHypotheses'][number]): CauseHypothesisView {
+	return {
+		id: hypothesis.id,
+		title: hypothesis.title,
+		origin: hypothesis.origin,
+		expectedIfTrue: hypothesis.expectedIfTrue,
+		whatWeakensIt: hypothesis.whatWeakensIt,
+		evidenceIds: hypothesis.evidenceIds
+	};
+}
+
+function buildCauseExplorationView(causeExploration: ProjectState['causeExploration']): CauseExplorationView {
+	return { stillUnknown: causeExploration.stillUnknown };
+}
+
 function buildEvidenceView(evidence: ProjectState['evidences'][number]): EvidenceView {
 	return {
 		id: evidence.id,
@@ -178,6 +200,9 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		evidences: state.evidences.map(buildEvidenceView),
 		currentTreatment: buildCurrentTreatmentView(state.currentTreatment),
 		treatmentSteps: state.treatmentSteps.map(buildTreatmentStepView).sort((a, b) => a.order - b.order),
-		treatmentConfirmationIssues: getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps)
+		treatmentConfirmationIssues: getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps),
+		causeExploration: buildCauseExplorationView(state.causeExploration),
+		causeHypotheses: state.causeHypotheses.map(buildCauseHypothesisView),
+		causeHypothesisConfirmationIssues: getCauseHypothesesConfirmationIssues()
 	};
 }

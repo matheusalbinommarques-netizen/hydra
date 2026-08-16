@@ -12,7 +12,9 @@ export const load: PageServerLoad = async ({ parent }) => {
 		view.affectedGroups,
 		view.evidences,
 		view.currentTreatment,
-		view.treatmentSteps
+		view.treatmentSteps,
+		view.causeExploration,
+		view.causeHypotheses
 	);
 
 	// Evidence no Documento (ETAPA 3 do rework) — projeção determinística

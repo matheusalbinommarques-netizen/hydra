@@ -64,6 +64,12 @@ async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	await page.getByRole('button', { name: 'Adicionar' }).click();
 	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
+	// "Entender as causas" (Stage 4B do rework) — fora do escopo deste teste;
+	// concluir sem nenhuma hipótese (nunca bloqueada) para chegar a "Resultado
+	// desejado", sem depender do modal de "Pular etapa".
+	await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
+	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+
 	await page.getByLabel('O que deverá estar diferente quando este projeto tiver sucesso?').fill('Resultado original.');
 	await page.getByLabel('Quem é o principal beneficiário?').fill('Beneficiário original.');
 	await page.getByLabel('Como você vai perceber a melhoria?').fill('Percepção original.');

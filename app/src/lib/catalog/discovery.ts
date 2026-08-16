@@ -280,10 +280,36 @@ const estadoAtual: ActivityDefinition = {
 	pendingItemDetail: 'Impacta o quão precisas serão as recomendações sobre a solução.'
 };
 
+// "Entender as causas" — Stage 4B do rework (Claude Design, "Entender as
+// Causas - 1A Refinada.dc.html"): substitui qualquer especulação em texto
+// livre por hipóteses de causa reais (ver domain/state-types.ts,
+// CauseHypothesis/CauseExploration). completionMode explicit_confirmation —
+// a conclusão deriva do estado estruturado (mesmo padrão de publico/
+// estado_atual), mas nunca é bloqueada por estado incompleto (ver
+// domain/transitions.ts, getCauseHypothesesConfirmationIssues): "ainda não
+// sabemos o que está por trás disso" é um resultado legítimo, não uma
+// resposta pendente. Nenhum campo de catálogo antigo existia para "causas" —
+// não há READ-LEGACY a registrar para esta atividade (ver
+// domain/legacy-answers.ts).
+const entenderCausas: ActivityDefinition = {
+	id: 'entender_causas',
+	phaseId: 'descoberta',
+	order: 5,
+	title: 'Entender as causas',
+	mainQuestion: 'O que pode estar por trás dessa situação?',
+	why: 'Explorar hipóteses de causa ajuda a mirar a solução no que realmente importa, sem precisar de uma causa raiz confirmada.',
+	example: 'O aprovador só revisa a planilha uma vez por semana — ainda uma hipótese, não um fato confirmado.',
+	completionCriteria: 'Hipóteses de causa consideradas, ou "ainda não sabemos" escolhido conscientemente.',
+	completionMode: 'explicit_confirmation',
+	allowsSkip: true,
+	pendingItemLabel: 'Causas não foram exploradas',
+	pendingItemDetail: 'Hipóteses de causa ajudam a mirar a solução no que realmente importa.'
+};
+
 const resultado: ActivityDefinition = {
 	id: 'resultado',
 	phaseId: 'descoberta',
-	order: 5,
+	order: 6,
 	title: 'Resultado desejado',
 	mainQuestion: 'O que deverá estar diferente quando este projeto tiver sucesso?',
 	why: 'Um resultado claro ajuda a priorizar funcionalidades e critérios de aceitação, evitando medir sucesso apenas por entregas.',
@@ -335,7 +361,7 @@ const resultado: ActivityDefinition = {
 const resumo: ActivityDefinition = {
 	id: 'resumo',
 	phaseId: 'descoberta',
-	order: 6,
+	order: 7,
 	title: 'Resumo da descoberta',
 	mainQuestion: 'Revise o que entendemos até aqui antes de avançar.',
 	why: 'Revisar o resumo garante que problema, público e resultado estão alinhados antes de seguir.',
@@ -350,6 +376,7 @@ export const discoveryActivities: ActivityDefinition[] = [
 	problema,
 	publico,
 	estadoAtual,
+	entenderCausas,
 	resultado,
 	resumo
 ];

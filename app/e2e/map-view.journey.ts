@@ -121,7 +121,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Jornada', level: 1 })).toBeVisible();
 	});
 
-	await test.step('avançar as 35 atividades reais até catalog_limit_reached', async () => {
+	await test.step('avançar as 36 atividades reais até catalog_limit_reached', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 
 		// "Origem do projeto" já foi respondida atomicamente em `/projects/new`
@@ -151,6 +151,11 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Estado atual de teste do Mapa.');
 		await page.getByRole('button', { name: 'Adicionar' }).click();
+		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+
+		// "Entender as causas" (Stage 4B do rework) também não é required_fields
+		// — não passa por answerAndContinue; conclui sem nenhuma hipótese.
+		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
 		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
 		await answerAndContinue(page, {

@@ -154,6 +154,13 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
 
 		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+
+		// "Entender as causas" (Stage 4B do rework) — heading próprio, fora do
+		// escopo deste teste; concluir sem nenhuma hipótese (nunca bloqueada)
+		// para chegar a "Resultado desejado".
+		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
+		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+
 		await expect(page.getByRole('heading', { name: 'Resultado desejado' })).toBeVisible();
 	});
 

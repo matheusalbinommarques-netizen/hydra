@@ -9,6 +9,8 @@ import {
 	mapActivityProgressRow,
 	mapAffectedGroupRow,
 	mapAnswerRow,
+	mapCauseExplorationRow,
+	mapCauseHypothesisRow,
 	mapCurrentTreatmentRow,
 	mapEvidenceRow,
 	mapExternalActionRow,
@@ -21,6 +23,8 @@ import {
 	type ActivityProgressRow,
 	type AffectedGroupRow,
 	type AnswerRow,
+	type CauseExplorationRow,
+	type CauseHypothesisRow,
 	type CurrentTreatmentRow,
 	type EvidenceRow,
 	type ExternalActionRow,
@@ -99,6 +103,24 @@ function ensureCurrentTreatmentRows(db: Database.Database): void {
 	).run();
 }
 
+// Quarta evolução do schema desde 0001_init.sql (Stage 4B do rework, "Entender
+// as causas") — mesmo caso de ensureCurrentTreatmentRows acima:
+// cause_exploration é uma TABELA nova 1:1 com project, não uma coluna
+// adicionada a uma tabela existente, então `CREATE TABLE IF NOT EXISTS`
+// sozinho não gera a linha para projetos já cadastrados. Idempotente e
+// isolado da inicialização, mesmo padrão. Estado inicial sempre
+// stillUnknown: 0 (nunca inferido de nenhum dado legado — não existia campo
+// de causas antes deste corte).
+function ensureCauseExplorationRows(db: Database.Database): void {
+	db.prepare(
+		`INSERT INTO cause_exploration (project_id, still_unknown, updated_at)
+		 SELECT p.id, 0, p.created_at
+		 FROM project p
+		 LEFT JOIN cause_exploration ce ON ce.project_id = p.id
+		 WHERE ce.project_id IS NULL`
+	).run();
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -106,6 +128,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureRouteStartPhaseColumn(db);
 	ensureScopeItemExecutionStatusColumn(db);
 	ensureCurrentTreatmentRows(db);
+	ensureCauseExplorationRows(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(
@@ -215,6 +238,24 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				frictions: JSON.stringify(step.frictions)
 			});
 		}
+
+		db.prepare(
+			`INSERT INTO cause_exploration (project_id, still_unknown, updated_at)
+			 VALUES (@projectId, @stillUnknown, @updatedAt)`
+		).run({
+			projectId: state.causeExploration.projectId,
+			stillUnknown: state.causeExploration.stillUnknown ? 1 : 0,
+			updatedAt: state.causeExploration.updatedAt
+		});
+
+		const insertCauseHypothesis = db.prepare(
+			`INSERT INTO cause_hypothesis
+			   (id, project_id, title, origin, expected_if_true, what_weakens_it, evidence_ids, created_at, updated_at)
+			 VALUES (@id, @projectId, @title, @origin, @expectedIfTrue, @whatWeakensIt, @evidenceIds, @createdAt, @updatedAt)`
+		);
+		for (const hypothesis of state.causeHypotheses) {
+			insertCauseHypothesis.run({ ...hypothesis, evidenceIds: JSON.stringify(hypothesis.evidenceIds) });
+		}
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -256,6 +297,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM affected_group WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM treatment_step WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM current_treatment WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM cause_hypothesis WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM cause_exploration WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
 
@@ -349,6 +392,20 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as TreatmentStepRow[];
 
+			const causeExplorationRow = db
+				.prepare('SELECT project_id, still_unknown, updated_at FROM cause_exploration WHERE project_id = ?')
+				.get(projectId) as CauseExplorationRow | undefined;
+			if (!causeExplorationRow) {
+				throw new Error(`Projeto "${projectId}" não tem cause_exploration (violação do schema — 1:1 com project)`);
+			}
+
+			const causeHypothesisRows = db
+				.prepare(
+					`SELECT id, project_id, title, origin, expected_if_true, what_weakens_it, evidence_ids, created_at, updated_at
+					 FROM cause_hypothesis WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as CauseHypothesisRow[];
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
@@ -361,7 +418,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				externalActions: externalActionRows.map(mapExternalActionRow),
 				evidences: evidenceRows.map(mapEvidenceRow),
 				currentTreatment: mapCurrentTreatmentRow(currentTreatmentRow),
-				treatmentSteps: treatmentStepRows.map(mapTreatmentStepRow)
+				treatmentSteps: treatmentStepRows.map(mapTreatmentStepRow),
+				causeExploration: mapCauseExplorationRow(causeExplorationRow),
+				causeHypotheses: causeHypothesisRows.map(mapCauseHypothesisRow)
 			};
 		},
 

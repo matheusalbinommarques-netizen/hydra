@@ -12,6 +12,7 @@ import {
 	addTreatmentStep,
 	answerActivity,
 	confirmAffectedGroups,
+	confirmCauseHypotheses,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
@@ -161,6 +162,11 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else if (activity.id === 'estado_atual') {
 				next = confirmTreatmentMinimally(catalog, next, `${activity.id}-treatment-step-1`, occurredAt);
+			} else if (activity.id === 'entender_causas') {
+				// "Entender as causas" (Stage 4B do rework) nunca bloqueia conclusão
+				// (ver getCauseHypothesesConfirmationIssues, sempre []) — completar
+				// minimamente é só confirmar, sem precisar de nenhuma CauseHypothesis.
+				next = unwrapResult(confirmCauseHypotheses(catalog, next, occurredAt));
 			} else {
 				next = unwrapResult(confirmSummary(catalog, next));
 			}

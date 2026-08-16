@@ -8,6 +8,7 @@ import type {
 	AffectedGroup,
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
+	CauseHypothesis,
 	CurrentTreatment,
 	Evidence,
 	EvidenceOutcome,
@@ -62,7 +63,10 @@ export type DomainTransitionError =
 	| { kind: 'external_action_not_open' }
 	| { kind: 'evidence_learning_required' }
 	| { kind: 'treatment_step_not_found' }
-	| { kind: 'treatment_confirmation_invalid'; issues: TreatmentConfirmationIssue[] };
+	| { kind: 'treatment_confirmation_invalid'; issues: TreatmentConfirmationIssue[] }
+	| { kind: 'cause_hypothesis_not_found' }
+	| { kind: 'cause_exploration_has_hypotheses' }
+	| { kind: 'evidence_not_found' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -1370,6 +1374,262 @@ export function confirmTreatment(
 	const issues = getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps);
 	if (issues.length > 0) {
 		return { ok: false, error: { kind: 'treatment_confirmation_invalid', issues } };
+	}
+
+	let next = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		next = resolvePendingItem(next, activity.id, occurredAt);
+	}
+	return { ok: true, value: next };
+}
+
+// --- CauseHypothesis / CauseExploration — "Entender as causas" (Stage 4B do
+// rework, ver docs/core/HYDRA_PRODUCT_REWORK.md, Design Gate "Entender as
+// Causas - 1A Refinada") -----------------------------------------------------
+//
+// Mesmo espírito de AffectedGroup/CurrentTreatment: ligada à atividade
+// `entender_causas` do catálogo (completionMode explicit_confirmation) —
+// qualquer mutação invalida o Resumo da descoberta já confirmado (mesmo
+// afterAffectedGroupsMutation/afterTreatmentMutation acima). Diferença
+// deliberada: a conclusão nunca é bloqueada por estado incompleto (ver
+// getCauseHypothesesConfirmationIssues) — "ainda não sabemos" é um resultado
+// legítimo, não uma resposta pendente — por isso não existe
+// invalidateCauseHypothesesConfirmation/reabertura automática por mutação:
+// nenhuma mutação pode tornar a atividade "novamente incompleta", porque ela
+// nunca tem critério de completude a violar.
+
+// Sempre vazio — existe só para simetria com getAffectedGroupConfirmationIssues/
+// getTreatmentConfirmationIssues (mesma assinatura usada pela interface e por
+// ProjectView) e para deixar testável a garantia de que esta atividade nunca
+// bloqueia conclusão, mesmo com zero hipóteses e stillUnknown false.
+export type CauseHypothesisConfirmationIssue = never;
+
+const CAUSE_HYPOTHESES_ACTIVITY_ID = 'entender_causas';
+
+export function getCauseHypothesesConfirmationIssues(): CauseHypothesisConfirmationIssue[] {
+	return [];
+}
+
+function findCauseHypothesis(state: ProjectState, hypothesisId: string): CauseHypothesis | undefined {
+	return state.causeHypotheses.find((hypothesis) => hypothesis.id === hypothesisId);
+}
+
+function afterCauseHypothesisMutation(catalog: Catalog, state: ProjectState): ProjectState {
+	if (shouldInvalidateSummary(catalog, state, { kind: 'answer', activityDefinitionId: CAUSE_HYPOTHESES_ACTIVITY_ID })) {
+		return invalidateSummary(catalog, state);
+	}
+	return state;
+}
+
+/**
+ * Cria uma hipótese — título obrigatório (não vazio), origin é proveniência
+ * opcional (rótulo do cartão de contexto usado como ponto de partida, ou
+ * "Sugestão do Hydra"), nunca evidência. Desliga `stillUnknown` na mesma
+ * transição (mesmo espírito de addTreatmentStep desligando noTreatment) —
+ * registrar uma hipótese real é prova de que o estado "ainda não sabemos"
+ * não se aplica mais.
+ */
+export function addCauseHypothesis(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesisId: string,
+	title: string,
+	origin: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const trimmed = title.trim();
+	if (trimmed.length === 0) return { ok: false, error: { kind: 'invalid_field_value', fieldDefinitionId: 'title' } };
+
+	const hypothesis: CauseHypothesis = {
+		id: hypothesisId,
+		projectId: state.project.id,
+		title: trimmed,
+		origin: origin && origin.trim().length > 0 ? origin.trim() : null,
+		expectedIfTrue: null,
+		whatWeakensIt: null,
+		evidenceIds: [],
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeExploration: { ...state.causeExploration, stillUnknown: false, updatedAt: occurredAt },
+		causeHypotheses: [...state.causeHypotheses, hypothesis]
+	});
+	return { ok: true, value: next };
+}
+
+export function setCauseHypothesisTitle(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesisId: string,
+	title: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const hypothesis = findCauseHypothesis(state, hypothesisId);
+	if (!hypothesis) return { ok: false, error: { kind: 'cause_hypothesis_not_found' } };
+	const trimmed = title.trim();
+	if (trimmed.length === 0) return { ok: false, error: { kind: 'invalid_field_value', fieldDefinitionId: 'title' } };
+
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeHypotheses: state.causeHypotheses.map((item) =>
+			item.id === hypothesisId ? { ...item, title: trimmed, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function setCauseHypothesisExpectedIfTrue(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesisId: string,
+	value: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const hypothesis = findCauseHypothesis(state, hypothesisId);
+	if (!hypothesis) return { ok: false, error: { kind: 'cause_hypothesis_not_found' } };
+
+	const cleaned = value && value.trim().length > 0 ? value.trim() : null;
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeHypotheses: state.causeHypotheses.map((item) =>
+			item.id === hypothesisId ? { ...item, expectedIfTrue: cleaned, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function setCauseHypothesisWhatWeakensIt(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesisId: string,
+	value: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const hypothesis = findCauseHypothesis(state, hypothesisId);
+	if (!hypothesis) return { ok: false, error: { kind: 'cause_hypothesis_not_found' } };
+
+	const cleaned = value && value.trim().length > 0 ? value.trim() : null;
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeHypotheses: state.causeHypotheses.map((item) =>
+			item.id === hypothesisId ? { ...item, whatWeakensIt: cleaned, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+/**
+ * Liga/desliga a relação com uma Evidence já existente (ETAPA 3 do rework) —
+ * nunca cria Evidence nova, só referencia por id. evidenceId precisa
+ * pertencer a uma Evidence real do projeto.
+ */
+export function toggleCauseHypothesisEvidence(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesisId: string,
+	evidenceId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const hypothesis = findCauseHypothesis(state, hypothesisId);
+	if (!hypothesis) return { ok: false, error: { kind: 'cause_hypothesis_not_found' } };
+	if (!state.evidences.some((evidence) => evidence.id === evidenceId)) {
+		return { ok: false, error: { kind: 'evidence_not_found' } };
+	}
+
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeHypotheses: state.causeHypotheses.map((item) =>
+			item.id === hypothesisId
+				? {
+						...item,
+						evidenceIds: item.evidenceIds.includes(evidenceId)
+							? item.evidenceIds.filter((id) => id !== evidenceId)
+							: [...item.evidenceIds, evidenceId],
+						updatedAt: occurredAt
+					}
+				: item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function removeCauseHypothesis(
+	catalog: Catalog,
+	state: ProjectState,
+	hypothesisId: string
+): Result<ProjectState, DomainTransitionError> {
+	const hypothesis = findCauseHypothesis(state, hypothesisId);
+	if (!hypothesis) return { ok: false, error: { kind: 'cause_hypothesis_not_found' } };
+
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeHypotheses: state.causeHypotheses.filter((item) => item.id !== hypothesisId)
+	});
+	return { ok: true, value: next };
+}
+
+/**
+ * Liga "Ainda não sabemos o que está por trás disso" — só permitido com
+ * nenhuma hipótese registrada (mesma regra já aplicada pela interface no
+ * Design Gate: o link para este estado só aparece com hypotheses.length ===
+ * 0). Evita a ambiguidade de o que fazer com hipóteses existentes ao ligar
+ * este estado — em vez de escolher uma transição destrutiva sozinha, a
+ * transição recusa (ver HYDRA_PRODUCT_REWORK.md, invariante "Ainda não sei").
+ */
+export function markCauseExplorationUnknown(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (state.causeExploration.stillUnknown) return { ok: true, value: state };
+	if (state.causeHypotheses.length > 0) {
+		return { ok: false, error: { kind: 'cause_exploration_has_hypotheses' } };
+	}
+
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeExploration: { ...state.causeExploration, stillUnknown: true, updatedAt: occurredAt }
+	});
+	return { ok: true, value: next };
+}
+
+export function undoCauseExplorationUnknown(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!state.causeExploration.stillUnknown) return { ok: true, value: state };
+
+	const next = afterCauseHypothesisMutation(catalog, {
+		...state,
+		causeExploration: { ...state.causeExploration, stillUnknown: false, updatedAt: occurredAt }
+	});
+	return { ok: true, value: next };
+}
+
+/**
+ * Conclui "Entender as causas" — nunca bloqueada por estado incompleto (ver
+ * getCauseHypothesesConfirmationIssues, sempre []): zero hipóteses e
+ * stillUnknown false é uma saída legítima ("você pode seguir sem uma
+ * explicação ainda", Design Gate).
+ */
+export function confirmCauseHypotheses(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, CAUSE_HYPOTHESES_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
 	}
 
 	let next = setActivityStatus(state, activity.id, 'concluída');

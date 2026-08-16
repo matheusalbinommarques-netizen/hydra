@@ -9,6 +9,8 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	Answer,
+	CauseExploration,
+	CauseHypothesis,
 	CurrentTreatment,
 	Evidence,
 	EvidenceOutcome,
@@ -261,6 +263,44 @@ export function mapTreatmentStepRow(row: TreatmentStepRow): TreatmentStep {
 		actors: JSON.parse(row.actors) as string[],
 		medium: row.medium,
 		frictions: JSON.parse(row.frictions) as TreatmentFriction[],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
+	};
+}
+
+export interface CauseExplorationRow {
+	project_id: string;
+	still_unknown: 0 | 1;
+	updated_at: string;
+}
+
+export function mapCauseExplorationRow(row: CauseExplorationRow): CauseExploration {
+	return { projectId: row.project_id, stillUnknown: row.still_unknown === 1, updatedAt: row.updated_at };
+}
+
+export interface CauseHypothesisRow {
+	id: string;
+	project_id: string;
+	title: string;
+	origin: string | null;
+	expected_if_true: string | null;
+	what_weakens_it: string | null;
+	// evidence_ids: JSON array em TEXT — mesmo padrão de
+	// TreatmentStepRow.actors/frictions acima.
+	evidence_ids: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapCauseHypothesisRow(row: CauseHypothesisRow): CauseHypothesis {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		title: row.title,
+		origin: row.origin,
+		expectedIfTrue: row.expected_if_true,
+		whatWeakensIt: row.what_weakens_it,
+		evidenceIds: JSON.parse(row.evidence_ids) as string[],
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

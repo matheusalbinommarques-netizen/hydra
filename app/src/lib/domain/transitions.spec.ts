@@ -3,24 +3,29 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
+	addCauseHypothesis,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
+	confirmCauseHypotheses,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
 	getAffectedGroupConfirmationIssues,
+	getCauseHypothesesConfirmationIssues,
 	getScopeConfirmationIssues,
 	getTreatmentConfirmationIssues,
 	isActivityFieldsValid,
+	markCauseExplorationUnknown,
 	moveScopeItem,
 	moveTreatmentStep,
 	prepareExternalAction,
 	removeAffectedGroup,
+	removeCauseHypothesis,
 	removeScopeItem,
 	removeTreatmentStep,
 	renameProject,
@@ -29,6 +34,9 @@ import {
 	resolveImpediment,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
+	setCauseHypothesisExpectedIfTrue,
+	setCauseHypothesisTitle,
+	setCauseHypothesisWhatWeakensIt,
 	setHypothesis,
 	setImpedimentNextAction,
 	setImpedimentType,
@@ -41,7 +49,9 @@ import {
 	setTreatmentStepMedium,
 	shouldInvalidateSummary,
 	skipActivity,
-	toggleTreatmentStepFriction
+	toggleCauseHypothesisEvidence,
+	toggleTreatmentStepFriction,
+	undoCauseExplorationUnknown
 } from './transitions';
 import { encodePlanningItems } from './planning-items';
 import type { Catalog, RequiredFieldsActivity } from './catalog-types';
@@ -1514,6 +1524,182 @@ describe('CurrentTreatment / TreatmentStep (Stage 4A — "Como é tratado hoje")
 	it('addTreatmentStep invalida o Resumo já concluído (mesma regra de answerActivity/addAffectedGroup)', () => {
 		const withSummary = unwrap(confirmSummary(catalog, freshState()));
 		const added = unwrap(addTreatmentStep(catalog, withSummary, 'ts-1', 'Novo passo', T2));
+		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
+		expect(resumo?.status).toBe('em_andamento');
+	});
+});
+
+describe('CauseHypothesis / CauseExploration (Stage 4B — "Entender as causas")', () => {
+	function withEvidence(): { state: ProjectState; evidenceId: string } {
+		let state = unwrap(addAffectedGroup(catalog, freshState(), 'ag-1', 'Equipe de vendas', T1));
+		state = unwrap(
+			prepareExternalAction(
+				catalog,
+				state,
+				'ea-1',
+				'ag-1',
+				{ objective: 'Validar', questions: ['Pergunta?'], informationToTake: ['Info'], expectedResult: 'Resultado' },
+				T1
+			)
+		);
+		state = unwrap(completeExternalAction(catalog, state, 'ea-1', 'ev-1', 'confirmed', 'Aprendizado real', T2));
+		return { state, evidenceId: 'ev-1' };
+	}
+
+	it('addCauseHypothesis cria uma hipótese com title/origin e desliga stillUnknown', () => {
+		const marked = unwrap(markCauseExplorationUnknown(catalog, freshState(), T1));
+		const state = unwrap(addCauseHypothesis(catalog, marked, 'ch-1', '  O aprovador só revisa uma vez por semana  ', 'Fricção observada', T2));
+		expect(state.causeHypotheses).toEqual([
+			{
+				id: 'ch-1',
+				projectId: 'proj-1',
+				title: 'O aprovador só revisa uma vez por semana',
+				origin: 'Fricção observada',
+				expectedIfTrue: null,
+				whatWeakensIt: null,
+				evidenceIds: [],
+				createdAt: T2,
+				updatedAt: T2
+			}
+		]);
+		expect(state.causeExploration.stillUnknown).toBe(false);
+	});
+
+	it('addCauseHypothesis rejeita title vazio/só espaços; origin ausente vira null', () => {
+		expect(addCauseHypothesis(catalog, freshState(), 'ch-1', '   ', null, T1)).toEqual({
+			ok: false,
+			error: { kind: 'invalid_field_value', fieldDefinitionId: 'title' }
+		});
+		const state = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Hipótese', '   ', T1));
+		expect(state.causeHypotheses[0].origin).toBeNull();
+	});
+
+	it('múltiplas hipóteses coexistem', () => {
+		let state = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Primeira', null, T1));
+		state = unwrap(addCauseHypothesis(catalog, state, 'ch-2', 'Segunda', null, T1));
+		expect(state.causeHypotheses.map((h) => h.id)).toEqual(['ch-1', 'ch-2']);
+	});
+
+	it('setCauseHypothesisTitle edita; erro cause_hypothesis_not_found para id inexistente', () => {
+		const state = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Original', null, T1));
+		const edited = unwrap(setCauseHypothesisTitle(catalog, state, 'ch-1', '  Editada  ', T2));
+		expect(edited.causeHypotheses[0].title).toBe('Editada');
+		expect(setCauseHypothesisTitle(catalog, freshState(), 'inexistente', 'x', T1)).toEqual({
+			ok: false,
+			error: { kind: 'cause_hypothesis_not_found' }
+		});
+		expect(setCauseHypothesisTitle(catalog, state, 'ch-1', '   ', T1)).toEqual({
+			ok: false,
+			error: { kind: 'invalid_field_value', fieldDefinitionId: 'title' }
+		});
+	});
+
+	it('setCauseHypothesisExpectedIfTrue/WhatWeakensIt definem e limpam (string vazia ou null viram null)', () => {
+		const state = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Hipótese', null, T1));
+		const withSigns = unwrap(setCauseHypothesisExpectedIfTrue(catalog, state, 'ch-1', 'Sinal esperado', T2));
+		expect(withSigns.causeHypotheses[0].expectedIfTrue).toBe('Sinal esperado');
+		const cleared = unwrap(setCauseHypothesisExpectedIfTrue(catalog, withSigns, 'ch-1', '', T2));
+		expect(cleared.causeHypotheses[0].expectedIfTrue).toBeNull();
+
+		const withWeakens = unwrap(setCauseHypothesisWhatWeakensIt(catalog, state, 'ch-1', 'Sinal contrário', T2));
+		expect(withWeakens.causeHypotheses[0].whatWeakensIt).toBe('Sinal contrário');
+		const clearedWeakens = unwrap(setCauseHypothesisWhatWeakensIt(catalog, withWeakens, 'ch-1', null, T2));
+		expect(clearedWeakens.causeHypotheses[0].whatWeakensIt).toBeNull();
+	});
+
+	it('toggleCauseHypothesisEvidence liga/desliga; erro evidence_not_found para evidência inexistente', () => {
+		const { state, evidenceId } = withEvidence();
+		const withHypothesis = unwrap(addCauseHypothesis(catalog, state, 'ch-1', 'Hipótese', null, T2));
+		const linked = unwrap(toggleCauseHypothesisEvidence(catalog, withHypothesis, 'ch-1', evidenceId, T2));
+		expect(linked.causeHypotheses[0].evidenceIds).toEqual([evidenceId]);
+		const unlinked = unwrap(toggleCauseHypothesisEvidence(catalog, linked, 'ch-1', evidenceId, T2));
+		expect(unlinked.causeHypotheses[0].evidenceIds).toEqual([]);
+		expect(toggleCauseHypothesisEvidence(catalog, withHypothesis, 'ch-1', 'ev-inexistente', T2)).toEqual({
+			ok: false,
+			error: { kind: 'evidence_not_found' }
+		});
+	});
+
+	it('removeCauseHypothesis remove a hipótese; erro cause_hypothesis_not_found para id inexistente', () => {
+		const state = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Hipótese', null, T1));
+		const removed = unwrap(removeCauseHypothesis(catalog, state, 'ch-1'));
+		expect(removed.causeHypotheses).toEqual([]);
+		expect(removeCauseHypothesis(catalog, removed, 'ch-1')).toEqual({
+			ok: false,
+			error: { kind: 'cause_hypothesis_not_found' }
+		});
+	});
+
+	it('markCauseExplorationUnknown só é permitido com zero hipóteses (invariante: nunca transição destrutiva)', () => {
+		const withHypothesis = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Hipótese', null, T1));
+		expect(markCauseExplorationUnknown(catalog, withHypothesis, T2)).toEqual({
+			ok: false,
+			error: { kind: 'cause_exploration_has_hypotheses' }
+		});
+
+		const marked = unwrap(markCauseExplorationUnknown(catalog, freshState(), T1));
+		expect(marked.causeExploration.stillUnknown).toBe(true);
+	});
+
+	it('markCauseExplorationUnknown: valor repetido é no-op', () => {
+		const marked = unwrap(markCauseExplorationUnknown(catalog, freshState(), T1));
+		const again = unwrap(markCauseExplorationUnknown(catalog, marked, T2));
+		expect(again).toBe(marked);
+	});
+
+	it('undoCauseExplorationUnknown desliga stillUnknown; no-op quando já false', () => {
+		const marked = unwrap(markCauseExplorationUnknown(catalog, freshState(), T1));
+		const undone = unwrap(undoCauseExplorationUnknown(catalog, marked, T2));
+		expect(undone.causeExploration.stillUnknown).toBe(false);
+		const noop = unwrap(undoCauseExplorationUnknown(catalog, undone, T2));
+		expect(noop).toBe(undone);
+	});
+
+	it('getCauseHypothesesConfirmationIssues é sempre vazio', () => {
+		expect(getCauseHypothesesConfirmationIssues()).toEqual([]);
+	});
+
+	it('confirmCauseHypotheses conclui "entender_causas" com zero hipóteses e stillUnknown false (nunca bloqueada)', () => {
+		const confirmed = unwrap(confirmCauseHypotheses(catalog, freshState(), T1));
+		expect(confirmed.activityProgress.find((p) => p.activityDefinitionId === 'entender_causas')?.status).toBe(
+			'concluída'
+		);
+	});
+
+	it('confirmCauseHypotheses conclui também com hipóteses ou com stillUnknown true', () => {
+		const withHypothesis = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Hipótese', null, T1));
+		const confirmedWithHypothesis = unwrap(confirmCauseHypotheses(catalog, withHypothesis, T2));
+		expect(
+			confirmedWithHypothesis.activityProgress.find((p) => p.activityDefinitionId === 'entender_causas')?.status
+		).toBe('concluída');
+
+		const marked = unwrap(markCauseExplorationUnknown(catalog, freshState(), T1));
+		const confirmedUnknown = unwrap(confirmCauseHypotheses(catalog, marked, T2));
+		expect(confirmedUnknown.activityProgress.find((p) => p.activityDefinitionId === 'entender_causas')?.status).toBe(
+			'concluída'
+		);
+	});
+
+	it('confirmCauseHypotheses: erro transition_not_allowed se já concluída', () => {
+		const confirmed = unwrap(confirmCauseHypotheses(catalog, freshState(), T1));
+		expect(confirmCauseHypotheses(catalog, confirmed, T2)).toEqual({
+			ok: false,
+			error: { kind: 'transition_not_allowed', from: 'concluída' }
+		});
+	});
+
+	it('remover a única hipótese depois de concluído não reabre "entender_causas" (nunca bloqueada por estado incompleto)', () => {
+		const withHypothesis = unwrap(addCauseHypothesis(catalog, freshState(), 'ch-1', 'Hipótese', null, T1));
+		const confirmed = unwrap(confirmCauseHypotheses(catalog, withHypothesis, T1));
+		const removed = unwrap(removeCauseHypothesis(catalog, confirmed, 'ch-1'));
+		expect(removed.activityProgress.find((p) => p.activityDefinitionId === 'entender_causas')?.status).toBe(
+			'concluída'
+		);
+	});
+
+	it('addCauseHypothesis invalida o Resumo já concluído (mesma regra de addAffectedGroup/addTreatmentStep)', () => {
+		const withSummary = unwrap(confirmSummary(catalog, freshState()));
+		const added = unwrap(addCauseHypothesis(catalog, withSummary, 'ch-1', 'Nova hipótese', null, T2));
 		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
 	});

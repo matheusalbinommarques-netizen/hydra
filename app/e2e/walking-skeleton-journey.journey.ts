@@ -118,6 +118,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 	});
 
+	await test.step('Entender as causas', async () => {
+		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
+		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+	});
+
 	await test.step('Resultado desejado', async () => {
 		await expect(page.getByRole('heading', { name: 'Resultado desejado' })).toBeVisible();
 		await page
@@ -348,11 +353,10 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		// 35 atividades no catálogo atual (6 Descoberta + 4 Definição do produto +
-		// 6 Estruturação + 7 Planejamento + 6 Execução + 6 Validação) — "Contexto
-		// inicial" foi incorporada/removida do catálogo (D034), reduzindo de 36
-		// para 35.
-		expect(exportedJson.state.activityProgress).toHaveLength(35);
+		// 36 atividades no catálogo atual (7 Descoberta + 4 Definição do produto +
+		// 6 Estruturação + 7 Planejamento + 6 Execução + 6 Validação) — Descoberta
+		// ganhou "Entender as causas" (Stage 4B do rework), subindo de 6 para 7.
+		expect(exportedJson.state.activityProgress).toHaveLength(36);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}

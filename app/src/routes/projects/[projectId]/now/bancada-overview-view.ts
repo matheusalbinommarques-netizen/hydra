@@ -12,6 +12,7 @@ import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
 import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
 import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
 import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
+import { causeHypothesisCountLabel } from '$lib/catalog/cause-hypothesis';
 
 export interface BancadaOverviewBlock {
 	activityId: string;
@@ -79,7 +80,9 @@ export function buildBancadaOverviewView(
 	affectedGroups: AffectedGroupSummaryInput[] = [],
 	evidences: readonly { affectedGroupId: string }[] = [],
 	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
-	treatmentSteps: TreatmentStepSynthesisInput[] = []
+	treatmentSteps: TreatmentStepSynthesisInput[] = [],
+	causeExploration: { stillUnknown: boolean } = { stillUnknown: false },
+	causeHypotheses: readonly { title: string }[] = []
 ): BancadaOverviewView {
 	const blocks: BancadaOverviewBlock[] = [];
 
@@ -117,6 +120,18 @@ export function buildBancadaOverviewView(
 						activityId: 'estado_atual',
 						heading: 'Como é tratado hoje',
 						value: `${treatmentStepCountLabel(currentTreatment.noTreatment, treatmentSteps.length)}. ${summarizeCurrentTreatment(currentTreatment.noTreatment, treatmentSteps)}`.trim()
+					});
+				}
+				continue;
+			}
+
+			if (activity.id === 'entender_causas') {
+				if (causeExploration.stillUnknown || causeHypotheses.length > 0) {
+					blocks.push({
+						activityId: 'entender_causas',
+						heading: 'Hipóteses de causa',
+						value: causeHypothesisCountLabel(causeExploration.stillUnknown, causeHypotheses.length),
+						chips: causeHypotheses.length > 0 ? causeHypotheses.map((hypothesis) => hypothesis.title) : undefined
 					});
 				}
 				continue;

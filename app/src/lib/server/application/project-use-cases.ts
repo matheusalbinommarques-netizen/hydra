@@ -7,22 +7,26 @@ import { computeNextActivity, computeProjectStatus, computeSnapshot } from '$lib
 import type { NextActivityResult } from '$lib/orientation-engine';
 import {
 	addAffectedGroup as addAffectedGroupInDomain,
+	addCauseHypothesis as addCauseHypothesisInDomain,
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
+	confirmCauseHypotheses as confirmCauseHypothesesInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
 	confirmTreatment as confirmTreatmentInDomain,
 	createInitialProjectState,
 	deserializeProjectState,
+	markCauseExplorationUnknown as markCauseExplorationUnknownInDomain,
 	moveScopeItem as moveScopeItemInDomain,
 	moveTreatmentStep as moveTreatmentStepInDomain,
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
+	removeCauseHypothesis as removeCauseHypothesisInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	removeTreatmentStep as removeTreatmentStepInDomain,
 	renameProject as renameProjectInDomain,
@@ -32,6 +36,9 @@ import {
 	serializeProjectState,
 	setAffectedGroupFrequency as setAffectedGroupFrequencyInDomain,
 	setAffectedGroupImpact as setAffectedGroupImpactInDomain,
+	setCauseHypothesisExpectedIfTrue as setCauseHypothesisExpectedIfTrueInDomain,
+	setCauseHypothesisTitle as setCauseHypothesisTitleInDomain,
+	setCauseHypothesisWhatWeakensIt as setCauseHypothesisWhatWeakensItInDomain,
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
@@ -43,7 +50,9 @@ import {
 	setTreatmentStepActors as setTreatmentStepActorsInDomain,
 	setTreatmentStepMedium as setTreatmentStepMediumInDomain,
 	skipActivity as skipActivityInDomain,
-	toggleTreatmentStepFriction as toggleTreatmentStepFrictionInDomain
+	toggleCauseHypothesisEvidence as toggleCauseHypothesisEvidenceInDomain,
+	toggleTreatmentStepFriction as toggleTreatmentStepFrictionInDomain,
+	undoCauseExplorationUnknown as undoCauseExplorationUnknownInDomain
 } from '$lib/domain';
 import { buildExternalActionPreparation } from '$lib/catalog/external-action';
 import type { ProjectRepository } from '../persistence';
@@ -51,23 +60,27 @@ import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
 import type {
 	AddAffectedGroupInput,
+	AddCauseHypothesisInput,
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AddTreatmentStepInput,
 	AnswerActivityInput,
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
+	ConfirmCauseHypothesesInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
 	ConfirmTreatmentInput,
 	CreateConfiguredProjectInput,
+	MarkCauseExplorationUnknownInput,
 	MoveScopeItemInput,
 	MoveTreatmentStepInput,
 	PrepareExternalActionInput,
 	ProjectListItem,
 	ProjectUseCases,
 	RemoveAffectedGroupInput,
+	RemoveCauseHypothesisInput,
 	RemoveScopeItemInput,
 	RemoveTreatmentStepInput,
 	RenameProjectInput,
@@ -76,6 +89,9 @@ import type {
 	ResolveImpedimentInput,
 	SetAffectedGroupFrequencyInput,
 	SetAffectedGroupImpactInput,
+	SetCauseHypothesisExpectedIfTrueInput,
+	SetCauseHypothesisTitleInput,
+	SetCauseHypothesisWhatWeakensItInput,
 	SetHypothesisInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
@@ -87,7 +103,9 @@ import type {
 	SetTreatmentStepActorsInput,
 	SetTreatmentStepMediumInput,
 	SkipActivityInput,
+	ToggleCauseHypothesisEvidenceInput,
 	ToggleTreatmentStepFrictionInput,
+	UndoCauseExplorationUnknownInput,
 	UseCaseOutcome
 } from './types';
 import type { ProjectView } from './types';
@@ -181,6 +199,13 @@ function computeLastMovementAt(state: ProjectState): string | null {
 	// instante.
 	if (state.currentTreatment.noTreatment) timestamps.push(state.currentTreatment.updatedAt);
 	for (const step of state.treatmentSteps) timestamps.push(step.updatedAt);
+	// "Entender as causas" (Stage 4B do rework) — mesma extensão pequena e
+	// coerente já aplicada a CurrentTreatment acima: causeExploration.updatedAt
+	// só entra quando stillUnknown é `true` (ação explícita do usuário); com
+	// hipóteses, o timestamp de cada CauseHypothesis abaixo já cobre o
+	// movimento, sem duplicar o mesmo instante.
+	if (state.causeExploration.stillUnknown) timestamps.push(state.causeExploration.updatedAt);
+	for (const hypothesis of state.causeHypotheses) timestamps.push(hypothesis.updatedAt);
 	for (const pending of state.pendingItems) {
 		timestamps.push(pending.createdAt);
 		if (pending.status === 'resolvida') timestamps.push(pending.resolvedAt);
@@ -753,6 +778,133 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!result.ok) return { ok: false, error: result.error };
 
 			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// "Entender as causas" (Stage 4B do rework) — mesmo padrão dos casos de
+		// uso do Mapa de Impacto/Como é tratado hoje: cada interação persiste
+		// imediatamente.
+		async addCauseHypothesis(input: AddCauseHypothesisInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addCauseHypothesisInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.title,
+				input.origin ?? null,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setCauseHypothesisTitle(input: SetCauseHypothesisTitleInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setCauseHypothesisTitleInDomain(catalog, state, input.hypothesisId, input.title, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setCauseHypothesisExpectedIfTrue(input: SetCauseHypothesisExpectedIfTrueInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setCauseHypothesisExpectedIfTrueInDomain(
+				catalog,
+				state,
+				input.hypothesisId,
+				input.value,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setCauseHypothesisWhatWeakensIt(input: SetCauseHypothesisWhatWeakensItInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setCauseHypothesisWhatWeakensItInDomain(
+				catalog,
+				state,
+				input.hypothesisId,
+				input.value,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async toggleCauseHypothesisEvidence(input: ToggleCauseHypothesisEvidenceInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = toggleCauseHypothesisEvidenceInDomain(
+				catalog,
+				state,
+				input.hypothesisId,
+				input.evidenceId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeCauseHypothesis(input: RemoveCauseHypothesisInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeCauseHypothesisInDomain(catalog, state, input.hypothesisId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async markCauseExplorationUnknown(input: MarkCauseExplorationUnknownInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = markCauseExplorationUnknownInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async undoCauseExplorationUnknown(input: UndoCauseExplorationUnknownInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = undoCauseExplorationUnknownInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmCauseHypotheses(input: ConfirmCauseHypothesesInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmCauseHypothesesInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

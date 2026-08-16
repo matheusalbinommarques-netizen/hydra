@@ -5,6 +5,7 @@ import type {
 	AffectedGroupConfirmationIssue,
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
+	CauseHypothesisConfirmationIssue,
 	DomainTransitionError,
 	EvidenceOutcome,
 	ExternalActionStatus,
@@ -205,6 +206,22 @@ export interface CurrentTreatmentView {
 	noTreatment: boolean;
 }
 
+// "Entender as causas" (Stage 4B do rework) — view leve de CauseHypothesis,
+// sem projectId/createdAt/updatedAt, que a interface não precisa (mesmo
+// padrão de AffectedGroupView/TreatmentStepView).
+export interface CauseHypothesisView {
+	id: string;
+	title: string;
+	origin: string | null;
+	expectedIfTrue: string | null;
+	whatWeakensIt: string | null;
+	evidenceIds: string[];
+}
+
+export interface CauseExplorationView {
+	stillUnknown: boolean;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -270,6 +287,14 @@ export interface ProjectView {
 	currentTreatment: CurrentTreatmentView;
 	treatmentSteps: TreatmentStepView[];
 	treatmentConfirmationIssues: TreatmentConfirmationIssue[];
+	// "Entender as causas" (Stage 4B do rework) — cabeçalho stillUnknown e as
+	// hipóteses de causa; causeHypothesisConfirmationIssues é sempre [] (ver
+	// domain/transitions.ts, getCauseHypothesesConfirmationIssues), mantido
+	// aqui só por simetria com affectedGroupConfirmationIssues/
+	// treatmentConfirmationIssues, não porque algo bloqueia a conclusão.
+	causeExploration: CauseExplorationView;
+	causeHypotheses: CauseHypothesisView[];
+	causeHypothesisConfirmationIssues: CauseHypothesisConfirmationIssue[];
 }
 
 export type UseCaseError =
@@ -506,6 +531,58 @@ export interface ConfirmTreatmentInput {
 	projectId: string;
 }
 
+// "Entender as causas" (Stage 4B do rework) — mesmo padrão dos inputs de
+// AffectedGroup/TreatmentStep: id gerado pelo caso de uso (idGenerator),
+// nunca recebido do cliente. `origin`, quando presente, é o rótulo do
+// cartão de contexto usado como ponto de partida (ou "Sugestão do Hydra") —
+// nunca um vínculo a Evidence.
+export interface AddCauseHypothesisInput {
+	projectId: string;
+	title: string;
+	origin?: string | null;
+}
+
+export interface SetCauseHypothesisTitleInput {
+	projectId: string;
+	hypothesisId: string;
+	title: string;
+}
+
+export interface SetCauseHypothesisExpectedIfTrueInput {
+	projectId: string;
+	hypothesisId: string;
+	value: string | null;
+}
+
+export interface SetCauseHypothesisWhatWeakensItInput {
+	projectId: string;
+	hypothesisId: string;
+	value: string | null;
+}
+
+export interface ToggleCauseHypothesisEvidenceInput {
+	projectId: string;
+	hypothesisId: string;
+	evidenceId: string;
+}
+
+export interface RemoveCauseHypothesisInput {
+	projectId: string;
+	hypothesisId: string;
+}
+
+export interface MarkCauseExplorationUnknownInput {
+	projectId: string;
+}
+
+export interface UndoCauseExplorationUnknownInput {
+	projectId: string;
+}
+
+export interface ConfirmCauseHypothesesInput {
+	projectId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
@@ -546,6 +623,15 @@ export interface ProjectUseCases {
 	toggleTreatmentStepFriction(input: ToggleTreatmentStepFrictionInput): Promise<UseCaseOutcome<ProjectView>>;
 	setTreatmentNoTreatment(input: SetTreatmentNoTreatmentInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmTreatment(input: ConfirmTreatmentInput): Promise<UseCaseOutcome<ProjectView>>;
+	addCauseHypothesis(input: AddCauseHypothesisInput): Promise<UseCaseOutcome<ProjectView>>;
+	setCauseHypothesisTitle(input: SetCauseHypothesisTitleInput): Promise<UseCaseOutcome<ProjectView>>;
+	setCauseHypothesisExpectedIfTrue(input: SetCauseHypothesisExpectedIfTrueInput): Promise<UseCaseOutcome<ProjectView>>;
+	setCauseHypothesisWhatWeakensIt(input: SetCauseHypothesisWhatWeakensItInput): Promise<UseCaseOutcome<ProjectView>>;
+	toggleCauseHypothesisEvidence(input: ToggleCauseHypothesisEvidenceInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeCauseHypothesis(input: RemoveCauseHypothesisInput): Promise<UseCaseOutcome<ProjectView>>;
+	markCauseExplorationUnknown(input: MarkCauseExplorationUnknownInput): Promise<UseCaseOutcome<ProjectView>>;
+	undoCauseExplorationUnknown(input: UndoCauseExplorationUnknownInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmCauseHypotheses(input: ConfirmCauseHypothesesInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

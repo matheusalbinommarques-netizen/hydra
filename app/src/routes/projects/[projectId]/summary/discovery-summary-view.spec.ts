@@ -10,6 +10,7 @@ const ALL_NAO_INICIADA: Record<string, ActivityStatus> = {
 	problema: 'não_iniciada',
 	publico: 'não_iniciada',
 	estado_atual: 'não_iniciada',
+	entender_causas: 'não_iniciada',
 	resultado: 'não_iniciada'
 };
 
@@ -18,6 +19,7 @@ const ALL_CONCLUIDA: Record<string, ActivityStatus> = {
 	problema: 'concluída',
 	publico: 'concluída',
 	estado_atual: 'concluída',
+	entender_causas: 'concluída',
 	resultado: 'concluída'
 };
 
@@ -106,6 +108,42 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 		expect(bloco.value).toBe('Sem tratamento definido hoje. Hoje não existe um tratamento definido.');
 	});
 
+	it('bloco "Hipóteses de causa" só aparece quando há CauseHypothesis ou stillUnknown', () => {
+		const semNada = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: false }, []);
+		expect(semNada.overview.find((b) => b.activityId === 'entender_causas')).toBeUndefined();
+
+		const view = buildDiscoverySummaryView(
+			catalog,
+			{},
+			ALL_NAO_INICIADA,
+			[],
+			[],
+			{ noTreatment: false },
+			[],
+			{ stillUnknown: false },
+			[{ title: 'O aprovador só revisa uma vez por semana' }]
+		);
+		const causas = view.overview.find((b) => b.activityId === 'entender_causas')!;
+		expect(causas.heading).toBe('Hipóteses de causa');
+		expect(causas.editLabel).toBe('Editar hipóteses de causa');
+		expect(causas.value).toBe('1 hipótese em consideração.');
+		expect(causas.chips).toEqual(['O aprovador só revisa uma vez por semana']);
+
+		const stillUnknown = buildDiscoverySummaryView(
+			catalog,
+			{},
+			ALL_NAO_INICIADA,
+			[],
+			[],
+			{ noTreatment: false },
+			[],
+			{ stillUnknown: true },
+			[]
+		);
+		const blocoStillUnknown = stillUnknown.overview.find((b) => b.activityId === 'entender_causas')!;
+		expect(blocoStillUnknown.value).toBe('Ainda não sabemos o que está por trás disso.');
+	});
+
 	it('bloco "Resultado desejado" só aparece quando mudanca existe (usa mudanca, não beneficiario/percepcao)', () => {
 		const view = buildDiscoverySummaryView(
 			catalog,
@@ -130,9 +168,17 @@ describe('buildDiscoverySummaryView — visão geral (overview)', () => {
 			[{ id: 'ag-1', label: 'Público', impact: 'alto' }],
 			[],
 			{ noTreatment: false },
-			[{ whatHappens: 'Estado atual', actors: [], medium: null, frictions: [] }]
+			[{ whatHappens: 'Estado atual', actors: [], medium: null, frictions: [] }],
+			{ stillUnknown: false },
+			[{ title: 'Hipótese' }]
 		);
-		expect(view.overview.map((b) => b.activityId)).toEqual(['problema', 'publico', 'estado_atual', 'resultado']);
+		expect(view.overview.map((b) => b.activityId)).toEqual([
+			'problema',
+			'publico',
+			'estado_atual',
+			'entender_causas',
+			'resultado'
+		]);
 	});
 });
 
@@ -153,6 +199,7 @@ describe('buildDiscoverySummaryView — conferência (checklist)', () => {
 			'Problema definido',
 			'Público definido',
 			'Como é tratado hoje definido',
+			'Causas exploradas',
 			'Resultado definido'
 		]);
 	});

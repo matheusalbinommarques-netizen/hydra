@@ -66,6 +66,33 @@ describe('buildBancadaOverviewView', () => {
 		expect(estadoAtual.value).toContain('Hoje não existe um tratamento definido.');
 	});
 
+	it('bloco "Hipóteses de causa" aparece a partir de causeHypotheses, ausente quando vazio e stillUnknown false', () => {
+		const empty = buildBancadaOverviewView(catalog, {}, [], [], { noTreatment: false }, []);
+		expect(empty.blocks.find((b) => b.activityId === 'entender_causas')).toBeUndefined();
+
+		const withHypotheses = buildBancadaOverviewView(
+			catalog,
+			{},
+			[],
+			[],
+			{ noTreatment: false },
+			[],
+			{ stillUnknown: false },
+			[{ title: 'O aprovador só revisa uma vez por semana' }, { title: 'Formulário exige anexos difíceis' }]
+		);
+		const causas = withHypotheses.blocks.find((b) => b.activityId === 'entender_causas')!;
+		expect(causas.heading).toBe('Hipóteses de causa');
+		expect(causas.value).toBe('2 hipóteses em consideração.');
+		expect(causas.chips).toEqual(['O aprovador só revisa uma vez por semana', 'Formulário exige anexos difíceis']);
+	});
+
+	it('bloco "Hipóteses de causa" aparece com stillUnknown, mesmo sem hipóteses', () => {
+		const view = buildBancadaOverviewView(catalog, {}, [], [], { noTreatment: false }, [], { stillUnknown: true }, []);
+		const causas = view.blocks.find((b) => b.activityId === 'entender_causas')!;
+		expect(causas.value).toBe('Ainda não sabemos o que está por trás disso.');
+		expect(causas.chips).toBeUndefined();
+	});
+
 	it('bloco "Quem é afetado" reflete Evidence (ETAPA 3 do rework), reaproveitado por /now e /document', () => {
 		const withEvidence = buildBancadaOverviewView(
 			catalog,

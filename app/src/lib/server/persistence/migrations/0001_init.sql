@@ -185,3 +185,30 @@ CREATE TABLE IF NOT EXISTS treatment_step (
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL
 );
+
+-- Hipóteses de causa — Descoberta, "Entender as causas" (Stage 4B do rework,
+-- ver app/src/lib/domain/state-types.ts). 1:1 com project (mesmo molde de
+-- current_treatment): o cabeçalho que guarda stillUnknown; a coleção de
+-- hipóteses vive em cause_hypothesis, abaixo.
+CREATE TABLE IF NOT EXISTS cause_exploration (
+	project_id TEXT PRIMARY KEY REFERENCES project (id) ON DELETE CASCADE,
+	still_unknown INTEGER NOT NULL CHECK (still_unknown IN (0, 1)),
+	updated_at TEXT NOT NULL
+);
+
+-- evidence_ids: JSON array em TEXT — mesmo padrão de encoding já usado por
+-- treatment_step.actors/frictions acima (ver mappers.ts). Sem FK própria:
+-- referencia Evidence por id, validado em domain/serialization.ts, nunca
+-- pelo schema (Evidence nunca é removida, então uma FK aqui não traria
+-- integridade adicional real, só complexidade).
+CREATE TABLE IF NOT EXISTS cause_hypothesis (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	title TEXT NOT NULL,
+	origin TEXT,
+	expected_if_true TEXT,
+	what_weakens_it TEXT,
+	evidence_ids TEXT NOT NULL,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);

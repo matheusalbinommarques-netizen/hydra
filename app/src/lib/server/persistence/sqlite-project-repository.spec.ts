@@ -6,12 +6,14 @@ import path from 'node:path';
 import { catalog } from '../../catalog';
 import {
 	addAffectedGroup,
+	addCauseHypothesis,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
+	confirmCauseHypotheses,
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
@@ -23,12 +25,15 @@ import {
 	resolveImpediment,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
+	setCauseHypothesisExpectedIfTrue,
+	setCauseHypothesisWhatWeakensIt,
 	setHypothesis,
 	setImpedimentNextAction,
 	setRouteStartPhase,
 	setScopeItemEffort,
 	setScopeItemExecutionStatus,
-	skipActivity
+	skipActivity,
+	toggleCauseHypothesisEvidence
 } from '$lib/domain';
 import type { ProjectState } from '$lib/domain';
 import { createSqliteProjectRepository, type SqliteProjectRepository } from './sqlite-project-repository';
@@ -121,6 +126,17 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', 'Solicitar acesso à TI', T1));
 	state = unwrap(addImpediment(catalog, state, 'imp-2', 'Decisão pendente do time', 'decisao_pendente', T1));
 	state = unwrap(resolveImpediment(catalog, state, 'imp-2', T2));
+
+	// CauseHypothesis / CauseExploration (Stage 4B do rework, "Entender as
+	// causas") — duas hipóteses, uma delas com aprofundamento e ligada à
+	// Evidence já criada acima (ev-1), para exercitar o roundtrip completo
+	// (origin, expectedIfTrue/whatWeakensIt, evidenceIds).
+	state = unwrap(addCauseHypothesis(catalog, state, 'ch-1', 'O aprovador só revisa uma vez por semana', 'Fricção observada', T2));
+	state = unwrap(setCauseHypothesisExpectedIfTrue(catalog, state, 'ch-1', 'Atrasos concentrados numa mesma janela', T2));
+	state = unwrap(setCauseHypothesisWhatWeakensIt(catalog, state, 'ch-1', 'Atrasos distribuídos ao longo da semana', T2));
+	state = unwrap(toggleCauseHypothesisEvidence(catalog, state, 'ch-1', 'ev-1', T2));
+	state = unwrap(addCauseHypothesis(catalog, state, 'ch-2', 'O formulário exige anexos difíceis de obter', null, T2));
+	state = unwrap(confirmCauseHypotheses(catalog, state, T2));
 	return state;
 }
 
@@ -286,6 +302,12 @@ describe('createSqliteProjectRepository — schema', () => {
 		// interpretado a partir de estado_atual_detail.
 		expect(found.currentTreatment).toEqual({ projectId: 'legacy-1', noTreatment: false, updatedAt: T1 });
 		expect(found.treatmentSteps).toEqual([]);
+
+		// Mesmo banco também não tinha cause_exploration/cause_hypothesis
+		// (Stage 4B, "Entender as causas") — mesmo backfill idempotente
+		// (ensureCauseExplorationRows) preenche a linha 1:1 que faltava.
+		expect(found.causeExploration).toEqual({ projectId: 'legacy-1', stillUnknown: false, updatedAt: T1 });
+		expect(found.causeHypotheses).toEqual([]);
 
 		// A Answer legada permanece exatamente como estava — nunca lida para
 		// gerar TreatmentStep, nunca reescrita (sem dual-write).
@@ -533,7 +555,7 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 10 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 12 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
@@ -552,7 +574,9 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 				'externalActions',
 				'evidences',
 				'currentTreatment',
-				'treatmentSteps'
+				'treatmentSteps',
+				'causeExploration',
+				'causeHypotheses'
 			].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');

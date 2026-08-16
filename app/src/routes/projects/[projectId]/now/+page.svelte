@@ -4,6 +4,7 @@
 	import { tick } from 'svelte';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
 	import ComoETratadoHoje from '$lib/components/ComoETratadoHoje.svelte';
+	import EntenderCausas from '$lib/components/EntenderCausas.svelte';
 	import EntenderSituacao from '$lib/components/EntenderSituacao.svelte';
 	import MapaDeImpacto from '$lib/components/MapaDeImpacto.svelte';
 	import PlanningItemsEditor from '$lib/components/PlanningItemsEditor.svelte';
@@ -30,7 +31,7 @@
 	// de progresso e, quando aplicável, painel lateral próprio) — sem o
 	// Progresso da fase/Bancada genéricos ao lado, a coluna principal ocupa a
 	// largura toda (mesmo espírito de .dark-activity em +layout.svelte).
-	const OWN_SHELL_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual']);
+	const OWN_SHELL_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual', 'entender_causas']);
 	let hasOwnShell = $derived(OWN_SHELL_ACTIVITY_IDS.has(data.activity?.id ?? ''));
 
 	// "Revisão recomendada" (Resumo) é só um card pequeno com um link de
@@ -228,6 +229,20 @@
 			treatmentSteps={view.treatmentSteps}
 			treatmentConfirmationIssues={view.treatmentConfirmationIssues}
 			affectedGroups={view.affectedGroups}
+			reviewOrigin={data.reviewOrigin ?? undefined}
+			phaseProgress={data.phaseProgress}
+			projectName={view.projectName}
+			projectId={view.projectId}
+			situacaoSynthesis={view.answers['situacao']}
+		/>
+	{:else if data.activity?.id === 'entender_causas' && data.activity.completionMode === 'explicit_confirmation'}
+		<EntenderCausas
+			activity={data.activity}
+			causeExploration={view.causeExploration}
+			causeHypotheses={view.causeHypotheses}
+			evidences={view.evidences}
+			currentTreatment={view.currentTreatment}
+			treatmentSteps={view.treatmentSteps}
 			reviewOrigin={data.reviewOrigin ?? undefined}
 			phaseProgress={data.phaseProgress}
 			projectName={view.projectName}

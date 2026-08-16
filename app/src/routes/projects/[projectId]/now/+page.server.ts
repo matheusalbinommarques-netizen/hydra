@@ -82,7 +82,7 @@ const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set(['decompor_trabalho']
 // confirmAffectedGroups/confirmTreatment). Sem esta exceção, não haveria como
 // retomar a tela após concluí-la — `?activity=` só chega aqui via este
 // mecanismo de revisão.
-const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico', 'estado_atual']);
+const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico', 'estado_atual', 'entender_causas']);
 
 function findReviewableConcludedActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
 	const activity = findActivityDefinition(activityId);
@@ -145,7 +145,9 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		view.affectedGroups,
 		view.evidences,
 		view.currentTreatment,
-		view.treatmentSteps
+		view.treatmentSteps,
+		view.causeExploration,
+		view.causeHypotheses
 	);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 	const phaseProgress = buildPhaseProgress(catalog, view);
@@ -667,6 +669,122 @@ export const actions: Actions = {
 		// Mesmo padrão de confirmAffectedGroups: a rota canônica de Agora
 		// recomputa a atividade recomendada, que já avançou para a próxima da
 		// jornada agora que "estado_atual" está concluída.
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// "Entender as causas" (Stage 4B do rework) — mesmo padrão do Mapa de
+	// Impacto/Como é tratado hoje: cada interação persiste imediatamente, sem
+	// redirecionar; EntenderCausas.svelte permanece na mesma tela após cada
+	// ação.
+	addCauseHypothesis: async ({ request, params }) => {
+		const formData = await request.formData();
+		const title = formData.get('title');
+		if (typeof title !== 'string' || title.trim().length === 0) {
+			return fail(400, { message: 'Descreva a hipótese.' });
+		}
+		const origin = formData.get('origin');
+
+		const result = await getProjectUseCases().addCauseHypothesis({
+			projectId: params.projectId,
+			title: title.trim(),
+			origin: typeof origin === 'string' && origin.trim().length > 0 ? origin.trim() : null
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setCauseHypothesisTitle: async ({ request, params }) => {
+		const formData = await request.formData();
+		const hypothesisId = formData.get('hypothesisId');
+		const title = formData.get('title');
+		if (typeof hypothesisId !== 'string' || !hypothesisId) return fail(400, { message: 'Hipótese inválida.' });
+		if (typeof title !== 'string' || title.trim().length === 0) {
+			return fail(400, { message: 'Descreva a hipótese.' });
+		}
+
+		const result = await getProjectUseCases().setCauseHypothesisTitle({
+			projectId: params.projectId,
+			hypothesisId,
+			title: title.trim()
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setCauseHypothesisExpectedIfTrue: async ({ request, params }) => {
+		const formData = await request.formData();
+		const hypothesisId = formData.get('hypothesisId');
+		const value = formData.get('value');
+		if (typeof hypothesisId !== 'string' || !hypothesisId) return fail(400, { message: 'Hipótese inválida.' });
+
+		const result = await getProjectUseCases().setCauseHypothesisExpectedIfTrue({
+			projectId: params.projectId,
+			hypothesisId,
+			value: typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setCauseHypothesisWhatWeakensIt: async ({ request, params }) => {
+		const formData = await request.formData();
+		const hypothesisId = formData.get('hypothesisId');
+		const value = formData.get('value');
+		if (typeof hypothesisId !== 'string' || !hypothesisId) return fail(400, { message: 'Hipótese inválida.' });
+
+		const result = await getProjectUseCases().setCauseHypothesisWhatWeakensIt({
+			projectId: params.projectId,
+			hypothesisId,
+			value: typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	toggleCauseHypothesisEvidence: async ({ request, params }) => {
+		const formData = await request.formData();
+		const hypothesisId = formData.get('hypothesisId');
+		const evidenceId = formData.get('evidenceId');
+		if (typeof hypothesisId !== 'string' || !hypothesisId) return fail(400, { message: 'Hipótese inválida.' });
+		if (typeof evidenceId !== 'string' || !evidenceId) return fail(400, { message: 'Evidência inválida.' });
+
+		const result = await getProjectUseCases().toggleCauseHypothesisEvidence({
+			projectId: params.projectId,
+			hypothesisId,
+			evidenceId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	removeCauseHypothesis: async ({ request, params }) => {
+		const formData = await request.formData();
+		const hypothesisId = formData.get('hypothesisId');
+		if (typeof hypothesisId !== 'string' || !hypothesisId) return fail(400, { message: 'Hipótese inválida.' });
+
+		const result = await getProjectUseCases().removeCauseHypothesis({ projectId: params.projectId, hypothesisId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	markCauseExplorationUnknown: async ({ params }) => {
+		const result = await getProjectUseCases().markCauseExplorationUnknown({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	undoCauseExplorationUnknown: async ({ params }) => {
+		const result = await getProjectUseCases().undoCauseExplorationUnknown({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	confirmCauseHypotheses: async ({ params }) => {
+		const result = await getProjectUseCases().confirmCauseHypotheses({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		// Mesmo padrão de confirmAffectedGroups/confirmTreatment: a rota
+		// canônica de Agora recomputa a atividade recomendada, que já avançou
+		// para a próxima da jornada agora que "entender_causas" está concluída.
 		redirect(303, `/projects/${params.projectId}/now`);
 	}
 };

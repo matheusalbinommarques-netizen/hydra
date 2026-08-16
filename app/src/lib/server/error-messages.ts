@@ -57,6 +57,12 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Passo não encontrado.';
 		case 'treatment_confirmation_invalid':
 			return 'Adicione ao menos um passo ou marque "Hoje não existe um tratamento definido" antes de continuar.';
+		case 'cause_hypothesis_not_found':
+			return 'Hipótese não encontrada.';
+		case 'cause_exploration_has_hypotheses':
+			return 'Remova as hipóteses registradas antes de marcar "ainda não sabemos".';
+		case 'evidence_not_found':
+			return 'Evidência não encontrada.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

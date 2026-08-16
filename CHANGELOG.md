@@ -4,6 +4,15 @@
 
 ### Adicionado
 
+- Rework, Stage 4B ("Entender as causas") — nova atividade da Descoberta
+  onde o usuário registra hipóteses de causa reais (`CauseHypothesis`),
+  nunca causas confirmadas: múltiplas hipóteses coexistem, com
+  proveniência opcional (cartões de contexto reais do projeto),
+  aprofundamento opcional (sinal esperado / sinal que enfraquece) e
+  relação opcional com `Evidence` já existente; estado explícito "ainda
+  não sabemos o que está por trás disso" é legítimo e nunca bloqueia a
+  conclusão da atividade. Sem "Sugestão do Hydra" nesta rodada — o
+  repositório não tem hoje nenhuma capacidade real de gerar hipóteses.
 - Rework, Etapa 4A ("Como é tratado hoje") — `estado_atual_detail`
   (texto livre) dá lugar a uma cadeia ordenada de passos de tratamento
   reais, com meio/ferramenta, fricção e observação; síntese derivada

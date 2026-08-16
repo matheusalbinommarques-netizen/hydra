@@ -172,7 +172,7 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 	await test.step('atividade não pulável (Resumo) não exibe o botão', async () => {
 		const db = new Database(dbPath);
 		try {
-			for (const activityId of ['problema', 'publico', 'estado_atual', 'resultado']) {
+			for (const activityId of ['problema', 'publico', 'estado_atual', 'entender_causas', 'resultado']) {
 				db.prepare(
 					`UPDATE activity_progress SET status = 'concluída'
 					 WHERE project_id = ? AND activity_definition_id = ?`

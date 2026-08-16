@@ -3,6 +3,7 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
+	addCauseHypothesis,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
@@ -12,6 +13,7 @@ import {
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
+	markCauseExplorationUnknown,
 	prepareExternalAction,
 	resolveImpediment,
 	setAffectedGroupFrequency,
@@ -1217,5 +1219,93 @@ describe('deserializeProjectState — CurrentTreatment / TreatmentStep (Stage 4A
 		const estadoAtual = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'estado_atual')!;
 		estadoAtual.status = 'concluída';
 		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — compatibilidade com JSONs anteriores ao Stage 4B (sem causeExploration/causeHypotheses)', () => {
+	it('trata state.causeExploration ausente como { stillUnknown: false } e causeHypotheses ausente como []', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		delete envelope.state.causeExploration;
+		delete envelope.state.causeHypotheses;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.causeExploration).toEqual({
+			projectId: result.value.project.id,
+			stillUnknown: false,
+			updatedAt: result.value.project.createdAt
+		});
+		expect(result.value.causeHypotheses).toEqual([]);
+	});
+
+	it('continua rejeitando state.causeHypotheses: null', () => {
+		const envelope = baseEnvelope() as { state: Record<string, unknown> };
+		envelope.state.causeHypotheses = null;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
+describe('deserializeProjectState — CauseHypothesis / CauseExploration (Stage 4B, "Entender as causas")', () => {
+	function hypothesisState(): ProjectState {
+		return unwrap(
+			addCauseHypothesis(
+				catalog,
+				createInitialProjectState(catalog, 'proj-1', T1),
+				'ch-1',
+				'O aprovador só revisa uma vez por semana',
+				null,
+				T1
+			)
+		);
+	}
+
+	it('rejeita CauseHypothesis.title vazio', () => {
+		const envelope = JSON.parse(serializeProjectState(hypothesisState())) as {
+			state: { causeHypotheses: Array<Record<string, unknown>> };
+		};
+		envelope.state.causeHypotheses[0].title = '   ';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita CauseHypothesis com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(hypothesisState())) as {
+			state: { causeHypotheses: Array<Record<string, unknown>> };
+		};
+		envelope.state.causeHypotheses[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita CauseHypothesis.id duplicado', () => {
+		const envelope = JSON.parse(serializeProjectState(hypothesisState())) as {
+			state: { causeHypotheses: unknown[] };
+		};
+		envelope.state.causeHypotheses.push(envelope.state.causeHypotheses[0]);
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita CauseHypothesis.evidenceIds referenciando uma Evidence inexistente', () => {
+		const envelope = JSON.parse(serializeProjectState(hypothesisState())) as {
+			state: { causeHypotheses: Array<Record<string, unknown>> };
+		};
+		envelope.state.causeHypotheses[0].evidenceIds = ['ev-inexistente'];
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('rejeita causeExploration com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: { causeExploration: Record<string, unknown> };
+		};
+		envelope.state.causeExploration.projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('round-trip preserva stillUnknown e as hipóteses (nunca bloqueia conclusão, mesmo com zero hipóteses)', () => {
+		const marked = unwrap(markCauseExplorationUnknown(catalog, createInitialProjectState(catalog, 'proj-1', T1), T1));
+		const result = deserializeProjectState(serializeProjectState(marked), catalog);
+		expect(result).toEqual({ ok: true, value: marked });
+
+		const withHypothesis = hypothesisState();
+		const resultWithHypothesis = deserializeProjectState(serializeProjectState(withHypothesis), catalog);
+		expect(resultWithHypothesis).toEqual({ ok: true, value: withHypothesis });
 	});
 });
