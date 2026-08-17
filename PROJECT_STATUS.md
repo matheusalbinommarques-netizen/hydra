@@ -373,10 +373,16 @@ Histórico completo em `docs/07-management/decision-log.md`.
 Estado atual do rework: ETAPA 3 concluída (commit `ceadf4c`); Stage 4A
 ("Como é tratado hoje") concluído e entregue em `c1e6c7b` (base
 `61e5c3b` + refinamento visual/síntese aprovado por dogfooding); Stage 4B
-("Entender as causas") implementado em `b0a52f7`. Próximo corte da
-Discovery — refinamento/fechamento do Stage 4B ou Etapa 4C — ainda não
-decidido; decisão de Matheus. Trabalho atual rastreado em
-`docs/core/CURRENT_WORK.json`.
+("Entender as causas") implementado em `b0a52f7` e fechado. Decisão de
+Matheus: próximo corte da Discovery é Stage 4C — Resultado desejado /
+DesiredOutcome. Trabalho atual rastreado em
+`docs/core/CURRENT_WORK.json` (`S4C`).
+
+Entre a conclusão do Stage 4B e essa decisão, o programa de remediação
+técnica R1–R6 (`docs/core/ENGINEERING_REMEDIATION.md`) rodou e está
+COMPLETE — controle operacional, localização de E2E, protocolo de
+desenvolvimento, plumbing de living objects, persistência e
+runtime/frontend reliability, sem mudança de arquitetura.
 
 As etapas 1 a 7 do roadmap (`docs/03-product/product-roadmap.md`) estão
 concluídas. A etapa 7, "Convergência da experiência e das telas",

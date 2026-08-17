@@ -1,8 +1,8 @@
 # Hydra Engineering Remediation
 
-Status: ACTIVE
-Decision: B — manter a arquitetura atual e executar correções cirúrgicas
-antes de retomar normalmente o roadmap de produto.
+Status: COMPLETE
+Decision: B — arquitetura atual mantida; correções cirúrgicas
+executadas.
 
 ## Why
 
@@ -146,7 +146,17 @@ genérico de migrations.
 
 ### R6 — Runtime/frontend reliability cleanup — P1
 
-STATUS: CURRENT.
+STATUS: DONE — silent async failure em `ComoETratadoHoje.svelte`
+corrigido (`errorMessage` local + `role="alert"`, precedente de
+`SkipActivityConfirm.svelte`); duplicate-submit protegido nas 3
+superfícies confirmadas vulneráveis (`ComoETratadoHoje`,
+`MapaDeImpacto`, `EntenderCausas` — forms de adicionar registro
+desabilitam o controle enquanto pendente); Finding B (storage error
+boundary) = absent/not confirmed no HEAD — nenhum `throw` do
+repositório é exceção de storage legítima e distinguível de bug (todos
+são guards de invariante), então nenhuma arquitetura preventiva foi
+criada. Focused verification verde (`svelte-check` + journeys
+`como-e-tratado-hoje`/`walking-skeleton`); dogfood humano PASS.
 
 GOAL: corrigir somente gaps já comprovados:
 - storage failure → erro compreensível;
@@ -182,3 +192,32 @@ mostrar:
   fazer.
 
 Depois disso o roadmap de produto volta a ser o trabalho normal.
+
+## Completion proof
+
+R1 — operational truth/control plane
+- `CURRENT_WORK` + `hydra-state`/`verify`/`guard` suportam trabalho real e
+  source determinística.
+
+R2 — E2E localization
+- GOLDEN preservada; FEATURE semantic setup; lifecycle compartilhado;
+  counts/selectors acidentais removidos; synthetic catalog proof passou.
+
+R3 — development protocol
+- implementation → focused → runtime → DOGFOOD → STOP; broad/full fica no
+  risk/delivery boundary por default; isolated failure → isolated
+  falsifier; rerun amplo exige informação nova.
+
+R4 — living-object assistance
+- checklist discoverable; structural verifier explícito; semantic
+  decisions não são inferidas/geradas; real precedents + negative proof
+  passaram.
+
+R5 — persistence reliability
+- supported old DB compatibility verde; init idempotente; 7 ausências
+  reais de index `project_id` corrigidas; existing DB recebe os índices
+  pelo init atual.
+
+R6 — runtime/frontend reliability
+- silent failure corrigido; duplicate-submit corrigido onde confirmado;
+  Finding B não gerou arquitetura especulativa; dogfood humano PASS.

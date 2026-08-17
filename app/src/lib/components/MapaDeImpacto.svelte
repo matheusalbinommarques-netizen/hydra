@@ -99,6 +99,7 @@
 	let addOpen = $state(false);
 	let showMore = $state(false);
 	let customLabel = $state('');
+	let addingGroup = $state(false);
 	let expandedGroupId = $state<string | null>(null);
 	let justAdded = $state<string | null>(null);
 	let pulseTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -157,7 +158,9 @@
 	// de uso não devolve "qual id foi criado" separadamente.
 	function handleAddGroupSubmit(): EnhanceCallback {
 		const existingIds = new Set(affectedGroups.map((g) => g.id));
+		addingGroup = true;
 		return async ({ result, update }) => {
+			addingGroup = false;
 			if (result.type === 'failure' || result.type === 'error') {
 				await update();
 				return;
@@ -322,11 +325,11 @@
 							class="mi-suggestions"
 						>
 							{#each primarySuggestions as label (label)}
-								<button type="submit" name="label" value={label} class="mi-chip">{label}</button>
+								<button type="submit" name="label" value={label} class="mi-chip" disabled={addingGroup}>{label}</button>
 							{/each}
 							{#if showMore}
 								{#each moreSuggestions as label (label)}
-									<button type="submit" name="label" value={label} class="mi-chip">{label}</button>
+									<button type="submit" name="label" value={label} class="mi-chip" disabled={addingGroup}>{label}</button>
 								{/each}
 							{/if}
 						</form>
@@ -344,7 +347,7 @@
 							class="mi-custom-form"
 						>
 							<input type="text" name="label" placeholder="Nome curto…" bind:value={customLabel} />
-							<button type="submit" class="mi-custom-ok" disabled={customDisabled}>OK</button>
+							<button type="submit" class="mi-custom-ok" disabled={customDisabled || addingGroup}>OK</button>
 						</form>
 						{#if customDuplicate}
 							<p class="mi-custom-error" role="alert">Esse grupo já foi adicionado.</p>

@@ -71,8 +71,15 @@
 	let justAdded = $state<string | null>(null);
 	let pulseTimeout: ReturnType<typeof setTimeout> | undefined;
 
+	// Falha assíncrona visível (R6) — mesmo padrão local de
+	// SkipActivityConfirm.svelte: lê `result.data.message` diretamente no
+	// callback de enhance, sem depender de plumbing do `form` da página (que
+	// não chega a este componente hoje).
+	let errorMessage = $state<string | null>(null);
+
 	let newStepValue = $state('');
 	let addStepFormEl = $state<HTMLFormElement | undefined>();
+	let addingStep = $state(false);
 
 	let actorCustomOpenStepId = $state<string | null>(null);
 	let actorCustomValue = $state('');
@@ -96,11 +103,20 @@
 
 	function handleAddStepSubmit(): EnhanceCallback {
 		const existingIds = new Set(steps.map((s) => s.id));
+		addingStep = true;
 		return async ({ result, update }) => {
-			if (result.type === 'failure' || result.type === 'error') {
+			addingStep = false;
+			if (result.type === 'failure') {
+				errorMessage =
+					(result.data as { message?: string } | undefined)?.message ?? 'Não foi possível adicionar o passo.';
 				await update();
 				return;
 			}
+			if (result.type === 'error') {
+				await update();
+				return;
+			}
+			errorMessage = null;
 			await update();
 			newStepValue = '';
 			// Só destaque visual (pulse) — o contexto/fricções permanece fechado
@@ -113,20 +129,34 @@
 
 	function handleGenericSubmit(): EnhanceCallback {
 		return async ({ result, update }) => {
-			if (result.type === 'failure' || result.type === 'error') {
+			if (result.type === 'failure') {
+				errorMessage =
+					(result.data as { message?: string } | undefined)?.message ?? 'Não foi possível concluir a ação.';
 				await update();
 				return;
 			}
+			if (result.type === 'error') {
+				await update();
+				return;
+			}
+			errorMessage = null;
 			await update();
 		};
 	}
 
 	function handleRemoveSubmit(stepId: string): EnhanceCallback {
 		return async ({ result, update }) => {
-			if (result.type === 'failure' || result.type === 'error') {
+			if (result.type === 'failure') {
+				errorMessage =
+					(result.data as { message?: string } | undefined)?.message ?? 'Não foi possível remover o passo.';
 				await update();
 				return;
 			}
+			if (result.type === 'error') {
+				await update();
+				return;
+			}
+			errorMessage = null;
 			await update();
 			if (expandedStepId === stepId) expandedStepId = null;
 		};
@@ -217,6 +247,10 @@
 	<p class="cet-eyebrow">Como é tratado hoje</p>
 	<h2 class="cet-question">O que acontece quando isso aparece?</h2>
 	<p class="cet-help">Construa a sequência do que costuma acontecer, na ordem. Você pode voltar e ajustar depois.</p>
+
+	{#if errorMessage}
+		<p class="cet-error" role="alert">{errorMessage}</p>
+	{/if}
 
 	{#if currentTreatment.noTreatment}
 		<div class="cet-empty-state">
@@ -408,7 +442,7 @@
 								placeholder="Descrever em poucas palavras…"
 								bind:value={newStepValue}
 							/>
-							<button type="submit" disabled={newStepTrimmed.length === 0}>Adicionar</button>
+							<button type="submit" disabled={newStepTrimmed.length === 0 || addingStep}>Adicionar</button>
 						</div>
 					</form>
 					<form method="POST" action="?/setTreatmentNoTreatment" use:enhance={handleGenericSubmit}>
@@ -541,6 +575,12 @@
 		font-size: 0.84375rem;
 		color: var(--hydra-muted);
 		margin: 0 0 1.5rem;
+	}
+
+	.cet-error {
+		margin: 0 0 0.875rem;
+		font-size: 0.8125rem;
+		color: var(--hydra-warning);
 	}
 
 	.cet-empty-state {

@@ -131,6 +131,7 @@
 
 	let contextUsedLabel = $state<string | null>(null);
 	let draftTitle = $state('');
+	let addingHypothesis = $state(false);
 
 	let expandedHypothesisId = $state<string | null>(null);
 	let editingHypothesisId = $state<string | null>(null);
@@ -260,7 +261,9 @@
 			action="?/addCauseHypothesis"
 			use:enhance={() => {
 				const usedOrigin = contextUsedLabel;
+				addingHypothesis = true;
 				return async ({ result, update }) => {
+					addingHypothesis = false;
 					if (result.type === 'failure' || result.type === 'error') {
 						await update();
 						return;
@@ -279,7 +282,7 @@
 					placeholder="O que você imagina que pode estar por trás disso?"
 					bind:value={draftTitle}
 				/>
-				<button type="submit" disabled={draftTrimmed.length === 0}>Registrar hipótese</button>
+				<button type="submit" disabled={draftTrimmed.length === 0 || addingHypothesis}>Registrar hipótese</button>
 			</div>
 		</form>
 

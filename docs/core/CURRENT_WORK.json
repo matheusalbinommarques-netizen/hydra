@@ -1,6 +1,6 @@
 {
-  "id": "R6",
-  "kind": "remediation",
-  "source": "docs/core/ENGINEERING_REMEDIATION.md",
+  "id": "S4C",
+  "kind": "stage",
+  "source": "docs/core/HYDRA_PRODUCT_REWORK.md",
   "status": "in_progress"
 }
