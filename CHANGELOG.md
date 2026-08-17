@@ -4,6 +4,12 @@
 
 ### Adicionado
 
+- R4 (remediação de engenharia) — checklist de living object
+  (`docs/core/LIVING_OBJECT_CHECKLIST.md`) e verifier estrutural
+  (`hydra-living-object-verifier.mjs`): assistência mecânica explícita
+  (target/profile informados por quem implementa, nunca inferidos) para
+  não redescobrir o plumbing previsível de uma nova living-object
+  capability, sem gerar código nem decidir semântica.
 - Rework, Stage 4B ("Entender as causas") — nova atividade da Descoberta
   onde o usuário registra hipóteses de causa reais (`CauseHypothesis`),
   nunca causas confirmadas: múltiplas hipóteses coexistem, com

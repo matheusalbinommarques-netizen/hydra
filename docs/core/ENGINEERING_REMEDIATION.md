@@ -122,7 +122,13 @@ Explicitamente proibido: `LivingObjectFramework`, CRUD genérico,
 generic object model, geração automática de
 invariantes/cardinalidade/completion/UX.
 
+STATUS: DONE — checklist + structural verifier explícito, sem code
+generation (`docs/core/LIVING_OBJECT_CHECKLIST.md` +
+`.claude/scripts/hydra-living-object-verifier.mjs`).
+
 ### R5 — Persistence reliability — P1
+
+STATUS: CURRENT.
 
 GOAL: eliminar classes comprovadas de fragilidade de upgrade/persistência.
 
