@@ -128,7 +128,11 @@ generation (`docs/core/LIVING_OBJECT_CHECKLIST.md` +
 
 ### R5 — Persistence reliability — P1
 
-STATUS: CURRENT.
+STATUS: DONE — compatibility contract já coberto pelo teste comportamental
+existente (pré-Stage 4A, `sqlite-project-repository.spec.ts`); 7 índices
+`project_id` ausentes no HEAD adicionados (`scope_item`, `impediment`,
+`affected_group`, `external_action`, `evidence`, `treatment_step`,
+`cause_hypothesis`) e provados também sobre DB existente.
 
 GOAL: eliminar classes comprovadas de fragilidade de upgrade/persistência.
 
@@ -141,6 +145,8 @@ OUT: reescrever `save()`; delta persistence; trocar SQLite; framework
 genérico de migrations.
 
 ### R6 — Runtime/frontend reliability cleanup — P1
+
+STATUS: CURRENT.
 
 GOAL: corrigir somente gaps já comprovados:
 - storage failure → erro compreensível;

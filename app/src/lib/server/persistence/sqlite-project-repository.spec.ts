@@ -335,6 +335,89 @@ describe('createSqliteProjectRepository — schema', () => {
 	});
 });
 
+describe('createSqliteProjectRepository — índices de project_id (R5)', () => {
+	const TABLES_WITH_PROJECT_ID_INDEX = [
+		'scope_item',
+		'impediment',
+		'affected_group',
+		'external_action',
+		'evidence',
+		'treatment_step',
+		'cause_hypothesis'
+	];
+
+	function hasProjectIdIndex(db: Database.Database, table: string): boolean {
+		const indexes = db.prepare(`PRAGMA index_list(${table})`).all() as { name: string }[];
+		return indexes.some((index) => {
+			const columns = db.prepare(`PRAGMA index_info(${index.name})`).all() as { name: string }[];
+			return columns.some((column) => column.name === 'project_id');
+		});
+	}
+
+	it('banco novo já nasce com índice de project_id nas tabelas sem outra constraint que o cubra', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const db = new Database(filePath, { readonly: true });
+		for (const table of TABLES_WITH_PROJECT_ID_INDEX) {
+			expect(hasProjectIdIndex(db, table), `${table} deveria ter índice de project_id`).toBe(true);
+		}
+		db.close();
+	});
+
+	it('banco existente sem os índices os recebe ao passar pela inicialização atual (CREATE INDEX IF NOT EXISTS)', async () => {
+		const filePath = tempFilePath();
+
+		// Simula um banco criado antes deste corte: schema completo (0001_init.sql
+		// sem os `CREATE INDEX` novos), sem nenhum índice além dos automáticos de PK.
+		const legacyDb = new Database(filePath);
+		legacyDb.exec(
+			`CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL, route_start_phase_id TEXT);
+			 CREATE TABLE scope_version (project_id TEXT PRIMARY KEY, hypothesis TEXT NOT NULL, confirmed_at TEXT);
+			 CREATE TABLE scope_item (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, text TEXT NOT NULL, bucket TEXT NOT NULL, effort TEXT, item_order INTEGER, source_suggestion_id TEXT, execution_status TEXT NOT NULL DEFAULT 'a_fazer', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+			 CREATE TABLE impediment (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, text TEXT NOT NULL, tipo TEXT NOT NULL, next_action TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, resolved_at TEXT);
+			 CREATE TABLE affected_group (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, label TEXT NOT NULL, impact TEXT, frequency TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+			 CREATE TABLE external_action (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL, affected_group_id TEXT NOT NULL, status TEXT NOT NULL, objective TEXT NOT NULL, questions TEXT NOT NULL, information_to_take TEXT NOT NULL, expected_result TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT);
+			 CREATE TABLE evidence (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, external_action_id TEXT NOT NULL, affected_group_id TEXT NOT NULL, kind TEXT NOT NULL, outcome TEXT NOT NULL, learning TEXT NOT NULL, created_at TEXT NOT NULL);
+			 CREATE TABLE current_treatment (project_id TEXT PRIMARY KEY, no_treatment INTEGER NOT NULL, updated_at TEXT NOT NULL);
+			 CREATE TABLE treatment_step (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, step_order INTEGER NOT NULL, what_happens TEXT NOT NULL, actors TEXT NOT NULL, medium TEXT, frictions TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+			 CREATE TABLE cause_exploration (project_id TEXT PRIMARY KEY, still_unknown INTEGER NOT NULL, updated_at TEXT NOT NULL);
+			 CREATE TABLE cause_hypothesis (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, origin TEXT, expected_if_true TEXT, what_weakens_it TEXT, evidence_ids TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+			 CREATE TABLE answer (project_id TEXT NOT NULL, activity_definition_id TEXT NOT NULL, field_definition_id TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (project_id, activity_definition_id, field_definition_id));
+			 CREATE TABLE activity_progress (project_id TEXT NOT NULL, activity_definition_id TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY (project_id, activity_definition_id));
+			 CREATE TABLE pending_item (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, activity_definition_id TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, resolved_at TEXT, UNIQUE (project_id, activity_definition_id));`
+		);
+		legacyDb
+			.prepare('INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (?, ?, ?, NULL)')
+			.run('legacy-1', 'Projeto pré-índices', T1);
+		legacyDb.prepare("INSERT INTO scope_version (project_id, hypothesis, confirmed_at) VALUES ('legacy-1', '', NULL)").run();
+		legacyDb.prepare("INSERT INTO current_treatment (project_id, no_treatment, updated_at) VALUES ('legacy-1', 0, ?)").run(T1);
+		legacyDb.prepare("INSERT INTO cause_exploration (project_id, still_unknown, updated_at) VALUES ('legacy-1', 0, ?)").run(T1);
+		legacyDb.close();
+
+		const verifyBefore = new Database(filePath, { readonly: true });
+		for (const table of TABLES_WITH_PROJECT_ID_INDEX) {
+			expect(hasProjectIdIndex(verifyBefore, table), `${table} não deveria ter índice antes da inicialização`).toBe(
+				false
+			);
+		}
+		verifyBefore.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		await expect(repo.findById('legacy-1')).resolves.not.toBeNull();
+
+		const verifyAfter = new Database(filePath, { readonly: true });
+		for (const table of TABLES_WITH_PROJECT_ID_INDEX) {
+			expect(hasProjectIdIndex(verifyAfter, table), `${table} deveria ter índice após a inicialização atual`).toBe(
+				true
+			);
+		}
+		verifyAfter.close();
+	});
+});
+
 describe('createSqliteProjectRepository — insert/findById', () => {
 	it('insert + findById do estado inicial (createInitialProjectState)', async () => {
 		const repo = memoryRepo();

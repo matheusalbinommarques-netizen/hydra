@@ -212,3 +212,20 @@ CREATE TABLE IF NOT EXISTS cause_hypothesis (
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL
 );
+
+-- Índices de project_id (R5, ENGINEERING_REMEDIATION.md) — só nas tabelas
+-- cuja PK não cobre project_id como coluna líder (scope_version,
+-- current_treatment, cause_exploration usam project_id como PK; project_id
+-- é a coluna líder da PK composta de activity_progress/answer; pending_item
+-- tem UNIQUE(project_id, activity_definition_id)). As sete tabelas abaixo
+-- têm `id` como PK e nenhuma outra constraint cobrindo project_id, então
+-- toda leitura por project_id em findById()/save() fazia table scan.
+-- CREATE INDEX IF NOT EXISTS roda a cada abertura (db.exec(initSql) em
+-- createSqliteProjectRepository), então também cobre bancos já existentes.
+CREATE INDEX IF NOT EXISTS idx_scope_item_project_id ON scope_item (project_id);
+CREATE INDEX IF NOT EXISTS idx_impediment_project_id ON impediment (project_id);
+CREATE INDEX IF NOT EXISTS idx_affected_group_project_id ON affected_group (project_id);
+CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);
+CREATE INDEX IF NOT EXISTS idx_treatment_step_project_id ON treatment_step (project_id);
+CREATE INDEX IF NOT EXISTS idx_cause_hypothesis_project_id ON cause_hypothesis (project_id);
