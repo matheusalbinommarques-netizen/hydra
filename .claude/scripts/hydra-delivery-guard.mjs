@@ -7,6 +7,7 @@
 // Uso:
 //   node .claude/scripts/hydra-delivery-guard.mjs seal --item C5-01 --level 2
 //   node .claude/scripts/hydra-delivery-guard.mjs seal --item S4B --level 3
+//   node .claude/scripts/hydra-delivery-guard.mjs seal --item R2 --level 1
 //   node .claude/scripts/hydra-delivery-guard.mjs check
 //   node .claude/scripts/hydra-delivery-guard.mjs clear
 //   node .claude/scripts/hydra-delivery-guard.mjs status
@@ -24,8 +25,9 @@ class UsageError extends Error {}
 class GuardError extends Error {}
 
 // Formatos aceitos para --item / receipt.item / seal.item: item de Ciclo
-// histórico (Cx-y) ou Stage do rework (Sx[Letra]) — ver hydra-state.mjs.
-const ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?)$/;
+// histórico (Cx-y), Stage do rework de produto (Sx[Letra]) ou corte do
+// programa de remediação de engenharia (Rx) — ver hydra-state.mjs.
+const ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?|R\d+)$/;
 
 function parseArgs(argv) {
 	const command = argv[0];
@@ -55,7 +57,9 @@ function parseArgs(argv) {
 	}
 	if (!args.item) throw new UsageError('seal exige --item.');
 	if (!ITEM_ID_RE.test(args.item)) {
-		throw new UsageError(`"${args.item}" não é um identificador de item válido. Formatos aceitos: Cx-y (ex.: C5-01, C4-03A) ou Sx (ex.: S4B).`);
+		throw new UsageError(
+			`"${args.item}" não é um identificador de item válido. Formatos aceitos: Cx-y (ex.: C5-01, C4-03A), Sx (ex.: S4B) ou Rx (ex.: R2).`
+		);
 	}
 	if (!args.level) throw new UsageError('seal exige --level.');
 	if (!['1', '2', '3'].includes(args.level)) {

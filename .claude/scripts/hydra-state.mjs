@@ -15,6 +15,7 @@
 //   node .claude/scripts/hydra-state.mjs
 //   node .claude/scripts/hydra-state.mjs --item C3-03
 //   node .claude/scripts/hydra-state.mjs --item S4B
+//   node .claude/scripts/hydra-state.mjs --item R2
 //   node .claude/scripts/hydra-state.mjs --format json
 //   node .claude/scripts/hydra-state.mjs --item C3-03 --format json
 //
@@ -39,8 +40,9 @@ class StateReadError extends Error {}
 const ITEM_ID_RE = /^C\d+-\d+[A-Z]?$/;
 
 // Formatos aceitos para --item e para o "id" de CURRENT_WORK.json: item de
-// Ciclo histórico (Cx-y) ou Stage do rework (Sx[Letra]).
-const SUPPORTED_ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?)$/;
+// Ciclo histórico (Cx-y), Stage do rework de produto (Sx[Letra]) ou corte
+// do programa de remediação de engenharia (Rx).
+const SUPPORTED_ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?|R\d+)$/;
 
 const CURRENT_WORK_RELATIVE = ['docs', 'core', 'CURRENT_WORK.json'].join('/');
 
@@ -49,10 +51,12 @@ function validateItemId(id) {
 	if (/^D\d+/.test(id)) {
 		throw new UsageError(
 			`"${id}" parece um identificador de decisão (Dxxx), não um item de trabalho. ` +
-				'Formatos aceitos: Cx-y (ex.: C5-01, C4-03A) ou Sx (ex.: S4B).'
+				'Formatos aceitos: Cx-y (ex.: C5-01, C4-03A), Sx (ex.: S4B) ou Rx (ex.: R2).'
 		);
 	}
-	throw new UsageError(`"${id}" não é um identificador de item válido. Formatos aceitos: Cx-y (ex.: C5-01, C4-03A) ou Sx (ex.: S4B).`);
+	throw new UsageError(
+		`"${id}" não é um identificador de item válido. Formatos aceitos: Cx-y (ex.: C5-01, C4-03A), Sx (ex.: S4B) ou Rx (ex.: R2).`
+	);
 }
 
 function findCurrentWorkPointer(repoRoot) {
@@ -83,7 +87,7 @@ function validateCurrentWorkShape(pointer) {
 	}
 	if (typeof pointer.id !== 'string' || !SUPPORTED_ITEM_ID_RE.test(pointer.id)) {
 		throw new StateReadError(
-			`${CURRENT_WORK_RELATIVE}: "id" ausente ou em formato inválido ("${pointer.id}"). Formatos aceitos: Cx-y ou Sx (ex.: S4B).`
+			`${CURRENT_WORK_RELATIVE}: "id" ausente ou em formato inválido ("${pointer.id}"). Formatos aceitos: Cx-y, Sx (ex.: S4B) ou Rx (ex.: R2).`
 		);
 	}
 	if (typeof pointer.kind !== 'string' || pointer.kind.trim() === '') {
