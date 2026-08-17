@@ -67,74 +67,18 @@ describe('computeFieldSuggestions', () => {
 		});
 	});
 
-	describe('resultado.mudanca → visao_produto.beneficio_central', () => {
-		it('gera sugestão com texto e ajuda corretos', () => {
-			const answers = [
-				answer({
-					activityDefinitionId: 'resultado',
-					fieldDefinitionId: 'mudanca',
-					value: 'Solicitações centralizadas'
-				})
-			];
+	// resultado.mudanca → visao_produto.beneficio_central e
+	// resultado.percepcao → criterios_sucesso_produto.sinais_sucesso foram
+	// removidos nesta suite: "Resultado desejado" deixou de ter campos de
+	// texto livre (Stage 4C do rework, ver catalog/discovery.ts) — os
+	// suggestedSource que apontavam para eles foram removidos do catálogo
+	// (ver catalog/product-definition.ts). DesiredOutcome não alimenta este
+	// mecanismo de sugestão de texto (mesmo caso de AffectedGroup acima).
 
-			const suggestions = computeFieldSuggestions(catalog, answers);
-			const beneficio = suggestionFor(suggestions, 'beneficio_central')!;
-			expect(beneficio).toBeDefined();
-			expect(beneficio.sourceValue).toBe('Solicitações centralizadas');
-			expect(beneficio.actionLabel).toBe('Usar o resultado desejado como ponto de partida');
-			expect(beneficio.helpText.length).toBeGreaterThan(0);
-		});
-
-		it('origem sem Answer: nenhuma sugestão para beneficio_central', () => {
-			expect(suggestionFor(computeFieldSuggestions(catalog, []), 'beneficio_central')).toBeUndefined();
-		});
-	});
-
-	describe('resultado.percepcao → criterios_sucesso_produto.sinais_sucesso', () => {
-		it('gera sugestão com texto e ajuda corretos', () => {
-			const answers = [
-				answer({
-					activityDefinitionId: 'resultado',
-					fieldDefinitionId: 'percepcao',
-					value: 'Menos retrabalho perceptível'
-				})
-			];
-
-			const suggestions = computeFieldSuggestions(catalog, answers);
-			const sinais = suggestionFor(suggestions, 'sinais_sucesso')!;
-			expect(sinais).toBeDefined();
-			expect(sinais.sourceValue).toBe('Menos retrabalho perceptível');
-			expect(sinais.actionLabel).toBe('Usar a percepção de melhoria como ponto de partida');
-			expect(sinais.helpText.length).toBeGreaterThan(0);
-		});
-
-		it('destino já respondido: sugestão não aparece', () => {
-			const answers = [
-				answer({
-					activityDefinitionId: 'resultado',
-					fieldDefinitionId: 'percepcao',
-					value: 'Menos retrabalho perceptível'
-				}),
-				answer({
-					activityDefinitionId: 'criterios_sucesso_produto',
-					fieldDefinitionId: 'sinais_sucesso',
-					value: 'Já escrevi isso'
-				})
-			];
-			expect(suggestionFor(computeFieldSuggestions(catalog, answers), 'sinais_sucesso')).toBeUndefined();
-		});
-	});
-
-	it('todas as origens preenchidas ao mesmo tempo geram as três sugestões restantes, sem interferência entre pares', () => {
-		const answers = [
-			answer({ activityDefinitionId: 'problema', fieldDefinitionId: 'situacao', value: 'Solicitações dispersas' }),
-			answer({ activityDefinitionId: 'resultado', fieldDefinitionId: 'mudanca', value: 'Solicitações centralizadas' }),
-			answer({ activityDefinitionId: 'resultado', fieldDefinitionId: 'percepcao', value: 'Menos retrabalho' })
-		];
+	it('sem os pares removidos, sobra só necessidade_central mesmo com todas as origens restantes preenchidas', () => {
+		const answers = [answer({ activityDefinitionId: 'problema', fieldDefinitionId: 'situacao', value: 'Solicitações dispersas' })];
 
 		const suggestions = computeFieldSuggestions(catalog, answers);
-		expect(suggestions.map((s) => s.fieldId).sort()).toEqual(
-			['necessidade_central', 'beneficio_central', 'sinais_sucesso'].sort()
-		);
+		expect(suggestions.map((s) => s.fieldId).sort()).toEqual(['necessidade_central']);
 	});
 });

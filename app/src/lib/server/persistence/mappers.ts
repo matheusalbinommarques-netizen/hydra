@@ -12,6 +12,7 @@ import type {
 	CauseExploration,
 	CauseHypothesis,
 	CurrentTreatment,
+	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -301,6 +302,28 @@ export function mapCauseHypothesisRow(row: CauseHypothesisRow): CauseHypothesis 
 		expectedIfTrue: row.expected_if_true,
 		whatWeakensIt: row.what_weakens_it,
 		evidenceIds: JSON.parse(row.evidence_ids) as string[],
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
+	};
+}
+
+export interface DesiredOutcomeRow {
+	id: string;
+	project_id: string;
+	change: string;
+	target: string | null;
+	outcome_order: number;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapDesiredOutcomeRow(row: DesiredOutcomeRow): DesiredOutcome {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		change: row.change,
+		target: row.target,
+		order: row.outcome_order,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

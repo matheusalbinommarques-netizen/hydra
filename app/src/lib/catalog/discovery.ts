@@ -306,6 +306,20 @@ const entenderCausas: ActivityDefinition = {
 	pendingItemDetail: 'Hipóteses de causa ajudam a mirar a solução no que realmente importa.'
 };
 
+// "Resultado desejado" — Descoberta, Stage 4C do rework (ver
+// docs/core/HYDRA_PRODUCT_REWORK.md §32): substitui os três campos de texto
+// livre (mudanca/beneficiario/percepcao) por uma coleção ordenada de
+// DesiredOutcome real (ver domain/state-types.ts). completionMode
+// explicit_confirmation — a conclusão deriva do estado estruturado (mesmo
+// padrão de publico/estado_atual), e AO CONTRÁRIO de entender_causas, é
+// bloqueada por estado incompleto: pelo menos um DesiredOutcome com `change`
+// preenchido é exigido para uma NOVA conclusão (ver domain/transitions.ts,
+// getDesiredOutcomeConfirmationIssues) — o Gate da Descoberta lista
+// DesiredOutcomes sem a ressalva "quando aplicável" que se aplica a
+// Hypotheses/Evidence. `beneficiario`/`percepcao` não têm equivalente no
+// objeto vivo novo (AffectedGroup já representa quem é afetado; duplicar
+// esse conceito dentro de DesiredOutcome não foi autorizado) — os três
+// campos antigos seguem READ-LEGACY (ver domain/legacy-answers.ts).
 const resultado: ActivityDefinition = {
 	id: 'resultado',
 	phaseId: 'descoberta',
@@ -314,48 +328,11 @@ const resultado: ActivityDefinition = {
 	mainQuestion: 'O que deverá estar diferente quando este projeto tiver sucesso?',
 	why: 'Um resultado claro ajuda a priorizar funcionalidades e critérios de aceitação, evitando medir sucesso apenas por entregas.',
 	example: 'As solicitações estarão centralizadas, priorizadas e poderão ser acompanhadas do início ao fim.',
-	completionCriteria: 'Mudança esperada, beneficiário principal e forma de perceber a melhoria descritos com clareza.',
-	completionMode: 'required_fields',
+	completionCriteria: 'Ao menos uma mudança esperada registrada, com alvo quantitativo opcional.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
 	pendingItemLabel: 'Resultado desejado não foi definido',
-	pendingItemDetail: 'Dificulta priorizar funcionalidades pelo impacto esperado.',
-	fields: [
-		{
-			id: 'mudanca',
-			activityId: 'resultado',
-			label: 'O que deverá estar diferente quando este projeto tiver sucesso?',
-			required: true,
-			help: 'Descreva a mudança esperada.',
-			placeholder: 'Descreva o que muda com o sucesso do projeto...',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'beneficiario',
-			activityId: 'resultado',
-			label: 'Quem é o principal beneficiário?',
-			required: true,
-			help: 'Identifique quem sente essa mudança primeiro.',
-			placeholder: 'Ex.: clientes, equipe de atendimento...',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-			// suggestedSource para "Quem é afetado" (publico/publico_detail) foi
-			// removido nesta etapa: o campo de origem não existe mais no catálogo
-			// (ver AffectedGroup, ETAPA 2 do rework) — reaproveitar os grupos
-			// estruturados como sugestão de texto livre exigiria um mecanismo novo,
-			// fora do escopo deste corte (ver relatório do Gate 2).
-		},
-		{
-			id: 'percepcao',
-			activityId: 'resultado',
-			label: 'Como você vai perceber a melhoria?',
-			required: true,
-			help: 'Descreva sinais concretos, sem depender de métricas complexas.',
-			placeholder: 'Descreva como a melhoria será percebida...',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemDetail: 'Dificulta priorizar funcionalidades pelo impacto esperado.'
 };
 
 const resumo: ActivityDefinition = {

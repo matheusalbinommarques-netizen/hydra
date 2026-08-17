@@ -34,6 +34,7 @@ export function createInitialProjectState(
 		currentTreatment: { projectId, noTreatment: false, updatedAt: createdAt },
 		treatmentSteps: [],
 		causeExploration: { projectId, stillUnknown: false, updatedAt: createdAt },
-		causeHypotheses: []
+		causeHypotheses: [],
+		desiredOutcomes: []
 	};
 }

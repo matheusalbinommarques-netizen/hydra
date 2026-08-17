@@ -12,6 +12,7 @@ import {
 	mapCauseExplorationRow,
 	mapCauseHypothesisRow,
 	mapCurrentTreatmentRow,
+	mapDesiredOutcomeRow,
 	mapEvidenceRow,
 	mapExternalActionRow,
 	mapImpedimentRow,
@@ -26,6 +27,7 @@ import {
 	type CauseExplorationRow,
 	type CauseHypothesisRow,
 	type CurrentTreatmentRow,
+	type DesiredOutcomeRow,
 	type EvidenceRow,
 	type ExternalActionRow,
 	type ImpedimentRow,
@@ -256,6 +258,14 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		for (const hypothesis of state.causeHypotheses) {
 			insertCauseHypothesis.run({ ...hypothesis, evidenceIds: JSON.stringify(hypothesis.evidenceIds) });
 		}
+
+		const insertDesiredOutcome = db.prepare(
+			`INSERT INTO desired_outcome (id, project_id, change, target, outcome_order, created_at, updated_at)
+			 VALUES (@id, @projectId, @change, @target, @order, @createdAt, @updatedAt)`
+		);
+		for (const outcome of state.desiredOutcomes) {
+			insertDesiredOutcome.run(outcome);
+		}
 	}
 
 	const insertTransaction = db.transaction((state: ProjectState) => {
@@ -299,6 +309,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM current_treatment WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM cause_hypothesis WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM cause_exploration WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM desired_outcome WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
 	});
 
@@ -406,6 +417,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as CauseHypothesisRow[];
 
+			const desiredOutcomeRows = db
+				.prepare(
+					`SELECT id, project_id, change, target, outcome_order, created_at, updated_at
+					 FROM desired_outcome WHERE project_id = ? ORDER BY outcome_order`
+				)
+				.all(projectId) as DesiredOutcomeRow[];
+
 			return {
 				project: mapProjectRow(projectRow),
 				activityProgress: activityProgressRows.map(mapActivityProgressRow),
@@ -420,7 +438,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				currentTreatment: mapCurrentTreatmentRow(currentTreatmentRow),
 				treatmentSteps: treatmentStepRows.map(mapTreatmentStepRow),
 				causeExploration: mapCauseExplorationRow(causeExplorationRow),
-				causeHypotheses: causeHypothesisRows.map(mapCauseHypothesisRow)
+				causeHypotheses: causeHypothesisRows.map(mapCauseHypothesisRow),
+				desiredOutcomes: desiredOutcomeRows.map(mapDesiredOutcomeRow)
 			};
 		},
 

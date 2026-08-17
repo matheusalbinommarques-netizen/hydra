@@ -4,6 +4,7 @@ import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
 	addCauseHypothesis,
+	addDesiredOutcome,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
@@ -1129,6 +1130,182 @@ describe('deserializeProjectState — READ-LEGACY de estado_atual_detail (snapsh
 		const envelope = legacyEnvelopeWithEstadoAtualDetail();
 		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'estado_atual_detail')!;
 		envelope.state.answers.push({ ...legacyAnswer });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — READ-LEGACY de mudanca/beneficiario/percepcao (snapshot exportado antes do Stage 4C)', () => {
+	// Mesmo espírito dos blocos publico_detail/estado_atual_detail acima:
+	// simula um export legítimo feito ANTES do Stage 4C — "resultado" era
+	// required_fields, o usuário respondeu os três campos e a atividade ficou
+	// concluída por esse mecanismo, sem nenhum DesiredOutcome (que não
+	// existia ainda). Confirma o contrato central deste corte: um projeto
+	// antigo com "resultado" já concluído não é invalidado retroativamente
+	// só porque desiredOutcomes está vazio.
+	function legacyEnvelopeWithResultadoAnswers(): {
+		state: {
+			project: { id: string };
+			answers: Array<Record<string, unknown>>;
+			activityProgress: Array<Record<string, unknown>>;
+			desiredOutcomes: unknown[];
+		};
+	} {
+		const envelope = baseEnvelope() as {
+			state: {
+				project: { id: string };
+				answers: Array<Record<string, unknown>>;
+				activityProgress: Array<Record<string, unknown>>;
+				desiredOutcomes: unknown[];
+			};
+		};
+		envelope.state.answers.push(
+			{
+				projectId: envelope.state.project.id,
+				activityDefinitionId: 'resultado',
+				fieldDefinitionId: 'mudanca',
+				value: 'Solicitações centralizadas.',
+				createdAt: T1,
+				updatedAt: T1
+			},
+			{
+				projectId: envelope.state.project.id,
+				activityDefinitionId: 'resultado',
+				fieldDefinitionId: 'beneficiario',
+				value: 'Clientes',
+				createdAt: T1,
+				updatedAt: T1
+			},
+			{
+				projectId: envelope.state.project.id,
+				activityDefinitionId: 'resultado',
+				fieldDefinitionId: 'percepcao',
+				value: 'Menos retrabalho perceptível.',
+				createdAt: T1,
+				updatedAt: T1
+			}
+		);
+		const resultadoProgress = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'resultado')!;
+		resultadoProgress.status = 'concluída';
+		return envelope;
+	}
+
+	it('export/snapshot legado com mudanca/beneficiario/percepcao importa com sucesso (não invalida o projeto inteiro)', () => {
+		const envelope = legacyEnvelopeWithResultadoAnswers();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+	});
+
+	it('o dado legado é preservado (READ-LEGACY) mas não cria nenhum DesiredOutcome automaticamente, e a conclusão histórica não é invalidada', () => {
+		const envelope = legacyEnvelopeWithResultadoAnswers();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const legacyMudanca = result.value.answers.find(
+			(a) => a.activityDefinitionId === 'resultado' && a.fieldDefinitionId === 'mudanca'
+		);
+		expect(legacyMudanca?.value).toBe('Solicitações centralizadas.');
+		const legacyBeneficiario = result.value.answers.find(
+			(a) => a.activityDefinitionId === 'resultado' && a.fieldDefinitionId === 'beneficiario'
+		);
+		expect(legacyBeneficiario?.value).toBe('Clientes');
+		const legacyPercepcao = result.value.answers.find(
+			(a) => a.activityDefinitionId === 'resultado' && a.fieldDefinitionId === 'percepcao'
+		);
+		expect(legacyPercepcao?.value).toBe('Menos retrabalho perceptível.');
+
+		expect(result.value.desiredOutcomes).toEqual([]);
+
+		const resultadoProgress = result.value.activityProgress.find((p) => p.activityDefinitionId === 'resultado');
+		expect(resultadoProgress?.status).toBe('concluída');
+	});
+
+	it('o fluxo novo a partir desse estado usa só DesiredOutcome — mudanca/beneficiario/percepcao nunca são reescritas nem lidas por nenhuma projeção', () => {
+		const envelope = legacyEnvelopeWithResultadoAnswers();
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const withOutcome = unwrap(
+			addDesiredOutcome(catalog, result.value, 'do-legacy', 'Resultado real, estruturado', T2)
+		);
+		expect(withOutcome.desiredOutcomes).toEqual([
+			{
+				id: 'do-legacy',
+				projectId: result.value.project.id,
+				change: 'Resultado real, estruturado',
+				target: null,
+				order: 0,
+				createdAt: T2,
+				updatedAt: T2
+			}
+		]);
+		const legacyMudancaStillThere = withOutcome.answers.find(
+			(a) => a.activityDefinitionId === 'resultado' && a.fieldDefinitionId === 'mudanca'
+		);
+		expect(legacyMudancaStillThere?.value).toBe('Solicitações centralizadas.');
+		expect(legacyMudancaStillThere?.updatedAt).toBe(T1); // nunca reescrita
+
+		// "resultado" permanece concluída (adicionar um DesiredOutcome não a
+		// torna incompleta — mesmo espírito do teste equivalente de
+		// AffectedGroup/CurrentTreatment).
+		const resultadoProgress = withOutcome.activityProgress.find((p) => p.activityDefinitionId === 'resultado');
+		expect(resultadoProgress?.status).toBe('concluída');
+	});
+
+	it('rejeita mudanca com projectId diferente do Project', () => {
+		const envelope = legacyEnvelopeWithResultadoAnswers();
+		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'mudanca')!;
+		legacyAnswer.projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita mudanca duplicada', () => {
+		const envelope = legacyEnvelopeWithResultadoAnswers();
+		const legacyAnswer = envelope.state.answers.find((a) => a.fieldDefinitionId === 'mudanca')!;
+		envelope.state.answers.push({ ...legacyAnswer });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — DesiredOutcome (Stage 4C, "Resultado desejado")', () => {
+	function desiredOutcomeState(): ProjectState {
+		return unwrap(
+			addDesiredOutcome(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'do-1', 'Solicitações centralizadas', T1)
+		);
+	}
+
+	it('rejeita DesiredOutcome.change vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(desiredOutcomeState())) as {
+			state: { desiredOutcomes: Array<Record<string, unknown>> };
+		};
+		envelope.state.desiredOutcomes[0].change = '   ';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('rejeita DesiredOutcome com projectId diferente do Project', () => {
+		const envelope = JSON.parse(serializeProjectState(desiredOutcomeState())) as {
+			state: { desiredOutcomes: Array<Record<string, unknown>> };
+		};
+		envelope.state.desiredOutcomes[0].projectId = 'outro-projeto';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita order não contíguo começando em 0', () => {
+		const withSecond = unwrap(addDesiredOutcome(catalog, desiredOutcomeState(), 'do-2', 'Segundo resultado', T2));
+		const envelope = JSON.parse(serializeProjectState(withSecond)) as {
+			state: { desiredOutcomes: Array<Record<string, unknown>> };
+		};
+		envelope.state.desiredOutcomes[1].order = 5;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita "resultado" concluída sem nenhum DesiredOutcome, quando não há Answer legada', () => {
+		const envelope = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: { activityProgress: Array<Record<string, unknown>> };
+		};
+		const resultadoProgress = envelope.state.activityProgress.find((p) => p.activityDefinitionId === 'resultado')!;
+		resultadoProgress.status = 'concluída';
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 });

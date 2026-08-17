@@ -13,6 +13,7 @@ import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
 import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
 import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
 import { causeHypothesisCountLabel } from '$lib/catalog/cause-hypothesis';
+import { desiredOutcomeCountLabel } from '$lib/catalog/desired-outcome';
 
 export interface DiscoveryOverviewBlock {
 	activityId: string;
@@ -67,7 +68,8 @@ export function buildDiscoverySummaryView(
 	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
 	treatmentSteps: TreatmentStepSynthesisInput[] = [],
 	causeExploration: { stillUnknown: boolean } = { stillUnknown: false },
-	causeHypotheses: readonly { title: string }[] = []
+	causeHypotheses: readonly { title: string }[] = [],
+	desiredOutcomes: readonly { change: string }[] = []
 ): DiscoverySummaryView {
 	const overview: DiscoveryOverviewBlock[] = [];
 
@@ -122,14 +124,27 @@ export function buildDiscoverySummaryView(
 		});
 	}
 
-	const mudanca = answers['mudanca'];
-	if (mudanca) {
+	// Canonical primeiro (DesiredOutcome, Stage 4C); READ-LEGACY (`mudanca`)
+	// como fallback só quando não há nenhum DesiredOutcome — um projeto nunca
+	// tem as duas fontes populadas ao mesmo tempo (nunca há dual-write).
+	if (desiredOutcomes.length > 0) {
 		overview.push({
 			activityId: 'resultado',
 			heading: 'Resultado desejado',
 			editLabel: 'Editar resultado',
-			value: mudanca
+			value: desiredOutcomeCountLabel(desiredOutcomes.length),
+			chips: desiredOutcomes.map((outcome) => outcome.change)
 		});
+	} else {
+		const mudanca = answers['mudanca'];
+		if (mudanca) {
+			overview.push({
+				activityId: 'resultado',
+				heading: 'Resultado desejado',
+				editLabel: 'Editar resultado',
+				value: mudanca
+			});
+		}
 	}
 
 	const checklist: DiscoveryChecklistItem[] = [

@@ -299,6 +299,31 @@ export interface CauseHypothesis {
 	updatedAt: string;
 }
 
+// Resultado desejado — Descoberta, "Resultado desejado" (Stage 4C do rework,
+// ver docs/core/HYDRA_PRODUCT_REWORK.md §32). Objeto vivo real: substitui o
+// texto livre antes capturado em `mudanca`/`beneficiario`/`percepcao`
+// (Answers da atividade `resultado`) como fonte canônica. Mesmo espírito de
+// AffectedGroup (coleção ligada à atividade, participa da conclusão — ao
+// contrário de CauseHypothesis), com ordenação própria (mesmo molde de
+// TreatmentStep.order: 0-based contígua, swap adjacente em moveDesiredOutcome).
+//
+// `change` é o único dado obrigatório (a mudança esperada); `target` é um
+// alvo quantitativo opcional, sempre texto livre curto (nunca number+unit:
+// decisão explícita — o Hydra não deve obrigar o usuário a inventar um KPI,
+// ver HYDRA_PRODUCT_REWORK.md §32). `beneficiario`/`percepcao` do modelo
+// antigo não têm equivalente aqui — AffectedGroup já representa quem é
+// afetado; duplicar esse conceito dentro de DesiredOutcome não foi
+// autorizado (ver domain/legacy-answers.ts, READ-LEGACY dos três campos).
+export interface DesiredOutcome {
+	id: string;
+	projectId: string;
+	change: string;
+	target: string | null;
+	order: number;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -314,4 +339,5 @@ export interface ProjectState {
 	treatmentSteps: TreatmentStep[];
 	causeExploration: CauseExploration;
 	causeHypotheses: CauseHypothesis[];
+	desiredOutcomes: DesiredOutcome[];
 }

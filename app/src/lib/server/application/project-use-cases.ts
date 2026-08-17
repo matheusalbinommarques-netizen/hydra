@@ -8,6 +8,7 @@ import type { NextActivityResult } from '$lib/orientation-engine';
 import {
 	addAffectedGroup as addAffectedGroupInDomain,
 	addCauseHypothesis as addCauseHypothesisInDomain,
+	addDesiredOutcome as addDesiredOutcomeInDomain,
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
@@ -15,6 +16,7 @@ import {
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmCauseHypotheses as confirmCauseHypothesesInDomain,
+	confirmDesiredOutcomes as confirmDesiredOutcomesInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
@@ -22,11 +24,13 @@ import {
 	createInitialProjectState,
 	deserializeProjectState,
 	markCauseExplorationUnknown as markCauseExplorationUnknownInDomain,
+	moveDesiredOutcome as moveDesiredOutcomeInDomain,
 	moveScopeItem as moveScopeItemInDomain,
 	moveTreatmentStep as moveTreatmentStepInDomain,
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeCauseHypothesis as removeCauseHypothesisInDomain,
+	removeDesiredOutcome as removeDesiredOutcomeInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	removeTreatmentStep as removeTreatmentStepInDomain,
 	renameProject as renameProjectInDomain,
@@ -39,6 +43,8 @@ import {
 	setCauseHypothesisExpectedIfTrue as setCauseHypothesisExpectedIfTrueInDomain,
 	setCauseHypothesisTitle as setCauseHypothesisTitleInDomain,
 	setCauseHypothesisWhatWeakensIt as setCauseHypothesisWhatWeakensItInDomain,
+	setDesiredOutcomeChange as setDesiredOutcomeChangeInDomain,
+	setDesiredOutcomeTarget as setDesiredOutcomeTargetInDomain,
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
@@ -61,6 +67,7 @@ import { buildProjectView } from './project-view';
 import type {
 	AddAffectedGroupInput,
 	AddCauseHypothesisInput,
+	AddDesiredOutcomeInput,
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AddTreatmentStepInput,
@@ -68,12 +75,14 @@ import type {
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmCauseHypothesesInput,
+	ConfirmDesiredOutcomesInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
 	ConfirmTreatmentInput,
 	CreateConfiguredProjectInput,
 	MarkCauseExplorationUnknownInput,
+	MoveDesiredOutcomeInput,
 	MoveScopeItemInput,
 	MoveTreatmentStepInput,
 	PrepareExternalActionInput,
@@ -81,6 +90,7 @@ import type {
 	ProjectUseCases,
 	RemoveAffectedGroupInput,
 	RemoveCauseHypothesisInput,
+	RemoveDesiredOutcomeInput,
 	RemoveScopeItemInput,
 	RemoveTreatmentStepInput,
 	RenameProjectInput,
@@ -92,6 +102,8 @@ import type {
 	SetCauseHypothesisExpectedIfTrueInput,
 	SetCauseHypothesisTitleInput,
 	SetCauseHypothesisWhatWeakensItInput,
+	SetDesiredOutcomeChangeInput,
+	SetDesiredOutcomeTargetInput,
 	SetHypothesisInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
@@ -206,6 +218,10 @@ function computeLastMovementAt(state: ProjectState): string | null {
 	// movimento, sem duplicar o mesmo instante.
 	if (state.causeExploration.stillUnknown) timestamps.push(state.causeExploration.updatedAt);
 	for (const hypothesis of state.causeHypotheses) timestamps.push(hypothesis.updatedAt);
+	// "Resultado desejado" (Stage 4C do rework) — mesma extensão pequena e
+	// coerente já aplicada a CauseHypothesis acima: mutações reais da coleção
+	// também são movimento real do projeto.
+	for (const outcome of state.desiredOutcomes) timestamps.push(outcome.updatedAt);
 	for (const pending of state.pendingItems) {
 		timestamps.push(pending.createdAt);
 		if (pending.status === 'resolvida') timestamps.push(pending.resolvedAt);
@@ -913,6 +929,75 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmTreatmentInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// "Resultado desejado" (Stage 4C do rework) — mesmo padrão dos casos de
+		// uso do Mapa de Impacto/Como é tratado hoje/Entender as causas: cada
+		// interação persiste imediatamente.
+		async addDesiredOutcome(input: AddDesiredOutcomeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addDesiredOutcomeInDomain(catalog, state, idGenerator.generate(), input.change, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setDesiredOutcomeChange(input: SetDesiredOutcomeChangeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setDesiredOutcomeChangeInDomain(catalog, state, input.outcomeId, input.change, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setDesiredOutcomeTarget(input: SetDesiredOutcomeTargetInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setDesiredOutcomeTargetInDomain(catalog, state, input.outcomeId, input.target, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeDesiredOutcome(input: RemoveDesiredOutcomeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeDesiredOutcomeInDomain(catalog, state, input.outcomeId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async moveDesiredOutcome(input: MoveDesiredOutcomeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = moveDesiredOutcomeInDomain(catalog, state, input.outcomeId, input.direction, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmDesiredOutcomes(input: ConfirmDesiredOutcomesInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmDesiredOutcomesInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

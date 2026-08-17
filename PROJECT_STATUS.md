@@ -373,10 +373,10 @@ Histórico completo em `docs/07-management/decision-log.md`.
 Estado atual do rework: ETAPA 3 concluída (commit `ceadf4c`); Stage 4A
 ("Como é tratado hoje") concluído e entregue em `c1e6c7b` (base
 `61e5c3b` + refinamento visual/síntese aprovado por dogfooding); Stage 4B
-("Entender as causas") implementado em `b0a52f7` e fechado. Decisão de
-Matheus: próximo corte da Discovery é Stage 4C — Resultado desejado /
-DesiredOutcome. Trabalho atual rastreado em
-`docs/core/CURRENT_WORK.json` (`S4C`).
+("Entender as causas") implementado em `b0a52f7` e fechado; Stage 4C
+("Resultado desejado") concluído e fechado — ver detalhamento abaixo.
+Trabalho atual rastreado em `docs/core/CURRENT_WORK.json` (`S4D`,
+"Checkpoint" — Resumo da Descoberta derivado, sem questionário novo).
 
 Entre a conclusão do Stage 4B e essa decisão, o programa de remediação
 técnica R1–R6 (`docs/core/ENGINEERING_REMEDIATION.md`) rodou e está
@@ -565,13 +565,27 @@ fricções de todos os passos consolidadas ao final, sem duplicatas.
 Stage 4A está integralmente concluído — nenhuma alteração adicional
 prevista para ele.
 
-A próxima decisão real é de Matheus: autorizar a Etapa 4B ("Causas /
-hipóteses", também chamada "Entender as causas") — ainda um problema de
-produto a decidir, não uma implementação já autorizada —, a Etapa 4C
-("Resultado desejado") ou outro corte do rework
-(`docs/core/HYDRA_PRODUCT_REWORK.md`) como próximo passo, ou direcionar ao
-vivo outra coisa. Não decidida ainda; nenhum desses cortes foi
-implementado.
+Stage 4C ("Resultado desejado", `docs/core/HYDRA_PRODUCT_REWORK.md` §32)
+está **concluído e fechado**: `DesiredOutcome` é o objeto vivo canônico da
+atividade "Resultado desejado" — coleção ordenada (`change` obrigatório,
+`target` textual opcional, nunca number+unit, para não forçar um KPI
+artificial), com adicionar/editar/remover/reordenar e conclusão por
+`explicit_confirmation` (mesma mecânica de `AffectedGroup`/
+`TreatmentStep`); os três campos antigos (`mudanca`/`beneficiario`/
+`percepcao`) seguem READ-LEGACY (`domain/legacy-answers.ts`), sem
+dual-write nem auto-promoção — `beneficiário`/`percepção` não têm
+equivalente no objeto novo (`AffectedGroup` já representa quem é
+afetado). Projeções em Bancada e Resumo da descoberta refletem a coleção
+sem redigitação. Dogfooding humano da mecânica/produto: PASS (a
+roupagem visual segue a identidade papel/tinta/grafite anterior à
+convergência do rework — dívida de design conhecida, não bloqueante para
+este fechamento). `hydra-living-object-verifier.mjs` (perfil
+`project-collection`) PASS.
+
+Com Stage 4C fechado, a próxima etapa deterministicamente definida pelo
+roadmap do rework é a Etapa 4D — "Checkpoint": Resumo da Descoberta
+derivado a partir dos objetos vivos já existentes, sem questionário novo.
+Ainda não implementada.
 
 ## Não fazer agora
 

@@ -8,6 +8,7 @@
 	import EntenderSituacao from '$lib/components/EntenderSituacao.svelte';
 	import MapaDeImpacto from '$lib/components/MapaDeImpacto.svelte';
 	import PlanningItemsEditor from '$lib/components/PlanningItemsEditor.svelte';
+	import ResultadoDesejado from '$lib/components/ResultadoDesejado.svelte';
 	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
 	import { encodePlanningItems } from '$lib/domain';
 	import type { PlanningItem } from '$lib/domain';
@@ -31,7 +32,7 @@
 	// de progresso e, quando aplicável, painel lateral próprio) — sem o
 	// Progresso da fase/Bancada genéricos ao lado, a coluna principal ocupa a
 	// largura toda (mesmo espírito de .dark-activity em +layout.svelte).
-	const OWN_SHELL_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual', 'entender_causas']);
+	const OWN_SHELL_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual', 'entender_causas', 'resultado']);
 	let hasOwnShell = $derived(OWN_SHELL_ACTIVITY_IDS.has(data.activity?.id ?? ''));
 
 	// "Revisão recomendada" (Resumo) é só um card pequeno com um link de
@@ -248,6 +249,16 @@
 			projectName={view.projectName}
 			projectId={view.projectId}
 			situacaoSynthesis={view.answers['situacao']}
+		/>
+	{:else if data.activity?.id === 'resultado' && data.activity.completionMode === 'explicit_confirmation'}
+		<ResultadoDesejado
+			activity={data.activity}
+			desiredOutcomes={view.desiredOutcomes}
+			desiredOutcomeConfirmationIssues={view.desiredOutcomeConfirmationIssues}
+			reviewOrigin={data.reviewOrigin ?? undefined}
+			phaseProgress={data.phaseProgress}
+			projectName={view.projectName}
+			projectId={view.projectId}
 		/>
 	{:else if data.activity?.completionMode === 'scope_confirmation'}
 		<section class="next-action">

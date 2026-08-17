@@ -82,7 +82,7 @@ const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set(['decompor_trabalho']
 // confirmAffectedGroups/confirmTreatment). Sem esta exceção, não haveria como
 // retomar a tela após concluí-la — `?activity=` só chega aqui via este
 // mecanismo de revisão.
-const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico', 'estado_atual', 'entender_causas']);
+const REVIEWABLE_NON_REQUIRED_FIELDS_ACTIVITY_IDS = new Set(['publico', 'estado_atual', 'entender_causas', 'resultado']);
 
 function findReviewableConcludedActivity(view: ProjectView, activityId: string): ActivityDefinition | undefined {
 	const activity = findActivityDefinition(activityId);
@@ -147,7 +147,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		view.currentTreatment,
 		view.treatmentSteps,
 		view.causeExploration,
-		view.causeHypotheses
+		view.causeHypotheses,
+		view.desiredOutcomes
 	);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 	const phaseProgress = buildPhaseProgress(catalog, view);
@@ -785,6 +786,94 @@ export const actions: Actions = {
 		// Mesmo padrão de confirmAffectedGroups/confirmTreatment: a rota
 		// canônica de Agora recomputa a atividade recomendada, que já avançou
 		// para a próxima da jornada agora que "entender_causas" está concluída.
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// "Resultado desejado" (Stage 4C do rework) — mesmo padrão do Mapa de
+	// Impacto/Como é tratado hoje/Entender as causas: cada interação persiste
+	// imediatamente, sem redirecionar; ResultadoDesejado.svelte permanece na
+	// mesma tela após cada ação.
+	addDesiredOutcome: async ({ request, params }) => {
+		const formData = await request.formData();
+		const change = formData.get('change');
+		if (typeof change !== 'string' || change.trim().length === 0) {
+			return fail(400, { message: 'Descreva a mudança esperada.' });
+		}
+
+		const result = await getProjectUseCases().addDesiredOutcome({
+			projectId: params.projectId,
+			change: change.trim()
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setDesiredOutcomeChange: async ({ request, params }) => {
+		const formData = await request.formData();
+		const outcomeId = formData.get('outcomeId');
+		const change = formData.get('change');
+		if (typeof outcomeId !== 'string' || !outcomeId) return fail(400, { message: 'Resultado inválido.' });
+		if (typeof change !== 'string' || change.trim().length === 0) {
+			return fail(400, { message: 'Descreva a mudança esperada.' });
+		}
+
+		const result = await getProjectUseCases().setDesiredOutcomeChange({
+			projectId: params.projectId,
+			outcomeId,
+			change: change.trim()
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setDesiredOutcomeTarget: async ({ request, params }) => {
+		const formData = await request.formData();
+		const outcomeId = formData.get('outcomeId');
+		const target = formData.get('target');
+		if (typeof outcomeId !== 'string' || !outcomeId) return fail(400, { message: 'Resultado inválido.' });
+
+		const result = await getProjectUseCases().setDesiredOutcomeTarget({
+			projectId: params.projectId,
+			outcomeId,
+			target: typeof target === 'string' && target.trim().length > 0 ? target.trim() : null
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	removeDesiredOutcome: async ({ request, params }) => {
+		const formData = await request.formData();
+		const outcomeId = formData.get('outcomeId');
+		if (typeof outcomeId !== 'string' || !outcomeId) return fail(400, { message: 'Resultado inválido.' });
+
+		const result = await getProjectUseCases().removeDesiredOutcome({ projectId: params.projectId, outcomeId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	moveDesiredOutcome: async ({ request, params }) => {
+		const formData = await request.formData();
+		const outcomeId = formData.get('outcomeId');
+		const direction = formData.get('direction');
+		if (typeof outcomeId !== 'string' || !outcomeId) return fail(400, { message: 'Resultado inválido.' });
+		if (direction !== '-1' && direction !== '1') return fail(400, { message: 'Direção inválida.' });
+
+		const result = await getProjectUseCases().moveDesiredOutcome({
+			projectId: params.projectId,
+			outcomeId,
+			direction: direction === '-1' ? -1 : 1
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	confirmDesiredOutcomes: async ({ params }) => {
+		const result = await getProjectUseCases().confirmDesiredOutcomes({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		// Mesmo padrão de confirmAffectedGroups/confirmTreatment/
+		// confirmCauseHypotheses: a rota canônica de Agora recomputa a
+		// atividade recomendada, que já avançou para a próxima da jornada
+		// agora que "resultado" está concluída.
 		redirect(303, `/projects/${params.projectId}/now`);
 	}
 };

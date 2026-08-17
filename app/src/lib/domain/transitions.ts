@@ -10,6 +10,7 @@ import type {
 	AffectedGroupImpact,
 	CauseHypothesis,
 	CurrentTreatment,
+	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -66,7 +67,9 @@ export type DomainTransitionError =
 	| { kind: 'treatment_confirmation_invalid'; issues: TreatmentConfirmationIssue[] }
 	| { kind: 'cause_hypothesis_not_found' }
 	| { kind: 'cause_exploration_has_hypotheses' }
-	| { kind: 'evidence_not_found' };
+	| { kind: 'evidence_not_found' }
+	| { kind: 'desired_outcome_not_found' }
+	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -1630,6 +1633,211 @@ export function confirmCauseHypotheses(
 	const currentStatus = progress?.status ?? 'não_iniciada';
 	if (currentStatus === 'concluída') {
 		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	let next = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		next = resolvePendingItem(next, activity.id, occurredAt);
+	}
+	return { ok: true, value: next };
+}
+
+// --- DesiredOutcome — "Resultado desejado" (Stage 4C do rework, ver
+// docs/core/HYDRA_PRODUCT_REWORK.md §32) -------------------------------------
+//
+// Mesmo espírito de AffectedGroup: ligada à atividade `resultado` do
+// catálogo (completionMode explicit_confirmation) — qualquer mutação que
+// torne a coleção novamente incompleta reabre a atividade se ela já estava
+// concluída, e invalida o Resumo da descoberta já confirmado (mesmo
+// afterAffectedGroupsMutation acima). Ordenação por swap adjacente, mesmo
+// padrão de moveTreatmentStep — diferente de AffectedGroup/CauseHypothesis,
+// que não têm order.
+
+export type DesiredOutcomeConfirmationIssue = { kind: 'no_outcomes' } | { kind: 'missing_change'; outcomeIds: string[] };
+
+const DESIRED_OUTCOME_ACTIVITY_ID = 'resultado';
+
+/**
+ * Retorna os motivos pelos quais "Resultado desejado" ainda não pode ser
+ * concluído (array vazio = pode concluir): pelo menos um DesiredOutcome, e
+ * cada um com `change` não vazio após trim. `change` vazio nunca existe no
+ * estado persistido (validado em addDesiredOutcome/setDesiredOutcomeChange),
+ * então `missing_change` é defesa redundante, não um caminho alcançável hoje
+ * — mesmo espírito de "passo vazio nunca existe" em
+ * getTreatmentConfirmationIssues. `target` nunca entra aqui: é sempre
+ * opcional, nenhuma quantidade mínima além de 1 outcome válido.
+ */
+export function getDesiredOutcomeConfirmationIssues(
+	outcomes: readonly DesiredOutcome[]
+): DesiredOutcomeConfirmationIssue[] {
+	const issues: DesiredOutcomeConfirmationIssue[] = [];
+	if (outcomes.length === 0) issues.push({ kind: 'no_outcomes' });
+
+	const missingChangeIds = outcomes.filter((outcome) => outcome.change.trim().length === 0).map((outcome) => outcome.id);
+	if (missingChangeIds.length > 0) issues.push({ kind: 'missing_change', outcomeIds: missingChangeIds });
+
+	return issues;
+}
+
+function findDesiredOutcome(state: ProjectState, outcomeId: string): DesiredOutcome | undefined {
+	return state.desiredOutcomes.find((outcome) => outcome.id === outcomeId);
+}
+
+function invalidateDesiredOutcomeConfirmation(catalog: Catalog, state: ProjectState): ProjectState {
+	const activity = findActivityDefinition(catalog, DESIRED_OUTCOME_ACTIVITY_ID);
+	if (!activity) return state;
+	const progress = findActivityProgress(state, activity.id);
+	if (progress?.status !== 'concluída') return state;
+	if (getDesiredOutcomeConfirmationIssues(state.desiredOutcomes).length === 0) return state;
+	return setActivityStatus(state, activity.id, 'em_andamento');
+}
+
+function afterDesiredOutcomeMutation(catalog: Catalog, state: ProjectState): ProjectState {
+	let next = invalidateDesiredOutcomeConfirmation(catalog, state);
+	if (shouldInvalidateSummary(catalog, next, { kind: 'answer', activityDefinitionId: DESIRED_OUTCOME_ACTIVITY_ID })) {
+		next = invalidateSummary(catalog, next);
+	}
+	return next;
+}
+
+/** Adiciona um resultado ao final da cadeia (order = length atual) — `change` vazio é rejeitado (único dado obrigatório). */
+export function addDesiredOutcome(
+	catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	change: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const trimmed = change.trim();
+	if (trimmed.length === 0) return { ok: false, error: { kind: 'invalid_field_value', fieldDefinitionId: 'change' } };
+
+	const outcome: DesiredOutcome = {
+		id: outcomeId,
+		projectId: state.project.id,
+		change: trimmed,
+		target: null,
+		order: state.desiredOutcomes.length,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	const next = afterDesiredOutcomeMutation(catalog, {
+		...state,
+		desiredOutcomes: [...state.desiredOutcomes, outcome]
+	});
+	return { ok: true, value: next };
+}
+
+export function setDesiredOutcomeChange(
+	catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	change: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const outcome = findDesiredOutcome(state, outcomeId);
+	if (!outcome) return { ok: false, error: { kind: 'desired_outcome_not_found' } };
+	const trimmed = change.trim();
+	if (trimmed.length === 0) return { ok: false, error: { kind: 'invalid_field_value', fieldDefinitionId: 'change' } };
+
+	const next = afterDesiredOutcomeMutation(catalog, {
+		...state,
+		desiredOutcomes: state.desiredOutcomes.map((item) =>
+			item.id === outcomeId ? { ...item, change: trimmed, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+/** `target` é sempre texto opcional — nunca number+unit (ver state-types.ts, DesiredOutcome). */
+export function setDesiredOutcomeTarget(
+	catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	target: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const outcome = findDesiredOutcome(state, outcomeId);
+	if (!outcome) return { ok: false, error: { kind: 'desired_outcome_not_found' } };
+
+	const cleaned = target && target.trim().length > 0 ? target.trim() : null;
+	const next = afterDesiredOutcomeMutation(catalog, {
+		...state,
+		desiredOutcomes: state.desiredOutcomes.map((item) =>
+			item.id === outcomeId ? { ...item, target: cleaned, updatedAt: occurredAt } : item
+		)
+	});
+	return { ok: true, value: next };
+}
+
+export function removeDesiredOutcome(
+	catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const outcome = findDesiredOutcome(state, outcomeId);
+	if (!outcome) return { ok: false, error: { kind: 'desired_outcome_not_found' } };
+
+	const remaining = state.desiredOutcomes
+		.filter((item) => item.id !== outcomeId)
+		.sort((a, b) => a.order - b.order)
+		.map((item, index) => (item.order === index ? item : { ...item, order: index, updatedAt: occurredAt }));
+
+	const next = afterDesiredOutcomeMutation(catalog, { ...state, desiredOutcomes: remaining });
+	return { ok: true, value: next };
+}
+
+/**
+ * Move um resultado uma posição para cima (-1) ou para baixo (+1) — troca de
+ * `order` com o vizinho adjacente, nunca reescreve a lista inteira (mesmo
+ * espírito de moveTreatmentStep). Fora dos limites é um no-op silencioso — a
+ * interface já desabilita o botão nesses casos.
+ */
+export function moveDesiredOutcome(
+	catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	direction: -1 | 1,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const outcome = findDesiredOutcome(state, outcomeId);
+	if (!outcome) return { ok: false, error: { kind: 'desired_outcome_not_found' } };
+
+	const targetOrder = outcome.order + direction;
+	const neighbor = state.desiredOutcomes.find((item) => item.order === targetOrder);
+	if (!neighbor) return { ok: true, value: state };
+
+	const next = afterDesiredOutcomeMutation(catalog, {
+		...state,
+		desiredOutcomes: state.desiredOutcomes.map((item) => {
+			if (item.id === outcome.id) return { ...item, order: targetOrder, updatedAt: occurredAt };
+			if (item.id === neighbor.id) return { ...item, order: outcome.order, updatedAt: occurredAt };
+			return item;
+		})
+	});
+	return { ok: true, value: next };
+}
+
+export function confirmDesiredOutcomes(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, DESIRED_OUTCOME_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	const issues = getDesiredOutcomeConfirmationIssues(state.desiredOutcomes);
+	if (issues.length > 0) {
+		return { ok: false, error: { kind: 'desired_outcome_confirmation_invalid', issues } };
 	}
 
 	let next = setActivityStatus(state, activity.id, 'concluída');

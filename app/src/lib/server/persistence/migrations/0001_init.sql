@@ -213,6 +213,21 @@ CREATE TABLE IF NOT EXISTS cause_hypothesis (
 	updated_at TEXT NOT NULL
 );
 
+-- Resultado desejado — Descoberta, "Resultado desejado" (Stage 4C do rework,
+-- ver app/src/lib/domain/state-types.ts). Coleção ordenada ligada ao
+-- projeto, mesmo molde de treatment_step (outcome_order, sem FK própria além
+-- de project_id — nunca referencia affected_group: beneficiário/percepção do
+-- modelo antigo não têm equivalente aqui).
+CREATE TABLE IF NOT EXISTS desired_outcome (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	change TEXT NOT NULL,
+	target TEXT,
+	outcome_order INTEGER NOT NULL,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
 -- Índices de project_id (R5, ENGINEERING_REMEDIATION.md) — só nas tabelas
 -- cuja PK não cobre project_id como coluna líder (scope_version,
 -- current_treatment, cause_exploration usam project_id como PK; project_id
@@ -229,3 +244,4 @@ CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (pr
 CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);
 CREATE INDEX IF NOT EXISTS idx_treatment_step_project_id ON treatment_step (project_id);
 CREATE INDEX IF NOT EXISTS idx_cause_hypothesis_project_id ON cause_hypothesis (project_id);
+CREATE INDEX IF NOT EXISTS idx_desired_outcome_project_id ON desired_outcome (project_id);

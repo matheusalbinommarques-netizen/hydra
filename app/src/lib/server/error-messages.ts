@@ -63,6 +63,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Remova as hipóteses registradas antes de marcar "ainda não sabemos".';
 		case 'evidence_not_found':
 			return 'Evidência não encontrada.';
+		case 'desired_outcome_not_found':
+			return 'Resultado desejado não encontrado.';
+		case 'desired_outcome_confirmation_invalid':
+			return 'Adicione ao menos uma mudança esperada antes de confirmar o resultado.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

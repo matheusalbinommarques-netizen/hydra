@@ -13,6 +13,7 @@ import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
 import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
 import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
 import { causeHypothesisCountLabel } from '$lib/catalog/cause-hypothesis';
+import { desiredOutcomeCountLabel } from '$lib/catalog/desired-outcome';
 
 export interface BancadaOverviewBlock {
 	activityId: string;
@@ -39,17 +40,16 @@ const BANCADA_PHASE_IDS = ['descoberta', 'definicao', 'estruturacao'];
 // Estruturação (seis atividades) segue a mesma curadoria: quando uma
 // atividade tem mais de um campo obrigatório (objetivo_entregaveis,
 // restricoes_premissas), o campo escolhido é o que mais de perto responde
-// à mainQuestion da atividade — mesmo critério já usado em "resultado"
-// (mudanca, não beneficiario/percepcao).
-// `publico`/`estado_atual` não entram aqui — deixaram de ser Answer-driven
-// (ETAPA 2 e Stage 4A do rework, ver catalog/discovery.ts) e ganham
-// tratamento próprio em buildBancadaOverviewView a partir de
+// à mainQuestion da atividade.
+// `publico`/`estado_atual`/`resultado` não entram aqui — deixaram de ser
+// Answer-driven (ETAPA 2, Stage 4A e Stage 4C do rework, ver
+// catalog/discovery.ts) e ganham tratamento próprio em
+// buildBancadaOverviewView a partir de
 // AffectedGroup/CurrentTreatment, não deste mapa genérico de
 // heading/valueFieldId.
 const BLOCK_SPECS: Record<string, { heading: string; valueFieldId: string; chipsFieldId?: string }> = {
 	origem: { heading: 'Origem do projeto', valueFieldId: 'origem' },
 	problema: { heading: 'Situação', valueFieldId: 'situacao', chipsFieldId: 'situacao_o_que' },
-	resultado: { heading: 'Resultado desejado', valueFieldId: 'mudanca' },
 	usuario_principal: { heading: 'Usuário principal', valueFieldId: 'usuario_principal' },
 	visao_produto: { heading: 'Visão do produto', valueFieldId: 'necessidade_central' },
 	criterios_sucesso_produto: { heading: 'Critérios de sucesso do produto', valueFieldId: 'sinais_sucesso' },
@@ -82,7 +82,8 @@ export function buildBancadaOverviewView(
 	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
 	treatmentSteps: TreatmentStepSynthesisInput[] = [],
 	causeExploration: { stillUnknown: boolean } = { stillUnknown: false },
-	causeHypotheses: readonly { title: string }[] = []
+	causeHypotheses: readonly { title: string }[] = [],
+	desiredOutcomes: readonly { change: string }[] = []
 ): BancadaOverviewView {
 	const blocks: BancadaOverviewBlock[] = [];
 
@@ -133,6 +134,24 @@ export function buildBancadaOverviewView(
 						value: causeHypothesisCountLabel(causeExploration.stillUnknown, causeHypotheses.length),
 						chips: causeHypotheses.length > 0 ? causeHypotheses.map((hypothesis) => hypothesis.title) : undefined
 					});
+				}
+				continue;
+			}
+
+			if (activity.id === 'resultado') {
+				// Canonical primeiro (DesiredOutcome, Stage 4C); READ-LEGACY como
+				// fallback só quando não há nenhum DesiredOutcome — um projeto nunca
+				// tem as duas fontes populadas ao mesmo tempo (nunca há dual-write),
+				// mesmo espírito de discovery-summary-view.ts.
+				if (desiredOutcomes.length > 0) {
+					blocks.push({
+						activityId: 'resultado',
+						heading: 'Resultado desejado',
+						value: desiredOutcomeCountLabel(desiredOutcomes.length),
+						chips: desiredOutcomes.map((outcome) => outcome.change)
+					});
+				} else if (answers['mudanca']) {
+					blocks.push({ activityId: 'resultado', heading: 'Resultado desejado', value: answers['mudanca'] });
 				}
 				continue;
 			}

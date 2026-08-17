@@ -146,7 +146,10 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
 		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
-		await expect(page.getByRole('heading', { name: 'Resultado desejado' })).toBeVisible();
+		// "Resultado desejado" (Stage 4C do rework) — heading próprio.
+		await expect(
+			page.getByRole('heading', { name: 'O que deverá estar diferente quando este projeto tiver sucesso?' })
+		).toBeVisible();
 	});
 
 	await test.step('Resumo e Documento refletem "Como é tratado hoje" sem redigitação', async () => {

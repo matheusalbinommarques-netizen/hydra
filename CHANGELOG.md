@@ -4,6 +4,13 @@
 
 ### Adicionado
 
+- Rework, Stage 4C ("Resultado desejado") — `mudanca`/`beneficiario`/
+  `percepcao` (texto livre) dão lugar a uma coleção ordenada de
+  `DesiredOutcome` real: adicionar/editar/remover/reordenar, alvo
+  quantitativo opcional (sempre texto, nunca number+unit), conclusão
+  bloqueada até haver ao menos um resultado com mudança preenchida;
+  campos antigos seguem READ-LEGACY, sem equivalente para
+  beneficiário/percepção (`AffectedGroup` já representa quem é afetado).
 - R4 (remediação de engenharia) — checklist de living object
   (`docs/core/LIVING_OBJECT_CHECKLIST.md`) e verifier estrutural
   (`hydra-living-object-verifier.mjs`): assistência mecânica explícita

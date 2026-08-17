@@ -6,6 +6,7 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	CauseHypothesisConfirmationIssue,
+	DesiredOutcomeConfirmationIssue,
 	DomainTransitionError,
 	EvidenceOutcome,
 	ExternalActionStatus,
@@ -222,6 +223,16 @@ export interface CauseExplorationView {
 	stillUnknown: boolean;
 }
 
+// "Resultado desejado" (Stage 4C do rework) — view leve de DesiredOutcome,
+// sem projectId/createdAt/updatedAt, que a interface não precisa (mesmo
+// padrão de AffectedGroupView/TreatmentStepView/CauseHypothesisView).
+export interface DesiredOutcomeView {
+	id: string;
+	change: string;
+	target: string | null;
+	order: number;
+}
+
 export interface ProjectView {
 	projectId: string;
 	projectName: string | null;
@@ -295,6 +306,14 @@ export interface ProjectView {
 	causeExploration: CauseExplorationView;
 	causeHypotheses: CauseHypothesisView[];
 	causeHypothesisConfirmationIssues: CauseHypothesisConfirmationIssue[];
+	// "Resultado desejado" (Stage 4C do rework) — coleção ordenada de
+	// DesiredOutcome; a interface (ResultadoDesejado.svelte) desabilita
+	// "Confirmar resultado" sem round-trip extra, mesma função pura usada pelo
+	// domínio na confirmação (getDesiredOutcomeConfirmationIssues) — mesmo
+	// padrão de affectedGroupConfirmationIssues/treatmentConfirmationIssues
+	// (bloqueia conclusão, ao contrário de causeHypothesisConfirmationIssues).
+	desiredOutcomes: DesiredOutcomeView[];
+	desiredOutcomeConfirmationIssues: DesiredOutcomeConfirmationIssue[];
 }
 
 export type UseCaseError =
@@ -583,6 +602,41 @@ export interface ConfirmCauseHypothesesInput {
 	projectId: string;
 }
 
+// "Resultado desejado" (Stage 4C do rework) — mesmo padrão dos inputs de
+// AffectedGroup/TreatmentStep: id gerado pelo caso de uso (idGenerator),
+// nunca recebido do cliente.
+export interface AddDesiredOutcomeInput {
+	projectId: string;
+	change: string;
+}
+
+export interface SetDesiredOutcomeChangeInput {
+	projectId: string;
+	outcomeId: string;
+	change: string;
+}
+
+export interface SetDesiredOutcomeTargetInput {
+	projectId: string;
+	outcomeId: string;
+	target: string | null;
+}
+
+export interface RemoveDesiredOutcomeInput {
+	projectId: string;
+	outcomeId: string;
+}
+
+export interface MoveDesiredOutcomeInput {
+	projectId: string;
+	outcomeId: string;
+	direction: -1 | 1;
+}
+
+export interface ConfirmDesiredOutcomesInput {
+	projectId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
@@ -632,6 +686,12 @@ export interface ProjectUseCases {
 	markCauseExplorationUnknown(input: MarkCauseExplorationUnknownInput): Promise<UseCaseOutcome<ProjectView>>;
 	undoCauseExplorationUnknown(input: UndoCauseExplorationUnknownInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmCauseHypotheses(input: ConfirmCauseHypothesesInput): Promise<UseCaseOutcome<ProjectView>>;
+	addDesiredOutcome(input: AddDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
+	setDesiredOutcomeChange(input: SetDesiredOutcomeChangeInput): Promise<UseCaseOutcome<ProjectView>>;
+	setDesiredOutcomeTarget(input: SetDesiredOutcomeTargetInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeDesiredOutcome(input: RemoveDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
+	moveDesiredOutcome(input: MoveDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmDesiredOutcomes(input: ConfirmDesiredOutcomesInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
 }

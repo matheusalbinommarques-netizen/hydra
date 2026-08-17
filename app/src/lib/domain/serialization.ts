@@ -13,6 +13,7 @@ import type {
 	CauseExploration,
 	CauseHypothesis,
 	CurrentTreatment,
+	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -35,6 +36,7 @@ import type { Result } from './result';
 import { isDeprecatedAnswerField } from './legacy-answers';
 import {
 	getAffectedGroupConfirmationIssues,
+	getDesiredOutcomeConfirmationIssues,
 	getScopeConfirmationIssues,
 	getTreatmentConfirmationIssues
 } from './transitions';
@@ -590,6 +592,45 @@ function parseCauseHypothesisList(value: unknown): Result<CauseHypothesis[], Pro
 	return { ok: true, value: result };
 }
 
+// desiredOutcomes não existia antes do Stage 4C do rework — mesmo espírito de
+// causeHypotheses acima: `undefined` (snapshot anterior a este corte) vira
+// lista vazia, nunca um erro de forma.
+function parseDesiredOutcomeList(value: unknown): Result<DesiredOutcome[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('desiredOutcomes deve ser um array');
+	const result: DesiredOutcome[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada DesiredOutcome deve ser um objeto');
+		if (!isString(item.id)) return shapeError('DesiredOutcome.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('DesiredOutcome.projectId deve ser uma string');
+		if (!isString(item.change) || item.change.trim().length === 0) {
+			return shapeError('DesiredOutcome.change deve ser uma string não vazia');
+		}
+		if (item.target !== null && !isString(item.target)) {
+			return shapeError('DesiredOutcome.target deve ser string ou null');
+		}
+		if (typeof item.order !== 'number' || !Number.isInteger(item.order) || item.order < 0) {
+			return shapeError('DesiredOutcome.order deve ser um inteiro não negativo');
+		}
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('DesiredOutcome.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (!isIsoDateString(item.updatedAt)) {
+			return shapeError('DesiredOutcome.updatedAt deve ser uma data ISO 8601 válida');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			change: item.change,
+			target: item.target as string | null,
+			order: item.order,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // --- fase 4: referências contra o catálogo --------------------------------
 
 function findActivityDefinition(catalog: Catalog, activityId: string): ActivityDefinition | undefined {
@@ -617,7 +658,8 @@ function assembleProjectState(
 	currentTreatment: CurrentTreatment,
 	treatmentSteps: TreatmentStep[],
 	causeExploration: CauseExploration,
-	causeHypotheses: CauseHypothesis[]
+	causeHypotheses: CauseHypothesis[],
+	desiredOutcomes: DesiredOutcome[]
 ): Result<ProjectState, ProjectStateParseError> {
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
@@ -1045,6 +1087,49 @@ function assembleProjectState(
 	// causeHypotheses/causeExploration que viole uma invariante de
 	// confirmação.
 
+	// referências + invariantes: DesiredOutcome — ligado à atividade
+	// `resultado` do catálogo, mas sem activityDefinitionId próprio (mesmo
+	// padrão de AffectedGroup/CauseHypothesis). order 0-based contíguo (mesma
+	// regra de TreatmentStep acima).
+	const seenDesiredOutcomeIds = new Set<string>();
+	for (const outcome of desiredOutcomes) {
+		if (outcome.projectId !== project.id) {
+			return invariantError(`DesiredOutcome "${outcome.id}" usa projectId diferente do Project`);
+		}
+		if (seenDesiredOutcomeIds.has(outcome.id)) {
+			return invariantError(`DesiredOutcome.id duplicado: "${outcome.id}"`);
+		}
+		seenDesiredOutcomeIds.add(outcome.id);
+	}
+	const desiredOutcomeOrders = desiredOutcomes.map((outcome) => outcome.order).sort((a, b) => a - b);
+	for (let i = 0; i < desiredOutcomeOrders.length; i++) {
+		if (desiredOutcomeOrders[i] !== i) {
+			return invariantError('Os itens de desiredOutcomes não têm order contíguo começando em 0');
+		}
+	}
+
+	// invariante: se "resultado" está concluída, a coleção precisa atender aos
+	// critérios de confirmação (mesmo padrão de ScopeVersion.confirmedAt/
+	// AffectedGroup/CurrentTreatment acima) — EXCETO quando a conclusão vem de
+	// um snapshot legado (Answer READ-LEGACY de `mudanca` presente, ver
+	// domain/legacy-answers.ts): nesse caso "resultado" foi concluída pelo
+	// mecanismo antigo (required_fields), antes de DesiredOutcome existir, e
+	// não deve ser invalidada retroativamente por não ter outcomes — mesma
+	// exceção de compatibilidade que publico/estado_atual já aplicam.
+	const hasLegacyResultadoAnswer = answers.some(
+		(answer) => answer.activityDefinitionId === 'resultado' && answer.fieldDefinitionId === 'mudanca'
+	);
+	const resultadoProgress = activityProgress.find((progress) => progress.activityDefinitionId === 'resultado');
+	if (resultadoProgress?.status === 'concluída' && !hasLegacyResultadoAnswer) {
+		const issues = getDesiredOutcomeConfirmationIssues(desiredOutcomes);
+		if (issues.length > 0) {
+			const issueKinds = issues.map((issue) => issue.kind).join(', ');
+			return invariantError(
+				`Atividade "resultado" está concluída mas o Resultado desejado não atende aos critérios de confirmação: ${issueKinds}`
+			);
+		}
+	}
+
 	return {
 		ok: true,
 		value: {
@@ -1061,7 +1146,8 @@ function assembleProjectState(
 			currentTreatment,
 			treatmentSteps,
 			causeExploration,
-			causeHypotheses
+			causeHypotheses,
+			desiredOutcomes
 		}
 	};
 }
@@ -1163,6 +1249,9 @@ export function deserializeProjectState(
 	const causeHypothesesResult = parseCauseHypothesisList(state.causeHypotheses);
 	if (!causeHypothesesResult.ok) return causeHypothesesResult;
 
+	const desiredOutcomesResult = parseDesiredOutcomeList(state.desiredOutcomes);
+	if (!desiredOutcomesResult.ok) return desiredOutcomesResult;
+
 	return assembleProjectState(
 		catalog,
 		projectResult.value,
@@ -1178,6 +1267,7 @@ export function deserializeProjectState(
 		currentTreatmentResult.value,
 		treatmentStepsResult.value,
 		causeExplorationResult.value,
-		causeHypothesesResult.value
+		causeHypothesesResult.value,
+		desiredOutcomesResult.value
 	);
 }

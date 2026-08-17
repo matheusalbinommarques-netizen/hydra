@@ -55,10 +55,13 @@ test('Bancada: "Definir visão do produto" campo a campo, painel crescendo, etap
 		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
 		await skipCurrentActivity(page);
 
-		for (const heading of ['Resultado desejado']) {
-			await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
-			await skipCurrentActivity(page);
-		}
+		// "Resultado desejado" (Stage 4C do rework) também tem componente
+		// bespoke próprio (ResultadoDesejado.svelte) — heading próprio, fora do
+		// loop genérico abaixo.
+		await expect(
+			page.getByRole('heading', { name: 'O que deverá estar diferente quando este projeto tiver sucesso?' })
+		).toBeVisible();
+		await skipCurrentActivity(page);
 
 		await expect(page.getByRole('heading', { name: 'Resumo da descoberta', exact: true })).toBeVisible();
 		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();

@@ -86,8 +86,9 @@ export function insertAnswer(
 // - entender_causas (explicit_confirmation): a conclusão nunca é bloqueada
 //   por estado incompleto (ver comentário em transitions.ts) — nenhum
 //   lastro extra é necessário;
-// - resultado (required_fields): isActivityFieldsValid exige as três
-//   Answers obrigatórias (mudanca, beneficiario, percepcao).
+// - resultado (explicit_confirmation, Stage 4C do rework): confirmDesiredOutcomes
+//   exige getDesiredOutcomeConfirmationIssues(...) vazio — pelo menos um
+//   DesiredOutcome com `change` preenchido.
 export function completeDiscoveryViaFixture(db: Database.Database, projectId: string): void {
 	insertAnswer(db, projectId, 'problema', 'situacao', 'Fixture de teste — descoberta concluída.');
 	insertAnswer(db, projectId, 'problema', 'situacao_o_que', JSON.stringify(['prob_retrabalho']));
@@ -108,9 +109,10 @@ export function completeDiscoveryViaFixture(db: Database.Database, projectId: st
 
 	setActivityStatus(db, projectId, 'entender_causas', 'concluída');
 
-	insertAnswer(db, projectId, 'resultado', 'mudanca', 'Fixture de teste — mudança esperada.');
-	insertAnswer(db, projectId, 'resultado', 'beneficiario', 'Fixture de teste — beneficiário.');
-	insertAnswer(db, projectId, 'resultado', 'percepcao', 'Fixture de teste — percepção.');
+	db.prepare(
+		`INSERT INTO desired_outcome (id, project_id, change, target, outcome_order, created_at, updated_at)
+		 VALUES (?, ?, 'Fixture de teste — mudança esperada.', NULL, 0, ?, ?)`
+	).run(randomUUID(), projectId, now, now);
 	setActivityStatus(db, projectId, 'resultado', 'concluída');
 }
 

@@ -82,13 +82,13 @@ const visaoProduto: ActivityDefinition = {
 			help: 'Descreva a transformação ou resultado esperado para o usuário.',
 			placeholder: 'Ex.: conduzir projetos com mais clareza, consistência e autonomia',
 			dataTarget: 'answer',
-			type: 'texto_longo',
-			suggestedSource: {
-				activityId: 'resultado',
-				fieldId: 'mudanca',
-				actionLabel: 'Usar o resultado desejado como ponto de partida',
-				helpText: 'Você poderá ajustar o texto para representar o principal benefício entregue pelo produto.'
-			}
+			type: 'texto_longo'
+			// suggestedSource para "Resultado desejado" (resultado/mudanca) foi
+			// removido no Stage 4C do rework: o campo de origem não existe mais no
+			// catálogo (ver DesiredOutcome, HYDRA_PRODUCT_REWORK.md §32) —
+			// reaproveitar a coleção estruturada como sugestão de texto livre
+			// exigiria um mecanismo novo, fora do escopo deste corte (mesmo
+			// motivo do campo `beneficiario` em usuario_principal acima).
 		},
 		{
 			id: 'diferencial',
@@ -138,13 +138,9 @@ const criteriosSucessoProduto: ActivityDefinition = {
 			help: 'Descreva o que indicaria que a proposta está funcionando.',
 			placeholder: 'Ex.: usuários voltam a usar o produto sem serem lembrados',
 			dataTarget: 'answer',
-			type: 'texto_longo',
-			suggestedSource: {
-				activityId: 'resultado',
-				fieldId: 'percepcao',
-				actionLabel: 'Usar a percepção de melhoria como ponto de partida',
-				helpText: 'Use o texto anterior como base e refine-o para definir sinais de sucesso mais específicos.'
-			}
+			type: 'texto_longo'
+			// suggestedSource para "Resultado desejado" (resultado/percepcao) foi
+			// removido no Stage 4C do rework — mesmo motivo do campo acima.
 		},
 		{
 			id: 'evidencias_indicadores',

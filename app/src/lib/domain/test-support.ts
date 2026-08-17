@@ -8,11 +8,13 @@
 
 import {
 	addAffectedGroup,
+	addDesiredOutcome,
 	addScopeItem,
 	addTreatmentStep,
 	answerActivity,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
@@ -140,6 +142,23 @@ export function confirmTreatmentMinimally(
 }
 
 /**
+ * Confirma "Resultado desejado" (`resultado`, Stage 4C do rework) com o
+ * mínimo que satisfaz {@link getDesiredOutcomeConfirmationIssues}: um
+ * DesiredOutcome com `change` preenchido — para quando o teste só precisa
+ * que `resultado` fique `concluída`, sem se importar com o conteúdo da
+ * coleção.
+ */
+export function confirmDesiredOutcomesMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	occurredAt: string
+): ProjectState {
+	const next = unwrapResult(addDesiredOutcome(catalog, state, outcomeId, 'Resultado de teste', occurredAt));
+	return unwrapResult(confirmDesiredOutcomes(catalog, next, occurredAt));
+}
+
+/**
  * Completa todas as atividades de uma fase, na ordem do catálogo:
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
  * via `confirmSummary` (Resumo), `confirmPlanningPriority` (Priorizar
@@ -167,6 +186,8 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				// (ver getCauseHypothesesConfirmationIssues, sempre []) — completar
 				// minimamente é só confirmar, sem precisar de nenhuma CauseHypothesis.
 				next = unwrapResult(confirmCauseHypotheses(catalog, next, occurredAt));
+			} else if (activity.id === 'resultado') {
+				next = confirmDesiredOutcomesMinimally(catalog, next, `${activity.id}-desired-outcome-1`, occurredAt);
 			} else {
 				next = unwrapResult(confirmSummary(catalog, next));
 			}

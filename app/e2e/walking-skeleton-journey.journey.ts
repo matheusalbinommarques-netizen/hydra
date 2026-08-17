@@ -125,15 +125,14 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	});
 
 	await test.step('Resultado desejado', async () => {
-		await expect(page.getByRole('heading', { name: 'Resultado desejado' })).toBeVisible();
+		await expect(
+			page.getByRole('heading', { name: 'O que deverá estar diferente quando este projeto tiver sucesso?' })
+		).toBeVisible();
 		await page
-			.getByLabel('O que deverá estar diferente quando este projeto tiver sucesso?')
+			.getByPlaceholder('O que deverá estar diferente?')
 			.fill('Solicitações centralizadas, priorizadas e acompanháveis.');
-		await page.getByLabel('Quem é o principal beneficiário?').fill('Equipe de atendimento e clientes.');
-		await page
-			.getByLabel('Como você vai perceber a melhoria?')
-			.fill('Menos retrabalho e resposta mais rápida.');
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+		await page.getByRole('button', { name: 'Adicionar resultado' }).click();
+		await page.getByRole('button', { name: 'Confirmar resultado' }).click();
 	});
 
 	await test.step('acessar o Resumo da descoberta a partir de Agora', async () => {
@@ -188,10 +187,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		// Origem do projeto (respondida em /projects/new na criação)
 		await expect(details.getByText('Existe um problema')).toBeVisible();
 
-		// Resultado desejado — beneficiário e percepção não fazem parte da
-		// visão geral (só a mudança esperada), continuam nos detalhes.
-		await expect(details.getByText('Equipe de atendimento e clientes.')).toBeVisible();
-		await expect(details.getByText('Menos retrabalho e resposta mais rápida.')).toBeVisible();
+		// "Resultado desejado" (Stage 4C do rework) deixou de ser required_fields
+		// — como publico/estado_atual/entender_causas, não aparece mais em "Ver
+		// todas as respostas" (só nos blocos ainda required_fields); a mudança
+		// esperada já foi conferida na visão geral acima, como chip do bloco
+		// "Resultado desejado".
 	});
 
 	await test.step('confirmar o Resumo', async () => {

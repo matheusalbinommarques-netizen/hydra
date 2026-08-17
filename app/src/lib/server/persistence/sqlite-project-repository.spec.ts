@@ -7,6 +7,7 @@ import { catalog } from '../../catalog';
 import {
 	addAffectedGroup,
 	addCauseHypothesis,
+	addDesiredOutcome,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
@@ -14,6 +15,7 @@ import {
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDesiredOutcomes,
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
@@ -27,6 +29,7 @@ import {
 	setAffectedGroupImpact,
 	setCauseHypothesisExpectedIfTrue,
 	setCauseHypothesisWhatWeakensIt,
+	setDesiredOutcomeTarget,
 	setHypothesis,
 	setImpedimentNextAction,
 	setRouteStartPhase,
@@ -86,9 +89,13 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(skipActivity(catalog, state, 'publico', 'pend-1', T1));
 	state = unwrap(addTreatmentStep(catalog, state, 'ts-1', 'Financeiro confere manualmente', T1));
 	state = unwrap(confirmTreatment(catalog, state, T1));
-	state = unwrap(
-		answerActivity(catalog, state, 'resultado', { mudanca: 'x', beneficiario: 'y', percepcao: 'z' }, T1)
-	);
+	// DesiredOutcome (Stage 4C do rework, "Resultado desejado") — dois
+	// resultados, um deles com alvo quantitativo, para exercitar o roundtrip
+	// completo (change/target/order).
+	state = unwrap(addDesiredOutcome(catalog, state, 'do-1', 'Solicitações centralizadas e priorizadas', T1));
+	state = unwrap(setDesiredOutcomeTarget(catalog, state, 'do-1', '-30% de retrabalho', T1));
+	state = unwrap(addDesiredOutcome(catalog, state, 'do-2', 'Acompanhamento do início ao fim', T1));
+	state = unwrap(confirmDesiredOutcomes(catalog, state, T1));
 	state = unwrap(confirmSummary(catalog, state));
 	// invalida o Resumo mutando "Como é tratado hoje" (novo passo) depois da confirmação
 	state = unwrap(addTreatmentStep(catalog, state, 'ts-2', 'Depois disso, é arquivado', T2));
@@ -638,7 +645,7 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 12 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 13 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
@@ -659,7 +666,8 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 				'currentTreatment',
 				'treatmentSteps',
 				'causeExploration',
-				'causeHypotheses'
+				'causeHypotheses',
+				'desiredOutcomes'
 			].sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');

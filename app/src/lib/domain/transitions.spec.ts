@@ -4,6 +4,7 @@ import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
 	addCauseHypothesis,
+	addDesiredOutcome,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
@@ -11,21 +12,25 @@ import {
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
 	getAffectedGroupConfirmationIssues,
 	getCauseHypothesesConfirmationIssues,
+	getDesiredOutcomeConfirmationIssues,
 	getScopeConfirmationIssues,
 	getTreatmentConfirmationIssues,
 	isActivityFieldsValid,
 	markCauseExplorationUnknown,
+	moveDesiredOutcome,
 	moveScopeItem,
 	moveTreatmentStep,
 	prepareExternalAction,
 	removeAffectedGroup,
 	removeCauseHypothesis,
+	removeDesiredOutcome,
 	removeScopeItem,
 	removeTreatmentStep,
 	renameProject,
@@ -37,6 +42,8 @@ import {
 	setCauseHypothesisExpectedIfTrue,
 	setCauseHypothesisTitle,
 	setCauseHypothesisWhatWeakensIt,
+	setDesiredOutcomeChange,
+	setDesiredOutcomeTarget,
 	setHypothesis,
 	setImpedimentNextAction,
 	setImpedimentType,
@@ -220,12 +227,12 @@ describe('answerActivity', () => {
 	});
 
 	it('campo answer gera uma Answer nova, com createdAt e updatedAt = occurredAt', () => {
-		const state = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
-		const answer = state.answers.find((a) => a.fieldDefinitionId === 'mudanca');
+		const state = unwrap(answerActivity(catalog, freshState(), 'problema', { situacao: 'Clientes' }, T1));
+		const answer = state.answers.find((a) => a.fieldDefinitionId === 'situacao');
 		expect(answer).toEqual({
 			projectId: 'proj-1',
-			activityDefinitionId: 'resultado',
-			fieldDefinitionId: 'mudanca',
+			activityDefinitionId: 'problema',
+			fieldDefinitionId: 'situacao',
 			value: 'Clientes',
 			createdAt: T1,
 			updatedAt: T1
@@ -233,22 +240,22 @@ describe('answerActivity', () => {
 	});
 
 	it('resposta idêntica não altera timestamps nem cria uma segunda Answer', () => {
-		const first = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
-		const second = unwrap(answerActivity(catalog, first, 'resultado', { mudanca: 'Clientes' }, T2));
+		const first = unwrap(answerActivity(catalog, freshState(), 'problema', { situacao: 'Clientes' }, T1));
+		const second = unwrap(answerActivity(catalog, first, 'problema', { situacao: 'Clientes' }, T2));
 		expect(second.answers).toEqual(first.answers); // updatedAt continua T1, não vira T2
 		expect(second.answers).toHaveLength(1);
 	});
 
 	it('resposta diferente atualiza updatedAt mas preserva createdAt', () => {
-		const first = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
+		const first = unwrap(answerActivity(catalog, freshState(), 'problema', { situacao: 'Clientes' }, T1));
 		const second = unwrap(
-			answerActivity(catalog, first, 'resultado', { mudanca: 'Clientes e atendentes' }, T2)
+			answerActivity(catalog, first, 'problema', { situacao: 'Clientes e atendentes' }, T2)
 		);
-		const answer = second.answers.find((a) => a.fieldDefinitionId === 'mudanca');
+		const answer = second.answers.find((a) => a.fieldDefinitionId === 'situacao');
 		expect(answer).toEqual({
 			projectId: 'proj-1',
-			activityDefinitionId: 'resultado',
-			fieldDefinitionId: 'mudanca',
+			activityDefinitionId: 'problema',
+			fieldDefinitionId: 'situacao',
 			value: 'Clientes e atendentes',
 			createdAt: T1,
 			updatedAt: T2
@@ -303,17 +310,15 @@ describe('answerActivity', () => {
 
 	it('mudança real em atividade anterior invalida o Resumo já concluída', () => {
 		const withSummary = unwrap(confirmSummary(catalog, freshState()));
-		const answered = unwrap(answerActivity(catalog, withSummary, 'resultado', { mudanca: 'Clientes' }, T2));
+		const answered = unwrap(answerActivity(catalog, withSummary, 'problema', { situacao: 'Clientes' }, T2));
 		const resumo = answered.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
 	});
 
 	it('mudança repetindo o mesmo valor não invalida o Resumo já concluída', () => {
-		const answered = unwrap(answerActivity(catalog, freshState(), 'resultado', { mudanca: 'Clientes' }, T1));
+		const answered = unwrap(answerActivity(catalog, freshState(), 'problema', { situacao: 'Clientes' }, T1));
 		const withSummary = unwrap(confirmSummary(catalog, answered));
-		const reanswered = unwrap(
-			answerActivity(catalog, withSummary, 'resultado', { mudanca: 'Clientes' }, T2)
-		);
+		const reanswered = unwrap(answerActivity(catalog, withSummary, 'problema', { situacao: 'Clientes' }, T2));
 		const resumo = reanswered.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('concluída');
 	});
@@ -1700,6 +1705,133 @@ describe('CauseHypothesis / CauseExploration (Stage 4B — "Entender as causas")
 	it('addCauseHypothesis invalida o Resumo já concluído (mesma regra de addAffectedGroup/addTreatmentStep)', () => {
 		const withSummary = unwrap(confirmSummary(catalog, freshState()));
 		const added = unwrap(addCauseHypothesis(catalog, withSummary, 'ch-1', 'Nova hipótese', null, T2));
+		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
+		expect(resumo?.status).toBe('em_andamento');
+	});
+});
+
+describe('DesiredOutcome (Stage 4C — "Resultado desejado")', () => {
+	it('addDesiredOutcome cria um resultado com target null, order = length atual e timestamps = occurredAt', () => {
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Solicitações centralizadas', T1));
+		expect(state.desiredOutcomes).toEqual([
+			{
+				id: 'do-1',
+				projectId: 'proj-1',
+				change: 'Solicitações centralizadas',
+				target: null,
+				order: 0,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+		const second = unwrap(addDesiredOutcome(catalog, state, 'do-2', 'Acompanhamento do início ao fim', T2));
+		expect(second.desiredOutcomes[1].order).toBe(1);
+	});
+
+	it('addDesiredOutcome rejeita change vazio/só espaços', () => {
+		expect(addDesiredOutcome(catalog, freshState(), 'do-1', '   ', T1)).toEqual({
+			ok: false,
+			error: { kind: 'invalid_field_value', fieldDefinitionId: 'change' }
+		});
+	});
+
+	it('getDesiredOutcomeConfirmationIssues: no_outcomes quando vazio, vazio quando ao menos um outcome com change preenchido', () => {
+		expect(getDesiredOutcomeConfirmationIssues([])).toEqual([{ kind: 'no_outcomes' }]);
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança real', T1));
+		expect(getDesiredOutcomeConfirmationIssues(state.desiredOutcomes)).toEqual([]);
+	});
+
+	it('setDesiredOutcomeChange edita (trim); erro desired_outcome_not_found para id inexistente; rejeita change vazio', () => {
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Original', T1));
+		const edited = unwrap(setDesiredOutcomeChange(catalog, state, 'do-1', '  Editado  ', T2));
+		expect(edited.desiredOutcomes[0].change).toBe('Editado');
+		expect(setDesiredOutcomeChange(catalog, freshState(), 'inexistente', 'x', T1)).toEqual({
+			ok: false,
+			error: { kind: 'desired_outcome_not_found' }
+		});
+		expect(setDesiredOutcomeChange(catalog, state, 'do-1', '   ', T1)).toEqual({
+			ok: false,
+			error: { kind: 'invalid_field_value', fieldDefinitionId: 'change' }
+		});
+	});
+
+	it('setDesiredOutcomeTarget define/limpa (string vazia ou null viram null); é sempre opcional', () => {
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança', T1));
+		const withTarget = unwrap(setDesiredOutcomeTarget(catalog, state, 'do-1', '-30% de retrabalho', T2));
+		expect(withTarget.desiredOutcomes[0].target).toBe('-30% de retrabalho');
+		const cleared = unwrap(setDesiredOutcomeTarget(catalog, withTarget, 'do-1', '', T2));
+		expect(cleared.desiredOutcomes[0].target).toBeNull();
+		expect(setDesiredOutcomeTarget(catalog, freshState(), 'inexistente', 'x', T1)).toEqual({
+			ok: false,
+			error: { kind: 'desired_outcome_not_found' }
+		});
+	});
+
+	it('removeDesiredOutcome remove e reindexa order dos restantes; erro desired_outcome_not_found para id inexistente', () => {
+		let state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Primeiro', T1));
+		state = unwrap(addDesiredOutcome(catalog, state, 'do-2', 'Segundo', T1));
+		state = unwrap(addDesiredOutcome(catalog, state, 'do-3', 'Terceiro', T1));
+		const removed = unwrap(removeDesiredOutcome(catalog, state, 'do-2', T2));
+		expect(removed.desiredOutcomes.map((o) => [o.id, o.order])).toEqual([
+			['do-1', 0],
+			['do-3', 1]
+		]);
+		expect(removeDesiredOutcome(catalog, removed, 'do-2', T2)).toEqual({
+			ok: false,
+			error: { kind: 'desired_outcome_not_found' }
+		});
+	});
+
+	it('moveDesiredOutcome troca order com o vizinho adjacente; fora dos limites é no-op', () => {
+		let state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Primeiro', T1));
+		state = unwrap(addDesiredOutcome(catalog, state, 'do-2', 'Segundo', T1));
+		const moved = unwrap(moveDesiredOutcome(catalog, state, 'do-2', -1, T2));
+		expect(moved.desiredOutcomes.map((o) => [o.id, o.order])).toEqual([
+			['do-1', 1],
+			['do-2', 0]
+		]);
+		const noop = unwrap(moveDesiredOutcome(catalog, moved, 'do-2', -1, T2));
+		expect(noop).toBe(moved);
+		expect(moveDesiredOutcome(catalog, freshState(), 'inexistente', -1, T1)).toEqual({
+			ok: false,
+			error: { kind: 'desired_outcome_not_found' }
+		});
+	});
+
+	it('confirmDesiredOutcomes conclui "resultado" quando há ao menos um outcome válido', () => {
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança real', T1));
+		const confirmed = unwrap(confirmDesiredOutcomes(catalog, state, T2));
+		expect(confirmed.activityProgress.find((p) => p.activityDefinitionId === 'resultado')?.status).toBe('concluída');
+	});
+
+	it('confirmDesiredOutcomes erro desired_outcome_confirmation_invalid quando vazio (nunca conclui sem ao menos 1 outcome)', () => {
+		expect(confirmDesiredOutcomes(catalog, freshState(), T1)).toEqual({
+			ok: false,
+			error: { kind: 'desired_outcome_confirmation_invalid', issues: [{ kind: 'no_outcomes' }] }
+		});
+	});
+
+	it('confirmDesiredOutcomes: erro transition_not_allowed se já concluída', () => {
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança', T1));
+		const confirmed = unwrap(confirmDesiredOutcomes(catalog, state, T1));
+		expect(confirmDesiredOutcomes(catalog, confirmed, T2)).toEqual({
+			ok: false,
+			error: { kind: 'transition_not_allowed', from: 'concluída' }
+		});
+	});
+
+	it('remover o único outcome depois de concluído reabre "resultado" (ao contrário de entender_causas, é bloqueada por estado incompleto)', () => {
+		const state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança real', T1));
+		const confirmed = unwrap(confirmDesiredOutcomes(catalog, state, T1));
+		const removed = unwrap(removeDesiredOutcome(catalog, confirmed, 'do-1', T2));
+		expect(removed.activityProgress.find((p) => p.activityDefinitionId === 'resultado')?.status).toBe(
+			'em_andamento'
+		);
+	});
+
+	it('addDesiredOutcome invalida o Resumo já concluído (mesma regra de addAffectedGroup/addTreatmentStep/addCauseHypothesis)', () => {
+		const withSummary = unwrap(confirmSummary(catalog, freshState()));
+		const added = unwrap(addDesiredOutcome(catalog, withSummary, 'do-1', 'Nova mudança', T2));
 		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
 	});

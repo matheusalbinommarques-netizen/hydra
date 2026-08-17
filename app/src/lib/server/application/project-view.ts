@@ -5,6 +5,7 @@ import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '
 import {
 	getAffectedGroupConfirmationIssues,
 	getCauseHypothesesConfirmationIssues,
+	getDesiredOutcomeConfirmationIssues,
 	getScopeConfirmationIssues,
 	getTreatmentConfirmationIssues
 } from '$lib/domain';
@@ -20,6 +21,7 @@ import type {
 	CauseExplorationView,
 	CauseHypothesisView,
 	CurrentTreatmentView,
+	DesiredOutcomeView,
 	EvidenceView,
 	ExternalActionView,
 	ImpedimentView,
@@ -149,6 +151,10 @@ function buildCauseExplorationView(causeExploration: ProjectState['causeExplorat
 	return { stillUnknown: causeExploration.stillUnknown };
 }
 
+function buildDesiredOutcomeView(outcome: ProjectState['desiredOutcomes'][number]): DesiredOutcomeView {
+	return { id: outcome.id, change: outcome.change, target: outcome.target, order: outcome.order };
+}
+
 function buildEvidenceView(evidence: ProjectState['evidences'][number]): EvidenceView {
 	return {
 		id: evidence.id,
@@ -203,6 +209,8 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		treatmentConfirmationIssues: getTreatmentConfirmationIssues(state.currentTreatment.noTreatment, state.treatmentSteps),
 		causeExploration: buildCauseExplorationView(state.causeExploration),
 		causeHypotheses: state.causeHypotheses.map(buildCauseHypothesisView),
-		causeHypothesisConfirmationIssues: getCauseHypothesesConfirmationIssues()
+		causeHypothesisConfirmationIssues: getCauseHypothesesConfirmationIssues(),
+		desiredOutcomes: state.desiredOutcomes.map(buildDesiredOutcomeView).sort((a, b) => a.order - b.order),
+		desiredOutcomeConfirmationIssues: getDesiredOutcomeConfirmationIssues(state.desiredOutcomes)
 	};
 }

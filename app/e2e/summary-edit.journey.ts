@@ -45,10 +45,9 @@ async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
 	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
-	await page.getByLabel('O que deverá estar diferente quando este projeto tiver sucesso?').fill('Resultado original.');
-	await page.getByLabel('Quem é o principal beneficiário?').fill('Beneficiário original.');
-	await page.getByLabel('Como você vai perceber a melhoria?').fill('Percepção original.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+	await page.getByPlaceholder('O que deverá estar diferente?').fill('Resultado original.');
+	await page.getByRole('button', { name: 'Adicionar resultado' }).click();
+	await page.getByRole('button', { name: 'Confirmar resultado' }).click();
 
 	await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
 	await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();

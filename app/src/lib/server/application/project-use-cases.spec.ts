@@ -430,11 +430,8 @@ describe('createProjectUseCases — answerActivity', () => {
 		await useCases.addTreatmentStep({ projectId, whatHappens: 'x' });
 		await useCases.confirmTreatment({ projectId });
 		await useCases.confirmCauseHypotheses({ projectId });
-		await useCases.answerActivity({
-			projectId,
-			activityDefinitionId: 'resultado',
-			values: { mudanca: 'x', beneficiario: 'y', percepcao: 'z' }
-		});
+		await useCases.addDesiredOutcome({ projectId, change: 'x' });
+		await useCases.confirmDesiredOutcomes({ projectId });
 		const confirmed = await useCases.confirmSummary({ projectId });
 		if (!confirmed.ok) throw new Error('esperado ok');
 		expect(confirmed.value.activityStatuses.resumo).toBe('concluída');
@@ -1219,7 +1216,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 });
 
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
-	it('o registro persistido contém só os 12 tipos de domínio', async () => {
+	it('o registro persistido contém só os 13 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1245,12 +1242,13 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'currentTreatment',
 				'treatmentSteps',
 				'causeExploration',
-				'causeHypotheses'
+				'causeHypotheses',
+				'desiredOutcomes'
 			].sort()
 		);
 	});
 
-	it('ProjectView contém só os 30 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 32 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1286,7 +1284,9 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'treatmentConfirmationIssues',
 				'causeExploration',
 				'causeHypotheses',
-				'causeHypothesisConfirmationIssues'
+				'causeHypothesisConfirmationIssues',
+				'desiredOutcomes',
+				'desiredOutcomeConfirmationIssues'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');
