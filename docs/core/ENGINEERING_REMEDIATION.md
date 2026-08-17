@@ -99,6 +99,17 @@ Regras aprovadas:
 - contexto ativo é preservado; contexto passivo é descartado/compactado;
 - sem threshold rígido de tokens.
 
+STATUS: DONE — protocolo vive em `.claude/skills/hydra-work/SKILL.md`
+(§3.5 introduz o ponto de parada dogfood/STOP antes de hardening/full,
+com exceção só por risco concreto; §4.1 formaliza falsificador localizado
+e motivo informacional para full rerun; §8 formaliza contexto
+ativo/passivo sem threshold e subagente não-default). Contradição mínima
+corrigida em `CLAUDE.md` (seção "Fluxo operacional"/"Níveis de
+cerimônia"): Nível 3 não implica mais `full` automático antes do
+dogfood, só no boundary pós-dogfood (seal/delivery) ou por risco
+concreto. Nenhum script alterado — `hydra-delivery-guard.mjs` já exigia
+`full` só no seal (boundary pós-dogfood), compatível com a regra.
+
 ### R4 — Living-object mechanical assistance — P1
 
 GOAL: máquina cuida do plumbing previsível; humano/Claude decide

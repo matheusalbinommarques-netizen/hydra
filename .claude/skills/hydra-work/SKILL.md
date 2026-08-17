@@ -1,6 +1,6 @@
 ---
 name: hydra-work
-description: Implementa um item do backlog vigente do Hydra (ex. C3-03) de ponta a ponta — planeja, implementa, verifica, documenta e sela — deixando o pacote pronto para /hydra-ship. Uso explícito apenas via /hydra-work.
+description: Implementa um item do backlog vigente do Hydra (ex. C3-03) até o ponto dogfoodável, e depois de aprovação humana, faz hardening/full/documentação/selo, deixando o pacote pronto para /hydra-ship. Uso explícito apenas via /hydra-work.
 disable-model-invocation: true
 argument-hint: <item-id> [continue]
 arguments:
@@ -10,9 +10,11 @@ allowed-tools: Read, Grep, Glob, Edit, Write, Bash(node .claude/scripts/hydra-st
 ---
 
 Implementa um único item do backlog vigente, identificado por `$item` (ex.:
-`C5-01`), do plano ao stage selado, numa única passagem — sem pausas
-intermediárias, exceto quando este documento pedir explicitamente para
-parar. Se `$item` não for informado, pare e peça o identificador.
+`C5-01`), do plano até o ponto dogfoodável numa única passagem — sem pausas
+intermediárias antes disso, exceto quando este documento pedir
+explicitamente para parar. Depois do dogfood, hardening/full/selo só
+acontecem numa passagem seguinte, depois de aprovação humana explícita. Se
+`$item` não for informado, pare e peça o identificador.
 
 Uso:
 
@@ -21,9 +23,10 @@ Uso:
 /hydra-work <item> continue
 ```
 
-`$mode` é opcional. Se informado, precisa ser exatamente `continue` (para
-retomar depois de corrigir um defeito sem descartar o trabalho já feito).
-Qualquer outro valor: pare e peça o correto.
+`$mode` é opcional. Se informado, precisa ser exatamente `continue` — usado
+tanto para retomar depois de corrigir um defeito quanto para retomar depois
+de aprovação humana pós-dogfood, sem descartar o trabalho já feito. Qualquer
+outro valor: pare e peça o correto.
 
 Este comando não comita nem publica — isso é `/hydra-ship`.
 
@@ -47,7 +50,8 @@ partir do JSON, confirme:
 - em modo `continue`, o stage precisa estar vazio
   (`git diff --cached --name-only` sem saída — não use a primeira coluna
   de `git status --short`, que não distingue stage vazio de arquivo `??`);
-  a árvore pode estar suja, isso é esperado.
+  a árvore pode estar suja, isso é esperado (é o trabalho já dogfoodado ou
+  o defeito em correção).
 
 ## 2. Plano curto (inline, não bloqueante)
 
@@ -63,25 +67,62 @@ dependências).
 - **Se tocar área sensível** (Nível 3): pare aqui e peça autorização
   explícita antes de editar qualquer coisa, a menos que essa autorização
   já esteja registrada no próprio item do backlog ou em decisão associada
-  em `docs/07-management/decision-log.md`.
+  em `docs/07-management/decision-log.md`. Autorização para editar não é
+  autorização para pular o dogfood do §3.5 — ela só libera a edição.
 
 ## 3. Implementação
 
-- implemente exclusivamente o que a entrada do item descreve (modo normal)
-  ou o defeito reportado (modo `continue`) — nada de itens vizinhos,
-  refino fora de escopo ou abstrações não pedidas;
+- carregue somente o contexto que muda a decisão atual — não releia
+  documentos inteiros já resumidos em §1/§2;
+- implemente o menor corte coerente que a entrada do item descreve (modo
+  normal) ou o defeito reportado (modo `continue`) — nada de itens
+  vizinhos, refino fora de escopo ou abstrações não pedidas;
 - preserve áreas protegidas do ciclo e os padrões já estabelecidos no
   código vizinho (DTOs discriminados, projeções puras, fronteira
   `ProjectView` nunca expondo `ProjectState` bruto);
-- em modo `continue`, inspecione `git status --short`, `git diff` e
-  `git diff --cached` antes de editar, confirme que toda mudança pendente
-  pertence a `$item`, e preserve integralmente o trabalho já existente —
-  corrija exclusivamente o defeito;
-- rode `node .claude/scripts/hydra-verify.mjs --mode fast --item $item`
-  quantas vezes fizer sentido durante o trabalho, sem esperar terminar
-  tudo para descobrir um erro.
+- em modo `continue` retomando de um defeito, inspecione `git status
+  --short`, `git diff` e `git diff --cached` antes de editar, confirme que
+  toda mudança pendente pertence a `$item`, e preserve integralmente o
+  trabalho já existente — corrija exclusivamente o defeito;
+- use o verificador focado mais barato que realmente falsifica o que você
+  acabou de mudar (`node .claude/scripts/hydra-verify.mjs --mode fast
+  --item $item`, um teste único, ou nenhum quando a mudança é
+  documentação/texto) — rode quantas vezes fizer sentido durante o
+  trabalho, sem esperar terminar tudo para descobrir um erro. `full` não é
+  o verificador desta fase.
 
-## 4. Nível final e verificação
+## 3.5. Runtime, dogfood e parada
+
+Quando a mudança for observável (UI, rota, comportamento em runtime),
+suba/atualize o preview e observe-a rodando antes de considerar o corte
+pronto. Mudança puramente não observável (script interno, doc, tipo) pode
+pular a observação em runtime.
+
+Ao chegar num estado que o usuário já consegue avaliar de verdade (dogfood):
+
+- **PARE** e devolva o controle ao humano. Não prossiga para §4 em diante
+  na mesma passagem.
+- `hydra-verify full`, QA extensa, documentação de acompanhamento e
+  stage/selo **não são requisito** para chegar aqui. O rótulo Nível 3 do
+  item, por si só, também não exige `full` antes deste ponto.
+- Relate: o que foi implementado, como observar/testar, nível provisório
+  (Nível 1/2/3) e se algo ficou consciente e deliberadamente pendente para
+  o pós-dogfood.
+
+**Exceção — risco concreto antes do dogfood:** só amplie o verificador
+antes deste ponto quando houver risco concreto e específico que o
+dogfood sozinho não detecta — por exemplo, uma mudança de persistência
+que precisa provar compatibilidade de upgrade de dados existentes antes
+que valha a pena o humano avaliar o resultado. Nesse caso, rode o
+verificador específico daquele risco (ex.: o teste de upgrade em questão),
+não `hydra-verify full` inteiro, a menos que não exista um verificador mais
+estreito para esse risco.
+
+O restante deste documento (§4 em diante) só roda **depois** que o humano
+aprovar explicitamente seguir adiante a partir do dogfood. Retome com
+`/hydra-work $item continue`.
+
+## 4. Nível final e verificação (pós-dogfood)
 
 Reavalie o nível a partir do diff real (`git diff --stat`,
 `git diff --name-status`):
@@ -98,7 +139,20 @@ Verificação final, exatamente uma:
 - Nível 1 ou 2: `node .claude/scripts/hydra-verify.mjs --mode fast --item $item`
 - Nível 3: `node .claude/scripts/hydra-verify.mjs --mode full --item $item`
 
-Se falhar, corrija e rode de novo — não prossiga com verificação falhando.
+Se falhar, siga §4.1 antes de tentar de novo às cegas.
+
+### 4.1. Falha de verificador amplo (full) ou E2E
+
+1. localize a etapa/teste que falhou — não trate a suíte inteira como uma
+   caixa preta;
+2. rode o falsificador específico daquele ponto (o teste isolado, não a
+   suíte inteira de novo);
+3. distinga regressão real de flake/setup/infra antes de agir;
+4. corrija a causa, ou obtenha evidência nova de que não é regressão;
+5. só então volte a rodar `full` — um novo full rerun precisa de motivo
+   informacional (mudança relevante desde o último full, ou evidência nova
+   que invalida o resultado anterior), não repetição automática porque a
+   suíte é a etapa "de sempre".
 
 ## 5. QA manual (só Nível 2/3 com interface visivelmente afetada)
 
@@ -155,14 +209,34 @@ stage só o que esta execução adicionou
 (`git restore --staged -- <lista explícita>`, nunca um comando amplo),
 preserve a working tree, corrija e repita a partir do ponto que falhou.
 
-## 8. O que este comando nunca faz
+## 8. Contexto e subagentes
+
+Preserve contexto enquanto ele continua ativo (ainda muda uma decisão
+desta sessão). Quando uma conclusão já está capturada em artefato estável
+(código, doc, log de verificação resumido) e o resto virou exploração que
+não muda mais decisão nenhuma, compactar, encerrar ou produzir um handoff
+curto é apropriado — sem threshold fixo de tokens para isso.
+
+Subagente não é default. Use um só quando uma investigação for realmente
+isolável (não depende do estado fino desta sessão) e o resultado puder
+voltar como handoff curto, sem que quem está executando o item precise
+reler tudo que o subagente leu.
+
+## 9. O que este comando nunca faz
 
 Não roda `git commit` nem `git push` — isso é `/hydra-ship`. Não inicia
 outro item do backlog. Não toca área sensível sem autorização já
-registrada. Não reproduz diff completo na resposta.
+registrada. Não reproduz diff completo na resposta. Não roda `full`,
+hardening, QA extensa ou stage/selo antes do dogfood (§3.5) sem risco
+concreto que justifique a exceção ali descrita.
 
-## 9. Relatório final
+## 10. Relatório final
 
-Item; nível e justificativa; arquivos criados/alterados; documentos
-tocados; resultado da verificação (`fast`/`full`); resultado de QA quando
-aplicável; resultado do `seal`/`check`; riscos ou limitações.
+Depois de §3.5 (parada para dogfood): item; nível provisório; arquivos
+criados/alterados; como observar/testar; o que ficou pendente para
+pós-dogfood.
+
+Depois de §7 (pacote selado, pós-aprovação): nível final e justificativa;
+resultado da verificação (`fast`/`full`) e de eventuais falhas tratadas
+via §4.1; resultado de QA quando aplicável; documentos tocados; resultado
+do `seal`/`check`; riscos ou limitações.

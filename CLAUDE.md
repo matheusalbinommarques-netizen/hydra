@@ -98,8 +98,11 @@ Três skills cobrem o ciclo inteiro de um item:
 
 - `/hydra-resume`: retomar o estado (branch, ciclo, itens, gate);
 - `/hydra-work <item>` (ou `... <item> continue` para retomar depois de um
-  defeito): planeja, implementa, verifica, documenta e sela o item numa
-  única passagem — sem parar entre etapas, exceto Nível 3 ou defeito real;
+  defeito, ou depois de aprovação humana pós-dogfood): planeja e implementa
+  o menor corte coerente até o ponto dogfoodável, então para e devolve o
+  controle ao humano — sem parar antes disso, exceto Nível 3 antes de
+  editar ou defeito real. Só depois de aprovação explícita, numa passagem
+  seguinte, faz hardening, verificação final, documenta e sela o item;
 - `/hydra-ship "<mensagem>"`: publica o stage selado — código e
   documentação de acompanhamento em um único commit.
 
@@ -121,17 +124,19 @@ manualmente leituras ou verificações que um script já realizou.
 - **Nível 3** — mudança sensível (`domain/`, `catalog/`,
   `orientation-engine/`, `server/persistence/`, schema/migrations,
   contratos arquiteturais, dependências, arquitetura, segurança,
-  transformação/migração de dados, comportamento transversal):
-  verificação `full`, QA manual quando aplicável, exige autorização
-  explícita registrada no item ou decisão associada antes de editar.
+  transformação/migração de dados, comportamento transversal): exige
+  autorização explícita registrada no item ou decisão associada antes de
+  editar; verificação `full` e QA manual quando aplicável, no boundary
+  pós-dogfood (seal/delivery) — o rótulo Nível 3 sozinho não exige `full`
+  antes do dogfood, só quando houver risco concreto que o justifique.
 
 `/hydra-work` classifica o nível a partir do que o item pede e do diff
-real, e escala para `full`/parar-e-pedir-autorização assim que detectar
-Nível 3 — não é preciso decidir o nível antes. Em dúvida, use o nível mais
-alto. `full` roda também antes de `/hydra-ship` quando várias entregas
-Nível 1/2 forem publicadas juntas, como checagem final de lote. O stage só
-é publicável depois de selado por `hydra-delivery-guard.mjs` dentro de
-`/hydra-work`.
+real, e pede autorização assim que detectar Nível 3 — não é preciso
+decidir o nível antes. Em dúvida, use o nível mais alto. `full` roda no
+boundary pós-dogfood (seal/delivery), inclusive antes de `/hydra-ship`
+quando várias entregas Nível 1/2 forem publicadas juntas, como checagem
+final de lote. O stage só é publicável depois de selado por
+`hydra-delivery-guard.mjs` dentro de `/hydra-work`.
 
 ### Documentação de acompanhamento
 
