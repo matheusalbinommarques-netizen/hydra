@@ -7,35 +7,10 @@
 // isolados) — ver e2e/helpers/ephemeral-server.ts.
 
 import { expect, test, type Page } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
 import { createProject } from './helpers/create-project';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-summary-edit-'));
-	const port = await getFreePort();
-	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
+const server = useEphemeralServer('summary-edit');
 
 async function completeDiscoveryAndConfirmSummary(page: Page): Promise<string> {
 	// Nome e origem já são respondidos atomicamente em `/projects/new` (D034)

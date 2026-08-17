@@ -15,7 +15,8 @@ import {
 	stopServer,
 	waitForServer
 } from './helpers/ephemeral-server';
-import { answerActivitiesGenerically } from './helpers/generic-activity';
+import { answerActivitiesGenericallyUntil } from './helpers/generic-activity';
+import { catalog } from '../src/lib/catalog/catalog';
 
 interface ExportedEnvelope {
 	version: number;
@@ -256,11 +257,15 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	});
 
 	await test.step('demais atividades da fase 2 e da Estruturação respondidas genericamente', async () => {
-		// criterios_sucesso_produto (1, fase 2) + estruturação (6) = 7.
 		// Conteúdo específico de cada campo já é coberto por catalog.spec.ts e
 		// por full-catalog-journey.spec.ts — aqui só precisa provar que a rota
-		// real atravessa essas fases sem erro.
-		await answerActivitiesGenerically(page, 7);
+		// real atravessa essas fases sem erro, até alcançar "Decompor o
+		// trabalho" (primeira atividade de Planejamento, tratada à parte
+		// abaixo). Sem contagem fixa: a quantidade de atividades genéricas até
+		// lá é o que o catálogo definir, não um número mantido à mão aqui.
+		await answerActivitiesGenericallyUntil(page, () =>
+			page.getByRole('heading', { name: 'Decompor o trabalho' }).isVisible()
+		);
 	});
 
 	const planningParts = [
@@ -318,11 +323,12 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 	});
 
 	await test.step('demais atividades do catálogo (Planejamento restante, Execução, Validação) respondidas genericamente até o encerramento', async () => {
-		// mapear_dependencias, estimar_esforco_capacidade, definir_marcos,
-		// criterios_aceitacao_entrega, consolidar_plano_entrega (5) +
-		// execução (6) + validação (6, incluindo "Confirmar encerramento do
-		// projeto") = 17.
-		await answerActivitiesGenerically(page, 17);
+		// Sem contagem fixa: avança até o catálogo sinalizar
+		// catalog_limit_reached (heading abaixo), qualquer que seja a
+		// quantidade real de atividades restantes hoje.
+		await answerActivitiesGenericallyUntil(page, () =>
+			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' }).isVisible()
+		);
 	});
 
 	let downloadedFilePath = '';
@@ -353,10 +359,11 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		expect(exportedJson.version).toBe(1);
 		expect(exportedJson.state.project.id).toBe(projectId);
 
-		// 36 atividades no catálogo atual (7 Descoberta + 4 Definição do produto +
-		// 6 Estruturação + 7 Planejamento + 6 Execução + 6 Validação) — Descoberta
-		// ganhou "Entender as causas" (Stage 4B do rework), subindo de 6 para 7.
-		expect(exportedJson.state.activityProgress).toHaveLength(36);
+		// Toda atividade do catálogo real deve ter sido exportada — contagem
+		// derivada do próprio catálogo (não um número mantido à mão), para não
+		// exigir edição aqui sempre que uma atividade for adicionada/removida.
+		const totalCatalogActivities = catalog.phases.reduce((sum, phase) => sum + phase.activities.length, 0);
+		expect(exportedJson.state.activityProgress).toHaveLength(totalCatalogActivities);
 		for (const progress of exportedJson.state.activityProgress) {
 			expect(progress.status).toBe('concluída');
 		}

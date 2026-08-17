@@ -5,52 +5,12 @@
 // canônica já concluída e aprovada na C2-12).
 
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
 import { createProject } from './helpers/create-project';
-import { answerActivitiesGenerically } from './helpers/generic-activity';
+import { completeDiscoveryViaFixture, openDb } from './helpers/db-fixtures';
+import { answerActivitiesGenericallyUntil } from './helpers/generic-activity';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-map-'));
-	const port = await getFreePort();
-	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
-
-async function answerAndContinue(
-	page: import('@playwright/test').Page,
-	fields: Record<string, { label: string; value: string; kind?: 'select' | 'check' }>
-) {
-	for (const { label, value, kind } of Object.values(fields)) {
-		if (kind === 'select') {
-			await page.getByLabel(label).selectOption(value);
-		} else if (kind === 'check') {
-			await page.getByLabel(label).check();
-		} else {
-			await page.getByLabel(label).fill(value);
-		}
-	}
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-}
+const server = useEphemeralServer('map');
 
 test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => {
 	let projectId = '';
@@ -121,82 +81,36 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await expect(page.getByRole('heading', { name: 'Jornada', level: 1 })).toBeVisible();
 	});
 
-	await test.step('avançar as 36 atividades reais até catalog_limit_reached', async () => {
+	await test.step('Descoberta concluída via fixture semântica (irrelevante à Jornada em si)', async () => {
+		// A Descoberta usa o wizard bespoke "Entender a situação" e telas
+		// próprias (Mapa de Impacto, Como é tratado hoje) já cobertas por
+		// skip-activity.journey.ts, problema-optional-group.journey.ts e
+		// como-e-tratado-hoje.journey.ts. Este teste só precisa chegar ao
+		// estado "Descoberta concluída" — a fixture recria o lastro mínimo que
+		// cada atividade exige para ser validamente 'concluída' pelo próprio
+		// domínio (ver helpers/db-fixtures.ts), não só o rótulo de status.
+		const db = openDb(server.dbPath);
+		try {
+			completeDiscoveryViaFixture(db, projectId);
+		} finally {
+			db.close();
+		}
+
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
-
-		// "Origem do projeto" já foi respondida atomicamente em `/projects/new`
-		// (D034); "Contexto inicial" foi incorporada/removida do catálogo.
-		// "Entender a situação" (id `problema`) usa o wizard bespoke
-		// EntenderSituacao.svelte — ver skip-activity.journey.ts para a
-		// cobertura dedicada.
-		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
-		await page.getByRole('button', { name: 'Existe muito retrabalho' }).click();
-		await page.getByRole('button', { name: 'Continuar' }).click();
-		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
-		await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
-		await page.getByRole('button', { name: 'Sim, continuar' }).click();
-		await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
-
-		// "Quem é afetado" (Mapa de Impacto, ETAPA 2 do rework) não é mais
-		// required_fields — não passa por answerAndContinue.
-		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
-		await page.getByRole('button', { name: '+ Adicionar grupo' }).click();
-		await page.getByRole('button', { name: 'Equipe interna', exact: true }).click();
-		await page.getByRole('button', { name: 'Alto', exact: true }).click();
-		await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
-		await page.getByRole('button', { name: 'Concluir mapa' }).click();
-
-		// "Como é tratado hoje" (Stage 4A do rework) também não é mais
-		// required_fields — não passa por answerAndContinue.
-		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
-		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Estado atual de teste do Mapa.');
-		await page.getByRole('button', { name: 'Adicionar' }).click();
-		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-
-		// "Entender as causas" (Stage 4B do rework) também não é required_fields
-		// — não passa por answerAndContinue; conclui sem nenhuma hipótese.
-		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
-		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-
-		await answerAndContinue(page, {
-			mudanca: {
-				label: 'O que deverá estar diferente quando este projeto tiver sucesso?',
-				value: 'Mudança de teste do Mapa.'
-			},
-			beneficiario: { label: 'Quem é o principal beneficiário?', value: 'Beneficiário de teste do Mapa.' },
-			percepcao: { label: 'Como você vai perceber a melhoria?', value: 'Percepção de teste do Mapa.' }
-		});
-
 		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
+		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
+	});
+
+	await test.step('demais fases respondidas por operações reais (formulário genérico + Escolha o próximo foco), até catalog_limit_reached', async () => {
 		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
-		await answerAndContinue(page, {
-			usuarioPrincipal: {
-				label: 'Quem é o usuário principal do produto?',
-				value: 'Usuário principal de teste do Mapa.'
-			}
-		});
-
-		// "Definir visão do produto" idem — três campos obrigatórios campo a
-		// campo, depois etapa opcional ("diferencial"), sem preencher nada.
-		await answerAndContinue(page, {
-			tipoProduto: { label: 'Que tipo de produto será?', value: 'Aplicativo web de teste do Mapa.' }
-		});
-		await answerAndContinue(page, {
-			necessidadeCentral: {
-				label: 'Qual necessidade principal esse produto atende?',
-				value: 'Necessidade central de teste do Mapa.'
-			}
-		});
-		await answerAndContinue(page, {
-			beneficioCentral: {
-				label: 'Qual benefício principal o produto deve entregar?',
-				value: 'Benefício central de teste do Mapa.'
-			}
-		});
-		await page.getByRole('link', { name: 'Avançar sem preencher' }).click();
+		// usuario_principal + visao_produto (campo a campo + etapa opcional) —
+		// sem contagem fixa, avança até o link de "Escolha o próximo foco".
+		await answerActivitiesGenericallyUntil(page, () =>
+			page.getByRole('link', { name: /Ir para Escolha o próximo foco/ }).isVisible()
+		);
 
 		await page.getByRole('link', { name: /Ir para Escolha o próximo foco/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/next-version`);
@@ -210,15 +124,13 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		await page.getByRole('link', { name: 'Agora' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
-		// demais atividades (1 restante da fase 2 + fases 3 a 6 = 26) —
-		// conteúdo específico já coberto por catalog.spec.ts e
-		// full-catalog-journey.spec.ts; aqui só prova que a rota real
-		// atravessa até o fim sem erro.
-		await answerActivitiesGenerically(page, 26);
-
-		await expect(
-			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })
-		).toBeVisible();
+		// Estruturação, Planejamento, Execução e Validação — conteúdo
+		// específico já coberto por catalog.spec.ts e
+		// full-catalog-journey.spec.ts; sem contagem fixa, avança até o
+		// catálogo sinalizar catalog_limit_reached.
+		await answerActivitiesGenericallyUntil(page, () =>
+			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' }).isVisible()
+		);
 	});
 
 	await test.step('Mapa em catalog_limit_reached: todas as atividades concluídas, nenhuma marcada como atual', async () => {

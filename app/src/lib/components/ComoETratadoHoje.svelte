@@ -228,10 +228,10 @@
 			<button type="submit" class="cet-ghost-affordance">Na verdade, existe algo — quero descrever</button>
 		</form>
 	{:else}
-		<div class="cet-chain">
+		<div class="cet-chain" role="list" aria-label="Cadeia de tratamento atual">
 			{#each steps as step, index (step.id)}
 				{@const currentActors = pendingActorsByStep[step.id] ?? step.actors}
-				<div class="cet-node-row">
+				<div class="cet-node-row" role="listitem">
 					<div class="cet-rail-col">
 						<div class="cet-node-circle cet-node-circle-num" class:cet-node-pulse={justAdded === step.id}>
 							{index + 1}

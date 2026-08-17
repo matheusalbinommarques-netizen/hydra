@@ -14,75 +14,23 @@
 
 import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
+import { createBareProject as createBareProjectFixture } from './helpers/db-fixtures';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-let dbPath: string;
+const server = useEphemeralServer('records');
 
 // Nome e origem são respondidos atomicamente em `/projects/new` (D034) —
 // hoje não existe caminho real de UI que deixe um projeto sem nenhuma
 // resposta. Para os cenários que precisam desse estado (Registros
 // verdadeiramente vazio), o projeto é criado direto no SQLite do servidor
-// efêmero, sem passar pelos use cases — mesma técnica de fixture já usada
-// neste arquivo para pendências.
+// efêmero, sem passar pelos use cases (helpers/db-fixtures.ts).
 function createBareProject(name: string): string {
 	const projectId = randomUUID();
-	const db = new Database(dbPath);
-	try {
-		db.prepare('INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (?, ?, ?, NULL)').run(
-			projectId,
-			name,
-			new Date().toISOString()
-		);
-		// scope_version e current_treatment são 1:1 com project, sempre
-		// presentes desde a criação real (ver sqlite-project-repository.ts) —
-		// sem essas linhas, findById lança erro de violação de schema.
-		db.prepare("INSERT INTO scope_version (project_id, hypothesis, confirmed_at) VALUES (?, '', NULL)").run(
-			projectId
-		);
-		db.prepare('INSERT INTO current_treatment (project_id, no_treatment, updated_at) VALUES (?, 0, ?)').run(
-			projectId,
-			new Date().toISOString()
-		);
-		// cause_exploration é 1:1 com project (Stage 4B do rework), mesmo padrão
-		// de current_treatment acima — sem essa linha, findById lança erro de
-		// violação de schema.
-		db.prepare('INSERT INTO cause_exploration (project_id, still_unknown, updated_at) VALUES (?, 0, ?)').run(
-			projectId,
-			new Date().toISOString()
-		);
-	} finally {
-		db.close();
-	}
+	createBareProjectFixture(server.dbPath, projectId, name);
 	return projectId;
 }
 
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-records-'));
-	dbPath = path.join(tmpRoot, 'hydra.sqlite');
-	const port = await getFreePort();
-	server = startServer(port, dbPath);
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
 
 test('Registros: respostas e histórico de pendências', async ({ page }) => {
 	let projectId = '';
@@ -140,7 +88,7 @@ test('Registros: respostas e histórico de pendências', async ({ page }) => {
 	});
 
 	await test.step('preparar uma pendência aberta e uma resolvida diretamente no banco (sem UI de pular)', async () => {
-		const db = new Database(dbPath);
+		const db = new Database(server.dbPath);
 		try {
 			const now = new Date().toISOString();
 			const earlier = new Date(Date.now() - 60_000).toISOString();
@@ -218,7 +166,7 @@ test('Registros: quarta combinação de estados — sem respostas, com pendênci
 	// não um caminho real de uso).
 	const projectId = createBareProject('Projeto Registros E2E — combinação 4');
 
-	const db = new Database(dbPath);
+	const db = new Database(server.dbPath);
 	try {
 		db.prepare(
 			`INSERT INTO pending_item (id, project_id, activity_definition_id, status, created_at, resolved_at)

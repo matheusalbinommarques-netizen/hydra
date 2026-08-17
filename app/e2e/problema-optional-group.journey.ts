@@ -16,39 +16,12 @@
 // real de "contexto opcional" para esta mesma atividade hoje é o par de
 // passos 2/3 do wizard, cada um com seu próprio "Pular esta pergunta".
 
-import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
 import { createProject } from './helpers/create-project';
+import { openDb } from './helpers/db-fixtures';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-let dbPath: string;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-optional-group-'));
-	dbPath = path.join(tmpRoot, 'hydra.sqlite');
-	const port = await getFreePort();
-	server = startServer(port, dbPath);
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
+const server = useEphemeralServer('optional-group');
 
 test('"Pular esta pergunta" nos passos 2 e 3: síntese sem eles, valor do passo 1 preservado ao reabrir', async ({
 	page
@@ -110,7 +83,7 @@ test('Answers já persistidas fora da progressão normal pré-selecionam os chip
 	});
 
 	await test.step('semear Answers direto no banco (atalho de fixture já usado nesta suíte), sem alterar activity_progress', async () => {
-		const db = new Database(dbPath);
+		const db = openDb(server.dbPath);
 		try {
 			const now = new Date().toISOString();
 			const insert = db.prepare(

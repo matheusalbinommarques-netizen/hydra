@@ -6,84 +6,31 @@
 // "Agora"). Roda via playwright.journey.config.ts (servidor efêmero +
 // banco temporário isolados) — ver e2e/helpers/ephemeral-server.ts.
 
-import { expect, test, type Page } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
+import { expect, test } from '@playwright/test';
 import { createProject } from './helpers/create-project';
 import { answerActivitiesGenerically, answerCurrentActivityGenerically } from './helpers/generic-activity';
+import { completeDiscoveryViaFixture, openDb } from './helpers/db-fixtures';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
+const server = useEphemeralServer('criteria-scope-conflict');
 
 const CONFLICT_MESSAGE = 'Você definiu critérios de sucesso, mas nenhum item de escopo em "Agora" os sustenta ainda.';
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-criteria-scope-conflict-'));
-	const port = await getFreePort();
-	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
-
-// Nome e origem já são respondidos atomicamente em `/projects/new` (D034) —
-// createProject() já cobre isso. "Contexto inicial" foi incorporada/removida
-// do catálogo; "Entender a situação" (id `problema`) usa o wizard bespoke
-// EntenderSituacao.svelte, não o formulário genérico — ver
-// skip-activity.journey.ts para a cobertura dedicada desse wizard.
-async function completeDiscovery(page: Page): Promise<void> {
-	await page.getByRole('button', { name: 'Existe muito retrabalho' }).click();
-	await page.getByRole('button', { name: 'Continuar' }).click();
-	await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
-	await page.getByRole('button', { name: 'Pular esta pergunta' }).click();
-	await page.getByRole('button', { name: 'Sim, continuar' }).click();
-	await page.getByRole('button', { name: 'Continuar para próxima atividade' }).click();
-
-	await page.getByRole('button', { name: '+ Adicionar grupo' }).click();
-	await page.getByRole('button', { name: 'Equipe interna', exact: true }).click();
-	await page.getByRole('button', { name: 'Alto', exact: true }).click();
-	await page.getByRole('button', { name: 'Frequentemente', exact: true }).click();
-	await page.getByRole('button', { name: 'Concluir mapa' }).click();
-
-	await page.getByPlaceholder('Descrever em poucas palavras…').fill('Estado atual de teste.');
-	await page.getByRole('button', { name: 'Adicionar' }).click();
-	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-
-	// "Entender as causas" (Stage 4B do rework) — fora do escopo deste teste;
-	// concluir sem nenhuma hipótese (nunca bloqueada) para chegar a "Resultado
-	// desejado", sem depender do modal de "Pular etapa".
-	await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
-	await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-
-	await page.getByLabel('O que deverá estar diferente quando este projeto tiver sucesso?').fill('Resultado de teste.');
-	await page.getByLabel('Quem é o principal beneficiário?').fill('Beneficiário de teste.');
-	await page.getByLabel('Como você vai perceber a melhoria?').fill('Percepção de teste.');
-	await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-}
 
 test('banner de conflito critério × escopo: ausente sem conflito, visível quando critério fica sem item em "Agora"', async ({
 	page
 }) => {
 	let projectId = '';
 
-	await test.step('criar projeto e completar a Descoberta', async () => {
+	await test.step('criar projeto e completar a Descoberta via fixture semântica (irrelevante ao conflito critério × escopo)', async () => {
 		projectId = await createProject(page, server.baseUrl);
 
-		await completeDiscovery(page);
+		const db = openDb(server.dbPath);
+		try {
+			completeDiscoveryViaFixture(db, projectId);
+		} finally {
+			db.close();
+		}
+		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 	});
 
 	await test.step('sem nenhum critério respondido: Resumo não mostra o banner', async () => {

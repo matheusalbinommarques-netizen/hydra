@@ -8,62 +8,12 @@
 // estado respondendo/pulando todas as atividades anteriores pela UI. Não
 // modifica nenhum outro journey existente.
 
-import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
 import { createProject } from './helpers/create-project';
+import { insertAnswer, openDb, setActivityStatus, setAllActivityStatuses } from './helpers/db-fixtures';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-let dbPath: string;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-closure-'));
-	dbPath = path.join(tmpRoot, 'hydra.sqlite');
-	const port = await getFreePort();
-	server = startServer(port, dbPath);
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
-
-function setActivityStatus(db: Database.Database, projectId: string, activityId: string, status: string) {
-	db.prepare(`UPDATE activity_progress SET status = ? WHERE project_id = ? AND activity_definition_id = ?`).run(
-		status,
-		projectId,
-		activityId
-	);
-}
-
-function insertAnswer(
-	db: Database.Database,
-	projectId: string,
-	activityId: string,
-	fieldId: string,
-	value: string
-) {
-	const now = new Date().toISOString();
-	db.prepare(
-		`INSERT INTO answer (project_id, activity_definition_id, field_definition_id, value, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`
-	).run(projectId, activityId, fieldId, value, now, now);
-}
+const server = useEphemeralServer('closure');
 
 test('Encerramento: projeto antes da validação — continuidade aponta para as etapas anteriores', async ({ page }) => {
 	const projectId = await createProject(page, server.baseUrl);
@@ -92,12 +42,12 @@ test('Encerramento: validação parcial — concluída, em andamento com campo v
 }) => {
 	const projectId = await createProject(page, server.baseUrl);
 
-	const db = new Database(dbPath);
+	const db = openDb(server.dbPath);
 	try {
 		// Todas as atividades das fases anteriores viram terminais (puladas) —
 		// só assim a próxima atividade real alcança a fase `validacao`
 		// (computeNextActivity varre o catálogo inteiro em ordem).
-		db.prepare(`UPDATE activity_progress SET status = 'pulada' WHERE project_id = ?`).run(projectId);
+		setAllActivityStatuses(db, projectId, 'pulada');
 
 		setActivityStatus(db, projectId, 'validar_entregas_criterios', 'concluída');
 		insertAnswer(
@@ -155,9 +105,9 @@ test('Encerramento: estado terminal — sem CTA, mensagem de conclusão, link pa
 }) => {
 	const projectId = await createProject(page, server.baseUrl);
 
-	const db = new Database(dbPath);
+	const db = openDb(server.dbPath);
 	try {
-		db.prepare(`UPDATE activity_progress SET status = 'pulada' WHERE project_id = ?`).run(projectId);
+		setAllActivityStatuses(db, projectId, 'pulada');
 		setActivityStatus(db, projectId, 'validar_entregas_criterios', 'concluída');
 		setActivityStatus(db, projectId, 'coletar_feedback', 'concluída');
 		setActivityStatus(db, projectId, 'transicao_proximos_passos', 'concluída');

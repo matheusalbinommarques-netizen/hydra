@@ -74,6 +74,15 @@ PROOF: adicionar/mover activity sintética não exige editar feature
 journeys não relacionadas; pelo menos uma feature journey começa perto
 do estado semântico que testa.
 
+STATUS: DONE — GOLDEN (walking-skeleton) sem magic counts (deriva do
+catálogo real / condições de parada); lifecycle de servidor/DB
+centralizado em `e2e/helpers/journey-server.ts` (13 journeys migradas);
+semantic setup em `e2e/helpers/db-fixtures.ts` recria o lastro que cada
+transição de domínio exige, não só `activity_progress.status`; selector
+ornamental (`.cet-step-card`/`.cet-node-row` como contrato) substituído
+por `role="list"`/`role="listitem"` em `ComoETratadoHoje.svelte`. Proof
+sintética de activity executada e revertida duas vezes (íntegra).
+
 ### R3 — Development protocol / time-to-dogfood — P0
 
 GOAL: contexto mínimo → implementação → focused verification → runtime

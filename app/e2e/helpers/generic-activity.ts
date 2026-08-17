@@ -86,3 +86,24 @@ export async function answerActivitiesGenerically(page: Page, count: number): Pr
 		await answerCurrentActivityGenerically(page);
 	}
 }
+
+// Variante sem contagem fixa (R2 — remediação E2E,
+// docs/core/ENGINEERING_REMEDIATION.md): avança atividades genéricas até que
+// `stopCondition` resolva true (checada ANTES de responder a atividade
+// corrente, então a atividade que satisfaz a condição nunca é respondida por
+// engano). Evita duplicar, no teste, uma contagem que só existe porque o
+// catálogo tem N atividades hoje — se o catálogo ganhar/perder uma atividade
+// genérica nesse trecho, a jornada continua funcionando sem edição.
+// maxSteps é só uma rede de segurança contra loop infinito por bug real
+// (condição nunca satisfeita), não uma expectativa de comportamento.
+export async function answerActivitiesGenericallyUntil(
+	page: Page,
+	stopCondition: () => Promise<boolean>,
+	maxSteps = 100
+): Promise<void> {
+	for (let i = 0; i < maxSteps; i++) {
+		if (await stopCondition()) return;
+		await answerCurrentActivityGenerically(page);
+	}
+	throw new Error(`answerActivitiesGenericallyUntil: condição de parada não alcançada após ${maxSteps} passos.`);
+}

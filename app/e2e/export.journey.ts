@@ -7,35 +7,11 @@
 // página, qualquer outro Accept cai no +server.ts).
 
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
+import { readFileSync } from 'node:fs';
 import { createProject } from './helpers/create-project';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-export-'));
-	const port = await getFreePort();
-	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
+const server = useEphemeralServer('export');
 
 test('Exportar projeto: navegação, conteúdo, download e compatibilidade do handler legado', async ({
 	page
@@ -86,8 +62,8 @@ test('Exportar projeto: navegação, conteúdo, download e compatibilidade do ha
 
 		expect(download.suggestedFilename()).toBe(expectedFilename());
 
-		const downloadedPath = path.join(tmpRoot, 'export-via-download-endpoint.json');
-		await download.saveAs(downloadedPath);
+		const downloadedPath = await download.path();
+		if (!downloadedPath) throw new Error('Download não produziu um path local.');
 		downloadedJson = JSON.parse(readFileSync(downloadedPath, 'utf-8'));
 	});
 

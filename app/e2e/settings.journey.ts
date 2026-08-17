@@ -6,35 +6,10 @@
 // própria tela de Configurações.
 
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
 import { createProject } from './helpers/create-project';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-settings-'));
-	const port = await getFreePort();
-	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
+const server = useEphemeralServer('settings');
 
 test('Configurações do projeto: navegação, edição, salvar, cancelar e erro de validação', async ({ page }) => {
 	let projectId = '';

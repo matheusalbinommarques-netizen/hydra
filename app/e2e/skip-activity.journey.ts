@@ -20,39 +20,12 @@
 // catálogo pela UI — a validação de que allowsSkip governa a visibilidade
 // do botão já é responsabilidade da interface, não do domínio.
 
-import Database from 'better-sqlite3';
 import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
 import { createProject } from './helpers/create-project';
+import { completeDiscoveryViaFixture, openDb } from './helpers/db-fixtures';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
-let dbPath: string;
-
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-skip-'));
-	dbPath = path.join(tmpRoot, 'hydra.sqlite');
-	const port = await getFreePort();
-	server = startServer(port, dbPath);
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
+const server = useEphemeralServer('skip');
 
 test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 	let projectId = '';
@@ -170,14 +143,9 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 	});
 
 	await test.step('atividade não pulável (Resumo) não exibe o botão', async () => {
-		const db = new Database(dbPath);
+		const db = openDb(server.dbPath);
 		try {
-			for (const activityId of ['problema', 'publico', 'estado_atual', 'entender_causas', 'resultado']) {
-				db.prepare(
-					`UPDATE activity_progress SET status = 'concluída'
-					 WHERE project_id = ? AND activity_definition_id = ?`
-				).run(projectId, activityId);
-			}
+			completeDiscoveryViaFixture(db, projectId);
 		} finally {
 			db.close();
 		}

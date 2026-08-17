@@ -6,36 +6,21 @@
 // playwright.journey.config.ts (servidor efêmero + banco temporário
 // isolados) — ver e2e/helpers/ephemeral-server.ts.
 
-import { expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import {
-	type EphemeralServer,
-	getFreePort,
-	startServer,
-	stopServer,
-	waitForServer
-} from './helpers/ephemeral-server';
+import { expect, test, type Page } from '@playwright/test';
 import { createProject } from './helpers/create-project';
+import { useEphemeralServer } from './helpers/journey-server';
 
-let tmpRoot: string;
-let server: EphemeralServer;
+const server = useEphemeralServer('como-e-tratado-hoje');
 
-test.beforeAll(async () => {
-	tmpRoot = mkdtempSync(path.join(tmpdir(), 'hydra-e2e-como-e-tratado-hoje-'));
-	const port = await getFreePort();
-	server = startServer(port, path.join(tmpRoot, 'hydra.sqlite'));
-	await waitForServer(server);
-});
-
-test.afterAll(async () => {
-	try {
-		await stopServer(server);
-	} finally {
-		rmSync(tmpRoot, { recursive: true, force: true });
-	}
-});
+// Passos da cadeia de tratamento atual, por role/accessible name
+// (ComoETratadoHoje.svelte: role="list" + aria-label na cadeia, role="listitem"
+// em cada passo real — a affordance "+ adicionar passo" fica fora do role
+// listitem, então não precisa de exclusão por classe). Contrato estável a
+// rename de classe CSS ornamental (ver incidente histórico com
+// .cet-step-card → .cet-node-row).
+function chainSteps(page: Page) {
+	return page.getByRole('list', { name: 'Cadeia de tratamento atual' }).getByRole('listitem');
+}
 
 test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatment, conclusão e persistência', async ({
 	page
@@ -68,8 +53,8 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Financeiro percebe o atraso');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
 
-		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
-		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)').getByText('Financeiro percebe o atraso')).toBeVisible();
+		await expect(chainSteps(page)).toHaveCount(1);
+		await expect(chainSteps(page).getByText('Financeiro percebe o atraso')).toBeVisible();
 	});
 
 	await test.step('segundo passo: prompt vira "E depois?"', async () => {
@@ -77,14 +62,14 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Gestor aprova manualmente');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
 
-		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(2);
-		const cards = page.locator('.cet-node-row:not(.cet-node-row-add)');
+		await expect(chainSteps(page)).toHaveCount(2);
+		const cards = chainSteps(page);
 		await expect(cards.nth(0)).toContainText('Financeiro percebe o atraso');
 		await expect(cards.nth(1)).toContainText('Gestor aprova manualmente');
 	});
 
 	await test.step('reordenar: mover o segundo passo para cima troca a ordem exibida', async () => {
-		const cards = page.locator('.cet-node-row:not(.cet-node-row-add)');
+		const cards = chainSteps(page);
 		await cards.nth(1).getByRole('button', { name: 'Mover para cima' }).click();
 
 		await expect(cards.nth(0)).toContainText('Gestor aprova manualmente');
@@ -96,7 +81,7 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	});
 
 	await test.step('contexto e fricções ficam atrás de uma affordance secundária, fechada por padrão', async () => {
-		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
+		const firstCard = chainSteps(page).nth(0);
 		await expect(firstCard.getByText('Quem atua aqui?')).toHaveCount(0);
 
 		await firstCard.getByRole('button', { name: '+ Adicionar contexto e fricções' }).click();
@@ -104,19 +89,19 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	});
 
 	await test.step('quem atua: sugestão vem do AffectedGroup real do projeto (Financeiro)', async () => {
-		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
+		const firstCard = chainSteps(page).nth(0);
 		await firstCard.getByRole('button', { name: 'Financeiro', exact: true }).click();
 		await expect(firstCard.locator('.cet-tag-actor', { hasText: 'Financeiro' })).toBeVisible();
 	});
 
 	await test.step('meio/ferramenta: seleciona uma sugestão genérica', async () => {
-		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
+		const firstCard = chainSteps(page).nth(0);
 		await firstCard.getByRole('button', { name: 'Planilha', exact: true }).click();
 		await expect(firstCard.locator('.cet-tag-medium', { hasText: 'Planilha' })).toBeVisible();
 	});
 
 	await test.step('fricção: pode marcar mais de uma', async () => {
-		const firstCard = page.locator('.cet-node-row:not(.cet-node-row-add)').nth(0);
+		const firstCard = chainSteps(page).nth(0);
 		await firstCard.getByRole('button', { name: 'Espera', exact: true }).click();
 		await firstCard.getByRole('button', { name: 'Retrabalho', exact: true }).click();
 		await expect(firstCard.locator('.cet-tag-friction')).toHaveCount(2);
@@ -133,15 +118,15 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	});
 
 	await test.step('remover um passo: cadeia volta a ter 1 passo', async () => {
-		const cards = page.locator('.cet-node-row:not(.cet-node-row-add)');
+		const cards = chainSteps(page);
 		await cards.nth(1).getByRole('button', { name: 'Remover passo' }).click();
-		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
+		await expect(chainSteps(page)).toHaveCount(1);
 	});
 
 	await test.step('"Hoje não existe um tratamento definido": alterna o estado e permite voltar', async () => {
 		await page.getByRole('button', { name: 'Hoje não existe um tratamento definido' }).click();
 		await expect(page.getByText('Hoje não existe um tratamento definido. Quando isso aparece')).toBeVisible();
-		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(0);
+		await expect(chainSteps(page)).toHaveCount(0);
 
 		// voltar a descrever
 		await page.getByRole('button', { name: 'Na verdade, existe algo — quero descrever' }).click();
@@ -151,7 +136,7 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 	await test.step('adicionar um passo de novo e concluir a atividade', async () => {
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Financeiro percebe o atraso');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-		await expect(page.locator('.cet-node-row:not(.cet-node-row-add)')).toHaveCount(1);
+		await expect(chainSteps(page)).toHaveCount(1);
 
 		await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
@@ -209,7 +194,7 @@ test('Como é tratado hoje — viewport 375px: sem overflow horizontal na cadeia
 		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
 		await page.getByPlaceholder('Descrever em poucas palavras…').fill('Financeiro percebe o atraso');
 		await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-		await page.locator('.cet-node-row:not(.cet-node-row-add)').getByRole('button', { name: '+ Adicionar contexto e fricções' }).click();
+		await chainSteps(page).getByRole('button', { name: '+ Adicionar contexto e fricções' }).click();
 	});
 
 	await test.step('sem overflow horizontal', async () => {
