@@ -10,6 +10,7 @@
 //   node .claude/scripts/hydra-verify.mjs --mode full
 //   node .claude/scripts/hydra-verify.mjs --mode fast --item C3-03
 //   node .claude/scripts/hydra-verify.mjs --mode full --item C3-03
+//   node .claude/scripts/hydra-verify.mjs --mode full --item S4B
 //
 // --item é usado somente para identificação no relatório — não muda a
 // bateria de comandos executada.
@@ -36,7 +37,9 @@ import path from 'node:path';
 
 class UsageError extends Error {}
 
-const ITEM_ID_RE = /^C\d+-\d+[A-Z]?$/;
+// Formatos aceitos: item de Ciclo histórico (Cx-y) ou Stage do rework
+// (Sx[Letra]) — ver hydra-state.mjs.
+const ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?)$/;
 const IS_WIN = process.platform === 'win32';
 
 function parseArgs(argv) {
@@ -49,7 +52,7 @@ function parseArgs(argv) {
 			args.item = argv[++i];
 			if (!args.item) throw new UsageError('--item exige um valor (ex.: --item C3-03).');
 			if (!ITEM_ID_RE.test(args.item)) {
-				throw new UsageError(`"${args.item}" não é um identificador de item válido. Formato esperado: Cx-y (ex.: C5-01, C4-03A).`);
+				throw new UsageError(`"${args.item}" não é um identificador de item válido. Formatos aceitos: Cx-y (ex.: C5-01, C4-03A) ou Sx (ex.: S4B).`);
 			}
 		} else {
 			throw new UsageError(`argumento desconhecido: ${arg}`);

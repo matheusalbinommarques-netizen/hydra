@@ -32,6 +32,10 @@ Fontes disponíveis:
 - `docs/core/RELEASE_0_SPEC.md`: escopo e critérios do Release 0;
 - `docs/core/UX_DESIGN_SPEC.md`: experiência e comportamento da interface;
 - `docs/core/TECHNICAL_BRIEF.md`: stack e decisões técnicas;
+- `docs/core/HYDRA_PRODUCT_REWORK.md`: semântica e decisões canônicas do
+  rework de produto em andamento;
+- `docs/core/CURRENT_WORK.json`: ponteiro operacional — qual é o
+  Stage/corte atual, sem interpretar histórico;
 - `PROJECT_STATUS.md`: estado operacional e próxima decisão relevante;
 - backlog do ciclo vigente: critérios e limites do item;
 - documentação completa em `docs/`: histórico e aprofundamento.

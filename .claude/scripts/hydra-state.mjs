@@ -1,21 +1,30 @@
 #!/usr/bin/env node
 // hydra-state.mjs — leitura somente-leitura do estado do Hydra: branch,
-// HEAD/origin, árvore, ciclo de entrega ativo e (opcionalmente) um item do
-// backlog vigente. Node.js puro, sem dependências externas. Nunca altera
-// nenhum arquivo.
+// HEAD/origin, árvore, trabalho atual e (opcionalmente) um item específico.
+// Node.js puro, sem dependências externas. Nunca altera nenhum arquivo.
+//
+// O trabalho atual é descoberto assim:
+//   1. se docs/core/CURRENT_WORK.json existe, ele é a autoridade — deve ser
+//      um JSON válido com {id, kind, source, status}; se existir mas for
+//      inválido, falha explicitamente (nunca cai para o Ciclo por engano);
+//   2. se docs/core/CURRENT_WORK.json não existe, usa o comportamento legado
+//      de descoberta pelo backlog de Ciclo mais recente
+//      (docs/08-delivery/cycle-*-backlog.md).
 //
 // Uso:
 //   node .claude/scripts/hydra-state.mjs
 //   node .claude/scripts/hydra-state.mjs --item C3-03
+//   node .claude/scripts/hydra-state.mjs --item S4B
 //   node .claude/scripts/hydra-state.mjs --format json
 //   node .claude/scripts/hydra-state.mjs --item C3-03 --format json
 //
 // Exit codes:
 //   0 — sucesso (árvore suja NÃO é erro — é só reportada);
 //   1 — argumento inválido (ex.: --format desconhecido, flag não reconhecida);
-//   2 — --item informado mas não encontrado no backlog vigente;
+//   2 — --item informado mas não encontrado no trabalho atual/backlog vigente;
 //   3 — erro real de Git ou de leitura de arquivo (ex.: não é um repo Git,
-//       docs/08-delivery/ ausente, PROJECT_STATUS.md ausente).
+//       docs/08-delivery/ ausente, PROJECT_STATUS.md ausente,
+//       CURRENT_WORK.json presente mas inválido).
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -25,17 +34,67 @@ class UsageError extends Error {}
 class NotFoundError extends Error {}
 class StateReadError extends Error {}
 
+// Formato de item de backlog histórico (usado só para reconhecer cabeçalhos
+// "### Cx-y — Título" dentro de docs/08-delivery/cycle-*-backlog.md).
 const ITEM_ID_RE = /^C\d+-\d+[A-Z]?$/;
 
+// Formatos aceitos para --item e para o "id" de CURRENT_WORK.json: item de
+// Ciclo histórico (Cx-y) ou Stage do rework (Sx[Letra]).
+const SUPPORTED_ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?)$/;
+
+const CURRENT_WORK_RELATIVE = ['docs', 'core', 'CURRENT_WORK.json'].join('/');
+
 function validateItemId(id) {
-	if (ITEM_ID_RE.test(id)) return;
+	if (SUPPORTED_ITEM_ID_RE.test(id)) return;
 	if (/^D\d+/.test(id)) {
 		throw new UsageError(
-			`"${id}" parece um identificador de decisão (Dxxx), não um item de backlog. ` +
-				'O fluxo normal exige um identificador de item no formato Cx-y (ex.: C5-01, C4-03A).'
+			`"${id}" parece um identificador de decisão (Dxxx), não um item de trabalho. ` +
+				'Formatos aceitos: Cx-y (ex.: C5-01, C4-03A) ou Sx (ex.: S4B).'
 		);
 	}
-	throw new UsageError(`"${id}" não é um identificador de item válido. Formato esperado: Cx-y (ex.: C5-01, C4-03A).`);
+	throw new UsageError(`"${id}" não é um identificador de item válido. Formatos aceitos: Cx-y (ex.: C5-01, C4-03A) ou Sx (ex.: S4B).`);
+}
+
+function findCurrentWorkPointer(repoRoot) {
+	const pointerPath = path.join(repoRoot, ...CURRENT_WORK_RELATIVE.split('/'));
+	if (!fs.existsSync(pointerPath)) return null;
+
+	let raw;
+	try {
+		raw = fs.readFileSync(pointerPath, 'utf8');
+	} catch (err) {
+		throw new StateReadError(`não foi possível ler ${CURRENT_WORK_RELATIVE}: ${err.message}`);
+	}
+
+	let parsed;
+	try {
+		parsed = JSON.parse(raw);
+	} catch (err) {
+		throw new StateReadError(`${CURRENT_WORK_RELATIVE} existe mas não é JSON válido: ${err.message}`);
+	}
+
+	validateCurrentWorkShape(parsed);
+	return parsed;
+}
+
+function validateCurrentWorkShape(pointer) {
+	if (pointer === null || typeof pointer !== 'object' || Array.isArray(pointer)) {
+		throw new StateReadError(`${CURRENT_WORK_RELATIVE} existe mas não é um objeto JSON válido.`);
+	}
+	if (typeof pointer.id !== 'string' || !SUPPORTED_ITEM_ID_RE.test(pointer.id)) {
+		throw new StateReadError(
+			`${CURRENT_WORK_RELATIVE}: "id" ausente ou em formato inválido ("${pointer.id}"). Formatos aceitos: Cx-y ou Sx (ex.: S4B).`
+		);
+	}
+	if (typeof pointer.kind !== 'string' || pointer.kind.trim() === '') {
+		throw new StateReadError(`${CURRENT_WORK_RELATIVE}: "kind" ausente ou vazio.`);
+	}
+	if (typeof pointer.source !== 'string' || pointer.source.trim() === '') {
+		throw new StateReadError(`${CURRENT_WORK_RELATIVE}: "source" ausente ou vazio.`);
+	}
+	if (typeof pointer.status !== 'string' || pointer.status.trim() === '') {
+		throw new StateReadError(`${CURRENT_WORK_RELATIVE}: "status" ausente ou vazio.`);
+	}
 }
 
 function parseArgs(argv) {
@@ -262,15 +321,14 @@ function buildState(repoRoot) {
 		.split(/\r?\n/)
 		.filter((l) => l.length > 0);
 
-	const cycleFile = findLatestCycleBacklog(repoRoot);
-	const backlogContent = readFileSafe(cycleFile.absolutePath);
-	const parsed = parseBacklog(backlogContent);
+	// Autoridade sobre "trabalho atual": se o pointer existe, ele decide —
+	// nenhuma descoberta por Ciclo é feita quando ele está presente, e um
+	// pointer inválido falha explicitamente em vez de cair para o Ciclo.
+	const currentWork = findCurrentWorkPointer(repoRoot);
 
 	const projectStatusPath = path.join(repoRoot, 'PROJECT_STATUS.md');
 	const projectStatusContent = readFileSafe(projectStatusPath);
 	const nextDecision = extractSection(projectStatusContent, /^## Próxima decisão relevante/);
-	const cycleMentions = detectCycleMentionsInStatus(projectStatusContent);
-	const consistentWithProjectStatus = cycleMentions.length === 0 || cycleMentions.includes(cycleFile.number);
 
 	const changelogPath = path.join(repoRoot, 'CHANGELOG.md');
 	let unreleased = null;
@@ -281,13 +339,14 @@ function buildState(repoRoot) {
 		unreleased = null; // CHANGELOG sem Unreleased não é erro fatal
 	}
 
-	return {
-		branch,
-		head,
-		originMain,
-		clean: statusPorcelain.length === 0,
-		statusPorcelain,
-		cycle: {
+	let cycle = null;
+	if (!currentWork) {
+		const cycleFile = findLatestCycleBacklog(repoRoot);
+		const backlogContent = readFileSafe(cycleFile.absolutePath);
+		const parsed = parseBacklog(backlogContent);
+		const cycleMentions = detectCycleMentionsInStatus(projectStatusContent);
+		const consistentWithProjectStatus = cycleMentions.length === 0 || cycleMentions.includes(cycleFile.number);
+		cycle = {
 			number: cycleFile.number,
 			file: cycleFile.relativePath,
 			meta: parsed.meta,
@@ -295,13 +354,26 @@ function buildState(repoRoot) {
 			gate: parsed.gate,
 			dependencies: parsed.dependencies,
 			consistentWithProjectStatus
-		},
+		};
+	}
+
+	return {
+		branch,
+		head,
+		originMain,
+		clean: statusPorcelain.length === 0,
+		statusPorcelain,
+		currentWork,
+		cycle,
 		nextDecision,
 		changelogUnreleased: unreleased
 	};
 }
 
 function findItem(state, itemId) {
+	if (state.currentWork) {
+		return state.currentWork.id.toLowerCase() === itemId.toLowerCase() ? state.currentWork : null;
+	}
 	return state.cycle.items.find((item) => item.id.toLowerCase() === itemId.toLowerCase()) || null;
 }
 
@@ -313,23 +385,32 @@ function toMarkdown(state, item, itemId) {
 	out.push(`**HEAD:** ${state.head}`);
 	out.push(`**origin/main:** ${state.originMain ?? '(sem remoto configurado)'}`);
 	out.push(`**Árvore:** ${state.clean ? 'limpa' : `${state.statusPorcelain.length} entrada(s) — ver git status`}`);
-	if (!state.cycle.consistentWithProjectStatus) {
+	out.push('');
+
+	if (state.currentWork) {
+		out.push(`## Trabalho atual: ${state.currentWork.id} (${state.currentWork.kind})`);
 		out.push('');
-		out.push('⚠️ PROJECT_STATUS.md menciona um número de ciclo diferente do backlog mais recente encontrado — possível divergência.');
+		out.push(`**Source:** ${state.currentWork.source}`);
+		out.push(`**Status:** ${state.currentWork.status}`);
+	} else {
+		if (!state.cycle.consistentWithProjectStatus) {
+			out.push('⚠️ PROJECT_STATUS.md menciona um número de ciclo diferente do backlog mais recente encontrado — possível divergência.');
+			out.push('');
+		}
+		out.push(`## Ciclo ativo: Ciclo ${state.cycle.number} (${state.cycle.file})`);
+		out.push('');
+		if (state.cycle.meta) out.push(`**Meta:** ${state.cycle.meta}`);
+		out.push('');
+		out.push('### Itens');
+		for (const it of state.cycle.items) {
+			const commitPart = it.commit ? ` — commit ${it.commit}` : '';
+			out.push(`- ${it.id} (${it.priority ?? '?'}): ${it.status}${commitPart} — ${it.title}`);
+		}
+		out.push('');
+		out.push('### Gate');
+		out.push(truncateLines(state.cycle.gate ?? '(não encontrado)', 12));
 	}
-	out.push('');
-	out.push(`## Ciclo ativo: Ciclo ${state.cycle.number} (${state.cycle.file})`);
-	out.push('');
-	if (state.cycle.meta) out.push(`**Meta:** ${state.cycle.meta}`);
-	out.push('');
-	out.push('### Itens');
-	for (const it of state.cycle.items) {
-		const commitPart = it.commit ? ` — commit ${it.commit}` : '';
-		out.push(`- ${it.id} (${it.priority ?? '?'}): ${it.status}${commitPart} — ${it.title}`);
-	}
-	out.push('');
-	out.push('### Gate');
-	out.push(truncateLines(state.cycle.gate ?? '(não encontrado)', 12));
+
 	out.push('');
 	out.push('## Próxima decisão relevante (PROJECT_STATUS.md)');
 	out.push(truncateLines(state.nextDecision ?? '(não encontrado)', 6));
@@ -338,7 +419,13 @@ function toMarkdown(state, item, itemId) {
 		out.push('## CHANGELOG — Unreleased');
 		out.push(truncateLines(state.changelogUnreleased, 10));
 	}
-	if (item) {
+	if (item && state.currentWork) {
+		out.push('');
+		out.push(`## Item ${item.id}`);
+		out.push(`**Kind:** ${item.kind}`);
+		out.push(`**Source:** ${item.source}`);
+		out.push(`**Status:** ${item.status}`);
+	} else if (item) {
 		out.push('');
 		out.push(`## Item ${item.id}`);
 		out.push(`**Título:** ${item.title}`);
@@ -355,7 +442,8 @@ function toMarkdown(state, item, itemId) {
 		}
 	} else if (itemId) {
 		out.push('');
-		out.push(`⚠️ Item "${itemId}" não encontrado no backlog vigente.`);
+		const where = state.currentWork ? `trabalho atual (${state.currentWork.id})` : 'backlog vigente';
+		out.push(`⚠️ Item "${itemId}" não encontrado no ${where}.`);
 	}
 	return truncateLines(out.join('\n'), 60);
 }
@@ -369,7 +457,8 @@ function main() {
 	if (args.item) {
 		item = findItem(state, args.item);
 		if (!item) {
-			throw new NotFoundError(`item "${args.item}" não encontrado no backlog vigente (${state.cycle.file}).`);
+			const where = state.currentWork ? `trabalho atual (${state.currentWork.id})` : `backlog vigente (${state.cycle.file})`;
+			throw new NotFoundError(`item "${args.item}" não encontrado no ${where}.`);
 		}
 	}
 

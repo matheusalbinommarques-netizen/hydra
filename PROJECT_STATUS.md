@@ -372,9 +372,11 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 Estado atual do rework: ETAPA 3 concluída (commit `ceadf4c`); Stage 4A
 ("Como é tratado hoje") concluído e entregue em `c1e6c7b` (base
-`61e5c3b` + refinamento visual/síntese aprovado por dogfooding). Próximo
-corte da Discovery — Etapa 4B ("Causas/hipóteses", "Entender as causas")
-ou 4C — ainda não implementado nem decidido; decisão de Matheus.
+`61e5c3b` + refinamento visual/síntese aprovado por dogfooding); Stage 4B
+("Entender as causas") implementado em `b0a52f7`. Próximo corte da
+Discovery — refinamento/fechamento do Stage 4B ou Etapa 4C — ainda não
+decidido; decisão de Matheus. Trabalho atual rastreado em
+`docs/core/CURRENT_WORK.json`.
 
 As etapas 1 a 7 do roadmap (`docs/03-product/product-roadmap.md`) estão
 concluídas. A etapa 7, "Convergência da experiência e das telas",
