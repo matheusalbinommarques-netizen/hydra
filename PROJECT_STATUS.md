@@ -602,11 +602,26 @@ pelo usuário em servidor limpo — considerado incidente não reproduzível
 no HEAD atual).
 
 Com Stage 4D fechado, a ETAPA 4 do rework está integralmente concluída.
-A próxima etapa deterministicamente definida pelo roadmap do rework é a
-ETAPA 5 — "Decidir o modelo canônico de trabalho": auditar
-`PlanningItem`/`ScopeItem` e decidir a relação entre `Deliverable`,
-`WorkItem`, `ScopeItem` histórico e `PlanningItem` histórico, evitando
-duas entidades concorrentes para o mesmo conceito. Ainda não iniciada.
+
+ETAPA 5 ("Decidir o modelo canônico de trabalho") está **concluída e
+fechada** (D035, `docs/07-management/decision-log.md`;
+`docs/core/HYDRA_PRODUCT_REWORK.md` §35) — decisão exclusivamente
+semântica/documental, sem entidade nova, sem schema alterado, sem dado
+migrado: `Deliverable` e `WorkItem` são semanticamente distintos —
+`Deliverable` é a camada de priorização/escopo (alimenta o Roadmap) e
+`WorkItem` é a camada de execução (alimenta o Kanban). `ScopeItem`
+histórico é o precursor/candidato de promoção para `Deliverable`,
+preservando integralmente a semântica de `bucket` (`agora`/`depois`/
+`fora`, inclusive `fora` continuando a significar fora do recorte).
+`PlanningItem` histórico é o precursor semântico de `WorkItem`, mas não
+auto-converte — qualquer promoção exige confirmação/associação explícita
+do usuário. `ScopeItem.executionStatus` (D025) passa a ser tratado como
+compatibilidade histórica, não como definição do novo modelo operacional.
+Trabalho atual rastreado em `docs/core/CURRENT_WORK.json` aponta para
+`S6` — ETAPA 6, "Primeiro loop operacional" (Deliverable/WorkItem →
+Kanban → Impediment → Signal → Acompanhamento → ação → estado
+atualizado), que introduzirá somente a menor representação real de
+`WorkItem` que seu loop exigir. Ainda não iniciada.
 
 ## Não fazer agora
 

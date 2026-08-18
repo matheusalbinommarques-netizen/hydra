@@ -4,6 +4,17 @@
 
 ### Adicionado
 
+- Rework, ETAPA 5 ("Decidir o modelo canônico de trabalho") — decisão
+  exclusivamente documental: `Deliverable` (priorização/escopo, alimenta
+  o Roadmap) e `WorkItem` (execução, alimenta o Kanban) são
+  semanticamente distintos; `ScopeItem` histórico é o precursor de
+  `Deliverable` (preserva integralmente a semântica de `bucket`
+  agora/depois/fora); `PlanningItem` histórico é o precursor semântico de
+  `WorkItem`, mas não auto-converte (exige confirmação/associação
+  explícita); `ScopeItem.executionStatus` passa a ser tratado como
+  compatibilidade histórica, não como definição do novo modelo (D035,
+  `docs/07-management/decision-log.md`). Nenhuma entidade nova, schema ou
+  dado alterado.
 - Rework, Stage 4D ("Checkpoint") — nova tela `/summary` (Checkpoint da
   Descoberta) substitui a antiga "Revisão e confirmação": deriva as
   cinco seções da Descoberta dos objetos vivos existentes, com status

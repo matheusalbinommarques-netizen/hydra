@@ -1806,6 +1806,41 @@ Somente decisão + menor fundação necessária.
 
 Não adicionar Gantt ainda.
 
+## Decisão registrada (D035, `docs/07-management/decision-log.md`)
+
+ETAPA 5 **concluída e fechada** — decisão exclusivamente semântica/
+documental, sem entidade nova, sem schema alterado, sem dado migrado:
+
+- `Deliverable` e `WorkItem` são **semanticamente distintos**, não a mesma
+  entidade em disfarce. `Deliverable` é a camada de priorização/escopo —
+  o que entra, em que ordem, tamanho aproximado — e alimenta o Roadmap
+  (§17: "Roadmap = entregas + ordenação/prioridade"). `WorkItem` é a
+  camada de execução — unidade executável, com progresso e, no futuro,
+  `Dependency`/`AcceptanceCriterion`/`Responsible` próprios (§12) — e
+  alimenta o Kanban (§17: "Kanban = itens executáveis").
+- `ScopeItem` histórico é o **precursor/candidato de promoção para
+  `Deliverable`**: seu `bucket`/`order`/`effort`, nascidos de "Escolha o
+  próximo foco", já capturam decisão de prioridade/escopo — a mesma
+  semântica que `Deliverable` precisa. A promoção não reinterpreta
+  registros históricos como "entrega comprometida"; a semântica de
+  `bucket` é preservada integralmente (`agora`/`depois`/`fora`), inclusive
+  `fora`, que continua significando fora do recorte, não "entrega
+  descartada".
+- `PlanningItem` histórico é o **precursor semântico de `WorkItem`**
+  ("decompor o trabalho" já significa partir em unidades executáveis),
+  mas tecnicamente imaturo — id/texto dentro de `Answer.value`, sem
+  lifecycle, sem tabela própria, sem vínculo com nenhum `ScopeItem`/
+  `Deliverable` específico. **Não auto-converte**: qualquer promoção de
+  `PlanningItem` para `WorkItem` exige confirmação/associação explícita do
+  usuário (CONFIRM-TO-CONVERT, regra 13.2) — não há dado hoje que
+  sustente a qual Deliverable cada parte pertence.
+- `ScopeItem.executionStatus` (D025) é **compatibilidade histórica**, não
+  a definição do novo modelo operacional de `WorkItem`. A ETAPA 6 não deve
+  tratá-lo como substituto canônico de `WorkItem`.
+- Menor fundação desta etapa: nenhuma. A ETAPA 6 introduzirá somente a
+  menor representação real de `WorkItem` que seu primeiro loop
+  operacional exigir.
+
 ---
 
 # 36. ETAPA 6 — Primeiro loop operacional
