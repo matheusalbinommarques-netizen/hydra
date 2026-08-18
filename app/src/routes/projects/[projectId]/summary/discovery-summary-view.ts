@@ -1,165 +1,217 @@
-// Projeção pura de leitura para a visão geral do Resumo da descoberta — cruza
-// catalog/ (estático) com os campos já expostos por ProjectView (answers,
-// activityStatuses). Não lê nem grava persistência, não gera prosa nova:
-// seleciona e organiza respostas já existentes (Answer canônica de cada
-// campo), nunca interpreta ou reescreve o texto do usuário.
+// Projeção pura de leitura para o Checkpoint da Descoberta (S4D, ver
+// docs/core/HYDRA_PRODUCT_REWORK.md §34 "4D — Checkpoint" e o Design Gate
+// aprovado "Checkpoint da Descoberta") — deriva as cinco seções (Situação,
+// Quem é afetado, Como é tratado hoje, Causas & evidências, Resultado
+// desejado) a partir dos mesmos objetos vivos já usados por
+// now/bancada-overview-view.ts, sem nova fonte de verdade nem síntese
+// fundida numa frase única: cada seção lista os itens individualmente, como
+// o Design Gate especifica. Não lê nem grava persistência, não introduz
+// regra de conclusão nova — status por seção deriva de ActivityStatus (já
+// computado por ProjectView) e "ponto de atenção" deriva de PendingItem (já
+// existente), nunca de uma regra nova de divergência.
 
-import { decodeMultiSelectValue } from '$lib/domain';
-import type { ActivityStatus, Catalog } from '$lib/domain';
+import type {
+	ActivityStatus,
+	AffectedGroupFrequency,
+	AffectedGroupImpact,
+	TreatmentFriction
+} from '$lib/domain';
+import type { Catalog } from '$lib/domain';
 import type { PendingItemView } from '$lib/orientation-engine';
-import { summarizeAffectedGroups } from '$lib/catalog/affected-group';
-import type { AffectedGroupSummaryInput } from '$lib/catalog/affected-group';
-import { summarizeAffectedGroupEvidences } from '$lib/catalog/external-action';
-import { summarizeCurrentTreatment, treatmentStepCountLabel } from '$lib/catalog/current-treatment';
-import type { TreatmentStepSynthesisInput } from '$lib/catalog/current-treatment';
-import { causeHypothesisCountLabel } from '$lib/catalog/cause-hypothesis';
-import { desiredOutcomeCountLabel } from '$lib/catalog/desired-outcome';
+import { affectedGroupFrequencyLabel, affectedGroupImpactLabel } from '$lib/catalog/affected-group';
+import { treatmentFrictionLabel } from '$lib/catalog/current-treatment';
 
-export interface DiscoveryOverviewBlock {
-	activityId: string;
-	heading: string;
-	editLabel: string;
-	value: string;
-	chips?: string[];
-}
+export type CheckpointSectionKey = 'situacao' | 'afetados' | 'estado' | 'causas' | 'resultado';
+export type CheckpointSectionStatus = 'completa' | 'pendente' | 'opcional';
 
-export interface DiscoveryChecklistItem {
+export interface CheckpointListItem {
 	label: string;
-	complete: boolean;
+	badge?: string;
+	note?: string;
 }
 
-export interface DiscoverySummaryView {
-	overview: DiscoveryOverviewBlock[];
-	checklist: DiscoveryChecklistItem[];
-	// Abre "Ver todas as respostas da descoberta" por padrão quando alguma das
-	// seis atividades da Descoberta ainda não está concluída — nunca uma regra
-	// nova de completude, só reaproveita ActivityStatus já calculado.
-	detailsOpenByDefault: boolean;
+export interface CheckpointSection {
+	key: CheckpointSectionKey;
+	activityId: string;
+	eyebrow: string;
+	title: string;
+	required: boolean;
+	status: CheckpointSectionStatus;
+	flagText: string | null;
+	// Situação
+	situacaoText?: string;
+	// Quem é afetado
+	afetadosSummary?: string;
+	afetadosGroups?: CheckpointListItem[];
+	// Como é tratado hoje
+	estadoNoTreatment?: boolean;
+	estadoSteps?: CheckpointListItem[];
+	// Causas & evidências
+	causasStillUnknown?: boolean;
+	causasHypotheses?: CheckpointListItem[];
+	// Resultado desejado
+	resultadoOutcomes?: CheckpointListItem[];
 }
 
-const DISCOVERY_REQUIRED_FIELDS_ACTIVITY_IDS = [
-	'origem',
-	'problema',
-	'publico',
-	'estado_atual',
-	'entender_causas',
-	'resultado'
-];
+export interface DiscoveryCheckpointView {
+	sections: CheckpointSection[];
+	requiredDoneCount: number;
+	requiredTotal: number;
+	ctaDisabled: boolean;
+	missingRequiredTitles: string[];
+}
 
-function decodeMultiSelectLabels(catalog: Catalog, activityId: string, fieldId: string, encodedValue: string): string[] {
-	for (const phase of catalog.phases) {
-		const activity = phase.activities.find((a) => a.id === activityId);
-		if (!activity || activity.completionMode !== 'required_fields') continue;
-		const field = activity.fields.find((f) => f.id === fieldId);
-		if (!field || field.dataTarget !== 'answer' || field.type !== 'selecao_multipla') continue;
-		const selectedIds = decodeMultiSelectValue(encodedValue) ?? [];
-		const labelById = new Map(field.options.map((option) => [option.id, option.label]));
-		return selectedIds.map((id) => labelById.get(id) ?? id);
+interface CheckpointAffectedGroupInput {
+	label: string;
+	impact: AffectedGroupImpact | null;
+	frequency: AffectedGroupFrequency | null;
+}
+
+interface CheckpointTreatmentStepInput {
+	whatHappens: string;
+	actors: readonly string[];
+	medium: string | null;
+	frictions: readonly TreatmentFriction[];
+}
+
+interface CheckpointCauseHypothesisInput {
+	title: string;
+	evidenceCount: number;
+}
+
+interface CheckpointDesiredOutcomeInput {
+	change: string;
+	target: string | null;
+}
+
+const REQUIRED_SECTION_KEYS: readonly CheckpointSectionKey[] = ['situacao', 'afetados', 'estado', 'resultado'];
+
+const SECTION_META: Record<
+	CheckpointSectionKey,
+	{ activityId: string; eyebrow: string; title: string; required: boolean }
+> = {
+	situacao: { activityId: 'problema', eyebrow: 'Situação', title: 'O problema entendido', required: true },
+	afetados: { activityId: 'publico', eyebrow: 'Afetados', title: 'Quem é afetado', required: true },
+	estado: { activityId: 'estado_atual', eyebrow: 'Estado atual', title: 'Como é tratado hoje', required: true },
+	causas: {
+		activityId: 'entender_causas',
+		eyebrow: 'Causas & evidências',
+		title: 'Causas prováveis e evidências',
+		required: false
+	},
+	resultado: {
+		activityId: 'resultado',
+		eyebrow: 'Resultado desejado',
+		title: 'O que o projeto deve produzir',
+		required: true
 	}
-	return [];
+};
+
+function joinWithAnd(items: readonly string[]): string {
+	if (items.length <= 1) return items.join('');
+	if (items.length === 2) return items.join(' e ');
+	return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
 }
 
-export function buildDiscoverySummaryView(
-	catalog: Catalog,
-	answers: Record<string, string>,
+function treatmentStepNote(step: CheckpointTreatmentStepInput): string | undefined {
+	const parts: string[] = [];
+	if (step.actors.length > 0) parts.push(joinWithAnd(step.actors));
+	if (step.medium) parts.push(step.medium);
+	if (step.frictions.length > 0) {
+		parts.push(`Fricção: ${joinWithAnd(step.frictions.map((f) => treatmentFrictionLabel(f).toLowerCase()))}`);
+	}
+	return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+function causeHypothesisNote(evidenceCount: number): string {
+	if (evidenceCount === 0) return 'Nenhuma evidência relacionada';
+	return evidenceCount === 1 ? '1 evidência relacionada' : `${evidenceCount} evidências relacionadas`;
+}
+
+export function buildDiscoveryCheckpointView(
 	activityStatuses: Record<string, ActivityStatus>,
-	affectedGroups: AffectedGroupSummaryInput[] = [],
-	evidences: readonly { affectedGroupId: string }[] = [],
-	currentTreatment: { noTreatment: boolean } = { noTreatment: false },
-	treatmentSteps: TreatmentStepSynthesisInput[] = [],
-	causeExploration: { stillUnknown: boolean } = { stillUnknown: false },
-	causeHypotheses: readonly { title: string }[] = [],
-	desiredOutcomes: readonly { change: string }[] = []
-): DiscoverySummaryView {
-	const overview: DiscoveryOverviewBlock[] = [];
-
-	const situacao = answers['situacao'];
-	if (situacao) {
-		const oQueValue = answers['situacao_o_que'];
-		overview.push({
-			activityId: 'problema',
-			heading: 'Situação',
-			editLabel: 'Editar situação',
-			value: situacao,
-			chips: oQueValue ? decodeMultiSelectLabels(catalog, 'problema', 'situacao_o_que', oQueValue) : undefined
-		});
-	}
-
-	if (affectedGroups.length > 0) {
-		// Evidência (ETAPA 3 do rework) — síntese curta anexada ao mesmo bloco,
-		// sem redigitação e sem despejar a preparação/resultado inteiros (ver
-		// HYDRA_PRODUCT_REWORK.md §33, "Resumo da descoberta").
-		const evidenceCounts = new Map<string, number>();
-		for (const evidence of evidences) {
-			evidenceCounts.set(evidence.affectedGroupId, (evidenceCounts.get(evidence.affectedGroupId) ?? 0) + 1);
-		}
-		const evidenceSummary = summarizeAffectedGroupEvidences(
-			affectedGroups.map((group) => ({ label: group.label, count: evidenceCounts.get(group.id) ?? 0 }))
-		);
-		overview.push({
-			activityId: 'publico',
-			heading: 'Quem é afetado',
-			editLabel: 'Editar quem é afetado',
-			value: evidenceSummary ? `${summarizeAffectedGroups(affectedGroups)} ${evidenceSummary}` : summarizeAffectedGroups(affectedGroups),
-			chips: affectedGroups.map((group) => group.label)
-		});
-	}
-
-	if (currentTreatment.noTreatment || treatmentSteps.length > 0) {
-		overview.push({
-			activityId: 'estado_atual',
-			heading: 'Como é tratado hoje',
-			editLabel: 'Editar como é tratado hoje',
-			value: `${treatmentStepCountLabel(currentTreatment.noTreatment, treatmentSteps.length)}. ${summarizeCurrentTreatment(currentTreatment.noTreatment, treatmentSteps)}`.trim()
-		});
-	}
-
-	if (causeExploration.stillUnknown || causeHypotheses.length > 0) {
-		overview.push({
-			activityId: 'entender_causas',
-			heading: 'Hipóteses de causa',
-			editLabel: 'Editar hipóteses de causa',
-			value: causeHypothesisCountLabel(causeExploration.stillUnknown, causeHypotheses.length),
-			chips: causeHypotheses.length > 0 ? causeHypotheses.map((hypothesis) => hypothesis.title) : undefined
-		});
-	}
-
-	// Canonical primeiro (DesiredOutcome, Stage 4C); READ-LEGACY (`mudanca`)
-	// como fallback só quando não há nenhum DesiredOutcome — um projeto nunca
-	// tem as duas fontes populadas ao mesmo tempo (nunca há dual-write).
-	if (desiredOutcomes.length > 0) {
-		overview.push({
-			activityId: 'resultado',
-			heading: 'Resultado desejado',
-			editLabel: 'Editar resultado',
-			value: desiredOutcomeCountLabel(desiredOutcomes.length),
-			chips: desiredOutcomes.map((outcome) => outcome.change)
-		});
-	} else {
-		const mudanca = answers['mudanca'];
-		if (mudanca) {
-			overview.push({
-				activityId: 'resultado',
-				heading: 'Resultado desejado',
-				editLabel: 'Editar resultado',
-				value: mudanca
-			});
-		}
-	}
-
-	const checklist: DiscoveryChecklistItem[] = [
-		{ label: 'Problema definido', complete: activityStatuses['problema'] === 'concluída' },
-		{ label: 'Público definido', complete: activityStatuses['publico'] === 'concluída' },
-		{ label: 'Como é tratado hoje definido', complete: activityStatuses['estado_atual'] === 'concluída' },
-		{ label: 'Causas exploradas', complete: activityStatuses['entender_causas'] === 'concluída' },
-		{ label: 'Resultado definido', complete: activityStatuses['resultado'] === 'concluída' }
-	];
-
-	const detailsOpenByDefault = DISCOVERY_REQUIRED_FIELDS_ACTIVITY_IDS.some(
-		(activityId) => activityStatuses[activityId] !== 'concluída'
+	openPendingItems: readonly PendingItemView[],
+	situacaoText: string | null,
+	affectedGroups: readonly CheckpointAffectedGroupInput[],
+	currentTreatment: { noTreatment: boolean },
+	treatmentSteps: readonly CheckpointTreatmentStepInput[],
+	causeExploration: { stillUnknown: boolean },
+	causeHypotheses: readonly CheckpointCauseHypothesisInput[],
+	desiredOutcomes: readonly CheckpointDesiredOutcomeInput[]
+): DiscoveryCheckpointView {
+	const flagByActivity = new Map(
+		openPendingItems.map((item) => [item.activityDefinitionId, item.detail ?? item.label])
 	);
 
-	return { overview, checklist, detailsOpenByDefault };
+	function statusOf(activityId: string, required: boolean): CheckpointSectionStatus {
+		if (activityStatuses[activityId] === 'concluída') return 'completa';
+		return required ? 'pendente' : 'opcional';
+	}
+
+	const sections: CheckpointSection[] = [
+		{
+			...SECTION_META.situacao,
+			key: 'situacao',
+			status: statusOf(SECTION_META.situacao.activityId, SECTION_META.situacao.required),
+			flagText: flagByActivity.get(SECTION_META.situacao.activityId) ?? null,
+			situacaoText: situacaoText ?? undefined
+		},
+		{
+			...SECTION_META.afetados,
+			key: 'afetados',
+			status: statusOf(SECTION_META.afetados.activityId, SECTION_META.afetados.required),
+			flagText: flagByActivity.get(SECTION_META.afetados.activityId) ?? null,
+			afetadosSummary: affectedGroups.length === 1 ? '1 grupo mapeado' : `${affectedGroups.length} grupos mapeados`,
+			afetadosGroups: affectedGroups.map((group) => ({
+				label: group.label,
+				badge: group.impact ? affectedGroupImpactLabel(group.impact) : 'Por classificar',
+				note: group.frequency ? `Frequência: ${affectedGroupFrequencyLabel(group.frequency)}` : undefined
+			}))
+		},
+		{
+			...SECTION_META.estado,
+			key: 'estado',
+			status: statusOf(SECTION_META.estado.activityId, SECTION_META.estado.required),
+			flagText: flagByActivity.get(SECTION_META.estado.activityId) ?? null,
+			estadoNoTreatment: currentTreatment.noTreatment,
+			estadoSteps: treatmentSteps.map((step) => ({ label: step.whatHappens, note: treatmentStepNote(step) }))
+		},
+		{
+			...SECTION_META.causas,
+			key: 'causas',
+			status: statusOf(SECTION_META.causas.activityId, SECTION_META.causas.required),
+			flagText: flagByActivity.get(SECTION_META.causas.activityId) ?? null,
+			causasStillUnknown: causeExploration.stillUnknown,
+			causasHypotheses: causeHypotheses.map((hypothesis) => ({
+				label: hypothesis.title,
+				note: causeHypothesisNote(hypothesis.evidenceCount)
+			}))
+		},
+		{
+			...SECTION_META.resultado,
+			key: 'resultado',
+			status: statusOf(SECTION_META.resultado.activityId, SECTION_META.resultado.required),
+			flagText: flagByActivity.get(SECTION_META.resultado.activityId) ?? null,
+			resultadoOutcomes: desiredOutcomes.map((outcome) => ({
+				label: outcome.change,
+				note: outcome.target ? `Meta: ${outcome.target}` : undefined
+			}))
+		}
+	];
+
+	const requiredSections = sections.filter((section) => REQUIRED_SECTION_KEYS.includes(section.key));
+	const requiredDoneCount = requiredSections.filter((section) => section.status === 'completa').length;
+	const requiredTotal = requiredSections.length;
+
+	return {
+		sections,
+		requiredDoneCount,
+		requiredTotal,
+		ctaDisabled: requiredDoneCount < requiredTotal,
+		missingRequiredTitles: requiredSections
+			.filter((section) => section.status !== 'completa')
+			.map((section) => section.title)
+	};
 }
 
 // Filtra as pendências abertas do projeto para as que pertencem às

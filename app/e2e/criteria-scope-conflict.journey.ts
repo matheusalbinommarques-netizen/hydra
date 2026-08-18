@@ -1,5 +1,5 @@
 // Teste Playwright dedicado do banner de conflito critério × escopo na
-// tela "Revisão e confirmação" (/summary).
+// Checkpoint da Descoberta (/summary, S4D).
 // Cobre: tela sem conflito (nenhum critério respondido ainda; critério
 // respondido mas ainda sustentado por um item em "Agora") e tela com
 // conflito (critério respondido, item de escopo movido para fora de
@@ -33,13 +33,14 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 	});
 
-	await test.step('sem nenhum critério respondido: Resumo não mostra o banner', async () => {
-		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
+	await test.step('sem nenhum critério respondido: Checkpoint não mostra o banner', async () => {
+		// "resumo" concluída → fluxo normal de Agora entra direto no Checkpoint
+		// (S4D), sem card intermediário nem link de saída.
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Confira o que foi entendido antes de avançar' })).toBeVisible();
 		await expect(page.getByText(CONFLICT_MESSAGE)).toHaveCount(0);
 
-		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
+		await page.getByRole('button', { name: 'Concluir Descoberta e avançar →' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 	});
 
@@ -69,12 +70,16 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 	await test.step('critério de sucesso respondido, mas ainda sustentado por um item em "Agora": banner ausente', async () => {
 		await answerCurrentActivityGenerically(page); // criterios_sucesso_produto
 
+		// Discovery já está concluída neste ponto (passo anterior) — o
+		// Checkpoint mostra o estado pós-conclusão, que também reflete o banner
+		// (única janela real em que este conflito pode ocorrer: o critério é
+		// respondido em Definição, sempre depois de "resumo" confirmado).
 		await page.goto(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Descoberta concluída' })).toBeVisible();
 		await expect(page.getByText(CONFLICT_MESSAGE)).toHaveCount(0);
 	});
 
-	await test.step('item movido para fora de "Agora": banner de conflito aparece no Resumo', async () => {
+	await test.step('item movido para fora de "Agora": banner de conflito aparece no Checkpoint', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/next-version`);
 		await Promise.all([
 			page.waitForResponse((response) => response.url().includes('?/move') && response.request().method() === 'POST'),
@@ -82,7 +87,7 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 		]);
 
 		await page.goto(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Descoberta concluída' })).toBeVisible();
 		await expect(page.getByText(CONFLICT_MESSAGE)).toBeVisible();
 	});
 });

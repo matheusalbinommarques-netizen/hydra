@@ -152,12 +152,12 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		).toBeVisible();
 	});
 
-	await test.step('Resumo e Documento refletem "Como é tratado hoje" sem redigitação', async () => {
+	await test.step('Checkpoint e Documento refletem "Como é tratado hoje" sem redigitação', async () => {
 		await page.getByRole('link', { name: 'Resumo' }).click();
 		await page.waitForURL(/\/summary$/);
-		const overview = page.locator('.overview');
-		await expect(overview.getByRole('heading', { name: 'Como é tratado hoje' })).toBeVisible();
-		await expect(overview.getByText('1 etapa descrita.')).toBeVisible();
+		const estadoSection = page.locator('#sec-estado');
+		await expect(estadoSection.getByRole('heading', { name: 'Como é tratado hoje' })).toBeVisible();
+		await expect(estadoSection.getByText('Financeiro percebe o atraso')).toBeVisible();
 
 		await page.getByRole('link', { name: 'Documento' }).click();
 		await page.waitForURL(/\/document$/);
@@ -175,7 +175,7 @@ test('Como é tratado hoje: cadeia, reordenação, contexto/fricções, noTreatm
 		// via Resumo confirma a persistência real do reload.
 		await page.getByRole('link', { name: 'Resumo' }).click();
 		await page.waitForURL(/\/summary$/);
-		await expect(page.locator('.overview').getByText('Financeiro percebe o atraso')).toBeVisible();
+		await expect(page.locator('#sec-estado').getByText('Financeiro percebe o atraso')).toBeVisible();
 	});
 });
 

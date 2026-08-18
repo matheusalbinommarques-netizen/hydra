@@ -134,11 +134,10 @@ test('Validação Externa: AffectedGroup → ExternalAction → navegação → 
 		await expect(tile.getByRole('button', { name: 'Validar com essas pessoas' })).toBeVisible();
 	});
 
-	await test.step('Resumo e Documento refletem a Evidence sem redigitação', async () => {
-		await page.getByRole('link', { name: 'Resumo' }).click();
-		await page.waitForURL(/\/summary$/);
-		await expect(page.getByText('Evidências: Operação (1 evidência).')).toBeVisible();
-
+	await test.step('Documento reflete a Evidence sem redigitação', async () => {
+		// O Checkpoint da Descoberta (S4D, /summary) segue fielmente o Design
+		// Gate aprovado, que não mostra Evidence na seção Afetados — só o Mapa
+		// de Impacto e o Documento do projeto trazem esse detalhe.
 		await page.getByRole('link', { name: 'Documento' }).click();
 		await page.waitForURL(/\/document$/);
 		await expect(page.getByText('Evidências: Operação (1 evidência).')).toBeVisible();

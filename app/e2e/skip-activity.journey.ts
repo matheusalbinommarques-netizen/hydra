@@ -150,8 +150,12 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 			db.close();
 		}
 
+		// "resumo" (Resumo da descoberta) não é mais uma superfície própria de
+		// /now (S4D) — o fluxo normal entra direto no Checkpoint, que nunca tem
+		// "Pular etapa" (não é um conceito do checkpoint).
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta', exact: true })).toBeVisible();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
+		await expect(page.getByRole('heading', { name: 'Confira o que foi entendido antes de avançar' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Pular etapa' })).toHaveCount(0);
 	});
 });

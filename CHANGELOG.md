@@ -4,6 +4,12 @@
 
 ### Adicionado
 
+- Rework, Stage 4D ("Checkpoint") — nova tela `/summary` (Checkpoint da
+  Descoberta) substitui a antiga "Revisão e confirmação": deriva as
+  cinco seções da Descoberta dos objetos vivos existentes, com status
+  por seção, "Revisar" com retorno ao checkpoint, e CTA de conclusão
+  condicionado às seções obrigatórias; `resumo` deixa de ter superfície
+  própria em `/now` e entra direto em `/summary`.
 - Rework, Stage 4C ("Resultado desejado") — `mudanca`/`beneficiario`/
   `percepcao` (texto livre) dão lugar a uma coleção ordenada de
   `DesiredOutcome` real: adicionar/editar/remover/reordenar, alvo

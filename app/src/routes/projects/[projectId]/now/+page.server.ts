@@ -21,6 +21,13 @@ const DESCOBERTA_PHASE_ID = 'descoberta';
 const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
 const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
 
+// S4D — "Resumo da descoberta" agora é representada pela tela dedicada
+// /summary (Checkpoint da Descoberta), não mais por uma superfície própria
+// dentro de /now. `resumo` nunca é allowsSkip, então nunca chega aqui via
+// retomada de pendência — só via view.nextActivity no fluxo normal, tratado
+// abaixo.
+const RESUMO_ACTIVITY_ID = 'resumo';
+
 // Conjunto fechado de origens de revisão reconhecidas (?from=<origem> na
 // carga, returnTo=<origem> na action `answer`) — Resumo e Registros, os dois
 // únicos lugares que hoje linkam para cá pedindo revisão de uma atividade já
@@ -233,6 +240,12 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 			: undefined;
 
 	const activity = activityId ? findActivityDefinition(activityId) : undefined;
+
+	// S4D — o fluxo normal de avanço nunca renderiza a superfície legada de
+	// "resumo" dentro de /now; entra direto no Checkpoint da Descoberta.
+	if (activity?.id === RESUMO_ACTIVITY_ID && !resumingPendingItem) {
+		redirect(303, `/projects/${params.projectId}/summary`);
+	}
 
 	// Campo a campo só no fluxo normal de avanço — nunca ao retomar uma
 	// etapa pulada (quem pulou e está voltando quer ver tudo de uma vez).

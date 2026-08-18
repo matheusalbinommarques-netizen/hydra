@@ -18,54 +18,32 @@
 
 import { expect, test } from '@playwright/test';
 import { createProject } from './helpers/create-project';
+import { completeDiscoveryViaFixture, openDb } from './helpers/db-fixtures';
 import { useEphemeralServer } from './helpers/journey-server';
 
 const server = useEphemeralServer('bancada-field-by-field');
 
-async function skipCurrentActivity(page: import('@playwright/test').Page): Promise<void> {
-	await page.getByRole('button', { name: 'Pular etapa' }).click();
-	await page.locator('dialog[open]').getByRole('button', { name: 'Confirmar' }).click();
-}
-
 test('Bancada: "Definir visão do produto" campo a campo, painel crescendo, etapa opcional e conclusão equivalente a envio único', async ({
 	page
 }) => {
-	await test.step('criar projeto e pular toda a Descoberta para chegar a "Definir visão do produto"', async () => {
-		await createProject(page, server.baseUrl);
+	await test.step('criar projeto e completar a Descoberta via fixture semântica para chegar a "Definir visão do produto"', async () => {
+		// O foco deste teste é a apresentação campo a campo de "Definir visão do
+		// produto" (Definição), não a mecânica da Descoberta — completar via
+		// fixture (mesmo lastro que uma conclusão real do domínio produziria,
+		// ver helpers/db-fixtures.ts) evita depender do Checkpoint (S4D) exigir
+		// as quatro seções obrigatórias antes de liberar "Concluir Descoberta e
+		// avançar".
+		const projectId = await createProject(page, server.baseUrl);
+		const db = openDb(server.dbPath);
+		try {
+			completeDiscoveryViaFixture(db, projectId);
+		} finally {
+			db.close();
+		}
 
-		// Entender a situação (wizard bespoke) tem seu próprio "Pular etapa".
-		await expect(page.getByRole('heading', { name: 'O que está acontecendo?', exact: true })).toBeVisible();
-		await skipCurrentActivity(page);
-
-		// "Quem é afetado" (Mapa de Impacto, ETAPA 2 do rework) tem componente
-		// bespoke próprio (MapaDeImpacto.svelte) — heading próprio, fora do loop
-		// genérico abaixo.
-		await expect(page.getByRole('heading', { name: 'Quem sente mais essa situação?' })).toBeVisible();
-		await skipCurrentActivity(page);
-
-		// "Como é tratado hoje" (Stage 4A do rework) também tem componente
-		// bespoke próprio (ComoETratadoHoje.svelte) — heading próprio, fora do
-		// loop genérico abaixo.
-		await expect(page.getByRole('heading', { name: 'O que acontece quando isso aparece?' })).toBeVisible();
-		await skipCurrentActivity(page);
-
-		// "Entender as causas" (Stage 4B do rework) também tem componente
-		// bespoke próprio (EntenderCausas.svelte) — heading próprio, fora do
-		// loop genérico abaixo.
-		await expect(page.getByRole('heading', { name: 'O que pode estar por trás dessa situação?' })).toBeVisible();
-		await skipCurrentActivity(page);
-
-		// "Resultado desejado" (Stage 4C do rework) também tem componente
-		// bespoke próprio (ResultadoDesejado.svelte) — heading próprio, fora do
-		// loop genérico abaixo.
-		await expect(
-			page.getByRole('heading', { name: 'O que deverá estar diferente quando este projeto tiver sucesso?' })
-		).toBeVisible();
-		await skipCurrentActivity(page);
-
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta', exact: true })).toBeVisible();
-		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
-		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
+		await page.goto(`${server.baseUrl}/projects/${projectId}/summary`);
+		await expect(page.getByRole('heading', { name: 'Confira o que foi entendido antes de avançar' })).toBeVisible();
+		await page.getByRole('button', { name: 'Concluir Descoberta e avançar →' }).click();
 		await page.waitForURL(/\/now$/);
 	});
 

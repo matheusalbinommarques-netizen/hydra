@@ -35,14 +35,6 @@
 	const OWN_SHELL_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual', 'entender_causas', 'resultado']);
 	let hasOwnShell = $derived(OWN_SHELL_ACTIVITY_IDS.has(data.activity?.id ?? ''));
 
-	// "Revisão recomendada" (Resumo) é só um card pequeno com um link de
-	// saída — sem isto, sobra muito espaço vazio na coluna principal ao lado
-	// do painel lateral, que a essa altura da jornada já está densa. Ajuste
-	// só deste caso específico, sem alterar o layout geral de duas colunas.
-	// Identidade por id, não por completionMode: "Priorizar entregas" (C5-01)
-	// também é explicit_confirmation, mas tem sua própria apresentação (ver
-	// branch dedicada abaixo), não o link de saída do Resumo.
-	let isReviewRecommendation = $derived(data.activity?.id === 'resumo');
 	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
 
 	// C5-01 — "Priorizar entregas": estado local da MESMA coleção que
@@ -137,14 +129,7 @@
 		</section>
 	{/if}
 
-	{#if data.activity?.id === 'resumo'}
-		<section class="next-action">
-			<p class="eyebrow">Revisão recomendada</p>
-			<h2>{data.activity.title}</h2>
-			<p class="main-question">{data.activity.mainQuestion}</p>
-			<p><a href="/projects/{view.projectId}/summary">Ir para o Resumo da descoberta →</a></p>
-		</section>
-	{:else if data.activity?.id === 'priorizar_entregas'}
+	{#if data.activity?.id === 'priorizar_entregas'}
 		<section class="next-action">
 			{#if priorityItems.length === 0}
 				<p class="eyebrow">Priorizar entregas</p>
@@ -359,7 +344,7 @@
 {/snippet}
 
 <div class="workspace-layout" class:full-width={hasOwnShell}>
-	<div class="workspace-main" class:center-single-card={isReviewRecommendation}>
+	<div class="workspace-main">
 		{@render mainContent()}
 	</div>
 	{#if !hasOwnShell}
@@ -537,22 +522,6 @@
 	   toda. */
 	.workspace-layout.full-width {
 		grid-template-columns: 1fr;
-	}
-
-	/* Só o caso "Revisão recomendada" (explicit_confirmation) — estica a
-	   coluna principal até a altura do painel lateral (a mais alta das duas
-	   nesse ponto da jornada) e centraliza o card pequeno no espaço sobrando,
-	   sem tocar no h1/pendências acima dele nem no restante do layout. */
-	.workspace-main.center-single-card {
-		display: flex;
-		flex-direction: column;
-		align-self: stretch;
-	}
-
-	.center-single-card .next-action {
-		margin-top: auto;
-		margin-bottom: auto;
-		padding: 2.5rem;
 	}
 
 	.workspace-sidebar {

@@ -135,14 +135,14 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await page.getByRole('button', { name: 'Confirmar resultado' }).click();
 	});
 
-	await test.step('acessar o Resumo da descoberta a partir de Agora', async () => {
-		await expect(page.getByRole('heading', { name: 'Resumo da descoberta' })).toBeVisible();
-		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
+	await test.step('acessar o Checkpoint da Descoberta a partir de Agora', async () => {
+		// "resumo" concluída → fluxo normal de Agora entra direto no Checkpoint
+		// (S4D), sem card intermediário nem link de saída.
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/summary`);
 	});
 
-	await test.step('verificar respostas no Resumo', async () => {
-		await expect(page.getByRole('heading', { name: 'Revisão e confirmação', level: 1 })).toBeVisible();
+	await test.step('verificar respostas no Checkpoint', async () => {
+		await expect(page.getByRole('heading', { name: 'Confira o que foi entendido antes de avançar' })).toBeVisible();
 
 		// nome do projeto (cabeçalho persistente do layout do projeto) — o shell
 		// mantém cabeçalho desktop e mobile simultaneamente no DOM (navegação
@@ -152,50 +152,30 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		const desktopHeader = page.locator('header.header-desktop');
 		await expect(desktopHeader.getByText('Portal de Solicitações E2E')).toBeVisible();
 
-		// Visão geral (Corte 3) — só as Answers canônicas de problema/sinais/
-		// público/estado atual/resultado, sempre visíveis, escopadas a
-		// .overview para não colidir com a cópia integral em "detalhes". A
-		// síntese de "Entender a situação" é gerada deterministicamente
-		// (catalog/situation-synthesis.ts), não digitada pelo usuário.
-		const overview = page.locator('.overview');
+		// Cada seção do Checkpoint (S4D) deriva dos mesmos objetos vivos, sem
+		// redigitação — síntese de "Entender a situação" gerada
+		// deterministicamente (catalog/situation-synthesis.ts).
 		await expect(
-			overview.getByText(
-				'Há um problema relacionado a retrabalho, percebido principalmente no processo, e é crítico hoje.'
-			)
+			page
+				.locator('#sec-situacao')
+				.getByText('Há um problema relacionado a retrabalho, percebido principalmente no processo, e é crítico hoje.')
 		).toBeVisible();
-		await expect(overview.getByText('Existe muito retrabalho')).toBeVisible();
 		// Síntese determinística do Mapa de Impacto (catalog/affected-group.ts),
 		// não texto livre — reflete o grupo adicionado e classificado no passo
 		// "Quem é afetado" acima.
-		await expect(overview.getByText('Grupo afetado: Equipe interna (Alto).')).toBeVisible();
-		await expect(overview.getByText('Cada time usa sua própria planilha, sem padrão.')).toBeVisible();
-		await expect(overview.getByText('Solicitações centralizadas, priorizadas e acompanháveis.')).toBeVisible();
+		await expect(page.locator('#sec-afetados').getByText('Equipe interna')).toBeVisible();
+		await expect(page.locator('#sec-afetados').getByText('Alto')).toBeVisible();
+		await expect(page.locator('#sec-estado').getByText('Cada time usa sua própria planilha, sem padrão.')).toBeVisible();
+		await expect(
+			page.locator('#sec-resultado').getByText('Solicitações centralizadas, priorizadas e acompanháveis.')
+		).toBeVisible();
 
-		// Conferência compacta — as seis atividades da Descoberta já concluídas
-		// nesta jornada, então os quatro itens aparecem marcados.
-		await expect(page.getByText('Problema definido')).toBeVisible();
-		await expect(page.getByText('Público definido')).toBeVisible();
-		await expect(page.getByText('Como é tratado hoje definido')).toBeVisible();
-		await expect(page.getByText('Resultado definido')).toBeVisible();
-
-		// "Ver todas as respostas da descoberta" recolhida por padrão (todas as
-		// seis atividades já concluídas) — abre para checar os campos que só
-		// aparecem nos detalhes completos (fora da visão geral).
-		await page.getByText('Ver todas as respostas da descoberta').click();
-		const details = page.locator('.full-details');
-
-		// Origem do projeto (respondida em /projects/new na criação)
-		await expect(details.getByText('Existe um problema')).toBeVisible();
-
-		// "Resultado desejado" (Stage 4C do rework) deixou de ser required_fields
-		// — como publico/estado_atual/entender_causas, não aparece mais em "Ver
-		// todas as respostas" (só nos blocos ainda required_fields); a mudança
-		// esperada já foi conferida na visão geral acima, como chip do bloco
-		// "Resultado desejado".
+		// Rail de status — as quatro seções obrigatórias completas.
+		await expect(page.getByText('4 de 4')).toBeVisible();
 	});
 
-	await test.step('confirmar o Resumo', async () => {
-		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
+	await test.step('confirmar o Checkpoint', async () => {
+		await page.getByRole('button', { name: 'Concluir Descoberta e avançar →' }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
 	});
 

@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
-import { encodeMultiSelectValue } from '$lib/domain';
 import type { ActivityStatus } from '$lib/domain';
 import type { PendingItemView } from '$lib/orientation-engine';
-import { buildDiscoverySummaryView, filterDiscoveryOpenPendingItems } from './discovery-summary-view';
+import { buildDiscoveryCheckpointView, filterDiscoveryOpenPendingItems } from './discovery-summary-view';
 
 const ALL_NAO_INICIADA: Record<string, ActivityStatus> = {
 	origem: 'não_iniciada',
@@ -23,185 +22,260 @@ const ALL_CONCLUIDA: Record<string, ActivityStatus> = {
 	resultado: 'concluída'
 };
 
-describe('buildDiscoverySummaryView — visão geral (overview)', () => {
-	it('sem nenhuma Answer: visão geral vazia', () => {
-		const view = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA);
-		expect(view.overview).toEqual([]);
-	});
+const NO_TREATMENT = { noTreatment: false };
+const NO_CAUSE_EXPLORATION = { stillUnknown: false };
 
-	it('bloco "Situação" só aparece quando situacao existe, com chips decodificados de situacao_o_que', () => {
-		const view = buildDiscoverySummaryView(
-			catalog,
-			{
-				situacao: 'As solicitações chegam sem padrão.',
-				situacao_o_que: encodeMultiSelectValue(['prob_manual', 'prob_visibilidade'])
-			},
-			ALL_NAO_INICIADA
-		);
+function buildEmpty(activityStatuses: Record<string, ActivityStatus>) {
+	return buildDiscoveryCheckpointView(activityStatuses, [], null, [], NO_TREATMENT, [], NO_CAUSE_EXPLORATION, [], []);
+}
 
-		const problema = view.overview.find((block) => block.activityId === 'problema')!;
-		expect(problema).toBeDefined();
-		expect(problema.heading).toBe('Situação');
-		expect(problema.editLabel).toBe('Editar situação');
-		expect(problema.value).toBe('As solicitações chegam sem padrão.');
-		expect(problema.chips).toEqual(['O processo é manual demais', 'Falta informação ou visibilidade']);
-	});
-
-	it('bloco "Situação" sem situacao_o_que respondido não tem chips', () => {
-		const view = buildDiscoverySummaryView(catalog, { situacao: 'Situação X' }, ALL_NAO_INICIADA);
-		const problema = view.overview.find((block) => block.activityId === 'problema')!;
-		expect(problema.chips).toBeUndefined();
-	});
-
-	it('bloco "Quem é afetado" só aparece quando há AffectedGroup, nunca a partir de publico_detail', () => {
-		const semGrupos = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, []);
-		expect(semGrupos.overview.find((b) => b.activityId === 'publico')).toBeUndefined();
-
-		const comGrupos = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [
-			{ id: 'ag-1', label: 'Agentes de atendimento', impact: 'alto' }
+describe('buildDiscoveryCheckpointView — seções', () => {
+	it('cinco seções, na ordem esperada', () => {
+		const view = buildEmpty(ALL_NAO_INICIADA);
+		expect(view.sections.map((section) => section.key)).toEqual([
+			'situacao',
+			'afetados',
+			'estado',
+			'causas',
+			'resultado'
 		]);
-		const publico = comGrupos.overview.find((b) => b.activityId === 'publico')!;
-		expect(publico.heading).toBe('Quem é afetado');
-		expect(publico.editLabel).toBe('Editar quem é afetado');
-		expect(publico.value).toBe('Grupo afetado: Agentes de atendimento (Alto).');
-		expect(publico.chips).toEqual(['Agentes de atendimento']);
 	});
 
-	it('bloco "Quem é afetado" reflete Evidence (ETAPA 3 do rework) sem redigitação, discretamente anexada ao mesmo bloco', () => {
-		const semEvidencia = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [
-			{ id: 'ag-1', label: 'Operação', impact: 'alto' }
-		]);
-		const publicoSemEvidencia = semEvidencia.overview.find((b) => b.activityId === 'publico')!;
-		expect(publicoSemEvidencia.value).toBe('Grupo afetado: Operação (Alto).');
-
-		const comEvidencia = buildDiscoverySummaryView(
-			catalog,
-			{},
-			ALL_NAO_INICIADA,
-			[{ id: 'ag-1', label: 'Operação', impact: 'alto' }],
-			[{ affectedGroupId: 'ag-1' }]
-		);
-		const publicoComEvidencia = comEvidencia.overview.find((b) => b.activityId === 'publico')!;
-		expect(publicoComEvidencia.value).toBe('Grupo afetado: Operação (Alto). Evidências: Operação (1 evidência).');
+	it('Situação: texto ausente vira seção sem situacaoText', () => {
+		const view = buildEmpty(ALL_NAO_INICIADA);
+		const situacao = view.sections.find((s) => s.key === 'situacao')!;
+		expect(situacao.situacaoText).toBeUndefined();
 	});
 
-	it('bloco "Como é tratado hoje" só aparece quando há TreatmentStep ou noTreatment, nunca a partir de estado_atual_detail', () => {
-		const semNada = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: false }, []);
-		expect(semNada.overview.find((b) => b.activityId === 'estado_atual')).toBeUndefined();
-
-		const view = buildDiscoverySummaryView(
-			catalog,
-			{},
+	it('Situação: texto presente é repassado tal como está', () => {
+		const view = buildDiscoveryCheckpointView(
 			ALL_NAO_INICIADA,
 			[],
+			'As solicitações chegam sem padrão.',
 			[],
-			{ noTreatment: false },
-			[{ whatHappens: 'Cada time usa sua planilha.', actors: [], medium: null, frictions: [] }]
-		);
-		const estadoAtual = view.overview.find((b) => b.activityId === 'estado_atual')!;
-		expect(estadoAtual.heading).toBe('Como é tratado hoje');
-		expect(estadoAtual.editLabel).toBe('Editar como é tratado hoje');
-		expect(estadoAtual.value).toBe('1 etapa descrita. Cada time usa sua planilha..');
-
-		const semTratamento = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: true }, []);
-		const bloco = semTratamento.overview.find((b) => b.activityId === 'estado_atual')!;
-		expect(bloco.value).toBe('Sem tratamento definido hoje. Hoje não existe um tratamento definido.');
-	});
-
-	it('bloco "Hipóteses de causa" só aparece quando há CauseHypothesis ou stillUnknown', () => {
-		const semNada = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA, [], [], { noTreatment: false }, []);
-		expect(semNada.overview.find((b) => b.activityId === 'entender_causas')).toBeUndefined();
-
-		const view = buildDiscoverySummaryView(
-			catalog,
-			{},
-			ALL_NAO_INICIADA,
+			NO_TREATMENT,
 			[],
+			NO_CAUSE_EXPLORATION,
 			[],
-			{ noTreatment: false },
-			[],
-			{ stillUnknown: false },
-			[{ title: 'O aprovador só revisa uma vez por semana' }]
-		);
-		const causas = view.overview.find((b) => b.activityId === 'entender_causas')!;
-		expect(causas.heading).toBe('Hipóteses de causa');
-		expect(causas.editLabel).toBe('Editar hipóteses de causa');
-		expect(causas.value).toBe('1 hipótese em consideração.');
-		expect(causas.chips).toEqual(['O aprovador só revisa uma vez por semana']);
-
-		const stillUnknown = buildDiscoverySummaryView(
-			catalog,
-			{},
-			ALL_NAO_INICIADA,
-			[],
-			[],
-			{ noTreatment: false },
-			[],
-			{ stillUnknown: true },
 			[]
 		);
-		const blocoStillUnknown = stillUnknown.overview.find((b) => b.activityId === 'entender_causas')!;
-		expect(blocoStillUnknown.value).toBe('Ainda não sabemos o que está por trás disso.');
+		const situacao = view.sections.find((s) => s.key === 'situacao')!;
+		expect(situacao.situacaoText).toBe('As solicitações chegam sem padrão.');
 	});
 
-	it('bloco "Resultado desejado" só aparece quando mudanca existe (usa mudanca, não beneficiario/percepcao)', () => {
-		const view = buildDiscoverySummaryView(
-			catalog,
-			{ mudanca: 'Solicitações centralizadas.', beneficiario: 'Time de suporte', percepcao: 'Menos retrabalho' },
-			ALL_NAO_INICIADA
-		);
-		const resultado = view.overview.find((b) => b.activityId === 'resultado')!;
-		expect(resultado.heading).toBe('Resultado desejado');
-		expect(resultado.editLabel).toBe('Editar resultado');
-		expect(resultado.value).toBe('Solicitações centralizadas.');
-	});
-
-	it('todos os blocos juntos, na ordem esperada', () => {
-		const view = buildDiscoverySummaryView(
-			catalog,
-			{
-				situacao: 'Situação',
-				sinais_situacao: encodeMultiSelectValue(['rework']),
-				mudanca: 'Resultado'
-			},
+	it('Afetados: cada grupo vira um item com badge de impacto e nota de frequência', () => {
+		const view = buildDiscoveryCheckpointView(
 			ALL_NAO_INICIADA,
-			[{ id: 'ag-1', label: 'Público', impact: 'alto' }],
 			[],
-			{ noTreatment: false },
-			[{ whatHappens: 'Estado atual', actors: [], medium: null, frictions: [] }],
-			{ stillUnknown: false },
-			[{ title: 'Hipótese' }]
+			null,
+			[
+				{ label: 'Agentes de atendimento', impact: 'alto', frequency: 'frequente' },
+				{ label: 'Clientes', impact: null, frequency: null }
+			],
+			NO_TREATMENT,
+			[],
+			NO_CAUSE_EXPLORATION,
+			[],
+			[]
 		);
-		expect(view.overview.map((b) => b.activityId)).toEqual([
-			'problema',
-			'publico',
-			'estado_atual',
-			'entender_causas',
-			'resultado'
+		const afetados = view.sections.find((s) => s.key === 'afetados')!;
+		expect(afetados.afetadosSummary).toBe('2 grupos mapeados');
+		expect(afetados.afetadosGroups).toEqual([
+			{ label: 'Agentes de atendimento', badge: 'Alto', note: 'Frequência: Frequentemente' },
+			{ label: 'Clientes', badge: 'Por classificar', note: undefined }
+		]);
+	});
+
+	it('Estado: noTreatment true não lista passos', () => {
+		const view = buildDiscoveryCheckpointView(
+			ALL_NAO_INICIADA,
+			[],
+			null,
+			[],
+			{ noTreatment: true },
+			[],
+			NO_CAUSE_EXPLORATION,
+			[],
+			[]
+		);
+		const estado = view.sections.find((s) => s.key === 'estado')!;
+		expect(estado.estadoNoTreatment).toBe(true);
+	});
+
+	it('Estado: cada TreatmentStep vira um item com nota de atores/meio/fricção', () => {
+		const view = buildDiscoveryCheckpointView(
+			ALL_NAO_INICIADA,
+			[],
+			null,
+			[],
+			NO_TREATMENT,
+			[
+				{
+					whatHappens: 'Financeiro reenvia a planilha por e-mail.',
+					actors: ['Financeiro', 'Gestor'],
+					medium: 'E-mail',
+					frictions: ['espera', 'retrabalho']
+				}
+			],
+			NO_CAUSE_EXPLORATION,
+			[],
+			[]
+		);
+		const estado = view.sections.find((s) => s.key === 'estado')!;
+		expect(estado.estadoSteps).toEqual([
+			{
+				label: 'Financeiro reenvia a planilha por e-mail.',
+				note: 'Financeiro e Gestor · E-mail · Fricção: espera e retrabalho'
+			}
+		]);
+	});
+
+	it('Causas: stillUnknown true não lista hipóteses', () => {
+		const view = buildDiscoveryCheckpointView(
+			ALL_NAO_INICIADA,
+			[],
+			null,
+			[],
+			NO_TREATMENT,
+			[],
+			{ stillUnknown: true },
+			[],
+			[]
+		);
+		const causas = view.sections.find((s) => s.key === 'causas')!;
+		expect(causas.causasStillUnknown).toBe(true);
+	});
+
+	it('Causas: cada hipótese vira um item com contagem de evidências relacionadas', () => {
+		const view = buildDiscoveryCheckpointView(
+			ALL_NAO_INICIADA,
+			[],
+			null,
+			[],
+			NO_TREATMENT,
+			[],
+			NO_CAUSE_EXPLORATION,
+			[
+				{ title: 'O aprovador só revisa uma vez por semana', evidenceCount: 0 },
+				{ title: 'Falta de padrão no processo', evidenceCount: 2 }
+			],
+			[]
+		);
+		const causas = view.sections.find((s) => s.key === 'causas')!;
+		expect(causas.causasHypotheses).toEqual([
+			{ label: 'O aprovador só revisa uma vez por semana', note: 'Nenhuma evidência relacionada' },
+			{ label: 'Falta de padrão no processo', note: '2 evidências relacionadas' }
+		]);
+	});
+
+	it('Resultado: cada DesiredOutcome vira um item, com meta opcional', () => {
+		const view = buildDiscoveryCheckpointView(
+			ALL_NAO_INICIADA,
+			[],
+			null,
+			[],
+			NO_TREATMENT,
+			[],
+			NO_CAUSE_EXPLORATION,
+			[],
+			[
+				{ change: 'Reduzir o tempo médio de resposta', target: '30%' },
+				{ change: 'Eliminar repetição de explicação', target: null }
+			]
+		);
+		const resultado = view.sections.find((s) => s.key === 'resultado')!;
+		expect(resultado.resultadoOutcomes).toEqual([
+			{ label: 'Reduzir o tempo médio de resposta', note: 'Meta: 30%' },
+			{ label: 'Eliminar repetição de explicação', note: undefined }
 		]);
 	});
 });
 
-describe('buildDiscoverySummaryView — conferência (checklist)', () => {
-	it('reflete ActivityStatus de cada atividade, não a mera presença de uma Answer', () => {
-		const view = buildDiscoverySummaryView(catalog, { situacao: 'Preenchido, mas sinais ainda faltam' }, {
-			...ALL_NAO_INICIADA,
-			problema: 'em_andamento'
-		});
-		const problemaItem = view.checklist.find((item) => item.label === 'Problema definido')!;
-		expect(problemaItem.complete).toBe(false);
+describe('buildDiscoveryCheckpointView — status por seção', () => {
+	it('seção obrigatória concluída vira "completa"', () => {
+		const view = buildEmpty(ALL_CONCLUIDA);
+		const situacao = view.sections.find((s) => s.key === 'situacao')!;
+		expect(situacao.status).toBe('completa');
+		expect(situacao.required).toBe(true);
 	});
 
-	it('todos concluídos: checklist inteiro completo', () => {
-		const view = buildDiscoverySummaryView(catalog, {}, ALL_CONCLUIDA);
-		expect(view.checklist.every((item) => item.complete)).toBe(true);
-		expect(view.checklist.map((item) => item.label)).toEqual([
-			'Problema definido',
-			'Público definido',
-			'Como é tratado hoje definido',
-			'Causas exploradas',
-			'Resultado definido'
-		]);
+	it('seção obrigatória não concluída vira "pendente"', () => {
+		const view = buildEmpty(ALL_NAO_INICIADA);
+		const situacao = view.sections.find((s) => s.key === 'situacao')!;
+		expect(situacao.status).toBe('pendente');
+	});
+
+	it('causas (não obrigatória) não concluída vira "opcional", nunca "pendente"', () => {
+		const view = buildEmpty(ALL_NAO_INICIADA);
+		const causas = view.sections.find((s) => s.key === 'causas')!;
+		expect(causas.status).toBe('opcional');
+		expect(causas.required).toBe(false);
+	});
+
+	it('causas concluída (mesmo com stillUnknown) vira "completa"', () => {
+		const view = buildEmpty({ ...ALL_NAO_INICIADA, entender_causas: 'concluída' });
+		const causas = view.sections.find((s) => s.key === 'causas')!;
+		expect(causas.status).toBe('completa');
+	});
+});
+
+describe('buildDiscoveryCheckpointView — ponto de atenção por seção', () => {
+	it('sem PendingItem correspondente: flagText null', () => {
+		const view = buildEmpty(ALL_NAO_INICIADA);
+		expect(view.sections.every((section) => section.flagText === null)).toBe(true);
+	});
+
+	it('PendingItem aberto da atividade correspondente vira flagText da seção', () => {
+		const pending: PendingItemView = {
+			id: 'p1',
+			activityDefinitionId: 'estado_atual',
+			label: 'Como é tratado hoje não foi mapeado',
+			detail: 'Impacta o quão precisas serão as recomendações sobre a solução.'
+		};
+		const view = buildDiscoveryCheckpointView(
+			ALL_CONCLUIDA,
+			[pending],
+			null,
+			[],
+			NO_TREATMENT,
+			[],
+			NO_CAUSE_EXPLORATION,
+			[],
+			[]
+		);
+		const estado = view.sections.find((s) => s.key === 'estado')!;
+		expect(estado.flagText).toBe('Impacta o quão precisas serão as recomendações sobre a solução.');
+		// hasFlag é independente do status — uma seção completa ainda pode ter um ponto de atenção.
+		expect(estado.status).toBe('completa');
+	});
+});
+
+describe('buildDiscoveryCheckpointView — conclusão (CTA)', () => {
+	it('todas as quatro seções obrigatórias concluídas: ctaDisabled false', () => {
+		const view = buildEmpty(ALL_CONCLUIDA);
+		expect(view.requiredDoneCount).toBe(4);
+		expect(view.requiredTotal).toBe(4);
+		expect(view.ctaDisabled).toBe(false);
+		expect(view.missingRequiredTitles).toEqual([]);
+	});
+
+	it('causas nunca conta para requiredTotal', () => {
+		const view = buildEmpty({ ...ALL_CONCLUIDA, entender_causas: 'não_iniciada' });
+		expect(view.requiredTotal).toBe(4);
+		expect(view.ctaDisabled).toBe(false);
+	});
+
+	it('uma seção obrigatória pendente: ctaDisabled true, listada em missingRequiredTitles', () => {
+		const view = buildEmpty({ ...ALL_CONCLUIDA, resultado: 'não_iniciada' });
+		expect(view.ctaDisabled).toBe(true);
+		expect(view.missingRequiredTitles).toEqual(['O que o projeto deve produzir']);
+	});
+
+	it('nenhuma seção concluída: todas as quatro obrigatórias pendentes', () => {
+		const view = buildEmpty(ALL_NAO_INICIADA);
+		expect(view.requiredDoneCount).toBe(0);
+		expect(view.ctaDisabled).toBe(true);
+		expect(view.missingRequiredTitles).toHaveLength(4);
 	});
 });
 
@@ -237,22 +311,5 @@ describe('filterDiscoveryOpenPendingItems', () => {
 		const second: PendingItemView = { ...discoveryPending, id: 'p3', activityDefinitionId: 'publico' };
 		const result = filterDiscoveryOpenPendingItems(catalog, [second, discoveryPending, otherPhasePending]);
 		expect(result.map((item) => item.id)).toEqual(['p3', 'p1']);
-	});
-});
-
-describe('buildDiscoverySummaryView — detailsOpenByDefault', () => {
-	it('true quando qualquer uma das seis atividades da Descoberta não está concluída', () => {
-		const view = buildDiscoverySummaryView(catalog, {}, ALL_NAO_INICIADA);
-		expect(view.detailsOpenByDefault).toBe(true);
-	});
-
-	it('false quando as cinco atividades da Descoberta estão concluídas', () => {
-		const view = buildDiscoverySummaryView(catalog, {}, ALL_CONCLUIDA);
-		expect(view.detailsOpenByDefault).toBe(false);
-	});
-
-	it('true mesmo com só uma atividade pendente (problema em_andamento, resto concluída)', () => {
-		const view = buildDiscoverySummaryView(catalog, {}, { ...ALL_CONCLUIDA, problema: 'em_andamento' });
-		expect(view.detailsOpenByDefault).toBe(true);
 	});
 });

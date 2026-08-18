@@ -72,8 +72,13 @@
 	// atividade. Ao sair delas, o shell volta ao normal — nenhuma outra tela
 	// foi redesenhada.
 	const DARK_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual', 'entender_causas']);
+	// Checkpoint da Descoberta (S4D) — Design Gate aprovado na mesma
+	// identidade escura das atividades acima; diferente delas, não é uma
+	// atividade dentro de /now, é sua própria rota (/summary), então entra por
+	// pathname em vez de page.data.activity.id.
+	let isCheckpointRoute = $derived(pathname === `/projects/${projectId}/summary`);
 	let isDarkActivity = $derived(
-		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '')
+		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '') || isCheckpointRoute
 	);
 
 	// Ativo tanto na rota exata quanto em subrotas (ex.: /deliveries/x),

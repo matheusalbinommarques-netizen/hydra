@@ -72,7 +72,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 
 		await page.getByRole('link', { name: 'Resumo' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Confira o que foi entendido antes de avançar' })).toBeVisible();
 
 		await page.getByRole('link', { name: 'Mapa' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/map`);
@@ -96,14 +96,15 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 			db.close();
 		}
 
+		// "resumo" concluída → fluxo normal de Agora entra direto no Checkpoint
+		// (S4D), sem card intermediário nem link de saída.
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
-		await page.getByRole('link', { name: /Ir para o Resumo da descoberta/ }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/summary`);
-		await expect(page.getByRole('heading', { name: 'Revisão e confirmação' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Confira o que foi entendido antes de avançar' })).toBeVisible();
 	});
 
 	await test.step('demais fases respondidas por operações reais (formulário genérico + Escolha o próximo foco), até catalog_limit_reached', async () => {
-		await page.getByRole('button', { name: 'Confirmar e avançar' }).click();
+		await page.getByRole('button', { name: 'Concluir Descoberta e avançar →' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 
 		// usuario_principal + visao_produto (campo a campo + etapa opcional) —

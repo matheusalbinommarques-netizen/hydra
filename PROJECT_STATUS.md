@@ -374,9 +374,11 @@ Estado atual do rework: ETAPA 3 concluída (commit `ceadf4c`); Stage 4A
 ("Como é tratado hoje") concluído e entregue em `c1e6c7b` (base
 `61e5c3b` + refinamento visual/síntese aprovado por dogfooding); Stage 4B
 ("Entender as causas") implementado em `b0a52f7` e fechado; Stage 4C
-("Resultado desejado") concluído e fechado — ver detalhamento abaixo.
-Trabalho atual rastreado em `docs/core/CURRENT_WORK.json` (`S4D`,
-"Checkpoint" — Resumo da Descoberta derivado, sem questionário novo).
+("Resultado desejado") concluído e fechado; Stage 4D ("Checkpoint")
+concluído e fechado — ver detalhamento abaixo. Com isso, a ETAPA 4 do
+rework está integralmente concluída. Trabalho atual rastreado em
+`docs/core/CURRENT_WORK.json` (`S5` — ETAPA 5, "Decidir o modelo
+canônico de trabalho", ainda não iniciada).
 
 Entre a conclusão do Stage 4B e essa decisão, o programa de remediação
 técnica R1–R6 (`docs/core/ENGINEERING_REMEDIATION.md`) rodou e está
@@ -582,10 +584,29 @@ convergência do rework — dívida de design conhecida, não bloqueante para
 este fechamento). `hydra-living-object-verifier.mjs` (perfil
 `project-collection`) PASS.
 
-Com Stage 4C fechado, a próxima etapa deterministicamente definida pelo
-roadmap do rework é a Etapa 4D — "Checkpoint": Resumo da Descoberta
-derivado a partir dos objetos vivos já existentes, sem questionário novo.
-Ainda não implementada.
+Stage 4D ("Checkpoint", `docs/core/HYDRA_PRODUCT_REWORK.md` §34.4D) está
+**concluído e fechado**: nova tela `/summary` (Checkpoint da Descoberta)
+substitui a antiga "Revisão e confirmação" — deriva Situação, Afetados,
+Estado atual, Causas & evidências e Resultado desejado diretamente dos
+objetos vivos já existentes (nenhum questionário novo, nenhuma
+persistência nova), com status por seção (completa/pendente/opcional/
+atenção), afordance "Revisar" que reabre a atividade e retorna ao
+checkpoint (`?from=summary`, mecanismo já existente), CTA de conclusão
+condicionado às quatro seções obrigatórias, e estado pós-conclusão para
+revisitas depois de a Descoberta já ter avançado. A atividade `resumo`
+deixou de ter superfície própria dentro de `/now`: o fluxo normal entra
+direto em `/summary`. Dogfooding humano: PASS, incluindo dois blockers
+encontrados e resolvidos (entrada direta no checkpoint; round-trip de
+revisão investigado a fundo sem reprodução do 500 relatado, retestado
+pelo usuário em servidor limpo — considerado incidente não reproduzível
+no HEAD atual).
+
+Com Stage 4D fechado, a ETAPA 4 do rework está integralmente concluída.
+A próxima etapa deterministicamente definida pelo roadmap do rework é a
+ETAPA 5 — "Decidir o modelo canônico de trabalho": auditar
+`PlanningItem`/`ScopeItem` e decidir a relação entre `Deliverable`,
+`WorkItem`, `ScopeItem` histórico e `PlanningItem` histórico, evitando
+duas entidades concorrentes para o mesmo conceito. Ainda não iniciada.
 
 ## Não fazer agora
 
