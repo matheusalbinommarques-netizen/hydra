@@ -35,6 +35,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Impedimento não encontrado.';
 		case 'impediment_id_already_exists':
 			return 'Já existe um impedimento com este identificador.';
+		case 'work_item_not_found':
+			return 'Item de trabalho não encontrado.';
+		case 'work_item_blocked':
+			return 'Marque o impedimento como resolvido antes de concluir este item.';
 		case 'phase_not_found':
 			return 'A fase escolhida não existe mais no catálogo.';
 		case 'planning_no_items':

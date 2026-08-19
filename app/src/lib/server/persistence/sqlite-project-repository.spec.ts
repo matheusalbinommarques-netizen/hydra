@@ -11,6 +11,7 @@ import {
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
+	addWorkItem,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
@@ -22,6 +23,7 @@ import {
 	createInitialProjectState,
 	encodeMultiSelectValue,
 	moveScopeItem,
+	moveWorkItem,
 	prepareExternalAction,
 	renameProject,
 	resolveImpediment,
@@ -133,6 +135,15 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(setImpedimentNextAction(catalog, state, 'imp-1', 'Solicitar acesso à TI', T1));
 	state = unwrap(addImpediment(catalog, state, 'imp-2', 'Decisão pendente do time', 'decisao_pendente', T1));
 	state = unwrap(resolveImpediment(catalog, state, 'imp-2', T2));
+
+	// WorkItem (ETAPA 6 do rework, "Primeiro loop operacional") — um item
+	// movido para "em_andamento" sem impedimento, e outro bloqueado por um
+	// Impediment vinculado (work_item_id), para exercitar o roundtrip
+	// completo do vínculo, inclusive a FK impediment.work_item_id.
+	state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Revisar contrato com fornecedor', T1));
+	state = unwrap(moveWorkItem(catalog, state, 'wi-1', 'em_andamento', T2));
+	state = unwrap(addWorkItem(catalog, state, 'wi-2', 'Migrar base de clientes', T1));
+	state = unwrap(addImpediment(catalog, state, 'imp-3', 'Acesso ao novo CRM ainda não liberado', 'dependencia_externa', T2, 'wi-2'));
 
 	// CauseHypothesis / CauseExploration (Stage 4B do rework, "Entender as
 	// causas") — duas hipóteses, uma delas com aprofundamento e ligada à
@@ -645,7 +656,7 @@ describe('createSqliteProjectRepository — listRecent', () => {
 });
 
 describe('createSqliteProjectRepository — nenhuma projeção do motor persistida', () => {
-	it('o ProjectState carregado contém só os 13 tipos de domínio, nada calculado pelo motor', async () => {
+	it('o ProjectState carregado contém só os 14 tipos de domínio, nada calculado pelo motor', async () => {
 		const repo = memoryRepo();
 		const state = nonTrivialState();
 		await repo.insert(state);
@@ -660,6 +671,7 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 				'scopeItems',
 				'scopeVersion',
 				'impediments',
+				'workItems',
 				'affectedGroups',
 				'externalActions',
 				'evidences',

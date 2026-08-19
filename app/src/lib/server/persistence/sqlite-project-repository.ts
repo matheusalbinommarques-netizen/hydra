@@ -21,6 +21,7 @@ import {
 	mapScopeItemRow,
 	mapScopeVersionRow,
 	mapTreatmentStepRow,
+	mapWorkItemRow,
 	type ActivityProgressRow,
 	type AffectedGroupRow,
 	type AnswerRow,
@@ -35,7 +36,8 @@ import {
 	type ProjectRow,
 	type ScopeItemRow,
 	type ScopeVersionRow,
-	type TreatmentStepRow
+	type TreatmentStepRow,
+	type WorkItemRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
 
@@ -123,6 +125,26 @@ function ensureCauseExplorationRows(db: Database.Database): void {
 	).run();
 }
 
+// Quinta evolução do schema desde 0001_init.sql (ETAPA 6 do rework, D035,
+// "Primeiro loop operacional") — mesmo caso de ensureScopeItemExecutionStatusColumn/
+// D025: work_item_id é uma COLUNA nova numa tabela existente (impediment),
+// não uma tabela nova, então `CREATE TABLE IF NOT EXISTS work_item` sozinho
+// (que só cria a tabela nova, vazia) não afeta a tabela impediment já
+// existente num banco criado antes desta etapa. Idempotente, isolado da
+// inicialização, mesmo padrão. Projetos existentes continuam abrindo e todo
+// impediment já persistido fica com work_item_id NULL — nenhum dado legado é
+// promovido/vinculado automaticamente a um WorkItem.
+function ensureImpedimentWorkItemIdColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(impediment)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'work_item_id');
+	if (!hasColumn) {
+		db.exec('ALTER TABLE impediment ADD COLUMN work_item_id TEXT REFERENCES work_item (id)');
+	}
+	// Precisa rodar depois de garantir a coluna acima — 0001_init.sql não
+	// indexa work_item_id (ver comentário lá) exatamente por isso.
+	db.exec('CREATE INDEX IF NOT EXISTS idx_impediment_work_item_id ON impediment (work_item_id)');
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -131,6 +153,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureScopeItemExecutionStatusColumn(db);
 	ensureCurrentTreatmentRows(db);
 	ensureCauseExplorationRows(db);
+	ensureImpedimentWorkItemIdColumn(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(
@@ -179,10 +202,20 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			 VALUES (@projectId, @hypothesis, @confirmedAt)`
 		).run(state.scopeVersion);
 
+		// work_item precisa ser inserido antes de impediment: impediment.work_item_id
+		// referencia work_item.id (FK checada imediatamente, foreign_keys = ON).
+		const insertWorkItem = db.prepare(
+			`INSERT INTO work_item (id, project_id, title, status, created_at, updated_at)
+			 VALUES (@id, @projectId, @title, @status, @createdAt, @updatedAt)`
+		);
+		for (const item of state.workItems) {
+			insertWorkItem.run(item);
+		}
+
 		const insertImpediment = db.prepare(
 			`INSERT INTO impediment
-			   (id, project_id, text, tipo, next_action, status, created_at, updated_at, resolved_at)
-			 VALUES (@id, @projectId, @text, @tipo, @nextAction, @status, @createdAt, @updatedAt, @resolvedAt)`
+			   (id, project_id, text, tipo, next_action, status, work_item_id, created_at, updated_at, resolved_at)
+			 VALUES (@id, @projectId, @text, @tipo, @nextAction, @status, @workItemId, @createdAt, @updatedAt, @resolvedAt)`
 		);
 		for (const impediment of state.impediments) {
 			insertImpediment.run(impediment);
@@ -299,7 +332,10 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM pending_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
+		// impediment antes de work_item: impediment.work_item_id referencia
+		// work_item.id (FK checada imediatamente, foreign_keys = ON).
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM work_item WHERE project_id = ?').run(state.project.id);
 		// evidence/external_action apagados antes de affected_group — ambos
 		// referenciam affected_group (FK sem ON DELETE, checagem imediata).
 		db.prepare('DELETE FROM evidence WHERE project_id = ?').run(state.project.id);
@@ -363,10 +399,17 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const impedimentRows = db
 				.prepare(
-					`SELECT id, project_id, text, tipo, next_action, status, created_at, updated_at, resolved_at
+					`SELECT id, project_id, text, tipo, next_action, status, work_item_id, created_at, updated_at, resolved_at
 					 FROM impediment WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as ImpedimentRow[];
+
+			const workItemRows = db
+				.prepare(
+					`SELECT id, project_id, title, status, created_at, updated_at
+					 FROM work_item WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as WorkItemRow[];
 
 			const affectedGroupRows = db
 				.prepare(
@@ -432,6 +475,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				scopeItems: scopeItemRows.map(mapScopeItemRow),
 				scopeVersion: mapScopeVersionRow(scopeVersionRow),
 				impediments: impedimentRows.map(mapImpedimentRow),
+				workItems: workItemRows.map(mapWorkItemRow),
 				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
 				externalActions: externalActionRows.map(mapExternalActionRow),
 				evidences: evidenceRows.map(mapEvidenceRow),

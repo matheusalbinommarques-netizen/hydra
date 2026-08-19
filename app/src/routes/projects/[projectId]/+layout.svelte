@@ -81,9 +81,9 @@
 		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '') || isCheckpointRoute
 	);
 
-	// Ativo tanto na rota exata quanto em subrotas (ex.: /deliveries/x),
+	// Ativo tanto na rota exata quanto em subrotas (ex.: /work/x),
 	// com limite de segmento para não casar caminhos apenas parecidos
-	// (ex.: /deliveries-archive).
+	// (ex.: /work-archive).
 	function isCurrentRoute(target: string): boolean {
 		return pathname === target || pathname.startsWith(`${target}/`);
 	}
@@ -98,7 +98,7 @@
 		{ key: 'tracking', label: 'Acompanhamento' },
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
-		{ key: 'deliveries', label: 'Entregas' },
+		{ key: 'work', label: 'Trabalho' },
 		{ key: 'summary', label: 'Resumo' },
 		{ key: 'document', label: 'Documento' },
 		{ key: 'closure', label: 'Encerramento' },
@@ -167,10 +167,10 @@
 					Registros
 				</a>
 				<a
-					href="/projects/{projectId}/deliveries"
-					aria-current={isCurrentRoute(`/projects/${projectId}/deliveries`) ? 'page' : undefined}
+					href="/projects/{projectId}/work"
+					aria-current={isCurrentRoute(`/projects/${projectId}/work`) ? 'page' : undefined}
 				>
-					Entregas
+					Trabalho
 				</a>
 				<a
 					href="/projects/{projectId}/summary"

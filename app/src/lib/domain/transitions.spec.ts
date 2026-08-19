@@ -1237,6 +1237,7 @@ describe('addImpediment', () => {
 				tipo: 'falta_de_recurso',
 				nextAction: null,
 				status: 'aberto',
+				workItemId: null,
 				createdAt: T1,
 				updatedAt: T1,
 				resolvedAt: null

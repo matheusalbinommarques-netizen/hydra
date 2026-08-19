@@ -18,7 +18,8 @@ import type {
 	ScopeEffort,
 	ScopeExecutionStatus,
 	TreatmentConfirmationIssue,
-	TreatmentFriction
+	TreatmentFriction,
+	WorkItemStatus
 } from '$lib/domain';
 import type {
 	CriteriaScopeConflict,
@@ -153,8 +154,26 @@ export interface ImpedimentView {
 	tipo: ImpedimentType;
 	nextAction: string | null;
 	status: 'aberto' | 'resolvido';
+	// WorkItem que este impedimento bloqueia (ETAPA 6 do rework) — null é o
+	// caso normal e continua totalmente válido: Impediment sempre pôde
+	// existir no nível do projeto, sem relação com nenhum item de trabalho.
+	workItemId: string | null;
 	createdAt: string;
 	resolvedAt: string | null;
+}
+
+// Trabalho (ETAPA 6 do rework, "Primeiro loop operacional") — view leve de
+// WorkItem, sem projectId (a interface não precisa). "Bloqueado" nunca é
+// persistido: blockedBy é sempre derivado na montagem da view (ver
+// project-view.ts, buildWorkItemView), a partir do Impediment aberto (se
+// houver) cujo workItemId aponte para este item — mesmo padrão de
+// movementSignal (computado, nunca gravado).
+export interface WorkItemView {
+	id: string;
+	title: string;
+	status: WorkItemStatus;
+	createdAt: string;
+	blockedBy: { impedimentId: string; text: string; tipo: ImpedimentType } | null;
 }
 
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — view leve de
@@ -276,6 +295,10 @@ export interface ProjectView {
 	// diretamente, sem campo derivado extra aqui (mesmo padrão de
 	// openPendingItems.length usado direto no template).
 	impediments: ImpedimentView[];
+	// Trabalho (ETAPA 6 do rework) — todos os WorkItems do projeto; a
+	// interface (/work) agrupa por status, Acompanhamento resume por
+	// blockedBy. Sempre computado (mesmo padrão de impediments acima).
+	workItems: WorkItemView[];
 	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — todos os grupos
 	// afetados do projeto; a interface (MapaDeImpacto.svelte) agrupa em faixas
 	// por `impact` (derivado, nunca persistido, ver
@@ -432,6 +455,9 @@ export interface AddImpedimentInput {
 	projectId: string;
 	text: string;
 	tipo: ImpedimentType;
+	// WorkItem que este impedimento bloqueia (ETAPA 6 do rework) — omitido/null
+	// para o caso normal de impedimento no nível do projeto, sem vínculo.
+	workItemId?: string | null;
 }
 
 export interface SetImpedimentTypeInput {
@@ -454,6 +480,20 @@ export interface ResolveImpedimentInput {
 export interface ReopenImpedimentInput {
 	projectId: string;
 	impedimentId: string;
+}
+
+// Trabalho (ETAPA 6 do rework) — mesmo padrão dos inputs de ScopeItem/
+// Impediment: id gerado pelo caso de uso (idGenerator), nunca recebido do
+// cliente.
+export interface AddWorkItemInput {
+	projectId: string;
+	title: string;
+}
+
+export interface MoveWorkItemInput {
+	projectId: string;
+	workItemId: string;
+	status: WorkItemStatus;
 }
 
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
@@ -662,6 +702,8 @@ export interface ProjectUseCases {
 	setImpedimentNextAction(input: SetImpedimentNextActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	resolveImpediment(input: ResolveImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenImpediment(input: ReopenImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
+	addWorkItem(input: AddWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
+	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

@@ -80,9 +80,29 @@ CREATE TABLE IF NOT EXISTS scope_version (
 	confirmed_at TEXT
 );
 
+-- Trabalho — ETAPA 6 do rework ("Primeiro loop operacional", D035,
+-- docs/core/HYDRA_PRODUCT_REWORK.md §35/§36). Camada de execução, distinta de
+-- Deliverable (ainda não introduzida): unidade executável mínima, sem
+-- activity_definition_id, sem colunas de responsável/prazo/prioridade/
+-- estimativa (fora desta etapa). "Bloqueado" nunca é uma coluna aqui — é
+-- sempre derivado de impediment.work_item_id (ver abaixo).
+CREATE TABLE IF NOT EXISTS work_item (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	title TEXT NOT NULL,
+	status TEXT NOT NULL CHECK (status IN ('a_fazer', 'em_andamento', 'concluido')),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
 -- Cockpit, vertical 2, fatia "Impedimentos" — ver app/src/lib/domain/state-types.ts.
 -- Coleção independente do catálogo: sem activity_definition_id, não gera
 -- pending_item, manipulada direto pela tela /cockpit.
+-- work_item_id (ETAPA 6 do rework): vínculo opcional com o WorkItem que este
+-- impedimento bloqueia — NULL continua sendo o caso normal (Impediment
+-- sempre pôde existir no nível do projeto, sem relação com nenhum item de
+-- trabalho). Bancos criados antes desta etapa recebem esta coluna via ALTER
+-- TABLE idempotente em sqlite-project-repository.ts, não aqui.
 CREATE TABLE IF NOT EXISTS impediment (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
@@ -92,6 +112,7 @@ CREATE TABLE IF NOT EXISTS impediment (
 	),
 	next_action TEXT,
 	status TEXT NOT NULL CHECK (status IN ('aberto', 'resolvido')),
+	work_item_id TEXT REFERENCES work_item (id),
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	resolved_at TEXT,
@@ -239,6 +260,13 @@ CREATE TABLE IF NOT EXISTS desired_outcome (
 -- createSqliteProjectRepository), então também cobre bancos já existentes.
 CREATE INDEX IF NOT EXISTS idx_scope_item_project_id ON scope_item (project_id);
 CREATE INDEX IF NOT EXISTS idx_impediment_project_id ON impediment (project_id);
+CREATE INDEX IF NOT EXISTS idx_work_item_project_id ON work_item (project_id);
+-- idx_impediment_work_item_id NÃO fica aqui: work_item_id é uma coluna nova
+-- em impediment, adicionada via ALTER TABLE idempotente em
+-- sqlite-project-repository.ts (ensureImpedimentWorkItemIdColumn) para bancos
+-- criados antes da ETAPA 6 — indexá-la aqui quebraria a inicialização desses
+-- bancos (a coluna ainda não existiria neste ponto do exec). O índice é
+-- criado junto com a coluna, na própria função idempotente.
 CREATE INDEX IF NOT EXISTS idx_affected_group_project_id ON affected_group (project_id);
 CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);

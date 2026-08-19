@@ -623,6 +623,39 @@ Kanban → Impediment → Signal → Acompanhamento → ação → estado
 atualizado), que introduzirá somente a menor representação real de
 `WorkItem` que seu loop exigir. Ainda não iniciada.
 
+ETAPA 6 ("Primeiro loop operacional") está **concluída e fechada** (D036,
+`docs/07-management/decision-log.md`; `docs/core/HYDRA_PRODUCT_REWORK.md`
+§36): `WorkItem` passa a existir como entidade real mínima (id/título/
+status — A fazer/Em andamento/Concluído), com superfície própria
+"Trabalho" (`/work`) que substitui semanticamente "Entregas" (rota
+removida, sem duas boards concorrentes). `Impediment` ganha `workItemId`
+opcional (compatibilidade via `ALTER TABLE` idempotente, mesmo padrão de
+D023/D025 — bancos existentes continuam abrindo, nenhum dado legado
+promovido automaticamente); "bloqueado" nunca é persistido, é sempre
+derivado de um Impediment aberto vinculado, e um WorkItem bloqueado não
+pode ser movido para Concluído (recusado no domínio, não só na interface).
+Acompanhamento ganhou a seção "Precisa de você" como projeção acionável
+única para impedimentos vinculados a WorkItem (excluídos de "Atenções" e
+"Gestão de impedimentos" para não duplicar o mesmo fato operacional em
+três superfícies); resolver segue dois passos explícitos ("Atualizar
+situação" → "Confirmar que foi resolvido", com "Cancelar" sempre
+disponível) e feedback claro do que mudou. `Deliverable`, promoção de
+`PlanningItem`, `Risk`/`Decision`/`Change`/`Dependency`/`Milestone`,
+scheduling e event log continuam fora de escopo (D035/D036). Quatro
+rodadas de dogfooding humano real (a última sem achados novos) — a
+terceira mediu a latência percebida de ~2s ao mover um item no Kanban e
+isolou a causa em overhead de recompilação por requisição do `vite dev`
+(não um custo persistente; caiu a ~13ms depois de aquecido), sem deixar de
+adicionar feedback de pendência imediato na interface. `hydra-verify full`
+PASS (5/5 etapas, 22/22 jornadas). Achado real registrado, deliberadamente
+fora deste corte: divergência visual entre a Home (identidade escura,
+D033) e a Biblioteca/workspace do projeto (ainda papel/tinta/grafite) —
+fica para decisão de corte futura, não é migração oportunista.
+
+Com isso, `docs/core/CURRENT_WORK.json` passa a apontar para `S7` — ETAPA
+7, "Event log incremental" (`docs/core/HYDRA_PRODUCT_REWORK.md` §37),
+ainda não iniciada e não autorizada.
+
 ## Não fazer agora
 
 - Não implementar IA.

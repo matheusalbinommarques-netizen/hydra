@@ -28,7 +28,9 @@ import type {
 	ScopeItem,
 	ScopeVersion,
 	TreatmentFriction,
-	TreatmentStep
+	TreatmentStep,
+	WorkItem,
+	WorkItemStatus
 } from '$lib/domain';
 
 export interface ProjectRow {
@@ -130,6 +132,7 @@ export interface ImpedimentRow {
 	tipo: ImpedimentType;
 	next_action: string | null;
 	status: 'aberto' | 'resolvido';
+	work_item_id: string | null;
 	created_at: string;
 	updated_at: string;
 	resolved_at: string | null;
@@ -143,9 +146,30 @@ export function mapImpedimentRow(row: ImpedimentRow): Impediment {
 		tipo: row.tipo,
 		nextAction: row.next_action,
 		status: row.status,
+		workItemId: row.work_item_id,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 		resolvedAt: row.resolved_at
+	};
+}
+
+export interface WorkItemRow {
+	id: string;
+	project_id: string;
+	title: string;
+	status: WorkItemStatus;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapWorkItemRow(row: WorkItemRow): WorkItem {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		title: row.title,
+		status: row.status,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
 	};
 }
 

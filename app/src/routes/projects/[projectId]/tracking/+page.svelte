@@ -14,8 +14,11 @@
 		outro: 'Outro'
 	};
 	const TIPOS = ['dependencia_externa', 'decisao_pendente', 'falta_de_recurso', 'bloqueio_tecnico', 'outro'];
-	const effortLabel: Record<string, string> = { pequeno: 'Pequeno', medio: 'Médio', grande: 'Grande' };
-
+	const workStatusLabel: Record<string, string> = {
+		a_fazer: 'A fazer',
+		em_andamento: 'Em andamento',
+		concluido: 'Concluído'
+	};
 	let newText = $state('');
 	let newTipo = $state('');
 	// Só um impedimento em edição por vez — evita deixar todos os formulários
@@ -38,6 +41,45 @@
 	}
 
 	let hasAttentions = $derived(tracking.attentionPendingItems.length > 0 || tracking.impediments.open.length > 0);
+	let hasBlocked = $derived(tracking.blockedWorkItems.length > 0);
+
+	// Feedback pós-mutação de "marcar como resolvido" (achado de dogfooding:
+	// a ação fazia o card sumir de "Precisa de você" sem nenhuma confirmação
+	// de que o item foi desbloqueado nem de qual estado ele manteve). Captura
+	// os dados do WorkItem ANTES do submit (o card vai sumir da lista após o
+	// reload), para poder mostrar depois exatamente o que mudou.
+	let resolvedFeedback = $state<{ title: string; statusLabel: string } | null>(null);
+
+	function handleResolveSubmit(blocked: { title: string; status: string }) {
+		return () => {
+			return async ({ result, update }: { result: ActionResult; update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+				if (result.type === 'success') {
+					resolvedFeedback = { title: blocked.title, statusLabel: workStatusLabel[blocked.status] ?? blocked.status };
+					confirmingWorkItemId = null;
+				}
+				await update({ reset: false });
+			};
+		};
+	}
+
+	function dismissResolvedFeedback() {
+		resolvedFeedback = null;
+	}
+
+	// "Atualizar situação" (achado de dogfooding: "Marcar como resolvido"
+	// como ação de um clique só comunicava mutação definitiva imediata
+	// demais). O primeiro clique nunca muta nada — só abre um estado de
+	// confirmação contextual por card; a mutação real (resolveImpediment)
+	// só acontece em "Confirmar que foi resolvido", uma ação explícita
+	// separada, com "Cancelar" sempre disponível.
+	let confirmingWorkItemId = $state<string | null>(null);
+
+	function openConfirm(workItemId: string) {
+		confirmingWorkItemId = workItemId;
+	}
+	function cancelConfirm() {
+		confirmingWorkItemId = null;
+	}
 </script>
 
 <svelte:head>
@@ -46,13 +88,73 @@
 
 <h1>Acompanhamento do projeto</h1>
 <p class="subtitle">
-	Retrato consolidado da fase atual, das entregas em execução e do que está impedindo o avanço deste projeto.
+	Retrato consolidado da fase atual, do trabalho em execução e do que está impedindo o avanço deste projeto.
 </p>
 <p class="subtitle">Para responder atividades ou avançar a jornada, use Agora.</p>
 
 {#if form?.message}
 	<p role="alert">{form.message}</p>
 {/if}
+
+<section class="card need-you" aria-labelledby="need-you-heading">
+	<p class="eyebrow" id="need-you-heading">Precisa de você</p>
+
+	{#if resolvedFeedback}
+		<div class="resolved-feedback" role="status">
+			<p class="resolved-feedback-text">
+				Impedimento resolvido. <strong>{resolvedFeedback.title}</strong> foi desbloqueado e permanece em "{resolvedFeedback.statusLabel}".
+			</p>
+			<div class="resolved-feedback-actions">
+				<a class="section-link" href="/projects/{projectId}/work">Continuar em Trabalho →</a>
+				<button type="button" class="link-button" onclick={dismissResolvedFeedback}>Entendi</button>
+			</div>
+		</div>
+	{/if}
+
+	{#if hasBlocked}
+		<ul class="blocked-list">
+			{#each tracking.blockedWorkItems as blocked (blocked.workItemId)}
+				<li class="blocked-card">
+					<span class="blocked-badge">Bloqueado</span>
+					<p class="blocked-headline">{blocked.title} está bloqueado</p>
+					<p class="blocked-impediment">Impedimento ({tipoLabel[blocked.impedimentTipo]})</p>
+					<p class="blocked-text">{blocked.impedimentText}</p>
+					<p class="blocked-why">Por que importa: {blocked.why}</p>
+
+					{#if confirmingWorkItemId === blocked.workItemId}
+						<div class="confirm-resolve" role="group" aria-label="Confirmar atualização de situação">
+							<p class="confirm-resolve-text">
+								Isso já foi resolvido no projeto, fora do Hydra? Confirme só se o impedimento realmente deixou de
+								bloquear o trabalho. Ao confirmar, {blocked.title} deixa de aparecer bloqueado e continua em "{workStatusLabel[
+									blocked.status
+								] ?? blocked.status}" — o estado operacional não muda sozinho.
+							</p>
+							<div class="blocked-actions">
+								<form method="POST" action="?/resolve" use:enhance={handleResolveSubmit(blocked)}>
+									<input type="hidden" name="impedimentId" value={blocked.impedimentId} />
+									<button type="submit" class="button-primary">Confirmar que foi resolvido</button>
+								</form>
+								<button type="button" class="button-secondary" onclick={cancelConfirm}>Cancelar</button>
+							</div>
+						</div>
+					{:else}
+						<div class="blocked-actions">
+							<button type="button" class="button-primary" onclick={() => openConfirm(blocked.workItemId)}>
+								Atualizar situação
+							</button>
+							<a class="section-link" href="/projects/{projectId}/work">Ver item em Trabalho →</a>
+						</div>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	{:else if !resolvedFeedback}
+		<p class="empty">
+			Nenhuma ação necessária agora. Quando um item de trabalho ficar bloqueado por um impedimento, o Hydra mostra
+			aqui o que fazer.
+		</p>
+	{/if}
+</section>
 
 {#if tracking.situation}
 	<section class="card situation" aria-labelledby="situation-heading">
@@ -79,44 +181,41 @@
 {/if}
 
 <div class="summary-grid">
-	<section class="card deliveries" aria-labelledby="deliveries-heading">
-		<h2 id="deliveries-heading">Entregas</h2>
+	<section class="card work-summary" aria-labelledby="work-heading">
+		<h2 id="work-heading">Trabalho</h2>
 		<div class="delivery-counts">
 			<div>
-				<p class="count-value">{tracking.deliveries.counts.a_fazer}</p>
+				<p class="count-value">{tracking.work.counts.a_fazer}</p>
 				<p class="count-label"><span aria-hidden="true">○</span> A fazer</p>
 			</div>
 			<div>
-				<p class="count-value">{tracking.deliveries.counts.em_andamento}</p>
+				<p class="count-value">{tracking.work.counts.em_andamento}</p>
 				<p class="count-label"><span aria-hidden="true">◐</span> Em andamento</p>
 			</div>
 			<div>
-				<p class="count-value">{tracking.deliveries.counts.concluido}</p>
+				<p class="count-value">{tracking.work.counts.concluido}</p>
 				<p class="count-label"><span aria-hidden="true">●</span> Concluído</p>
 			</div>
 		</div>
 
-		{#if tracking.deliveries.state === 'em_andamento'}
+		{#if tracking.work.state === 'em_andamento'}
 			<p class="section-label">Em andamento</p>
 			<ul class="delivery-list">
-				{#each tracking.deliveries.inProgress as item (item.id)}
+				{#each tracking.work.inProgress as item (item.id)}
 					<li>
-						<span class="item-text">{item.text}</span>
-						{#if item.effort}
-							<span class="item-meta">Esforço: {effortLabel[item.effort]}</span>
-						{/if}
+						<span class="item-text">{item.title}</span>
 					</li>
 				{/each}
 			</ul>
-		{:else if tracking.deliveries.state === 'concluido'}
-			<p class="empty">Todas as entregas foram concluídas.</p>
-		{:else if tracking.deliveries.state === 'nenhuma'}
-			<p class="empty">Nenhuma entrega disponível.</p>
+		{:else if tracking.work.state === 'concluido'}
+			<p class="empty">Todo o trabalho foi concluído.</p>
+		{:else if tracking.work.state === 'nenhuma'}
+			<p class="empty">Nenhum item de trabalho disponível.</p>
 		{:else}
 			<p class="empty">Nenhum item em andamento.</p>
 		{/if}
 
-		<a class="section-link" href="/projects/{projectId}/deliveries">Ver Entregas →</a>
+		<a class="section-link" href="/projects/{projectId}/work">Ver Trabalho →</a>
 	</section>
 
 	<section class="card attentions" aria-labelledby="attentions-heading">
@@ -395,7 +494,7 @@
 		align-items: start;
 	}
 
-	.deliveries {
+	.work-summary {
 		order: 1;
 	}
 
@@ -450,11 +549,6 @@
 	.item-text {
 		font-weight: 600;
 		display: block;
-	}
-
-	.item-meta {
-		font-size: var(--font-size-caption);
-		color: var(--hydra-muted);
 	}
 
 	.section-link {
@@ -659,6 +753,124 @@
 		text-decoration: underline;
 	}
 
+	/* Precisa de você (ETAPA 6 do rework) — sinal estreito e acionável: um
+	   WorkItem bloqueado por vez, com a explicação e a ação de resolver logo
+	   ali. --hydra-warning é reservado a conteúdo derivado pelo sistema
+	   (mesmo token usado no selo "Bloqueado" de /work). */
+	.need-you {
+		border-color: var(--hydra-warning);
+	}
+
+	.blocked-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+
+	.blocked-card {
+		border: 1px solid var(--hydra-warning);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-5);
+		background: var(--hydra-surface);
+	}
+
+	.blocked-badge {
+		display: inline-block;
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		color: var(--hydra-warning);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		margin-bottom: var(--space-2);
+	}
+
+	.blocked-headline {
+		margin: 0 0 var(--space-2);
+		font-weight: 700;
+		font-size: var(--font-size-body);
+	}
+
+	.blocked-impediment {
+		margin: 0;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.blocked-text {
+		margin: 0 0 var(--space-3);
+		font-size: var(--font-size-meta);
+	}
+
+	.blocked-why {
+		margin: 0 0 var(--space-3);
+		font-size: var(--font-size-caption);
+		font-style: italic;
+		color: var(--hydra-muted);
+	}
+
+	/* Contexto explícito antes da mutação (achado de dogfooding, ver §2 do
+	   corte): a ação precisa deixar claro que a resolução aconteceu no mundo
+	   real e que o Hydra só está sendo atualizado com esse resultado — nunca
+	   "resolve sozinho". */
+	/* Estado de confirmação (achado de dogfooding: "Marcar como resolvido"
+	   como ação de um clique só comunicava mutação definitiva demais) —
+	   contexto explícito antes da mutação real, aberto só depois de
+	   "Atualizar situação", nunca no primeiro clique. */
+	.confirm-resolve {
+		border: 1px dashed var(--hydra-warning);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-4);
+		margin-bottom: var(--space-2);
+		background: var(--hydra-surface-raised);
+	}
+
+	.confirm-resolve-text {
+		margin: 0 0 var(--space-4);
+		font-size: var(--font-size-caption);
+		color: var(--hydra-text);
+		line-height: 1.45;
+	}
+
+	.resolved-feedback {
+		border: 1px solid var(--hydra-accent);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-5);
+		margin-bottom: var(--space-5);
+		background: var(--hydra-surface);
+	}
+
+	.resolved-feedback-text {
+		margin: 0 0 var(--space-3);
+		font-size: var(--font-size-meta);
+	}
+
+	.resolved-feedback-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-5);
+	}
+
+	.blocked-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-5);
+		flex-wrap: wrap;
+	}
+
+	.button-primary {
+		background: var(--hydra-accent);
+		color: var(--hydra-surface);
+		border: none;
+		border-radius: var(--hydra-radius);
+		padding: var(--space-3) var(--space-5);
+		font-weight: 700;
+		font-size: var(--font-size-meta);
+		cursor: pointer;
+	}
+
 	@media (max-width: 860px) {
 		.situation-grid {
 			grid-template-columns: 1fr;
@@ -681,12 +893,12 @@
 			grid-template-columns: 1fr;
 		}
 
-		/* Ordem mobile aprovada: Atenções antes de Entregas. */
+		/* Ordem mobile aprovada: Atenções antes de Trabalho. */
 		.attentions {
 			order: 1;
 		}
 
-		.deliveries {
+		.work-summary {
 			order: 2;
 		}
 
@@ -699,6 +911,15 @@
 		.impediment-actions .resolve-form button {
 			min-height: 2.75rem;
 			flex: 1;
+		}
+
+		.blocked-actions {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.blocked-actions .button-primary {
+			min-height: 2.75rem;
 		}
 
 		.continuity {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ImpedimentView } from '$lib/server/application/types';
+import type { ImpedimentView, WorkItemView } from '$lib/server/application/types';
 import type { PendingItemView } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
@@ -28,11 +28,20 @@ function baseInput(overrides: Partial<TrackingViewInput> = {}): TrackingViewInpu
 			]
 		},
 		nextActivity: { kind: 'recommendation', activityDefinitionId: 'impedimentos' },
-		scopeItems: [],
-		scopeVersion: { confirmedAt: null },
+		workItems: [],
 		impediments: [],
 		openPendingItems: [],
 		...overrides
+	};
+}
+
+function makeWorkItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): WorkItemView {
+	return {
+		id: overrides.id,
+		title: overrides.title ?? `Item ${overrides.id}`,
+		status: overrides.status ?? 'a_fazer',
+		createdAt: overrides.createdAt ?? '2026-01-01T00:00:00.000Z',
+		blockedBy: overrides.blockedBy ?? null
 	};
 }
 
@@ -79,72 +88,87 @@ describe('buildTrackingView — situação e continuidade', () => {
 	});
 });
 
-describe('buildTrackingView — Entregas', () => {
-	it('conta os três estados de execução e lista os itens em andamento', () => {
+describe('buildTrackingView — Trabalho', () => {
+	it('conta os três estados operacionais e lista os itens em andamento', () => {
 		const result = buildTrackingView(
 			baseInput({
-				scopeItems: [
-					{ id: '1', text: 'Fluxo de aprovação', bucket: 'agora', effort: 'medio', executionStatus: 'em_andamento' },
-					{ id: '2', text: 'Notificação por e-mail', bucket: 'agora', effort: 'pequeno', executionStatus: 'a_fazer' },
-					{ id: '3', text: 'Item concluído', bucket: 'agora', effort: 'grande', executionStatus: 'concluido' }
-				],
-				scopeVersion: { confirmedAt: '2026-01-01T00:00:00.000Z' }
+				workItems: [
+					makeWorkItem({ id: '1', title: 'Fluxo de aprovação', status: 'em_andamento' }),
+					makeWorkItem({ id: '2', title: 'Notificação por e-mail', status: 'a_fazer' }),
+					makeWorkItem({ id: '3', title: 'Item concluído', status: 'concluido' })
+				]
 			})
 		);
-		expect(result.deliveries.counts).toEqual({ a_fazer: 1, em_andamento: 1, concluido: 1 });
-		expect(result.deliveries.inProgress.map((item) => item.id)).toEqual(['1']);
-		expect(result.deliveries.state).toBe('em_andamento');
+		expect(result.work.counts).toEqual({ a_fazer: 1, em_andamento: 1, concluido: 1 });
+		expect(result.work.inProgress.map((item) => item.id)).toEqual(['1']);
+		expect(result.work.state).toBe('em_andamento');
 	});
 
 	it('estado "sem_andamento": há itens a fazer, nenhum em andamento', () => {
 		const result = buildTrackingView(
-			baseInput({
-				scopeItems: [{ id: '1', text: 'Item', bucket: 'agora', effort: null, executionStatus: 'a_fazer' }],
-				scopeVersion: { confirmedAt: '2026-01-01T00:00:00.000Z' }
-			})
+			baseInput({ workItems: [makeWorkItem({ id: '1', status: 'a_fazer' })] })
 		);
-		expect(result.deliveries.state).toBe('sem_andamento');
-		expect(result.deliveries.inProgress).toEqual([]);
+		expect(result.work.state).toBe('sem_andamento');
+		expect(result.work.inProgress).toEqual([]);
 	});
 
-	it('estado "concluido": todos os itens confirmados foram concluídos', () => {
+	it('estado "concluido": todos os itens foram concluídos', () => {
 		const result = buildTrackingView(
-			baseInput({
-				scopeItems: [{ id: '1', text: 'Item', bucket: 'agora', effort: null, executionStatus: 'concluido' }],
-				scopeVersion: { confirmedAt: '2026-01-01T00:00:00.000Z' }
-			})
+			baseInput({ workItems: [makeWorkItem({ id: '1', status: 'concluido' })] })
 		);
-		expect(result.deliveries.state).toBe('concluido');
+		expect(result.work.state).toBe('concluido');
 	});
 
-	it('estado "nenhuma": sem versão confirmada', () => {
-		const result = buildTrackingView(baseInput({ scopeItems: [], scopeVersion: { confirmedAt: null } }));
-		expect(result.deliveries.state).toBe('nenhuma');
-		expect(result.deliveries.confirmed).toBe(false);
-	});
-
-	it('estado "nenhuma": confirmada mas sem nenhum item em "Agora"', () => {
-		const result = buildTrackingView(
-			baseInput({
-				scopeItems: [{ id: '1', text: 'Item fora de Agora', bucket: 'depois', effort: null, executionStatus: 'a_fazer' }],
-				scopeVersion: { confirmedAt: '2026-01-01T00:00:00.000Z' }
-			})
-		);
-		expect(result.deliveries.state).toBe('nenhuma');
+	it('estado "nenhuma": sem nenhum item de trabalho', () => {
+		const result = buildTrackingView(baseInput({ workItems: [] }));
+		expect(result.work.state).toBe('nenhuma');
 	});
 
 	it('não promove o primeiro item de "A fazer" a item em andamento', () => {
 		const result = buildTrackingView(
 			baseInput({
-				scopeItems: [
-					{ id: '1', text: 'Primeiro da fila', bucket: 'agora', effort: null, executionStatus: 'a_fazer' },
-					{ id: '2', text: 'Segundo da fila', bucket: 'agora', effort: null, executionStatus: 'a_fazer' }
-				],
-				scopeVersion: { confirmedAt: '2026-01-01T00:00:00.000Z' }
+				workItems: [
+					makeWorkItem({ id: '1', title: 'Primeiro da fila', status: 'a_fazer' }),
+					makeWorkItem({ id: '2', title: 'Segundo da fila', status: 'a_fazer' })
+				]
 			})
 		);
-		expect(result.deliveries.inProgress).toEqual([]);
-		expect(result.deliveries.state).toBe('sem_andamento');
+		expect(result.work.inProgress).toEqual([]);
+		expect(result.work.state).toBe('sem_andamento');
+	});
+});
+
+describe('buildTrackingView — Bloqueios (Precisa de você)', () => {
+	it('fica vazio quando nenhum WorkItem está bloqueado', () => {
+		const result = buildTrackingView(baseInput({ workItems: [makeWorkItem({ id: '1' })] }));
+		expect(result.blockedWorkItems).toEqual([]);
+	});
+
+	it('expõe um card por WorkItem bloqueado, com impedimento e explicação', () => {
+		const result = buildTrackingView(
+			baseInput({
+				workItems: [
+					makeWorkItem({
+						id: '1',
+						title: 'Migrar base de clientes',
+						status: 'em_andamento',
+						blockedBy: { impedimentId: 'imp-1', text: 'Acesso ao CRM ainda não liberado', tipo: 'dependencia_externa' }
+					}),
+					makeWorkItem({ id: '2', title: 'Item livre', status: 'a_fazer' })
+				]
+			})
+		);
+		expect(result.blockedWorkItems).toEqual([
+			{
+				workItemId: '1',
+				title: 'Migrar base de clientes',
+				status: 'em_andamento',
+				impedimentId: 'imp-1',
+				impedimentText: 'Acesso ao CRM ainda não liberado',
+				impedimentTipo: 'dependencia_externa',
+				why: 'Este impedimento está bloqueando trabalho atualmente em "Em andamento".'
+			}
+		]);
 	});
 });
 
@@ -169,6 +193,7 @@ describe('buildTrackingView — impedimentos', () => {
 				tipo: 'falta_de_recurso',
 				nextAction: 'Solicitar à TI',
 				status: 'aberto',
+				workItemId: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: null
 			},
@@ -178,6 +203,7 @@ describe('buildTrackingView — impedimentos', () => {
 				tipo: 'falta_de_recurso',
 				nextAction: null,
 				status: 'resolvido',
+				workItemId: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: '2026-01-02T00:00:00.000Z'
 			}
@@ -185,5 +211,43 @@ describe('buildTrackingView — impedimentos', () => {
 		const result = buildTrackingView(baseInput({ impediments }));
 		expect(result.impediments.open.map((i) => i.id)).toEqual(['i1']);
 		expect(result.impediments.resolved.map((i) => i.id)).toEqual(['i2']);
+	});
+
+	it('exclui impedimentos abertos vinculados a um WorkItem — já aparecem em "Precisa de você"', () => {
+		const impediments: ImpedimentView[] = [
+			{
+				id: 'i1',
+				text: 'Impedimento livre, sem WorkItem',
+				tipo: 'outro',
+				nextAction: null,
+				status: 'aberto',
+				workItemId: null,
+				createdAt: '2026-01-01T00:00:00.000Z',
+				resolvedAt: null
+			},
+			{
+				id: 'i2',
+				text: 'Bloqueia um WorkItem',
+				tipo: 'dependencia_externa',
+				nextAction: null,
+				status: 'aberto',
+				workItemId: 'wi-1',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				resolvedAt: null
+			},
+			{
+				id: 'i3',
+				text: 'Bloqueava um WorkItem, já resolvido',
+				tipo: 'dependencia_externa',
+				nextAction: null,
+				status: 'resolvido',
+				workItemId: 'wi-1',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				resolvedAt: '2026-01-02T00:00:00.000Z'
+			}
+		];
+		const result = buildTrackingView(baseInput({ impediments }));
+		expect(result.impediments.open.map((i) => i.id)).toEqual(['i1']);
+		expect(result.impediments.resolved.map((i) => i.id)).toEqual(['i3']);
 	});
 });

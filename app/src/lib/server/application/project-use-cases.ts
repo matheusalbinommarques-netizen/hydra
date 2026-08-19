@@ -12,6 +12,7 @@ import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
+	addWorkItem as addWorkItemInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
@@ -27,6 +28,7 @@ import {
 	moveDesiredOutcome as moveDesiredOutcomeInDomain,
 	moveScopeItem as moveScopeItemInDomain,
 	moveTreatmentStep as moveTreatmentStepInDomain,
+	moveWorkItem as moveWorkItemInDomain,
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeCauseHypothesis as removeCauseHypothesisInDomain,
@@ -71,6 +73,7 @@ import type {
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AddTreatmentStepInput,
+	AddWorkItemInput,
 	AnswerActivityInput,
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
@@ -85,6 +88,7 @@ import type {
 	MoveDesiredOutcomeInput,
 	MoveScopeItemInput,
 	MoveTreatmentStepInput,
+	MoveWorkItemInput,
 	PrepareExternalActionInput,
 	ProjectListItem,
 	ProjectUseCases,
@@ -554,7 +558,15 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
-			const result = addImpedimentInDomain(catalog, state, idGenerator.generate(), input.text, input.tipo, clock.now());
+			const result = addImpedimentInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.text,
+				input.tipo,
+				clock.now(),
+				input.workItemId ?? null
+			);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);
@@ -605,6 +617,28 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = reopenImpedimentInDomain(catalog, state, input.impedimentId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async addWorkItem(input: AddWorkItemInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addWorkItemInDomain(catalog, state, idGenerator.generate(), input.title, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async moveWorkItem(input: MoveWorkItemInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = moveWorkItemInDomain(catalog, state, input.workItemId, input.status, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			if (result.value !== state) await repository.save(result.value);

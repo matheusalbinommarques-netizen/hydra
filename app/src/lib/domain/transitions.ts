@@ -24,7 +24,9 @@ import type {
 	ScopeItem,
 	ScopeVersion,
 	TreatmentFriction,
-	TreatmentStep
+	TreatmentStep,
+	WorkItem,
+	WorkItemStatus
 } from './state-types';
 import type { Result } from './result';
 import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
@@ -54,6 +56,8 @@ export type DomainTransitionError =
 	| { kind: 'scope_version_not_confirmed' }
 	| { kind: 'impediment_not_found' }
 	| { kind: 'impediment_id_already_exists' }
+	| { kind: 'work_item_not_found' }
+	| { kind: 'work_item_blocked' }
 	| { kind: 'phase_not_found' }
 	| { kind: 'planning_no_items' }
 	| { kind: 'affected_group_not_found' }
@@ -118,6 +122,19 @@ function agoraItemsSorted(items: ScopeItem[]): ScopeItem[] {
 
 function findImpediment(state: ProjectState, impedimentId: string): Impediment | undefined {
 	return state.impediments.find((item) => item.id === impedimentId);
+}
+
+function findWorkItem(state: ProjectState, workItemId: string): WorkItem | undefined {
+	return state.workItems.find((item) => item.id === workItemId);
+}
+
+// "Bloqueado" nunca é persistido — sempre derivado, na leitura, de existir
+// algum Impediment aberto apontando para este WorkItem (ver
+// state-types.ts, WorkItem). Único ponto de verdade desta regra: tanto
+// moveWorkItem (abaixo) quanto a camada de apresentação (ProjectView) devem
+// chamar esta função, nunca reimplementar o critério.
+export function hasOpenImpediment(state: ProjectState, workItemId: string): boolean {
+	return state.impediments.some((impediment) => impediment.workItemId === workItemId && impediment.status === 'aberto');
 }
 
 function invalidateScopeConfirmation(catalog: Catalog, state: ProjectState): ProjectState {
@@ -715,10 +732,14 @@ export function addImpediment(
 	impedimentId: string,
 	text: string,
 	tipo: ImpedimentType,
-	occurredAt: string
+	occurredAt: string,
+	workItemId: string | null = null
 ): Result<ProjectState, DomainTransitionError> {
 	if (findImpediment(state, impedimentId)) {
 		return { ok: false, error: { kind: 'impediment_id_already_exists' } };
+	}
+	if (workItemId !== null && !findWorkItem(state, workItemId)) {
+		return { ok: false, error: { kind: 'work_item_not_found' } };
 	}
 
 	const impediment: Impediment = {
@@ -728,6 +749,7 @@ export function addImpediment(
 		tipo,
 		nextAction: null,
 		status: 'aberto',
+		workItemId,
 		createdAt: occurredAt,
 		updatedAt: occurredAt,
 		resolvedAt: null
@@ -825,6 +847,57 @@ export function reopenImpediment(
 			impediments: state.impediments.map((item) =>
 				item.id === impedimentId ? { ...item, status: 'aberto', resolvedAt: null, updatedAt: occurredAt } : item
 			)
+		}
+	};
+}
+
+// --- WorkItem / Trabalho (ETAPA 6 do rework, "Primeiro loop operacional") --
+// Mesmo espírito de Impediment: coleção independente do catálogo, sem
+// activityDefinitionId, `catalog` recebido só por consistência de assinatura.
+
+export function addWorkItem(
+	catalog: Catalog,
+	state: ProjectState,
+	workItemId: string,
+	title: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item: WorkItem = {
+		id: workItemId,
+		projectId: state.project.id,
+		title,
+		status: 'a_fazer',
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, workItems: [...state.workItems, item] } };
+}
+
+// Recusa a transição para 'concluido' enquanto existir um Impediment aberto
+// vinculado a este WorkItem (invariante congelada da ETAPA 6) — o impedimento
+// precisa ser resolvido primeiro (ver resolveImpediment). Idempotente (mesmo
+// espírito de resolveImpediment/reopenImpediment): mover para o status atual
+// é no-op, nunca erro.
+export function moveWorkItem(
+	catalog: Catalog,
+	state: ProjectState,
+	workItemId: string,
+	status: WorkItemStatus,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findWorkItem(state, workItemId);
+	if (!item) return { ok: false, error: { kind: 'work_item_not_found' } };
+	if (item.status === status) return { ok: true, value: state };
+	if (status === 'concluido' && hasOpenImpediment(state, workItemId)) {
+		return { ok: false, error: { kind: 'work_item_blocked' } };
+	}
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			workItems: state.workItems.map((i) => (i.id === workItemId ? { ...i, status, updatedAt: occurredAt } : i))
 		}
 	};
 }

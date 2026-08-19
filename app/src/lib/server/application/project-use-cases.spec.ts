@@ -1216,7 +1216,7 @@ describe('createProjectUseCases — escopo (Escolha o próximo foco)', () => {
 });
 
 describe('createProjectUseCases — nenhuma projeção do motor é persistida; ProjectView não expõe ProjectState bruto', () => {
-	it('o registro persistido contém só os 13 tipos de domínio', async () => {
+	it('o registro persistido contém só os 14 tipos de domínio', async () => {
 		const { useCases, repo } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1236,6 +1236,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'scopeItems',
 				'scopeVersion',
 				'impediments',
+				'workItems',
 				'affectedGroups',
 				'externalActions',
 				'evidences',
@@ -1248,7 +1249,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 32 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 33 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1275,6 +1276,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'fieldSuggestions',
 				'criteriaScopeConflict',
 				'impediments',
+				'workItems',
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',
@@ -1315,6 +1317,7 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 				tipo: 'falta_de_recurso',
 				nextAction: null,
 				status: 'aberto',
+				workItemId: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: null
 			}
@@ -1382,6 +1385,7 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 			tipo: 'outro',
 			nextAction: null,
 			status: 'resolvido',
+			workItemId: null,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			resolvedAt: '2026-01-02T00:00:00.000Z'
 		});

@@ -16,6 +16,7 @@ import {
 	computeScopeSuggestions,
 	computeSnapshot
 } from '$lib/orientation-engine';
+import { hasOpenImpediment } from '$lib/domain';
 import type {
 	AffectedGroupView,
 	CauseExplorationView,
@@ -28,7 +29,8 @@ import type {
 	PendingItemHistoryView,
 	ProjectView,
 	ScopeItemView,
-	TreatmentStepView
+	TreatmentStepView,
+	WorkItemView
 } from './types';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
@@ -100,8 +102,28 @@ function buildImpedimentView(impediment: ProjectState['impediments'][number]): I
 		tipo: impediment.tipo,
 		nextAction: impediment.nextAction,
 		status: impediment.status,
+		workItemId: impediment.workItemId,
 		createdAt: impediment.createdAt,
 		resolvedAt: impediment.resolvedAt
+	};
+}
+
+// blockedBy é sempre derivado aqui, nunca lido de um campo persistido (ver
+// domain/transitions.ts, hasOpenImpediment) — "bloqueado" nunca é status nem
+// coluna. Quando mais de um Impediment aberto aponta para o mesmo WorkItem
+// (schema permite; a interface desta rodada só cria um por vez), o primeiro
+// encontrado é o exibido — sem ordenação especial, mesmo espírito de
+// singleOpenAction em outras telas.
+function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][number]): WorkItemView {
+	const blocking = hasOpenImpediment(state, item.id)
+		? state.impediments.find((impediment) => impediment.workItemId === item.id && impediment.status === 'aberto')
+		: undefined;
+	return {
+		id: item.id,
+		title: item.title,
+		status: item.status,
+		createdAt: item.createdAt,
+		blockedBy: blocking ? { impedimentId: blocking.id, text: blocking.text, tipo: blocking.tipo } : null
 	};
 }
 
@@ -200,6 +222,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		fieldSuggestions: computeFieldSuggestions(catalog, state.answers),
 		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems),
 		impediments: state.impediments.map(buildImpedimentView),
+		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
 		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups),
 		externalActions: state.externalActions.map(buildExternalActionView),

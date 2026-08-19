@@ -28,6 +28,7 @@ export function createInitialProjectState(
 		scopeItems: [],
 		scopeVersion: { projectId, hypothesis: '', confirmedAt: null },
 		impediments: [],
+		workItems: [],
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],

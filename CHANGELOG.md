@@ -4,6 +4,16 @@
 
 ### Adicionado
 
+- Rework, ETAPA 6 ("Primeiro loop operacional") — `WorkItem` real (`/work`,
+  substitui "Entregas") com três estados (A fazer/Em andamento/Concluído);
+  registrar um impedimento vinculado ao item o marca como bloqueado (selo
+  visível, sempre derivado, nunca um status) e impede concluir o item até o
+  impedimento ser resolvido; Acompanhamento reage em "Precisa de você" com o
+  motivo do bloqueio e a ação para tratar, sem duplicar o mesmo impedimento
+  em "Atenções" ou "Gestão de impedimentos"; resolver segue dois passos
+  explícitos ("Atualizar situação" → "Confirmar que foi resolvido") com
+  feedback claro do que mudou e link para continuar em Trabalho (D036,
+  `docs/07-management/decision-log.md`).
 - Rework, ETAPA 5 ("Decidir o modelo canônico de trabalho") — decisão
   exclusivamente documental: `Deliverable` (priorização/escopo, alimenta
   o Roadmap) e `WorkItem` (execução, alimenta o Kanban) são

@@ -30,7 +30,9 @@ import type {
 	ScopeItem,
 	ScopeVersion,
 	TreatmentFriction,
-	TreatmentStep
+	TreatmentStep,
+	WorkItem,
+	WorkItemStatus
 } from './state-types';
 import type { Result } from './result';
 import { isDeprecatedAnswerField } from './legacy-answers';
@@ -96,6 +98,11 @@ function isImpedimentType(value: unknown): value is ImpedimentType {
 const IMPEDIMENT_STATUSES: readonly string[] = ['aberto', 'resolvido'];
 function isImpedimentStatus(value: unknown): value is 'aberto' | 'resolvido' {
 	return typeof value === 'string' && IMPEDIMENT_STATUSES.includes(value);
+}
+
+const WORK_ITEM_STATUSES: readonly string[] = ['a_fazer', 'em_andamento', 'concluido'];
+function isWorkItemStatus(value: unknown): value is WorkItemStatus {
+	return typeof value === 'string' && WORK_ITEM_STATUSES.includes(value);
 }
 
 function shapeError(details: string): Result<never, ProjectStateParseError> {
@@ -323,6 +330,12 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 		if (item.resolvedAt !== null && !isIsoDateString(item.resolvedAt)) {
 			return shapeError('Impediment.resolvedAt deve ser uma data ISO 8601 válida ou null');
 		}
+		// workItemId (ETAPA 6 do rework) — ausente em snapshots exportados antes
+		// desta etapa; ausente equivale a null (mesmo espírito de
+		// sourceSuggestionId em ScopeItem), nunca inferido do conteúdo.
+		if (item.workItemId !== undefined && item.workItemId !== null && !isString(item.workItemId)) {
+			return shapeError('Impediment.workItemId deve ser string, null ou ausente');
+		}
 		result.push({
 			id: item.id,
 			projectId: item.projectId,
@@ -330,9 +343,38 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 			tipo: item.tipo,
 			nextAction: (item.nextAction as string | null) ?? null,
 			status: item.status,
+			workItemId: (item.workItemId as string | null | undefined) ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt,
 			resolvedAt: (item.resolvedAt as string | null) ?? null
+		});
+	}
+	return { ok: true, value: result };
+}
+
+// WorkItem (ETAPA 6 do rework) — ausente em snapshots exportados antes desta
+// etapa (mesmo espírito de currentTreatment/causeExploration): tratado como
+// coleção vazia, nunca inferido de PlanningItem ou ScopeItem legados (D035
+// proíbe promoção silenciosa).
+function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('workItems deve ser um array');
+	const result: WorkItem[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada WorkItem deve ser um objeto');
+		if (!isString(item.id)) return shapeError('WorkItem.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('WorkItem.projectId deve ser uma string');
+		if (!isString(item.title)) return shapeError('WorkItem.title deve ser uma string');
+		if (!isWorkItemStatus(item.status)) return shapeError('WorkItem.status deve ser um dos literais aprovados');
+		if (!isIsoDateString(item.createdAt)) return shapeError('WorkItem.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('WorkItem.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			title: item.title,
+			status: item.status,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
 		});
 	}
 	return { ok: true, value: result };
@@ -652,6 +694,7 @@ function assembleProjectState(
 	scopeItems: ScopeItem[],
 	scopeVersion: ScopeVersion,
 	impediments: Impediment[],
+	workItems: WorkItem[],
 	affectedGroups: AffectedGroup[],
 	externalActions: ExternalAction[],
 	evidences: Evidence[],
@@ -881,6 +924,42 @@ function assembleProjectState(
 		}
 		if (impediment.status === 'resolvido' && impediment.resolvedAt === null) {
 			return invariantError(`Impediment "${impediment.id}" está resolvido mas não possui resolvedAt`);
+		}
+	}
+
+	// referências + invariantes: WorkItem (ETAPA 6 do rework) — mesmo molde de
+	// Impediment (coleção independente do catálogo).
+	const seenWorkItemIds = new Set<string>();
+	const workItemById = new Map<string, WorkItem>();
+	for (const item of workItems) {
+		if (item.projectId !== project.id) {
+			return invariantError(`WorkItem "${item.id}" usa projectId diferente do Project`);
+		}
+		if (seenWorkItemIds.has(item.id)) {
+			return invariantError(`WorkItem.id duplicado: "${item.id}"`);
+		}
+		seenWorkItemIds.add(item.id);
+		workItemById.set(item.id, item);
+	}
+
+	// referência: Impediment.workItemId (ETAPA 6) — quando presente, precisa
+	// apontar para um WorkItem real do mesmo projeto; e nenhum WorkItem
+	// 'concluido' pode ter um impedimento aberto apontando para ele (mesma
+	// invariante que moveWorkItem aplica em tempo de execução — reforçada
+	// aqui contra estado desserializado, mesmo padrão de
+	// scopeVersion.confirmedAt acima).
+	for (const impediment of impediments) {
+		if (impediment.workItemId === null) continue;
+		const target = workItemById.get(impediment.workItemId);
+		if (!target) {
+			return referenceError(
+				`Impediment "${impediment.id}" referencia workItemId "${impediment.workItemId}", que não existe`
+			);
+		}
+		if (impediment.status === 'aberto' && target.status === 'concluido') {
+			return invariantError(
+				`WorkItem "${target.id}" está "concluido" mas tem o Impediment "${impediment.id}" aberto apontando para ele`
+			);
 		}
 	}
 
@@ -1140,6 +1219,7 @@ function assembleProjectState(
 			scopeItems,
 			scopeVersion,
 			impediments,
+			workItems,
 			affectedGroups,
 			externalActions,
 			evidences,
@@ -1205,6 +1285,9 @@ export function deserializeProjectState(
 	const impedimentsResult = parseImpedimentList(state.impediments);
 	if (!impedimentsResult.ok) return impedimentsResult;
 
+	const workItemsResult = parseWorkItemList(state.workItems);
+	if (!workItemsResult.ok) return workItemsResult;
+
 	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
 	if (!affectedGroupsResult.ok) return affectedGroupsResult;
 
@@ -1261,6 +1344,7 @@ export function deserializeProjectState(
 		scopeItemsResult.value,
 		scopeVersionResult.value,
 		impedimentsResult.value,
+		workItemsResult.value,
 		affectedGroupsResult.value,
 		externalActionsResult.value,
 		evidencesResult.value,

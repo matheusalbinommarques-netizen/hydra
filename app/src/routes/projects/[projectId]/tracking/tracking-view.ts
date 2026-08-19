@@ -1,22 +1,18 @@
-// Projeção pura de leitura para "Acompanhamento" (etapa 7.4 do roadmap) —
-// compõe situação atual, síntese de Entregas, atenções e continuidade a
-// partir de projeções e campos já existentes (buildJourneyContext,
-// buildPhaseProgress, buildDeliveriesView, view.impediments,
-// view.openPendingItems). Não lê
-// catálogo nem persistência diretamente, não decide nada (isso já foi
-// decidido por orientation-engine/ e pelas projeções reaproveitadas), não
-// introduz estado de domínio novo.
+// Projeção pura de leitura para "Acompanhamento" (etapa 7.4 do roadmap;
+// seção "Bloqueios" adicionada na ETAPA 6 do rework, "Primeiro loop
+// operacional") — compõe situação atual, síntese de Trabalho, bloqueios,
+// atenções e continuidade a partir de projeções e campos já existentes
+// (buildJourneyContext, buildPhaseProgress, buildWorkView, view.impediments,
+// view.workItems, view.openPendingItems). Não lê catálogo nem persistência
+// diretamente, não decide nada (isso já foi decidido por orientation-engine/
+// e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
-import type { ImpedimentView } from '$lib/server/application/types';
+import type { ImpedimentType, WorkItemStatus } from '$lib/domain';
+import type { ImpedimentView, WorkItemView } from '$lib/server/application/types';
 import type { NextActivityResult, PendingItemView } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
-import {
-	buildDeliveriesView,
-	type DeliveriesScopeItemInput,
-	type DeliveriesScopeVersionInput,
-	type DeliveryItemView
-} from '../deliveries/deliveries-view';
+import { buildWorkView, type WorkItemBoardCounts } from '../work/work-view';
 
 export interface TrackingSituationView {
 	phaseLabel: string;
@@ -26,17 +22,12 @@ export interface TrackingSituationView {
 	progressPercent: number;
 }
 
-// "nenhuma": não há foco confirmado ou nenhum item confirmado em "Agora" —
-// mesma condição, uma única mensagem ("Nenhuma entrega disponível."). Nunca
-// promove o primeiro item de "A fazer" a "próxima entrega": o domínio não
-// garante que a ordem represente prioridade.
-export type TrackingDeliveriesState = 'em_andamento' | 'sem_andamento' | 'concluido' | 'nenhuma';
+export type TrackingWorkState = 'em_andamento' | 'sem_andamento' | 'concluido' | 'nenhuma';
 
-export interface TrackingDeliveriesView {
-	confirmed: boolean;
-	counts: { a_fazer: number; em_andamento: number; concluido: number };
-	inProgress: DeliveryItemView[];
-	state: TrackingDeliveriesState;
+export interface TrackingWorkView {
+	counts: WorkItemBoardCounts;
+	inProgress: WorkItemView[];
+	state: TrackingWorkState;
 }
 
 export interface TrackingAttentionPendingItem {
@@ -51,6 +42,27 @@ export interface TrackingImpedimentsView {
 	resolved: ImpedimentView[];
 }
 
+// Bloqueios (ETAPA 6 do rework) — sinal estreito, derivado, explicável e
+// acionável (contrato de Signal, ver HYDRA_PRODUCT_REWORK.md §15): um
+// WorkItem por card, só quando bloqueado por um Impediment aberto. `why` é
+// texto simples (mesmo espírito de TrackingContinuityView.label), não um
+// health score nem semáforo — a explicação é sempre "este impedimento está
+// bloqueando trabalho no estado X", nunca um cálculo de severidade.
+export interface TrackingBlockedWorkItem {
+	workItemId: string;
+	title: string;
+	// Estado operacional atual do WorkItem — exposto para a interface poder
+	// explicar, antes da ação de "marcar como resolvido", que esse estado NÃO
+	// muda automaticamente (só o bloqueio é removido). Achado de dogfooding:
+	// "Resolver impedimento" parecia resolver o problema sozinho; a interface
+	// precisa desta informação para dar contexto antes da mutação.
+	status: WorkItemStatus;
+	impedimentId: string;
+	impedimentText: string;
+	impedimentTipo: ImpedimentType;
+	why: string;
+}
+
 export interface TrackingContinuityView {
 	completed: boolean;
 	label: string;
@@ -58,7 +70,8 @@ export interface TrackingContinuityView {
 
 export interface TrackingView {
 	situation: TrackingSituationView | undefined;
-	deliveries: TrackingDeliveriesView;
+	work: TrackingWorkView;
+	blockedWorkItems: TrackingBlockedWorkItem[];
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
 	continuity: TrackingContinuityView;
@@ -68,11 +81,16 @@ export interface TrackingViewInput {
 	journeyContext: JourneyContextView | undefined;
 	phaseProgress: PhaseProgressView | undefined;
 	nextActivity: NextActivityResult;
-	scopeItems: DeliveriesScopeItemInput[];
-	scopeVersion: DeliveriesScopeVersionInput;
+	workItems: WorkItemView[];
 	impediments: ImpedimentView[];
 	openPendingItems: PendingItemView[];
 }
+
+const WORK_STATUS_LABEL: Record<WorkItemView['status'], string> = {
+	a_fazer: 'A fazer',
+	em_andamento: 'Em andamento',
+	concluido: 'Concluído'
+};
 
 function buildSituation(
 	journeyContext: JourneyContextView | undefined,
@@ -109,30 +127,37 @@ function buildSituation(
 	};
 }
 
-function buildDeliveries(
-	scopeItems: DeliveriesScopeItemInput[],
-	scopeVersion: DeliveriesScopeVersionInput
-): TrackingDeliveriesView {
-	const deliveries = buildDeliveriesView(scopeItems, scopeVersion);
-	const total = deliveries.counts.a_fazer + deliveries.counts.em_andamento + deliveries.counts.concluido;
+function buildWork(workItems: WorkItemView[]): TrackingWorkView {
+	const board = buildWorkView(workItems);
+	const total = board.counts.a_fazer + board.counts.em_andamento + board.counts.concluido;
 
-	let state: TrackingDeliveriesState;
-	if (!deliveries.confirmed || total === 0) {
+	let state: TrackingWorkState;
+	if (total === 0) {
 		state = 'nenhuma';
-	} else if (deliveries.groups.em_andamento.length > 0) {
+	} else if (board.groups.em_andamento.length > 0) {
 		state = 'em_andamento';
-	} else if (deliveries.counts.concluido === total) {
+	} else if (board.counts.concluido === total) {
 		state = 'concluido';
 	} else {
 		state = 'sem_andamento';
 	}
 
-	return {
-		confirmed: deliveries.confirmed,
-		counts: deliveries.counts,
-		inProgress: deliveries.groups.em_andamento,
-		state
-	};
+	return { counts: board.counts, inProgress: board.groups.em_andamento, state };
+}
+
+function buildBlockedWorkItems(workItems: WorkItemView[]): TrackingBlockedWorkItem[] {
+	return workItems
+		.filter((item) => item.blockedBy !== null)
+		.map((item) => ({
+			workItemId: item.id,
+			title: item.title,
+			status: item.status,
+			// filter acima já garante blockedBy !== null.
+			impedimentId: item.blockedBy!.impedimentId,
+			impedimentText: item.blockedBy!.text,
+			impedimentTipo: item.blockedBy!.tipo,
+			why: `Este impedimento está bloqueando trabalho atualmente em "${WORK_STATUS_LABEL[item.status]}".`
+		}));
 }
 
 function buildAttentionPendingItems(openPendingItems: PendingItemView[]): TrackingAttentionPendingItem[] {
@@ -144,9 +169,19 @@ function buildAttentionPendingItems(openPendingItems: PendingItemView[]): Tracki
 	}));
 }
 
+// Impedimentos vinculados a um WorkItem (workItemId !== null) já têm sua
+// própria projeção acionável e explicável em "Precisa de você"
+// (buildBlockedWorkItems, acima) — mantê-los também aqui duplicaria o mesmo
+// fato operacional em "Atenções" e ofereceria uma segunda superfície
+// administrativa concorrente ("Gestão de impedimentos") para o mesmo
+// bloqueio (achado real de dogfooding, não hipotético). Impedimentos sem
+// WorkItem (o caso normal de impedimento no nível do projeto) continuam
+// aparecendo aqui exatamente como antes — este filtro não muda o
+// comportamento deles. Resolvidos continuam todos juntos: histórico passivo,
+// não é uma segunda superfície de ação sobre um bloqueio ainda aberto.
 function buildImpediments(impediments: ImpedimentView[]): TrackingImpedimentsView {
 	return {
-		open: impediments.filter((impediment) => impediment.status === 'aberto'),
+		open: impediments.filter((impediment) => impediment.status === 'aberto' && impediment.workItemId === null),
 		resolved: impediments.filter((impediment) => impediment.status === 'resolvido')
 	};
 }
@@ -166,7 +201,8 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 
 	return {
 		situation,
-		deliveries: buildDeliveries(input.scopeItems, input.scopeVersion),
+		work: buildWork(input.workItems),
+		blockedWorkItems: buildBlockedWorkItems(input.workItems),
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
 		impediments: buildImpediments(input.impediments),
 		continuity: buildContinuity(input.nextActivity, situation)

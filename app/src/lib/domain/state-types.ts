@@ -107,6 +107,14 @@ export type ImpedimentType =
 	| 'bloqueio_tecnico'
 	| 'outro';
 
+// workItemId (ETAPA 6 do rework, "Primeiro loop operacional") — vínculo
+// opcional com o WorkItem que este impedimento está bloqueando. null é o
+// caso normal e continua totalmente válido: Impediment sempre pôde existir
+// no nível do projeto, sem relação com nenhum item de trabalho, e essa
+// possibilidade não muda aqui (ver HYDRA_PRODUCT_REWORK.md §36). Cardinalidade
+// é 1 Impediment → no máximo 1 WorkItem — o inverso (múltiplos impedimentos
+// bloqueando o mesmo WorkItem) é permitido pelo schema, mesmo que a interface
+// desta rodada só crie um de cada vez.
 export interface Impediment {
 	id: string;
 	projectId: string;
@@ -114,9 +122,39 @@ export interface Impediment {
 	tipo: ImpedimentType;
 	nextAction: string | null;
 	status: 'aberto' | 'resolvido';
+	workItemId: string | null;
 	createdAt: string;
 	updatedAt: string;
 	resolvedAt: string | null;
+}
+
+// WorkItem — ETAPA 6 do rework ("Primeiro loop operacional", D035,
+// docs/core/HYDRA_PRODUCT_REWORK.md §35/§36). Camada de execução, distinta de
+// Deliverable (camada de priorização/escopo, ainda não introduzida nesta
+// etapa — ver D035): unidade executável mínima capaz de provar o loop
+// WorkItem → Trabalho → mudança de estado → Impediment → Acompanhamento →
+// ação → estado atualizado. Não reaproveita ScopeItem.executionStatus (D025):
+// esse campo é compatibilidade histórica, não o modelo canônico (D035).
+//
+// "Bloqueado" nunca é um status nem uma coluna própria — é sempre condição
+// derivada de existir um Impediment com status 'aberto' e workItemId
+// apontando para este item (ver hasOpenImpediment em transitions.ts). Um
+// WorkItem com impedimento ativo não pode transicionar para 'concluido'
+// (moveWorkItem recusa a transição — ver transitions.ts).
+//
+// Nasce direto em Trabalho nesta etapa — promoção de PlanningItem para
+// WorkItem fica fora deste corte (D035 permanece válida para o futuro).
+// Nenhum metadado além do estritamente necessário para mover trabalho
+// (responsável, prazo, prioridade, estimativa ficam para etapas futuras).
+export type WorkItemStatus = 'a_fazer' | 'em_andamento' | 'concluido';
+
+export interface WorkItem {
+	id: string;
+	projectId: string;
+	title: string;
+	status: WorkItemStatus;
+	createdAt: string;
+	updatedAt: string;
 }
 
 // Mapa de Impacto — Descoberta, "Quem é afetado" (ETAPA 2 do rework, ver
@@ -332,6 +370,7 @@ export interface ProjectState {
 	scopeItems: ScopeItem[];
 	scopeVersion: ScopeVersion;
 	impediments: Impediment[];
+	workItems: WorkItem[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];

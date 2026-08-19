@@ -12,6 +12,7 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		scopeItems: [],
 		scopeVersion: { projectId: 'p1', hypothesis: '', confirmedAt: null },
 		impediments: [],
+		workItems: [],
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],
@@ -234,6 +235,7 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'fieldSuggestions',
 				'criteriaScopeConflict',
 				'impediments',
+				'workItems',
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',
@@ -267,6 +269,7 @@ describe('buildProjectView — impediments', () => {
 					tipo: 'falta_de_recurso',
 					nextAction: null,
 					status: 'aberto',
+					workItemId: null,
 					createdAt: '2026-01-02T00:00:00.000Z',
 					updatedAt: '2026-01-02T00:00:00.000Z',
 					resolvedAt: null
@@ -282,6 +285,7 @@ describe('buildProjectView — impediments', () => {
 				tipo: 'falta_de_recurso',
 				nextAction: null,
 				status: 'aberto',
+				workItemId: null,
 				createdAt: '2026-01-02T00:00:00.000Z',
 				resolvedAt: null
 			}
@@ -298,6 +302,7 @@ describe('buildProjectView — impediments', () => {
 					tipo: 'decisao_pendente',
 					nextAction: 'Aguardar reunião',
 					status: 'resolvido',
+					workItemId: null,
 					createdAt: '2026-01-02T00:00:00.000Z',
 					updatedAt: '2026-01-03T00:00:00.000Z',
 					resolvedAt: '2026-01-03T00:00:00.000Z'
@@ -312,6 +317,7 @@ describe('buildProjectView — impediments', () => {
 			tipo: 'decisao_pendente',
 			nextAction: 'Aguardar reunião',
 			status: 'resolvido',
+			workItemId: null,
 			createdAt: '2026-01-02T00:00:00.000Z',
 			resolvedAt: '2026-01-03T00:00:00.000Z'
 		});
