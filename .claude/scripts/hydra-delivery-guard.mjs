@@ -11,6 +11,7 @@
 //   node .claude/scripts/hydra-delivery-guard.mjs check
 //   node .claude/scripts/hydra-delivery-guard.mjs clear
 //   node .claude/scripts/hydra-delivery-guard.mjs status
+//   node .claude/scripts/hydra-delivery-guard.mjs self-test
 //
 // Exit codes:
 //   0 — sucesso;
@@ -19,6 +20,7 @@
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 class UsageError extends Error {}
@@ -31,8 +33,14 @@ const ITEM_ID_RE = /^(C\d+-\d+[A-Z]?|S\d+[A-Z]?|R\d+)$/;
 
 function parseArgs(argv) {
 	const command = argv[0];
-	if (!['seal', 'check', 'clear', 'status'].includes(command)) {
-		throw new UsageError(`comando desconhecido: "${command ?? '(ausente)'}". Use seal, check, clear ou status.`);
+	if (!['seal', 'check', 'clear', 'status', 'self-test'].includes(command)) {
+		throw new UsageError(`comando desconhecido: "${command ?? '(ausente)'}". Use seal, check, clear, status ou self-test.`);
+	}
+	if (command === 'self-test') {
+		if (argv.length > 1) {
+			throw new UsageError('self-test não aceita argumentos adicionais.');
+		}
+		return { command, item: null, level: null };
 	}
 	const args = { command, item: null, level: null };
 
@@ -152,7 +160,7 @@ function validateSealShape(seal) {
 	if (seal.verificationMode !== 'fast' && seal.verificationMode !== 'full') {
 		throw new GuardError(`seal com verificationMode inválido: esperado "fast" ou "full", recebido "${seal.verificationMode}".`);
 	}
-	if (seal.level !== 1 && seal.verificationMode !== 'full') {
+	if (seal.level === 3 && seal.verificationMode !== 'full') {
 		throw new GuardError(`seal de level ${seal.level} exige verificationMode "full", encontrado "${seal.verificationMode}".`);
 	}
 	if (!isValidSha40(seal.head)) {
@@ -228,13 +236,13 @@ function cmdSeal(repoRoot, args) {
 		throw new GuardError('a árvore staged atual difere da árvore do recibo — stage mudou desde a verificação.');
 	}
 
-	if (args.level === 1) {
-		if (receipt.mode !== 'fast' && receipt.mode !== 'full') {
-			throw new GuardError(`recibo com modo inválido: "${receipt.mode}".`);
-		}
-	} else {
+	if (args.level === 3) {
 		if (receipt.mode !== 'full') {
 			throw new GuardError(`level ${args.level} exige recibo de verificação "full", recibo é "${receipt.mode}".`);
+		}
+	} else {
+		if (receipt.mode !== 'fast' && receipt.mode !== 'full') {
+			throw new GuardError(`recibo com modo inválido: "${receipt.mode}".`);
 		}
 	}
 
@@ -324,8 +332,82 @@ function cmdStatus(repoRoot) {
 	process.stdout.write(describeSealState(sealPath));
 }
 
+// Cria um repositório Git isolado em diretório temporário (branch "main",
+// um commit inicial, e um arquivo staged adicional representando o que
+// seria entregue) para exercitar cmdSeal sem tocar o repositório real.
+function setupSelfTestRepo() {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydra-guard-selftest-'));
+	const run = (gitArgs) => {
+		const result = spawnSync('git', gitArgs, { cwd: dir, encoding: 'utf8' });
+		if (result.error || result.status !== 0) {
+			throw new Error(`self-test setup: git ${gitArgs.join(' ')} falhou: ${result.stderr || result.error?.message}`);
+		}
+		return result.stdout;
+	};
+	run(['init', '--quiet', '-b', 'main']);
+	run(['config', 'user.email', 'selftest@hydra.local']);
+	run(['config', 'user.name', 'hydra-selftest']);
+	fs.writeFileSync(path.join(dir, 'base.txt'), 'base\n');
+	run(['add', 'base.txt']);
+	run(['commit', '--quiet', '-m', 'base commit']);
+	fs.writeFileSync(path.join(dir, 'delivery.txt'), 'delivery\n');
+	run(['add', 'delivery.txt']);
+	return dir;
+}
+
+function writeSelfTestReceipt(repoRoot, item, mode) {
+	const { head, tree } = currentHeadAndTree(repoRoot);
+	const verificationPath = gitPath(repoRoot, 'hydra-verification.json');
+	const receipt = { version: 1, item, mode, head, tree, verifiedAt: new Date().toISOString() };
+	fs.writeFileSync(verificationPath, JSON.stringify(receipt, null, 2) + '\n');
+}
+
+function cmdSelfTest() {
+	const cases = [
+		{ level: 1, mode: 'fast', expect: 'accept' },
+		{ level: 2, mode: 'fast', expect: 'accept' },
+		{ level: 3, mode: 'fast', expect: 'reject' },
+		{ level: 3, mode: 'full', expect: 'accept' }
+	];
+
+	let pass = 0;
+	let fail = 0;
+	for (const c of cases) {
+		const dir = setupSelfTestRepo();
+		try {
+			writeSelfTestReceipt(dir, 'S6T', c.mode);
+			let outcome = 'accept';
+			try {
+				cmdSeal(dir, { item: 'S6T', level: c.level });
+			} catch (err) {
+				if (!(err instanceof GuardError)) throw err;
+				outcome = 'reject';
+			}
+			if (outcome === c.expect) {
+				pass++;
+			} else {
+				fail++;
+				process.stderr.write(
+					`self-test FALHOU: level=${c.level} mode=${c.mode} — esperado ${c.expect}, obtido ${outcome}\n`
+				);
+			}
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	}
+
+	process.stdout.write(`hydra-delivery-guard --self-test: ${pass}/${cases.length} casos OK\n`);
+	if (fail > 0) process.exit(1);
+}
+
 function main() {
 	const args = parseArgs(process.argv.slice(2));
+
+	if (args.command === 'self-test') {
+		cmdSelfTest();
+		return;
+	}
+
 	const repoRoot = findRepoRoot();
 
 	if (args.command === 'seal') cmdSeal(repoRoot, args);

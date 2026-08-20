@@ -1,6 +1,6 @@
 ---
 name: hydra-ship
-description: Faz commit do stage já selado e envia main para origin, com trailers Hydra-Item/Hydra-Cycle e todas as verificações de segurança do Hydra. Uso explícito apenas via /hydra-ship "mensagem".
+description: Faz commit do stage já selado e envia main para origin, com trailer Hydra-Item (e Hydra-Cycle quando o item for Cx-y) e todas as verificações de segurança do Hydra. Uso explícito apenas via /hydra-ship "mensagem".
 disable-model-invocation: true
 argument-hint: "<commit message>"
 allowed-tools: Read, Bash(node .claude/scripts/hydra-commit-lint.mjs:*), Bash(node .claude/scripts/hydra-delivery-guard.mjs:*), Bash(node -e:*), Bash(git status:*), Bash(git branch --show-current), Bash(git diff:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git rev-list:*)
@@ -47,8 +47,11 @@ aprovação normal do usuário, mesmo sendo o propósito do comando.
    node -e "console.log(require('node:fs').readFileSync(require('node:child_process').execSync('git rev-parse --git-path hydra-delivery-seal.json').toString().trim(), 'utf8'))"
    ```
    ou equivalente — não abra o arquivo por outro caminho manual.
-5. Derive o ciclo do item a partir do prefixo antes do hífen (ex.:
-   `C5-01` → ciclo `5`).
+5. Derive o ciclo somente quando o item for `Cx-y` (ex.: `C5-01` → ciclo
+   `5`) a partir do prefixo antes do hífen. Itens `Sx`/`Sx[Letra]`
+   (ex.: `S7`, `S6V`) e `Rx` (ex.: `R3`) não têm ciclo numérico — não
+   derive nem invente um valor (nunca `null`, `0` ou o próprio item) para
+   eles.
 6. `git diff --cached --stat`, `git diff --cached --name-status` completos,
    mais `git diff --cached --check` (deve retornar limpo).
 7. Apresente a lista de arquivos staged e confirme visualmente que faz
@@ -59,14 +62,26 @@ aprovação normal do usuário, mesmo sendo o propósito do comando.
 
 Depois que a mensagem, o seal e as verificações da §2 passarem, monte a
 mensagem final: `$ARGUMENTS` sem espaços/quebras excedentes no fim, uma
-linha em branco, e os trailers derivados do seal (nunca digitados pelo
-usuário):
+linha em branco, e o(s) trailer(s) derivados do seal (nunca digitados
+pelo usuário). O formato do item decide deterministicamente se
+`Hydra-Cycle` existe — a skill não pergunta ao usuário:
+
+Item `Cx-y` (ex.: `C5-01`):
 
 ```
 <mensagem recebida sem espaços/quebras excedentes no fim>
 
-Hydra-Item: <item do seal>
-Hydra-Cycle: <ciclo derivado>
+Hydra-Item: C5-01
+Hydra-Cycle: 5
+```
+
+Item `Sx`/`Sx[Letra]` ou `Rx` (ex.: `S7`, `S6V`, `R3`) — sem
+`Hydra-Cycle`:
+
+```
+<mensagem recebida sem espaços/quebras excedentes no fim>
+
+Hydra-Item: S6V
 ```
 
 Crie esse conteúdo em um arquivo temporário UTF-8 sob `os.tmpdir()` usando
@@ -84,12 +99,13 @@ const os = require('node:os');
 const path = require('node:path');
 const subject = process.argv[1];
 const item = process.argv[2];
-const cycle = process.argv[3];
-const message = subject.replace(/\s+$/, '') + '\n\nHydra-Item: ' + item + '\nHydra-Cycle: ' + cycle + '\n';
+const cycle = process.argv[3] === '' ? null : process.argv[3];
+const trailers = cycle === null ? ('Hydra-Item: ' + item) : ('Hydra-Item: ' + item + '\nHydra-Cycle: ' + cycle);
+const message = subject.replace(/\s+$/, '') + '\n\n' + trailers + '\n';
 const file = path.join(os.tmpdir(), 'hydra-ship-' + Date.now() + '.txt');
 fs.writeFileSync(file, message, 'utf8');
 console.log(file);
-" -- "$ARGUMENTS" "<item do seal>" "<ciclo derivado>"
+" -- "$ARGUMENTS" "<item do seal>" "<ciclo derivado, ou string vazia se o item não tiver ciclo>"
 ```
 
 (ajuste a passagem de argumentos ao `node -e` conforme o shell em uso,
@@ -142,8 +158,10 @@ porque o `clear` da §4 já rodou):
 - valide a mensagem recebida com `hydra-commit-lint.mjs` normalmente;
 - confirme igualdade exata entre o assunto recebido e
   `git log -1 --format=%s`;
-- confirme que o último commit contém trailers `Hydra-Item` e
-  `Hydra-Cycle` válidos (`git log -1 --format=%B`);
+- confirme que o último commit contém um trailer `Hydra-Item` válido
+  (`git log -1 --format=%B`); exija `Hydra-Cycle` também presente e
+  válido somente quando o item for `Cx-y` — itens `Sx`/`Rx` não têm
+  ciclo, e sua ausência não é motivo para recusar a recuperação;
 - confirme, com `git rev-list`, que não há divergência nem commits
   adicionais entre `HEAD` e `origin/main` além desse único commit;
 - não crie arquivo temporário — nenhum commit será feito nesta
@@ -168,6 +186,7 @@ o push. `git status --short` deve voltar vazio.
 
 ## 8. Relatório final
 
-Apresente: hash do commit; item e ciclo dos trailers; arquivos incluídos;
-resultado do push; `git status --short`; `git log --oneline -5`;
-confirmação de que `HEAD` e `origin/main` coincidem.
+Apresente: hash do commit; item do trailer (e ciclo, quando aplicável);
+arquivos incluídos; resultado do push; `git status --short`;
+`git log --oneline -5`; confirmação de que `HEAD` e `origin/main`
+coincidem.

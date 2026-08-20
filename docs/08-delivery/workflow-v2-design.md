@@ -106,26 +106,36 @@ da verificação. Implementada em duas peças, não uma única evidência:
   qualquer outro caso (FAIL, sem `--item`, ou árvore com sobra/pendência)
   não há recibo utilizável;
 - `hydra-delivery-guard.mjs seal --item <item> --level <nivel>`, chamado
-  por `/hydra-review-item` ao final da revisão, confirma que o recibo
+  por `/hydra-work` ao final da revisão, confirma que o recibo
   corresponde ao `HEAD`/árvore staged atuais e ao item informado, exige
-  `mode: "full"` para nível 2 ou 3, e grava o seal
-  (`hydra-delivery-seal.json`) com `item`, `level`, `head`, `tree` e
-  `sealedAt`;
+  `mode: "full"` somente para nível 3 (nível 1 e 2 aceitam `fast` ou
+  `full`, reconciliado em S6T com a redução de Nível 2 a verificação
+  `fast` — ver `9bdd1a4`), e grava o seal (`hydra-delivery-seal.json`)
+  com `item`, `level`, `head`, `tree` e `sealedAt`;
 - `hydra-delivery-guard.mjs check`, chamado por `/hydra-ship` antes do
   commit, recalcula `HEAD`/árvore e bloqueia se não corresponderem ao
   seal;
 - `hydra-delivery-guard.mjs clear` apaga as duas evidências — chamado por
-  `/hydra-review-item` em caso de falha depois do stage, e por
-  `/hydra-ship` logo após um commit bem-sucedido.
+  `/hydra-work` em caso de falha depois do stage, e por `/hydra-ship`
+  logo após um commit bem-sucedido.
 
 ## Identificação de commits
 
 Trailers estruturados na mensagem, anexados automaticamente por
-`/hydra-ship` (nunca digitados manualmente, para eliminar risco de erro):
+`/hydra-ship` (nunca digitados manualmente, para eliminar risco de erro).
+`Hydra-Cycle` só existe quando há um ciclo numérico real, derivável de um
+item `Cx-y`; itens `Sx`/`Sx[Letra]` (Stage do rework de produto) e `Rx`
+(corte de remediação de engenharia) não têm ciclo e levam somente
+`Hydra-Item` — reconciliado em S6T, quando o control plane já suportava
+esses formatos mas `/hydra-ship` ainda assumia ciclo obrigatório:
 
 ```
 Hydra-Item: C4-02
 Hydra-Cycle: 4
+```
+
+```
+Hydra-Item: S6V
 ```
 
 Consultáveis nativamente via `git log --pretty='%(trailers:key=Hydra-Item,valueonly=true)'`,
