@@ -2,6 +2,7 @@
 
 export type * from './catalog-types';
 export type * from './state-types';
+export type * from './events';
 export type * from './result';
 export * from './factory';
 export * from './transitions';

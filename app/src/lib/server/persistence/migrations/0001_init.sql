@@ -249,6 +249,32 @@ CREATE TABLE IF NOT EXISTS desired_outcome (
 	updated_at TEXT NOT NULL
 );
 
+-- Event log incremental — ETAPA 7 do rework ("Event log incremental", ver
+-- app/src/lib/domain/events.ts). Histórico auxiliar append-only: nunca
+-- apagado por saveTransaction (ao contrário de todas as tabelas acima, que
+-- são DELETE + reinsert a cada save), nunca usado para reconstruir
+-- ProjectState. Coleção 0:N que legitimamente começa vazia — sem função
+-- ensureX de backfill (mesmo padrão de work_item/impediment na ETAPA 6:
+-- CREATE TABLE IF NOT EXISTS já é suficiente para bancos existentes, um
+-- projeto pré-S7 simplesmente não tem nenhuma linha aqui). type/entity_type
+-- fechados na taxonomia da primeira versão (só o loop WorkItem/Impediment);
+-- ampliar a taxonomia é decisão de corte futura, não uma migração deste
+-- CHECK. payload é JSON em TEXT, mesmo padrão de encoding já usado por
+-- treatment_step.actors/external_action.questions acima.
+CREATE TABLE IF NOT EXISTS project_event (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	type TEXT NOT NULL CHECK (
+		type IN ('work_item.created', 'work_item.status_changed', 'impediment.registered', 'impediment.status_changed')
+	),
+	entity_type TEXT NOT NULL CHECK (entity_type IN ('work_item', 'impediment')),
+	entity_id TEXT NOT NULL,
+	payload TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_project_event_project_id ON project_event (project_id);
+CREATE INDEX IF NOT EXISTS idx_project_event_entity_id ON project_event (entity_id);
+
 -- Índices de project_id (R5, ENGINEERING_REMEDIATION.md) — só nas tabelas
 -- cuja PK não cobre project_id como coluna líder (scope_version,
 -- current_treatment, cause_exploration usam project_id como PK; project_id

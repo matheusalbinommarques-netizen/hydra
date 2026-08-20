@@ -3,6 +3,7 @@
 // exceção, sempre retorna Result; nenhum cast é usado para presumir validade.
 
 import type { ActivityDefinition, Catalog } from './catalog-types';
+import type { ProjectEvent, ProjectEventType } from './events';
 import type {
 	ActivityProgress,
 	ActivityStatus,
@@ -43,9 +44,18 @@ import {
 	getTreatmentConfirmationIssues
 } from './transitions';
 
+// events (ETAPA 7 do rework, "Event log incremental") — campo aditivo
+// opcional dentro do MESMO envelope version: 1, mesmo padrão já usado para
+// workItems/causeHypotheses/desiredOutcomes dentro de ProjectState (ver
+// parseWorkItemList etc. abaixo): um export anterior à S7 simplesmente não
+// tem esta chave, e isso é válido — vira histórico vazio, nunca erro de
+// forma. Fica FORA de ProjectState de propósito (não é um objeto vivo,
+// nunca reconstrói estado) — export/import tratam state e events como duas
+// coleções irmãs do mesmo envelope, nunca uma dentro da outra.
 export interface ExportedProjectState {
 	version: 1;
 	state: ProjectState;
+	events?: ProjectEvent[];
 }
 
 export type ProjectStateParseError =
@@ -55,8 +65,13 @@ export type ProjectStateParseError =
 	| { kind: 'invalid_reference'; details: string }
 	| { kind: 'invariant_violation'; details: string };
 
-export function serializeProjectState(state: ProjectState): string {
-	const envelope: ExportedProjectState = { version: 1, state };
+// events default [] preserva a assinatura de uso existente (todo call site
+// anterior à S7 continua compilando e produzindo o mesmo JSON de sempre,
+// só que agora com `events: []` explícito em vez de ausente — irrelevante
+// para deserializeProjectState/parseProjectEventList, que tratam ambos
+// igual).
+export function serializeProjectState(state: ProjectState, events: ProjectEvent[] = []): string {
+	const envelope: ExportedProjectState = { version: 1, state, events };
 	return JSON.stringify(envelope);
 }
 
@@ -1354,4 +1369,120 @@ export function deserializeProjectState(
 		causeHypothesesResult.value,
 		desiredOutcomesResult.value
 	);
+}
+
+// --- Event log incremental (ETAPA 7 do rework) ----------------------------
+// Parser independente de deserializeProjectState/assembleProjectState de
+// propósito: events é um campo irmão de state no mesmo envelope, não uma
+// coleção de ProjectState, então não precisa (nem deve) passar pelo mesmo
+// pipeline de validação cruzada contra o catálogo — só valida a forma de
+// cada evento contra a taxonomia fechada de domain/events.ts. entityType é
+// sempre recomputado a partir de `type` (nunca lido do JSON): os dois
+// sempre andam juntos por construção (ver events.ts), então ler o valor do
+// wire só adicionaria uma segunda fonte que poderia divergir da primeira.
+
+const PROJECT_EVENT_TYPES: readonly string[] = [
+	'work_item.created',
+	'work_item.status_changed',
+	'impediment.registered',
+	'impediment.status_changed'
+];
+
+function parseProjectEventList(value: unknown): Result<ProjectEvent[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('events deve ser um array');
+	const result: ProjectEvent[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada ProjectEvent deve ser um objeto');
+		if (!isString(item.id)) return shapeError('ProjectEvent.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('ProjectEvent.projectId deve ser uma string');
+		if (!isString(item.entityId)) return shapeError('ProjectEvent.entityId deve ser uma string');
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('ProjectEvent.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (typeof item.type !== 'string' || !PROJECT_EVENT_TYPES.includes(item.type)) {
+			return shapeError('ProjectEvent.type deve ser um dos literais aprovados');
+		}
+		if (!isRecord(item.payload)) return shapeError('ProjectEvent.payload deve ser um objeto');
+		const type = item.type as ProjectEventType;
+		const payload = item.payload;
+
+		switch (type) {
+			case 'work_item.created': {
+				if (!isString(payload.title)) return shapeError('ProjectEvent.payload.title deve ser uma string');
+				result.push({
+					id: item.id,
+					projectId: item.projectId,
+					type,
+					entityType: 'work_item',
+					entityId: item.entityId,
+					payload: { title: payload.title },
+					createdAt: item.createdAt
+				});
+				break;
+			}
+			case 'work_item.status_changed': {
+				if (!isWorkItemStatus(payload.fromStatus) || !isWorkItemStatus(payload.toStatus)) {
+					return shapeError('ProjectEvent.payload.fromStatus/toStatus devem ser status de WorkItem válidos');
+				}
+				result.push({
+					id: item.id,
+					projectId: item.projectId,
+					type,
+					entityType: 'work_item',
+					entityId: item.entityId,
+					payload: { fromStatus: payload.fromStatus, toStatus: payload.toStatus },
+					createdAt: item.createdAt
+				});
+				break;
+			}
+			case 'impediment.registered': {
+				if (!isString(payload.text) || !isImpedimentType(payload.tipo)) {
+					return shapeError('ProjectEvent.payload.text/tipo inválidos para impediment.registered');
+				}
+				result.push({
+					id: item.id,
+					projectId: item.projectId,
+					type,
+					entityType: 'impediment',
+					entityId: item.entityId,
+					payload: { text: payload.text, tipo: payload.tipo },
+					createdAt: item.createdAt
+				});
+				break;
+			}
+			case 'impediment.status_changed': {
+				if (!isImpedimentStatus(payload.fromStatus) || !isImpedimentStatus(payload.toStatus)) {
+					return shapeError('ProjectEvent.payload.fromStatus/toStatus devem ser status de Impediment válidos');
+				}
+				result.push({
+					id: item.id,
+					projectId: item.projectId,
+					type,
+					entityType: 'impediment',
+					entityId: item.entityId,
+					payload: { fromStatus: payload.fromStatus, toStatus: payload.toStatus },
+					createdAt: item.createdAt
+				});
+				break;
+			}
+		}
+	}
+	return { ok: true, value: result };
+}
+
+// Ausência do campo "events" no envelope (export anterior à S7) produz []
+// — nunca erro, mesmo espírito de workItems/causeHypotheses ausentes em
+// ProjectState acima.
+export function deserializeProjectEvents(json: string): Result<ProjectEvent[], ProjectStateParseError> {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(json);
+	} catch {
+		return { ok: false, error: { kind: 'invalid_json' } };
+	}
+	if (!isRecord(parsed)) {
+		return shapeError('o JSON raiz precisa ser um objeto') as Result<ProjectEvent[], ProjectStateParseError>;
+	}
+	return parseProjectEventList(parsed.events);
 }

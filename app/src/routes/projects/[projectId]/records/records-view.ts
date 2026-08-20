@@ -9,7 +9,7 @@
 // (auditoria de sustentação semântica das categorias do mockup, etapa 7.4).
 
 import { decodeMultiSelectValue, decodePlanningItems } from '$lib/domain';
-import type { ActivityDefinition, ActivityStatus, Catalog } from '$lib/domain';
+import type { ActivityDefinition, ActivityStatus, Catalog, ImpedimentType, ProjectEvent, WorkItemStatus } from '$lib/domain';
 
 export interface RecordsPendingItemInput {
 	id: string;
@@ -21,11 +21,42 @@ export interface RecordsPendingItemInput {
 	resolvedAt?: string;
 }
 
+// Event log incremental (ETAPA 7 do rework, "Event log incremental") —
+// menor entrada suficiente para nomear o WorkItem em work_item.status_changed
+// (o evento em si só carrega fromStatus/toStatus, nunca o título — ver
+// domain/events.ts). title é lido do estado atual (WorkItem não tem
+// operação de renomear nesta versão, então é sempre o mesmo título de quando
+// o evento aconteceu).
+export interface RecordsWorkItemInput {
+	id: string;
+	title: string;
+}
+
+// Mesmo espírito de RecordsWorkItemInput acima — Impediment.text é imutável
+// depois de criado (sem operação de editar o texto nesta versão), então o
+// estado atual sempre corresponde ao texto de quando o evento aconteceu.
+export interface RecordsImpedimentInput {
+	id: string;
+	text: string;
+}
+
 export interface RecordsViewInput {
 	projectId: string;
 	answers: Record<string, string>;
 	pendingItemHistory: RecordsPendingItemInput[];
 	activityStatuses: Record<string, ActivityStatus>;
+	// Opcionais (default []): testes/chamadores anteriores à S7 continuam
+	// válidos sem tocar no event log, mesmo espírito aditivo já usado em
+	// ProjectState (workItems/causeHypotheses ausentes viram coleção vazia).
+	events?: ProjectEvent[];
+	workItems?: RecordsWorkItemInput[];
+	impediments?: RecordsImpedimentInput[];
+	// entityId(s) da query string (Design Gate S7 — estado filtrado) — só os
+	// ids usados para FILTRAR, não os que aparecem nos eventos resultantes
+	// (podem divergir: "Ver mudanças relacionadas" filtra por WorkItem +
+	// Impediment, mas o chip nomeia o WorkItem mesmo quando só eventos do
+	// Impediment aparecem na lista). Ausente/vazio = sem filtro.
+	filterEntityIds?: string[];
 }
 
 export interface RecordsAnswerFieldView {
@@ -59,9 +90,30 @@ export interface RecordsResolvedPendingItemView {
 	detail: string;
 }
 
+// Event log incremental (ETAPA 7 do rework) — texto já em linguagem humana,
+// nunca o nome interno do evento (ver instrução do corte): a apresentação só
+// renderiza `text`, não decide vocabulário nem consulta type/payload.
+export interface RecordsEventView {
+	id: string;
+	text: string;
+	createdAt: string;
+}
+
+// Design Gate S7 — "Atividade recente" é uma unidade só (lista + empty state
+// + chip de filtro), nunca três campos soltos que a apresentação precisaria
+// recombinar: emptyText já vem na copy certa ("neste projeto" vs. nomeando o
+// objeto filtrado), filter já vem resolvido (label real do WorkItem/
+// Impediment, nunca id técnico) ou null quando não há filtro.
+export interface RecordsRecentActivityView {
+	events: RecordsEventView[];
+	emptyText: string;
+	filter: { label: string } | null;
+}
+
 export interface RecordsView {
 	phases: RecordsPhaseAnswersView[];
 	resolvedPendingItems: RecordsResolvedPendingItemView[];
+	recentActivity: RecordsRecentActivityView;
 }
 
 const EDITABLE_PHASE_ID = 'descoberta';
@@ -100,6 +152,89 @@ function buildEditHref(
 	if (phaseId !== EDITABLE_PHASE_ID && !EDITABLE_ACTIVITY_IDS_OUTSIDE_PHASE.has(activityId)) return null;
 	if (activityStatuses[activityId] !== 'concluída') return null;
 	return `/projects/${projectId}/now?activity=${activityId}&from=records`;
+}
+
+const WORK_ITEM_STATUS_LABEL: Record<WorkItemStatus, string> = {
+	a_fazer: 'A fazer',
+	em_andamento: 'Em andamento',
+	concluido: 'Concluído'
+};
+
+const IMPEDIMENT_TIPO_LABEL: Record<ImpedimentType, string> = {
+	dependencia_externa: 'Dependência externa',
+	decisao_pendente: 'Decisão pendente',
+	falta_de_recurso: 'Falta de recurso',
+	bloqueio_tecnico: 'Bloqueio técnico',
+	outro: 'Outro'
+};
+
+// Texto humano por tipo de evento — única fonte de tradução type→texto,
+// nunca duplicada na apresentação (ver RecordsEventView acima). workItemTitleById
+// só é consultado para work_item.status_changed (o único tipo cujo payload
+// não carrega o título — ver domain/events.ts).
+function buildEventText(event: ProjectEvent, workItemTitleById: Map<string, string>): string {
+	switch (event.type) {
+		case 'work_item.created':
+			return `Item de trabalho criado: "${event.payload.title}"`;
+		case 'work_item.status_changed': {
+			const title = workItemTitleById.get(event.entityId) ?? 'Item de trabalho';
+			return `"${title}" movido de ${WORK_ITEM_STATUS_LABEL[event.payload.fromStatus]} para ${WORK_ITEM_STATUS_LABEL[event.payload.toStatus]}`;
+		}
+		case 'impediment.registered':
+			return `Impedimento registrado (${IMPEDIMENT_TIPO_LABEL[event.payload.tipo]}): "${event.payload.text}"`;
+		case 'impediment.status_changed':
+			return event.payload.toStatus === 'resolvido' ? 'Impedimento marcado como resolvido' : 'Impedimento reaberto';
+	}
+}
+
+// Design Gate S7 — o chip do estado filtrado nomeia o objeto observado, não
+// os ids técnicos da URL: WorkItem tem prioridade sobre Impediment quando o
+// filtro cobre os dois (caso de "Ver mudanças relacionadas" em /tracking —
+// o chip nomeia o WorkItem mesmo que os eventos exibidos sejam só do
+// Impediment vinculado, ver Design Gate "Estado filtrado"). Sem rótulo
+// resolvível (id não corresponde a nenhum WorkItem/Impediment conhecido),
+// cai num rótulo genérico em vez de expor o id bruto.
+function buildFilterLabel(
+	filterEntityIds: string[],
+	workItemTitleById: Map<string, string>,
+	impedimentTextById: Map<string, string>
+): string {
+	for (const entityId of filterEntityIds) {
+		const workItemTitle = workItemTitleById.get(entityId);
+		if (workItemTitle) return workItemTitle;
+	}
+	for (const entityId of filterEntityIds) {
+		const impedimentText = impedimentTextById.get(entityId);
+		if (impedimentText) return impedimentText;
+	}
+	return 'item selecionado';
+}
+
+function buildRecentActivityView(
+	events: ProjectEvent[],
+	workItems: RecordsWorkItemInput[],
+	impediments: RecordsImpedimentInput[],
+	filterEntityIds: string[]
+): RecordsRecentActivityView {
+	const workItemTitleById = new Map(workItems.map((item) => [item.id, item.title]));
+	const impedimentTextById = new Map(impediments.map((item) => [item.id, item.text]));
+
+	const eventViews = events.map((event) => ({
+		id: event.id,
+		text: buildEventText(event, workItemTitleById),
+		createdAt: event.createdAt
+	}));
+
+	if (filterEntityIds.length === 0) {
+		return { events: eventViews, emptyText: 'Nenhuma mudança neste projeto ainda.', filter: null };
+	}
+
+	const label = buildFilterLabel(filterEntityIds, workItemTitleById, impedimentTextById);
+	return {
+		events: eventViews,
+		emptyText: `Nenhuma mudança registrada para "${label}" ainda.`,
+		filter: { label }
+	};
 }
 
 export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): RecordsView {
@@ -165,5 +300,14 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 			};
 		});
 
-	return { phases, resolvedPendingItems };
+	return {
+		phases,
+		resolvedPendingItems,
+		recentActivity: buildRecentActivityView(
+			input.events ?? [],
+			input.workItems ?? [],
+			input.impediments ?? [],
+			input.filterEntityIds ?? []
+		)
+	};
 }

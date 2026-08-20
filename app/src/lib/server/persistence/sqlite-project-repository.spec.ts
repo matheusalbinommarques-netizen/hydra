@@ -26,6 +26,7 @@ import {
 	moveWorkItem,
 	prepareExternalAction,
 	renameProject,
+	reopenImpediment,
 	resolveImpediment,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
@@ -40,7 +41,7 @@ import {
 	skipActivity,
 	toggleCauseHypothesisEvidence
 } from '$lib/domain';
-import type { ProjectState } from '$lib/domain';
+import type { ProjectEvent, ProjectState } from '$lib/domain';
 import { createSqliteProjectRepository, type SqliteProjectRepository } from './sqlite-project-repository';
 
 const T1 = '2026-01-01T00:00:00.000Z';
@@ -591,6 +592,152 @@ describe('createSqliteProjectRepository — save', () => {
 
 		await expect(repo.save(broken)).rejects.toThrow();
 		await expect(repo.findById('proj-1')).resolves.toEqual(valid); // inalterado
+	});
+});
+
+// Event log incremental (ETAPA 7 do rework, "Event log incremental") —
+// mesmos padrões já usados acima (memoryRepo/tempFilePath, unwrap,
+// rollback atômico via dado inválido) aplicados ao novo caminho de escrita
+// de project_event.
+describe('createSqliteProjectRepository — event log (ETAPA 7 do rework)', () => {
+	function workItemCreatedEvent(overrides: Partial<ProjectEvent> = {}): ProjectEvent {
+		return {
+			id: 'evt-1',
+			projectId: 'proj-1',
+			type: 'work_item.created',
+			entityType: 'work_item',
+			entityId: 'wi-1',
+			payload: { title: 'Revisar contrato' },
+			createdAt: T1,
+			...overrides
+		} as ProjectEvent;
+	}
+
+	it('banco novo: listEvents de um projeto sem eventos retorna []', async () => {
+		const repo = memoryRepo();
+		await repo.insert(createInitialProjectState(catalog, 'proj-1', T1));
+		await expect(repo.listEvents('proj-1')).resolves.toEqual([]);
+	});
+
+	it('abre um banco pré-S7 (sem a tabela project_event) e listEvents retorna [] sem quebrar — sem backfill', async () => {
+		const filePath = tempFilePath();
+
+		// Simula um banco criado antes da S7: schema sem project_event, mas com
+		// um projeto já existente (mesmo espírito dos testes pré-D023/D025
+		// acima — aqui não há coluna nem tabela 1:1 a migrar, só a ausência de
+		// uma tabela 0:N nova).
+		const legacyDb = new Database(filePath);
+		legacyDb.exec(
+			'CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL, route_start_phase_id TEXT)'
+		);
+		legacyDb.prepare('INSERT INTO project (id, name, created_at) VALUES (?, ?, ?)').run('legacy-1', null, T1);
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		// project_event foi criada vazia (CREATE TABLE IF NOT EXISTS) — nenhuma
+		// linha foi inventada para o projeto pré-existente (sem ensureX de
+		// backfill, ao contrário de current_treatment/cause_exploration).
+		await expect(repo.listEvents('legacy-1')).resolves.toEqual([]);
+	});
+
+	it('save(state, events) grava estado e evento na mesma transação', async () => {
+		const repo = memoryRepo();
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		await repo.insert(state);
+
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Revisar contrato', T1));
+		await repo.save(state, [workItemCreatedEvent()]);
+
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+		const events = await repo.listEvents('proj-1');
+		expect(events).toEqual([workItemCreatedEvent()]);
+	});
+
+	it('atomicidade: save com dado inválido não deixa nem o estado nem o evento gravados', async () => {
+		const repo = memoryRepo();
+		const valid = createInitialProjectState(catalog, 'proj-1', T1);
+		await repo.insert(valid);
+
+		const broken: ProjectState = {
+			...valid,
+			pendingItems: [
+				{ id: 'p1', projectId: 'proj-1', activityDefinitionId: 'publico', status: 'aberta', createdAt: T1 },
+				{ id: 'p1', projectId: 'proj-1', activityDefinitionId: 'estado_atual', status: 'aberta', createdAt: T1 } // id duplicado
+			]
+		};
+
+		await expect(repo.save(broken, [workItemCreatedEvent()])).rejects.toThrow();
+		await expect(repo.findById('proj-1')).resolves.toEqual(valid); // estado inalterado
+		await expect(repo.listEvents('proj-1')).resolves.toEqual([]); // nenhum evento órfão
+	});
+
+	it('evento sobrevive a saves posteriores que não passam events (histórico nunca é apagado por save)', async () => {
+		const repo = memoryRepo();
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		await repo.insert(state);
+
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Revisar contrato', T1));
+		await repo.save(state, [workItemCreatedEvent()]);
+
+		// save "normal", sem segundo argumento — mesmo caminho usado por toda
+		// operação que ainda não gera evento (ver project-use-cases.ts).
+		state = unwrap(renameProject(catalog, state, 'Novo nome'));
+		await repo.save(state);
+
+		await expect(repo.listEvents('proj-1')).resolves.toEqual([workItemCreatedEvent()]);
+	});
+
+	it('resolve → reopen produz dois eventos impediment.status_changed em ordem, com fromStatus/toStatus corretos', async () => {
+		const repo = memoryRepo();
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		await repo.insert(state);
+
+		state = unwrap(addImpediment(catalog, state, 'imp-1', 'Falta acesso', 'falta_de_recurso', T1));
+		state = unwrap(resolveImpediment(catalog, state, 'imp-1', T1));
+		const resolvedEvent: ProjectEvent = {
+			id: 'evt-resolved',
+			projectId: 'proj-1',
+			type: 'impediment.status_changed',
+			entityType: 'impediment',
+			entityId: 'imp-1',
+			payload: { fromStatus: 'aberto', toStatus: 'resolvido' },
+			createdAt: T1
+		};
+		await repo.save(state, [resolvedEvent]);
+
+		state = unwrap(reopenImpediment(catalog, state, 'imp-1', T2));
+		const reopenedEvent: ProjectEvent = {
+			id: 'evt-reopened',
+			projectId: 'proj-1',
+			type: 'impediment.status_changed',
+			entityType: 'impediment',
+			entityId: 'imp-1',
+			payload: { fromStatus: 'resolvido', toStatus: 'aberto' },
+			createdAt: T2
+		};
+		await repo.save(state, [reopenedEvent]);
+
+		// mais recente primeiro (ORDER BY created_at DESC)
+		await expect(repo.listEvents('proj-1')).resolves.toEqual([reopenedEvent, resolvedEvent]);
+	});
+
+	it('listEvents com filtro entityIds retorna só os eventos das entidades pedidas', async () => {
+		const repo = memoryRepo();
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		await repo.insert(state);
+
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Item A', T1));
+		const eventA = workItemCreatedEvent({ id: 'evt-a', entityId: 'wi-1' });
+		state = unwrap(addWorkItem(catalog, state, 'wi-2', 'Item B', T1));
+		const eventB = workItemCreatedEvent({ id: 'evt-b', entityId: 'wi-2', payload: { title: 'Item B' } });
+		await repo.save(state, [eventA, eventB]);
+
+		await expect(repo.listEvents('proj-1', { entityIds: ['wi-1'] })).resolves.toEqual([eventA]);
+		await expect(repo.listEvents('proj-1', { entityIds: ['wi-1', 'wi-2'] })).resolves.toEqual(
+			expect.arrayContaining([eventA, eventB])
+		);
 	});
 });
 

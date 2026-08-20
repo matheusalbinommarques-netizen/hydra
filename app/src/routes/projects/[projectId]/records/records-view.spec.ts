@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
 import { encodePlanningItems } from '$lib/domain';
+import type { ProjectEvent } from '$lib/domain';
 import { buildRecordsView } from './records-view';
 
 const PROJECT_ID = 'proj-1';
@@ -265,6 +266,132 @@ describe('buildRecordsView', () => {
 			pendingItemHistory: [],
 			activityStatuses: {}
 		});
-		expect(result).toEqual({ phases: [], resolvedPendingItems: [] });
+		expect(result).toEqual({
+			phases: [],
+			resolvedPendingItems: [],
+			recentActivity: { events: [], emptyText: 'Nenhuma mudança neste projeto ainda.', filter: null }
+		});
+	});
+});
+
+// Event log incremental (ETAPA 7 do rework) — texto humano por tipo de
+// evento, mais recentes primeiro é responsabilidade de quem lista
+// (repository.listEvents já ordena — ver sqlite-project-repository.spec.ts);
+// aqui só a tradução type/payload → texto.
+describe('buildRecordsView — events (ETAPA 7 do rework)', () => {
+	function baseInput() {
+		return { projectId: PROJECT_ID, answers: {}, pendingItemHistory: [], activityStatuses: {} };
+	}
+
+	it('work_item.created vira texto com o título do payload', () => {
+		const events: ProjectEvent[] = [
+			{
+				id: 'evt-1',
+				projectId: PROJECT_ID,
+				type: 'work_item.created',
+				entityType: 'work_item',
+				entityId: 'wi-1',
+				payload: { title: 'Revisar contrato' },
+				createdAt: '2026-01-01T00:00:00.000Z'
+			}
+		];
+		const result = buildRecordsView(catalog, { ...baseInput(), events, workItems: [{ id: 'wi-1', title: 'Revisar contrato' }] });
+		expect(result.recentActivity.events).toEqual([
+			{ id: 'evt-1', text: 'Item de trabalho criado: "Revisar contrato"', createdAt: '2026-01-01T00:00:00.000Z' }
+		]);
+	});
+
+	it('work_item.status_changed usa o título atual do WorkItem (não vem no payload)', () => {
+		const events: ProjectEvent[] = [
+			{
+				id: 'evt-2',
+				projectId: PROJECT_ID,
+				type: 'work_item.status_changed',
+				entityType: 'work_item',
+				entityId: 'wi-1',
+				payload: { fromStatus: 'a_fazer', toStatus: 'em_andamento' },
+				createdAt: '2026-01-02T00:00:00.000Z'
+			}
+		];
+		const result = buildRecordsView(catalog, { ...baseInput(), events, workItems: [{ id: 'wi-1', title: 'Revisar contrato' }] });
+		expect(result.recentActivity.events[0].text).toBe('"Revisar contrato" movido de A fazer para Em andamento');
+	});
+
+	it('impediment.registered e impediment.status_changed viram texto humano', () => {
+		const events: ProjectEvent[] = [
+			{
+				id: 'evt-3',
+				projectId: PROJECT_ID,
+				type: 'impediment.registered',
+				entityType: 'impediment',
+				entityId: 'imp-1',
+				payload: { text: 'Falta acesso ao ambiente', tipo: 'falta_de_recurso' },
+				createdAt: '2026-01-01T00:00:00.000Z'
+			},
+			{
+				id: 'evt-4',
+				projectId: PROJECT_ID,
+				type: 'impediment.status_changed',
+				entityType: 'impediment',
+				entityId: 'imp-1',
+				payload: { fromStatus: 'aberto', toStatus: 'resolvido' },
+				createdAt: '2026-01-02T00:00:00.000Z'
+			}
+		];
+		const result = buildRecordsView(catalog, { ...baseInput(), events, workItems: [] });
+		expect(result.recentActivity.events.map((event: { text: string }) => event.text)).toEqual([
+			'Impedimento registrado (Falta de recurso): "Falta acesso ao ambiente"',
+			'Impedimento marcado como resolvido'
+		]);
+	});
+});
+
+// Design Gate S7 — chip do estado filtrado e copy do empty state.
+describe('buildRecordsView — filtro de entidade (Design Gate S7)', () => {
+	function baseInput() {
+		return { projectId: PROJECT_ID, answers: {}, pendingItemHistory: [], activityStatuses: {} };
+	}
+
+	it('sem filterEntityIds: filter é null, empty state genérico', () => {
+		const result = buildRecordsView(catalog, { ...baseInput(), events: [] });
+		expect(result.recentActivity.filter).toBeNull();
+		expect(result.recentActivity.emptyText).toBe('Nenhuma mudança neste projeto ainda.');
+	});
+
+	it('filtro por um WorkItem: chip nomeia o WorkItem, empty state nomeia o item', () => {
+		const result = buildRecordsView(catalog, {
+			...baseInput(),
+			events: [],
+			workItems: [{ id: 'wi-1', title: 'Revisar contrato' }],
+			filterEntityIds: ['wi-1']
+		});
+		expect(result.recentActivity.filter).toEqual({ label: 'Revisar contrato' });
+		expect(result.recentActivity.emptyText).toBe('Nenhuma mudança registrada para "Revisar contrato" ainda.');
+	});
+
+	it('filtro por WorkItem + Impediment (Ver mudanças relacionadas): chip prioriza o nome do WorkItem', () => {
+		const result = buildRecordsView(catalog, {
+			...baseInput(),
+			events: [],
+			workItems: [{ id: 'wi-1', title: 'Revisar contrato' }],
+			impediments: [{ id: 'imp-1', text: 'Aguardando aprovação' }],
+			filterEntityIds: ['wi-1', 'imp-1']
+		});
+		expect(result.recentActivity.filter).toEqual({ label: 'Revisar contrato' });
+	});
+
+	it('filtro só por Impediment: chip nomeia o Impediment', () => {
+		const result = buildRecordsView(catalog, {
+			...baseInput(),
+			events: [],
+			impediments: [{ id: 'imp-1', text: 'Aguardando aprovação' }],
+			filterEntityIds: ['imp-1']
+		});
+		expect(result.recentActivity.filter).toEqual({ label: 'Aguardando aprovação' });
+	});
+
+	it('filtro por id desconhecido: rótulo genérico, nunca o id técnico exposto', () => {
+		const result = buildRecordsView(catalog, { ...baseInput(), events: [], filterEntityIds: ['id-inexistente-xyz'] });
+		expect(result.recentActivity.filter).toEqual({ label: 'item selecionado' });
 	});
 });

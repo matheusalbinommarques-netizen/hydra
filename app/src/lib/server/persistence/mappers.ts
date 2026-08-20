@@ -22,6 +22,7 @@ import type {
 	ImpedimentType,
 	PendingItem,
 	Project,
+	ProjectEvent,
 	ScopeBucket,
 	ScopeEffort,
 	ScopeExecutionStatus,
@@ -351,6 +352,33 @@ export function mapDesiredOutcomeRow(row: DesiredOutcomeRow): DesiredOutcome {
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};
+}
+
+// Event log incremental (ETAPA 7 do rework) — payload é JSON em TEXT (mesmo
+// padrão de encoding já usado por ExternalActionRow.questions/TreatmentStepRow.actors
+// acima). type/entity_type confiam nas CHECK constraints do schema (mesmo
+// nível de confiança já aplicado a ImpedimentRow.status/WorkItemRow.status —
+// nenhuma outra linha deste arquivo revalida o CHECK do banco em runtime).
+export interface ProjectEventRow {
+	id: string;
+	project_id: string;
+	type: string;
+	entity_type: string;
+	entity_id: string;
+	payload: string;
+	created_at: string;
+}
+
+export function mapProjectEventRow(row: ProjectEventRow): ProjectEvent {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		type: row.type,
+		entityType: row.entity_type,
+		entityId: row.entity_id,
+		payload: JSON.parse(row.payload),
+		createdAt: row.created_at
+	} as ProjectEvent;
 }
 
 export function mapPendingItemRow(row: PendingItemRow): PendingItem {

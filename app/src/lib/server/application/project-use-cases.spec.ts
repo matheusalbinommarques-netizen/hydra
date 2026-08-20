@@ -28,16 +28,17 @@ function countingRepository(inner: ProjectRepository): { repository: ProjectRepo
 	const counts = { insert: 0, save: 0 };
 	return {
 		repository: {
-			insert: async (state) => {
+			insert: async (state, events) => {
 				counts.insert++;
-				return inner.insert(state);
+				return inner.insert(state, events);
 			},
 			findById: (projectId) => inner.findById(projectId),
-			save: async (state) => {
+			save: async (state, events) => {
 				counts.save++;
-				return inner.save(state);
+				return inner.save(state, events);
 			},
-			listRecent: () => inner.listRecent()
+			listRecent: () => inner.listRecent(),
+			listEvents: (projectId, filter) => inner.listEvents(projectId, filter)
 		},
 		counts
 	};
@@ -685,6 +686,54 @@ describe('createProjectUseCases — exportProject / importProject', () => {
 			error: { kind: 'import_id_collision', projectId: created.value.projectId }
 		});
 	});
+
+	// Event log incremental (ETAPA 7 do rework) — export/import precisa
+	// preservar o histórico registrado (mesma promessa já válida para todo o
+	// resto do estado), sem tornar ProjectEvent fonte de verdade de
+	// ProjectState nem quebrar export no formato anterior à S7.
+	it('exportProject inclui os eventos do projeto; importProject os restaura', async () => {
+		const source = setup();
+		const created = await source.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		await source.useCases.addWorkItem({ projectId, title: 'Revisar contrato' });
+
+		const exported = await source.useCases.exportProject(projectId);
+		if (!exported.ok) throw new Error('esperado ok');
+		const envelope = JSON.parse(exported.value) as { events: unknown[] };
+		expect(envelope.events).toHaveLength(1);
+
+		const target = setup();
+		const imported = await target.useCases.importProject(exported.value);
+		expect(imported.ok).toBe(true);
+
+		const events = await target.useCases.listProjectEvents(projectId);
+		if (!events.ok) throw new Error('esperado ok');
+		expect(events.value).toEqual([
+			expect.objectContaining({ type: 'work_item.created', payload: { title: 'Revisar contrato' } })
+		]);
+	});
+
+	it('importProject aceita um export sem a chave "events" (formato anterior à S7) e produz histórico vazio', async () => {
+		const source = setup();
+		const created = await source.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		await source.useCases.addWorkItem({ projectId, title: 'Item' });
+
+		const exported = await source.useCases.exportProject(projectId);
+		if (!exported.ok) throw new Error('esperado ok');
+		const envelope = JSON.parse(exported.value) as { events?: unknown[] };
+		delete envelope.events; // simula um export gerado antes da S7
+
+		const target = setup();
+		const imported = await target.useCases.importProject(JSON.stringify(envelope));
+		expect(imported.ok).toBe(true);
+
+		const events = await target.useCases.listProjectEvents(projectId);
+		if (!events.ok) throw new Error('esperado ok');
+		expect(events.value).toEqual([]);
+	});
 });
 
 describe('createProjectUseCases — propagação de erros e falhas', () => {
@@ -707,7 +756,8 @@ describe('createProjectUseCases — propagação de erros e falhas', () => {
 			save: async () => {
 				throw new Error('falha simulada de persistência');
 			},
-			listRecent: async () => []
+			listRecent: async () => [],
+			listEvents: async () => []
 		};
 		const useCases = createProjectUseCases({
 			repository: brokenRepository,
@@ -1425,6 +1475,163 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 		expect(
 			await useCases.addImpediment({ projectId: 'nao-existe', text: 'x', tipo: 'outro' })
 		).toEqual({ ok: false, error: { kind: 'project_not_found' } });
+	});
+});
+
+// Event log incremental (ETAPA 7 do rework, "Event log incremental") —
+// cobre a emissão de evento pelos 5 use-cases do loop S6 (addWorkItem,
+// moveWorkItem, addImpediment, resolveImpediment, reopenImpediment),
+// inclusive o caso de no-op não emitir (mesma condição `result.value !==
+// state` que já decide se salva). Atomicidade estado+evento e sobrevivência
+// do evento a saves posteriores já são cobertas em
+// sqlite-project-repository.spec.ts — aqui o foco é a wiring do use-case
+// (payload correto, idempotência).
+describe('createProjectUseCases — event log (ETAPA 7 do rework)', () => {
+	it('addWorkItem emite work_item.created com o título', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addWorkItem({ projectId, title: 'Revisar contrato' });
+		if (!added.ok) throw new Error('esperado ok');
+		const workItemId = added.value.workItems[0].id;
+
+		const events = await useCases.listProjectEvents(projectId);
+		if (!events.ok) throw new Error('esperado ok');
+		expect(events.value).toEqual([
+			{
+				id: expect.any(String),
+				projectId,
+				type: 'work_item.created',
+				entityType: 'work_item',
+				entityId: workItemId,
+				payload: { title: 'Revisar contrato' },
+				createdAt: '2026-01-01T00:00:00.000Z'
+			}
+		]);
+	});
+
+	it('moveWorkItem emite work_item.status_changed com fromStatus/toStatus; mover para o mesmo status não emite nada', async () => {
+		const { useCases, clock } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const added = await useCases.addWorkItem({ projectId, title: 'Item' });
+		if (!added.ok) throw new Error('esperado ok');
+		const workItemId = added.value.workItems[0].id;
+
+		clock.set('2026-01-02T00:00:00.000Z');
+		await useCases.moveWorkItem({ projectId, workItemId, status: 'em_andamento' });
+
+		// no-op: mover para o status atual não deve adicionar um segundo evento
+		clock.set('2026-01-03T00:00:00.000Z');
+		await useCases.moveWorkItem({ projectId, workItemId, status: 'em_andamento' });
+
+		const events = await useCases.listProjectEvents(projectId, { entityIds: [workItemId] });
+		if (!events.ok) throw new Error('esperado ok');
+		const statusChanged = events.value.filter((event) => event.type === 'work_item.status_changed');
+		expect(statusChanged).toEqual([
+			{
+				id: expect.any(String),
+				projectId,
+				type: 'work_item.status_changed',
+				entityType: 'work_item',
+				entityId: workItemId,
+				payload: { fromStatus: 'a_fazer', toStatus: 'em_andamento' },
+				createdAt: '2026-01-02T00:00:00.000Z'
+			}
+		]);
+	});
+
+	it('addImpediment emite impediment.registered com text/tipo', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Falta acesso', tipo: 'falta_de_recurso' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		const events = await useCases.listProjectEvents(projectId);
+		if (!events.ok) throw new Error('esperado ok');
+		expect(events.value).toEqual([
+			{
+				id: expect.any(String),
+				projectId,
+				type: 'impediment.registered',
+				entityType: 'impediment',
+				entityId: impedimentId,
+				payload: { text: 'Falta acesso', tipo: 'falta_de_recurso' },
+				createdAt: '2026-01-01T00:00:00.000Z'
+			}
+		]);
+	});
+
+	it('resolveImpediment → reopenImpediment emite dois impediment.status_changed, mais recente primeiro; resolver de novo (no-op) não duplica', async () => {
+		const { useCases, clock } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const added = await useCases.addImpediment({ projectId, text: 'Item', tipo: 'outro' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		clock.set('2026-01-02T00:00:00.000Z');
+		await useCases.resolveImpediment({ projectId, impedimentId });
+		// no-op: já está resolvido, não deve gerar um segundo status_changed
+		await useCases.resolveImpediment({ projectId, impedimentId });
+
+		clock.set('2026-01-03T00:00:00.000Z');
+		await useCases.reopenImpediment({ projectId, impedimentId });
+
+		const events = await useCases.listProjectEvents(projectId, { entityIds: [impedimentId] });
+		if (!events.ok) throw new Error('esperado ok');
+		const statusChanged = events.value.filter((event) => event.type === 'impediment.status_changed');
+		expect(statusChanged).toEqual([
+			{
+				id: expect.any(String),
+				projectId,
+				type: 'impediment.status_changed',
+				entityType: 'impediment',
+				entityId: impedimentId,
+				payload: { fromStatus: 'resolvido', toStatus: 'aberto' },
+				createdAt: '2026-01-03T00:00:00.000Z'
+			},
+			{
+				id: expect.any(String),
+				projectId,
+				type: 'impediment.status_changed',
+				entityType: 'impediment',
+				entityId: impedimentId,
+				payload: { fromStatus: 'aberto', toStatus: 'resolvido' },
+				createdAt: '2026-01-02T00:00:00.000Z'
+			}
+		]);
+	});
+
+	it('listProjectEvents sem filtro retorna todos os eventos do projeto, mais recentes primeiro', async () => {
+		const { useCases, clock } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.addWorkItem({ projectId, title: 'A' });
+		clock.set('2026-01-02T00:00:00.000Z');
+		await useCases.addImpediment({ projectId, text: 'B', tipo: 'outro' });
+
+		const events = await useCases.listProjectEvents(projectId);
+		if (!events.ok) throw new Error('esperado ok');
+		expect(events.value.map((event) => event.type)).toEqual(['impediment.registered', 'work_item.created']);
+	});
+
+	it('project_not_found quando o projeto não existe', async () => {
+		const { useCases } = setup();
+		expect(await useCases.listProjectEvents('nao-existe')).toEqual({
+			ok: false,
+			error: { kind: 'project_not_found' }
+		});
 	});
 });
 

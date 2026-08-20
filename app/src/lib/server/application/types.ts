@@ -11,6 +11,7 @@ import type {
 	EvidenceOutcome,
 	ExternalActionStatus,
 	ImpedimentType,
+	ProjectEvent,
 	ProjectStateParseError,
 	Result,
 	ScopeBucket,
@@ -32,6 +33,7 @@ import type {
 	ScopeProjectionView,
 	ScopeSuggestionView
 } from '$lib/orientation-engine';
+import type { ProjectEventFilter } from '../persistence';
 
 // Histórico completo de pendências (Registros, C3-02) — deriva diretamente
 // de state.pendingItems nesta camada (mesmo padrão já usado para popular
@@ -736,4 +738,10 @@ export interface ProjectUseCases {
 	confirmDesiredOutcomes(input: ConfirmDesiredOutcomesInput): Promise<UseCaseOutcome<ProjectView>>;
 	exportProject(projectId: string): Promise<UseCaseOutcome<string>>;
 	importProject(json: string): Promise<UseCaseOutcome<ProjectView>>;
+	// Event log incremental (ETAPA 7 do rework) — leitura auxiliar, nunca
+	// parte de ProjectView (ver project-view.ts): /records busca separado,
+	// mesmo padrão de exportProject/importProject retornando algo que não é
+	// ProjectView. filter.entityIds vazio/ausente = todos os eventos do
+	// projeto.
+	listProjectEvents(projectId: string, filter?: ProjectEventFilter): Promise<UseCaseOutcome<ProjectEvent[]>>;
 }

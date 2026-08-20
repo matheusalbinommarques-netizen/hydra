@@ -143,6 +143,12 @@
 								Atualizar situação
 							</button>
 							<a class="section-link" href="/projects/{projectId}/work">Ver item em Trabalho →</a>
+							<a
+								class="section-link"
+								href="/projects/{projectId}/records?entityId={blocked.workItemId}&entityId={blocked.impedimentId}"
+							>
+								Ver mudanças relacionadas →
+							</a>
 						</div>
 					{/if}
 				</li>

@@ -301,6 +301,14 @@
 				</button>
 			{/if}
 		</div>
+
+		<!-- Design Gate S7 — "Ver histórico" vira contexto secundário: última
+		     linha do painel, depois do bloco operacional (Status + Impedimento).
+		     Mesmo estilo de link (.section-link) — só a posição muda; trabalhar
+		     no item primeiro, entender seu histórico depois. -->
+		<div class="panel-section">
+			<a class="section-link" href="/projects/{projectId}/records?entityId={selectedItem.id}">Ver histórico →</a>
+		</div>
 	</aside>
 {/if}
 

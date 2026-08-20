@@ -667,6 +667,36 @@ Com isso, `docs/core/CURRENT_WORK.json` volta a apontar para `S7` —
 ETAPA 7, "Event log incremental" (`docs/core/HYDRA_PRODUCT_REWORK.md`
 §37), ainda não iniciada e não autorizada.
 
+ETAPA 7 ("Event log incremental") está **concluída e fechada** (D037,
+`docs/07-management/decision-log.md`; `docs/core/HYDRA_PRODUCT_REWORK.md`
+§37): log de eventos append-only (`project_event`) cobrindo só o loop
+WorkItem/Impediment (D036) — quatro tipos fechados (criado/status
+mudou de WorkItem, registrado/status mudou de Impediment), sem
+taxonomia genérica, sem event sourcing/replay/CQRS — `ProjectState`
+continua a única fonte de verdade. Estado e evento persistem
+atomicamente na mesma transação SQLite (`ProjectRepository.save`/
+`insert` ganham `events?` opcional, toda chamada existente sem evento
+continua igual); operação idempotente nunca emite evento duplicado.
+Projeto pré-S7 abre com histórico vazio, sem backfill inventado.
+Export/import preserva eventos, e um export anterior à S7 continua
+importável (campo `events` aditivo no mesmo envelope `version: 1`).
+`/records` é a única projeção cronológica ("Atividade recente", mais
+recente primeiro, filtro por entidade); Trabalho ("Ver histórico") e
+Acompanhamento ("Ver mudanças relacionadas") só navegam até lá.
+Refinamento visual seguiu Design Gate aprovado via Claude Design MCP,
+com uma divergência de cor resolvida sem migrar as três superfícies
+para o tema teal do mockup (papel/tinta/grafite permanece sem cor de
+acento própria, decisão já documentada em `app.css`) — detalhamento
+completo em D037. Dogfood funcional e dogfood visual do Design Gate
+aprovados explicitamente por Matheus antes do fechamento; `hydra-verify
+full` PASS (5/5 etapas, 730 testes unitários, 22/22 jornadas). Concluído
+e fechado (`docs/08-delivery/s7-event-log-incremental.md`).
+
+Com isso, `docs/core/CURRENT_WORK.json` passa a apontar para `S8` —
+ETAPA 8, "Dependency + Milestone + Roadmap/Timeline"
+(`docs/core/HYDRA_PRODUCT_REWORK.md` §38), ainda não iniciada e não
+autorizada.
+
 ## Não fazer agora
 
 - Não implementar IA.

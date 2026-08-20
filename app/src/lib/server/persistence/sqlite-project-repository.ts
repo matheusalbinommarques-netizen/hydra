@@ -3,8 +3,8 @@
 // falar com o banco diretamente.
 
 import Database from 'better-sqlite3';
-import type { Project, ProjectState } from '$lib/domain';
-import type { ProjectRepository } from './project-repository';
+import type { Project, ProjectEvent, ProjectState } from '$lib/domain';
+import type { ProjectEventFilter, ProjectRepository } from './project-repository';
 import {
 	mapActivityProgressRow,
 	mapAffectedGroupRow,
@@ -17,6 +17,7 @@ import {
 	mapExternalActionRow,
 	mapImpedimentRow,
 	mapPendingItemRow,
+	mapProjectEventRow,
 	mapProjectRow,
 	mapScopeItemRow,
 	mapScopeVersionRow,
@@ -33,6 +34,7 @@ import {
 	type ExternalActionRow,
 	type ImpedimentRow,
 	type PendingItemRow,
+	type ProjectEventRow,
 	type ProjectRow,
 	type ScopeItemRow,
 	type ScopeVersionRow,
@@ -301,7 +303,22 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		}
 	}
 
-	const insertTransaction = db.transaction((state: ProjectState) => {
+	// Event log incremental (ETAPA 7 do rework) — append-only, nunca fora do
+	// DELETE + reinsert de saveTransaction (project_event não está na lista
+	// de DELETEs abaixo, de propósito: histórico não é apagado por save()).
+	// events chega vazio na imensa maioria das chamadas (toda operação que
+	// ainda não gera evento) — o loop simplesmente não roda.
+	const insertEvent = db.prepare(
+		`INSERT INTO project_event (id, project_id, type, entity_type, entity_id, payload, created_at)
+		 VALUES (@id, @projectId, @type, @entityType, @entityId, @payload, @createdAt)`
+	);
+	function insertEvents(events: ProjectEvent[]): void {
+		for (const event of events) {
+			insertEvent.run({ ...event, payload: JSON.stringify(event.payload) });
+		}
+	}
+
+	const insertTransaction = db.transaction((state: ProjectState, events: ProjectEvent[]) => {
 		db.prepare(
 			'INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (@id, @name, @createdAt, @routeStartPhaseId)'
 		).run({
@@ -311,9 +328,10 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			routeStartPhaseId: state.project.routeStartPhaseId ?? null
 		});
 		insertChildren(state);
+		insertEvents(events);
 	});
 
-	const saveTransaction = db.transaction((state: ProjectState) => {
+	const saveTransaction = db.transaction((state: ProjectState, events: ProjectEvent[]) => {
 		const result = db
 			.prepare(
 				'UPDATE project SET name = @name, created_at = @createdAt, route_start_phase_id = @routeStartPhaseId WHERE id = @id'
@@ -347,11 +365,12 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM cause_exploration WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM desired_outcome WHERE project_id = ?').run(state.project.id);
 		insertChildren(state);
+		insertEvents(events);
 	});
 
 	return {
-		async insert(state: ProjectState): Promise<void> {
-			insertTransaction(state);
+		async insert(state: ProjectState, events: ProjectEvent[] = []): Promise<void> {
+			insertTransaction(state, events);
 		},
 
 		async findById(projectId: string): Promise<ProjectState | null> {
@@ -487,8 +506,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			};
 		},
 
-		async save(state: ProjectState): Promise<void> {
-			saveTransaction(state);
+		async save(state: ProjectState, events: ProjectEvent[] = []): Promise<void> {
+			saveTransaction(state, events);
 		},
 
 		async listRecent(): Promise<Project[]> {
@@ -498,6 +517,35 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all() as ProjectRow[];
 			return rows.map(mapProjectRow);
+		},
+
+		// Event log incremental (ETAPA 7 do rework) — mais recente primeiro
+		// (created_at DESC), com rowid DESC como desempate determinístico para
+		// eventos com o mesmo created_at (mesmo espírito de listRecent acima):
+		// preserva a ordem real de inserção em vez de uma ordem indefinida do
+		// SQLite. filter.entityIds (quando presente e não vazio) restringe a
+		// eventos de uma ou mais entidades — "histórico de item" usa um id,
+		// "mudanças relacionadas" (WorkItem + Impediment vinculado) usa dois.
+		async listEvents(projectId: string, filter?: ProjectEventFilter): Promise<ProjectEvent[]> {
+			const entityIds = filter?.entityIds?.filter((id) => id.length > 0) ?? [];
+			if (entityIds.length > 0) {
+				const placeholders = entityIds.map(() => '?').join(', ');
+				const rows = db
+					.prepare(
+						`SELECT id, project_id, type, entity_type, entity_id, payload, created_at
+						 FROM project_event WHERE project_id = ? AND entity_id IN (${placeholders})
+						 ORDER BY created_at DESC, rowid DESC`
+					)
+					.all(projectId, ...entityIds) as ProjectEventRow[];
+				return rows.map(mapProjectEventRow);
+			}
+			const rows = db
+				.prepare(
+					`SELECT id, project_id, type, entity_type, entity_id, payload, created_at
+					 FROM project_event WHERE project_id = ? ORDER BY created_at DESC, rowid DESC`
+				)
+				.all(projectId) as ProjectEventRow[];
+			return rows.map(mapProjectEventRow);
 		},
 
 		close(): void {

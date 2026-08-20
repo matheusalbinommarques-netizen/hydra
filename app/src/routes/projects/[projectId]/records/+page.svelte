@@ -10,6 +10,39 @@
 <h1>Registros do projeto</h1>
 <p class="subtitle">Respostas registradas e pendências resolvidas ao longo de todo o projeto.</p>
 
+{#snippet eventsSection()}
+	<section class="card events" aria-labelledby="events-heading">
+		<div class="events-header">
+			<h2 id="events-heading">Atividade recente</h2>
+			{#if data.recentActivity.filter === null}
+				<a class="section-link" href="/projects/{projectId}/records">Ver tudo →</a>
+			{/if}
+		</div>
+		{#if data.recentActivity.filter !== null}
+			<!-- Design Gate S7 — chip discreto substitui "Ver tudo →" no estado
+			     filtrado: nomeia o objeto observado, o × limpa o filtro na hora
+			     (link direto para /records sem query, sem "modo filtro" persistente,
+			     sem breadcrumb novo). -->
+			<a class="filter-chip" href="/projects/{projectId}/records" aria-label="Limpar filtro: {data.recentActivity.filter.label}">
+				<span class="filter-chip-label">Filtrado por "{data.recentActivity.filter.label}"</span>
+				<span aria-hidden="true">✕</span>
+			</a>
+		{/if}
+		{#if data.recentActivity.events.length === 0}
+			<p class="empty">{data.recentActivity.emptyText}</p>
+		{:else}
+			<ul class="events-list">
+				{#each data.recentActivity.events as event (event.id)}
+					<li>
+						<p class="event-text">{event.text}</p>
+						<p class="event-meta">{new Date(event.createdAt).toLocaleString('pt-BR')}</p>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+{/snippet}
+
 {#snippet resolvedSection()}
 	<section class="card resolved" aria-labelledby="resolved-heading">
 		<h2 id="resolved-heading">Pendências resolvidas</h2>
@@ -44,6 +77,7 @@
 		</p>
 	</div>
 
+	{@render eventsSection()}
 	{@render resolvedSection()}
 	{@render continuitySection()}
 {:else}
@@ -86,6 +120,7 @@
 				</section>
 			{/each}
 
+			{@render eventsSection()}
 			{@render resolvedSection()}
 			{@render continuitySection()}
 		</div>
@@ -243,6 +278,92 @@
 		font-size: var(--font-size-caption);
 		font-weight: 700;
 		width: fit-content;
+	}
+
+	.section-link {
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		white-space: nowrap;
+	}
+
+	.events-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: var(--space-3);
+		margin-bottom: var(--space-4);
+	}
+
+	.events-header h2 {
+		margin: 0;
+	}
+
+	/* Design Gate S7 — chip discreto do estado filtrado. Sem cor de destaque
+	   própria (mesma regra de app.css, "papel/tinta/grafite": accent == text,
+	   nenhuma superfície editorial usa uma cor de acento separada) — ink sobre
+	   borda neutra, nunca o teal do mockup de referência (aquele bundle é do
+	   shell escuro, não desta paleta). overflow-wrap garante que o nome do
+	   objeto quebre em vez de cortar ou estourar a largura do card. */
+	.filter-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		max-width: 100%;
+		border: 1px solid var(--hydra-border);
+		border-radius: var(--hydra-radius-pill);
+		padding: var(--space-1) var(--space-3);
+		margin-bottom: var(--space-4);
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+		text-decoration: none;
+	}
+
+	.filter-chip:hover,
+	.filter-chip:focus-visible {
+		border-color: var(--hydra-text);
+		color: var(--hydra-text);
+	}
+
+	.filter-chip-label {
+		overflow-wrap: break-word;
+	}
+
+	.events-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+
+	.events-list li {
+		border-bottom: 1px solid rgba(101, 104, 108, 0.15);
+		padding-bottom: var(--space-3);
+	}
+
+	.events-list li:last-child {
+		border-bottom: none;
+		padding-bottom: 0;
+	}
+
+	/* Design Gate S7 — anatomia da linha de evento: texto peso normal (a
+	   hierarquia vem de ser a primeira informação e do tamanho, não de
+	   negrito), timestamp menor/apagado abaixo (.event-meta), hairline entre
+	   eventos (.events-list li) — sem card por evento, sem ícone, sem badge,
+	   sem avatar. overflow-wrap evita qualquer overflow horizontal em mobile;
+	   o texto nunca trunca, só quebra linha. */
+	.event-text {
+		margin: 0;
+		font-weight: 400;
+		font-size: var(--font-size-meta);
+		overflow-wrap: break-word;
+	}
+
+	.event-meta {
+		margin: var(--space-1) 0 0;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
 	}
 
 	.resolved-list {

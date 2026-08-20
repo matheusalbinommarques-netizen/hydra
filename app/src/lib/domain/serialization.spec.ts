@@ -26,7 +26,8 @@ import {
 	setTreatmentNoTreatment,
 	skipActivity
 } from './transitions';
-import { deserializeProjectState, serializeProjectState } from './serialization';
+import { deserializeProjectEvents, deserializeProjectState, serializeProjectState } from './serialization';
+import type { ProjectEvent } from './events';
 import { encodePlanningItems } from './planning-items';
 import type { Catalog, RequiredFieldsActivity } from './catalog-types';
 import type { ProjectState } from './state-types';
@@ -1484,5 +1485,65 @@ describe('deserializeProjectState — CauseHypothesis / CauseExploration (Stage 
 		const withHypothesis = hypothesisState();
 		const resultWithHypothesis = deserializeProjectState(serializeProjectState(withHypothesis), catalog);
 		expect(resultWithHypothesis).toEqual({ ok: true, value: withHypothesis });
+	});
+});
+
+// Event log incremental (ETAPA 7 do rework) — parser independente de
+// deserializeProjectState (ver comentário em serialization.ts): events é um
+// campo irmão de state no mesmo envelope, nunca parte de ProjectState.
+describe('deserializeProjectEvents', () => {
+	const workItemCreated: ProjectEvent = {
+		id: 'evt-1',
+		projectId: 'proj-1',
+		type: 'work_item.created',
+		entityType: 'work_item',
+		entityId: 'wi-1',
+		payload: { title: 'Revisar contrato' },
+		createdAt: T1
+	};
+
+	it('round-trip: serializeProjectState(state, events) → deserializeProjectEvents preserva os eventos', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const json = serializeProjectState(state, [workItemCreated]);
+		expect(deserializeProjectEvents(json)).toEqual({ ok: true, value: [workItemCreated] });
+	});
+
+	it('JSON sem a chave "events" (export anterior à S7) produz []', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const envelope = JSON.parse(serializeProjectState(state)) as { events?: unknown };
+		delete envelope.events;
+		expect(deserializeProjectEvents(JSON.stringify(envelope))).toEqual({ ok: true, value: [] });
+	});
+
+	it('rejeita JSON inválido', () => {
+		expect(deserializeProjectEvents('não é json {{')).toEqual({ ok: false, error: { kind: 'invalid_json' } });
+	});
+
+	it('rejeita um type fora da taxonomia fechada', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const envelope = JSON.parse(serializeProjectState(state, [workItemCreated])) as {
+			events: Array<Record<string, unknown>>;
+		};
+		envelope.events[0].type = 'work_item.deleted';
+		const result = deserializeProjectEvents(JSON.stringify(envelope));
+		expect(result.ok).toBe(false);
+	});
+
+	it('rejeita payload incompatível com o type declarado', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const envelope = JSON.parse(serializeProjectState(state, [workItemCreated])) as {
+			events: Array<{ payload: Record<string, unknown> }>;
+		};
+		envelope.events[0].payload = { fromStatus: 'a_fazer', toStatus: 'em_andamento' }; // payload de status_changed, type é created
+		const result = deserializeProjectEvents(JSON.stringify(envelope));
+		expect(result.ok).toBe(false);
+	});
+
+	it('serializeProjectState sem segundo argumento continua produzindo events: [] (compatibilidade dos ~125 call sites anteriores à S7)', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		const json = serializeProjectState(state);
+		expect(deserializeProjectEvents(json)).toEqual({ ok: true, value: [] });
+		// e o restante do envelope continua intacto
+		expect(deserializeProjectState(json, catalog)).toEqual({ ok: true, value: state });
 	});
 });

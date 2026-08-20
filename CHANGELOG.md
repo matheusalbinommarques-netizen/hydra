@@ -4,6 +4,13 @@
 
 ### Adicionado
 
+- Rework, ETAPA 7 ("Event log incremental") — histórico de mudanças do
+  loop WorkItem/Impediment (criado/moveu/registrado/resolveu/reabriu),
+  visível em Registros ("Atividade recente", filtrável por item) e
+  acessível a partir de Trabalho ("Ver histórico") e Acompanhamento ("Ver
+  mudanças relacionadas"); histórico auxiliar, nunca fonte de verdade do
+  estado; projetos existentes abrem com histórico vazio; export/import
+  preservam eventos, inclusive de exports anteriores a esta etapa.
 - S6V ("Convergência visual da fundação") — Biblioteca de projetos e
   shell do workspace passam para a identidade dark aprovada (Design
   Gate); o shell permanece dark em toda rota/activity, e conteúdo interno

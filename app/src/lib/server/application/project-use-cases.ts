@@ -2,7 +2,7 @@
 // ProjectRepository, domain/, catalog/ (via dependência) e orientation-engine/.
 // Nenhum SQL, nenhuma rota, nenhum HTML — só orquestração.
 
-import type { ActivityDefinition, ActivityProgress, Catalog, ProjectState } from '$lib/domain';
+import type { ActivityDefinition, ActivityProgress, Catalog, ProjectEvent, ProjectState } from '$lib/domain';
 import { computeNextActivity, computeProjectStatus, computeSnapshot } from '$lib/orientation-engine';
 import type { NextActivityResult } from '$lib/orientation-engine';
 import {
@@ -23,6 +23,7 @@ import {
 	confirmSummary as confirmSummaryInDomain,
 	confirmTreatment as confirmTreatmentInDomain,
 	createInitialProjectState,
+	deserializeProjectEvents,
 	deserializeProjectState,
 	markCauseExplorationUnknown as markCauseExplorationUnknownInDomain,
 	moveDesiredOutcome as moveDesiredOutcomeInDomain,
@@ -63,7 +64,7 @@ import {
 	undoCauseExplorationUnknown as undoCauseExplorationUnknownInDomain
 } from '$lib/domain';
 import { buildExternalActionPreparation } from '$lib/catalog/external-action';
-import type { ProjectRepository } from '../persistence';
+import type { ProjectEventFilter, ProjectRepository } from '../persistence';
 import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
 import type {
@@ -554,22 +555,39 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			return viewOf(result.value);
 		},
 
+		// events (ETAPA 7 do rework, "Event log incremental") — addImpediment
+		// nunca é no-op (sempre cria um Impediment novo), então sempre emite
+		// impediment.registered, mesmo espírito de addWorkItem abaixo. occurredAt
+		// é lido do mesmo clock.now() já injetado, uma única vez, e reaproveitado
+		// tanto na transição de domínio quanto no evento — nunca duas chamadas
+		// separadas que poderiam divergir por um instante.
 		async addImpediment(input: AddImpedimentInput) {
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
+			const impedimentId = idGenerator.generate();
+			const occurredAt = clock.now();
 			const result = addImpedimentInDomain(
 				catalog,
 				state,
-				idGenerator.generate(),
+				impedimentId,
 				input.text,
 				input.tipo,
-				clock.now(),
+				occurredAt,
 				input.workItemId ?? null
 			);
 			if (!result.ok) return { ok: false, error: result.error };
 
-			await repository.save(result.value);
+			const event: ProjectEvent = {
+				id: idGenerator.generate(),
+				projectId: input.projectId,
+				type: 'impediment.registered',
+				entityType: 'impediment',
+				entityId: impedimentId,
+				payload: { text: input.text, tipo: input.tipo },
+				createdAt: occurredAt
+			};
+			await repository.save(result.value, [event]);
 			return viewOf(result.value);
 		},
 
@@ -601,14 +619,31 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			return viewOf(result.value);
 		},
 
+		// events — resolveImpediment/reopenImpediment já são idempotentes no
+		// domínio (result.value === state quando o status já é o desejado); o
+		// mesmo `result.value !== state` que decide se salva decide se emite
+		// impediment.status_changed, então uma chamada repetida (ex.: duplo
+		// clique) nunca gera evento duplicado.
 		async resolveImpediment(input: ResolveImpedimentInput) {
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
-			const result = resolveImpedimentInDomain(catalog, state, input.impedimentId, clock.now());
+			const occurredAt = clock.now();
+			const result = resolveImpedimentInDomain(catalog, state, input.impedimentId, occurredAt);
 			if (!result.ok) return { ok: false, error: result.error };
 
-			if (result.value !== state) await repository.save(result.value);
+			if (result.value !== state) {
+				const event: ProjectEvent = {
+					id: idGenerator.generate(),
+					projectId: input.projectId,
+					type: 'impediment.status_changed',
+					entityType: 'impediment',
+					entityId: input.impedimentId,
+					payload: { fromStatus: 'aberto', toStatus: 'resolvido' },
+					createdAt: occurredAt
+				};
+				await repository.save(result.value, [event]);
+			}
 			return viewOf(result.value);
 		},
 
@@ -616,32 +651,76 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
-			const result = reopenImpedimentInDomain(catalog, state, input.impedimentId, clock.now());
+			const occurredAt = clock.now();
+			const result = reopenImpedimentInDomain(catalog, state, input.impedimentId, occurredAt);
 			if (!result.ok) return { ok: false, error: result.error };
 
-			if (result.value !== state) await repository.save(result.value);
+			if (result.value !== state) {
+				const event: ProjectEvent = {
+					id: idGenerator.generate(),
+					projectId: input.projectId,
+					type: 'impediment.status_changed',
+					entityType: 'impediment',
+					entityId: input.impedimentId,
+					payload: { fromStatus: 'resolvido', toStatus: 'aberto' },
+					createdAt: occurredAt
+				};
+				await repository.save(result.value, [event]);
+			}
 			return viewOf(result.value);
 		},
 
+		// events — addWorkItem nunca é no-op (sempre cria um item novo), então
+		// sempre emite work_item.created (mesmo espírito de addImpediment acima).
 		async addWorkItem(input: AddWorkItemInput) {
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
-			const result = addWorkItemInDomain(catalog, state, idGenerator.generate(), input.title, clock.now());
+			const workItemId = idGenerator.generate();
+			const occurredAt = clock.now();
+			const result = addWorkItemInDomain(catalog, state, workItemId, input.title, occurredAt);
 			if (!result.ok) return { ok: false, error: result.error };
 
-			await repository.save(result.value);
+			const event: ProjectEvent = {
+				id: idGenerator.generate(),
+				projectId: input.projectId,
+				type: 'work_item.created',
+				entityType: 'work_item',
+				entityId: workItemId,
+				payload: { title: input.title },
+				createdAt: occurredAt
+			};
+			await repository.save(result.value, [event]);
 			return viewOf(result.value);
 		},
 
+		// events — moveWorkItem é idempotente no domínio (mover para o status
+		// atual é no-op, result.value === state); fromStatus vem do estado ANTES
+		// da transição (o próprio item já carregado), não pode ser recomputado
+		// depois — mesmo motivo de status_changed de Impediment acima.
 		async moveWorkItem(input: MoveWorkItemInput) {
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
-			const result = moveWorkItemInDomain(catalog, state, input.workItemId, input.status, clock.now());
+			const beforeStatus = state.workItems.find((item) => item.id === input.workItemId)?.status;
+			const occurredAt = clock.now();
+			const result = moveWorkItemInDomain(catalog, state, input.workItemId, input.status, occurredAt);
 			if (!result.ok) return { ok: false, error: result.error };
 
-			if (result.value !== state) await repository.save(result.value);
+			// moveWorkItemInDomain já retornou work_item_not_found acima quando o
+			// item não existe — result.ok true garante beforeStatus definido.
+			if (result.value !== state && beforeStatus) {
+				const event: ProjectEvent = {
+					id: idGenerator.generate(),
+					projectId: input.projectId,
+					type: 'work_item.status_changed',
+					entityType: 'work_item',
+					entityId: input.workItemId,
+					payload: { fromStatus: beforeStatus, toStatus: input.status },
+					createdAt: occurredAt
+				};
+				await repository.save(result.value, [event]);
+			}
 			return viewOf(result.value);
 		},
 
@@ -1038,16 +1117,30 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			return viewOf(result.value);
 		},
 
+		// events (ETAPA 7 do rework) — export precisa carregar o histórico
+		// registrado (mesma promessa que já vale para todo o resto do estado);
+		// buscado à parte de findById() porque não é um objeto vivo de
+		// ProjectState (ver domain/serialization.ts).
 		async exportProject(projectId: string) {
 			const state = await repository.findById(projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
-			return { ok: true, value: serializeProjectState(state) };
+			const events = await repository.listEvents(projectId);
+			return { ok: true, value: serializeProjectState(state, events) };
 		},
 
+		// events — parseado à parte de deserializeProjectState (ver
+		// domain/serialization.ts, deserializeProjectEvents): um export anterior
+		// à S7 não tem a chave "events" e produz [] normalmente, nunca erro de
+		// import. insert(state, events) grava os dois atomicamente, mesmo
+		// contrato de save() usado pelo loop S6.
 		async importProject(json: string) {
 			const parsed = deserializeProjectState(json, catalog);
 			if (!parsed.ok) {
 				return { ok: false, error: { kind: 'invalid_import', reason: parsed.error } };
+			}
+			const eventsParsed = deserializeProjectEvents(json);
+			if (!eventsParsed.ok) {
+				return { ok: false, error: { kind: 'invalid_import', reason: eventsParsed.error } };
 			}
 
 			const state = parsed.value;
@@ -1056,8 +1149,17 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				return { ok: false, error: { kind: 'import_id_collision', projectId: state.project.id } };
 			}
 
-			await repository.insert(state);
+			await repository.insert(state, eventsParsed.value);
 			return viewOf(state);
+		},
+
+		// Event log incremental (ETAPA 7 do rework) — leitura auxiliar, nunca
+		// parte de ProjectView (ver types.ts).
+		async listProjectEvents(projectId: string, filter?: ProjectEventFilter) {
+			const state = await repository.findById(projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+			const events = await repository.listEvents(projectId, filter);
+			return { ok: true, value: events };
 		}
 	};
 }
