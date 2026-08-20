@@ -66,7 +66,7 @@
 	<title>Biblioteca de projetos — Hydra</title>
 </svelte:head>
 
-<div class="library-page">
+<div class="library-page hydra-dark-tokens">
 	<header class="library-header">
 		<div class="identity">
 			<a class="wordmark-link" href="/">
@@ -172,33 +172,42 @@
 </div>
 
 <style>
-	/* Mesmos tokens locais de routes/+page.svelte (Home) — escopados a esta
-	   rota; a Home não foi alterada para compartilhá-los porque as duas telas
-	   já convergem separadamente, e forçar um módulo compartilhado agora
-	   arriscaria mudar o resultado visual já aprovado da Home. */
+	/* Identidade dark aprovada (Design Gate "Convergência Visual", S6V) —
+	   mesmo reskin de routes/+page.svelte (Home): tokens locais `--lp-*`
+	   escopados a esta rota, lendo de `--hydra-dark-*` (app.css, ETAPA 1)
+	   onde o valor já é comprovadamente igual; hierarquia mais densa que a
+	   Home (tabela, chips de filtro) continua com valores próprios. Nenhuma
+	   capacidade (busca, filtros, contagens, lista, estados, criação,
+	   navegação) muda — só a cor. */
 	.library-page {
-		--lp-bg: oklch(97.5% 0.006 75);
-		--lp-surface: oklch(99% 0.003 75);
-		--lp-border: oklch(88% 0.007 75);
-		--lp-border-soft: oklch(90% 0.007 75);
-		--lp-border-row: oklch(91% 0.007 75);
-		--lp-border-dashed: oklch(80% 0.01 60);
-		--lp-text: oklch(20% 0.01 60);
-		--lp-muted: oklch(48% 0.012 60);
-		--lp-muted-strong: oklch(40% 0.012 60);
-		--lp-accent: oklch(42% 0.14 35);
-		--lp-accent-hover: oklch(34% 0.14 35);
-		--lp-accent-tint: oklch(96% 0.02 35);
-		--lp-accent-chip: oklch(93% 0.02 40);
-		--lp-done-bg: oklch(93% 0.007 60);
-		--lp-done-text: oklch(24% 0.012 60);
-		--lp-chip-bg: oklch(91% 0.007 75);
-		--lp-radius-lg: 0.625rem;
-		--lp-radius: 0.375rem;
+		--lp-bg: var(--hydra-dark-bg);
+		--lp-surface: var(--hydra-dark-surface-raised);
+		--lp-surface-muted: var(--hydra-dark-surface);
+		--lp-border: var(--hydra-dark-border);
+		--lp-border-soft: rgba(255, 255, 255, 0.06);
+		--lp-border-row: rgba(255, 255, 255, 0.06);
+		--lp-border-dashed: rgba(255, 255, 255, 0.14);
+		--lp-text: var(--hydra-dark-text-soft);
+		--lp-text-strong: var(--hydra-dark-text);
+		--lp-muted: #6f8ba0;
+		--lp-muted-strong: var(--hydra-dark-muted);
+		--lp-accent: var(--hydra-dark-accent);
+		--lp-accent-light: var(--hydra-dark-accent-light);
+		--lp-accent-hover: var(--hydra-dark-accent-light);
+		--lp-accent-tint: var(--hydra-dark-accent-tint);
+		--lp-accent-tint-strong: var(--hydra-dark-accent-tint-strong);
+		--lp-accent-border: rgba(45, 212, 196, 0.5);
+		--lp-on-accent: #04211f;
+		--lp-done-bg: rgba(255, 255, 255, 0.05);
+		--lp-done-text: var(--hydra-dark-text-soft);
+		--lp-chip-bg: rgba(255, 255, 255, 0.05);
+		--lp-radius-lg: 16px;
+		--lp-radius: 10px;
 
 		background: var(--lp-bg);
 		color: var(--lp-text);
 		min-height: 100vh;
+		font-family: var(--hydra-dark-font);
 	}
 
 	.library-header {
@@ -257,7 +266,7 @@
 		display: inline-flex;
 		align-items: center;
 		background: var(--lp-accent);
-		color: var(--lp-surface);
+		color: var(--lp-on-accent);
 		border: none;
 		border-radius: var(--lp-radius);
 		padding: 0.5625rem 1.125rem;
@@ -350,9 +359,9 @@
 	}
 
 	.filter-chip-active {
-		background: var(--lp-text);
-		color: var(--lp-surface);
-		border-color: var(--lp-text);
+		background: var(--lp-accent-tint-strong);
+		color: var(--lp-accent-light);
+		border-color: var(--lp-accent-border);
 	}
 
 	.filter-count {
@@ -365,8 +374,8 @@
 	}
 
 	.filter-count-active {
-		background: oklch(98% 0.005 75 / 0.18);
-		color: var(--lp-surface);
+		background: rgba(255, 255, 255, 0.14);
+		color: var(--lp-accent-light);
 	}
 
 	.project-table {
@@ -382,7 +391,7 @@
 		gap: 1.25rem;
 		padding: 0.6875rem 1.5rem;
 		border-bottom: 1px solid var(--lp-border);
-		background: oklch(97% 0.005 70);
+		background: var(--lp-surface-muted);
 		font-size: 0.6875rem;
 		font-weight: 600;
 		letter-spacing: 0.05em;
@@ -461,8 +470,8 @@
 	}
 
 	.col-cta a.button {
-		background: var(--lp-text);
-		color: var(--lp-surface);
+		background: var(--lp-accent);
+		color: var(--lp-on-accent);
 	}
 
 	.col-cta a.button-secondary {
@@ -481,14 +490,14 @@
 	}
 
 	.badge-active {
-		color: var(--lp-accent);
-		border-color: oklch(42% 0.14 35 / 0.5);
+		color: var(--lp-accent-light);
+		border-color: var(--lp-accent-border);
 		background: var(--lp-accent-tint);
 	}
 
 	.badge-done {
 		color: var(--lp-done-text);
-		border-color: oklch(24% 0.012 60 / 0.4);
+		border-color: var(--lp-border-dashed);
 		background: var(--lp-done-bg);
 	}
 
@@ -545,8 +554,8 @@
 	}
 
 	.empty-box .button {
-		background: var(--lp-text);
-		color: var(--lp-surface);
+		background: var(--lp-accent);
+		color: var(--lp-on-accent);
 		text-decoration: none;
 		border-radius: var(--lp-radius);
 		padding: 0.6875rem 1.375rem;

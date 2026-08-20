@@ -4,6 +4,12 @@
 
 ### Adicionado
 
+- S6V ("Convergência visual da fundação") — Biblioteca de projetos e
+  shell do workspace passam para a identidade dark aprovada (Design
+  Gate); o shell permanece dark em toda rota/activity, e conteúdo interno
+  ainda não migrado (ex.: Trabalho) aparece contido visualmente dentro
+  dele, sem nenhum rótulo de legado/migração exposto ao usuário; nenhuma
+  capacidade, rota ou comportamento mudou.
 - Rework, ETAPA 6 ("Primeiro loop operacional") — `WorkItem` real (`/work`,
   substitui "Entregas") com três estados (A fazer/Em andamento/Concluído);
   registrar um impedimento vinculado ao item o marca como bloqueado (selo

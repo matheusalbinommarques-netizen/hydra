@@ -652,9 +652,20 @@ fora deste corte: divergência visual entre a Home (identidade escura,
 D033) e a Biblioteca/workspace do projeto (ainda papel/tinta/grafite) —
 fica para decisão de corte futura, não é migração oportunista.
 
-Com isso, `docs/core/CURRENT_WORK.json` passa a apontar para `S7` — ETAPA
-7, "Event log incremental" (`docs/core/HYDRA_PRODUCT_REWORK.md` §37),
-ainda não iniciada e não autorizada.
+Antes de iniciar a ETAPA 7, rodou um interlúdio explícito fora da
+numeração de etapas: S6V ("Convergência visual da fundação"), a partir
+do Design Gate "Convergência Visual" aprovado e congelado via Claude
+Design MCP — Biblioteca de projetos e shell do workspace passam para a
+identidade dark já aprovada em Home/`/projects/new`; o shell fica dark
+sempre, em toda rota/activity, sem reverter; conteúdo interno ainda não
+migrado (ex.: Trabalho) passa a viver contido visualmente dentro do
+shell dark, sem nenhum rótulo de legado/migração exposto; superfícies já
+dark não recebem essa contenção. Dogfood humano PASS; concluído e
+fechado (`docs/08-delivery/s6v-convergencia-visual.md`).
+
+Com isso, `docs/core/CURRENT_WORK.json` volta a apontar para `S7` —
+ETAPA 7, "Event log incremental" (`docs/core/HYDRA_PRODUCT_REWORK.md`
+§37), ainda não iniciada e não autorizada.
 
 ## Não fazer agora
 

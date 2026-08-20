@@ -63,21 +63,21 @@
 	setContext<ExternalActionCaptureContext>(EXTERNAL_ACTION_CAPTURE_CONTEXT_KEY, { open: openCapture });
 
 	// "Entender a situação" e "Quem é afetado" (Claude Design) são as
-	// atividades já convergidas para a identidade escura — o resto do shell
-	// continua papel/tinta/grafite. Em vez de uma "ilha escura" isolada dentro
-	// do card claro, aplicamos o tema escuro ao shell inteiro só quando uma
-	// destas é a atividade atual: os mesmos tokens --hydra-* já usados por
-	// todo o shell/página (header, nav, /now) são redefinidos num escopo
-	// (.dark-activity), sem tocar o markup ou o CSS de nenhuma outra
-	// atividade. Ao sair delas, o shell volta ao normal — nenhuma outra tela
-	// foi redesenhada.
+	// atividades já convergidas para a identidade escura. O shell (header,
+	// nav, faixa de ações em campo) é dark sempre agora (S6V, Design Gate
+	// "Convergência Visual") — este predicate não decide mais isso. Ele
+	// continua decidindo só o CONTEÚDO: quando a atividade atual já foi
+	// migrada para a identidade escura, o conteúdo renderiza direto dentro
+	// do shell; quando ainda não foi, o conteúdo (com seu CSS/tema local
+	// intocado) é contido num cartão com o raio/borda do shell (S6V), sem
+	// nenhum aviso de "legado" exposto ao usuário.
 	const DARK_ACTIVITY_IDS = new Set(['problema', 'publico', 'estado_atual', 'entender_causas']);
 	// Checkpoint da Descoberta (S4D) — Design Gate aprovado na mesma
 	// identidade escura das atividades acima; diferente delas, não é uma
 	// atividade dentro de /now, é sua própria rota (/summary), então entra por
 	// pathname em vez de page.data.activity.id.
 	let isCheckpointRoute = $derived(pathname === `/projects/${projectId}/summary`);
-	let isDarkActivity = $derived(
+	let isContentMigrated = $derived(
 		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '') || isCheckpointRoute
 	);
 
@@ -124,7 +124,7 @@
 	});
 </script>
 
-<div class="project-shell" class:dark-activity={isDarkActivity} class:hydra-dark-tokens={isDarkActivity}>
+<div class="project-shell hydra-dark-tokens">
 	<header class="project-header header-desktop">
 		<div class="identity">
 			<a class="projects-link" href="/projects">← Projetos</a>
@@ -345,28 +345,28 @@
 	{/if}
 
 	<main class="container">
-		{@render children()}
+		{#if isContentMigrated}
+			{@render children()}
+		{:else}
+			<div class="content-frame">
+				{@render children()}
+			</div>
+		{/if}
 	</main>
 </div>
 
 <style>
 	/* Redefine só os tokens de cor já usados pelo shell/página (--hydra-*),
-	   para a paleta escura aprovada no Claude Design ("Entender a
-	   Situacao.dc.html") — mesmos valores usados na Home (D033). Nenhuma
-	   regra nova de layout/espaçamento; header, nav e /now continuam com o
-	   mesmo CSS, só lendo cores diferentes enquanto esta atividade é a atual.
-	   Valores comprovadamente iguais à Home e a /projects/new passam a ler
-	   de `--hydra-dark-*` (`.hydra-dark-tokens`, app.css, ETAPA 1); a borda
-	   e o aviso desta tela têm valor próprio, aprovado neste mockup
-	   especificamente, e continuam locais — não foram forçados a coincidir
-	   com o valor levemente diferente usado pelas outras duas telas.
-	   font-family: correção complementar da ETAPA 1 — esta tela herdava
-	   Manrope do body (sem efeito visual até aqui, porque nem Manrope nem
-	   'Inter' declarada tinham arquivo carregado); agora que Inter é
-	   carregada de verdade (app.css), esta tela passa a usar a mesma fonte
-	   real da Home e de /projects/new, em vez de continuar na única
-	   divergência de fallback que restava entre as três. */
-	.dark-activity {
+	   para a paleta escura aprovada no Claude Design. Nenhuma regra nova de
+	   layout/espaçamento; header, nav e faixa de ações em campo continuam
+	   com o mesmo CSS, só lendo cores diferentes. Valores comprovadamente
+	   iguais à Home e a /projects/new passam a ler de `--hydra-dark-*`
+	   (`.hydra-dark-tokens`, app.css, ETAPA 1).
+	   S6V (Design Gate "Convergência Visual"): o shell inteiro é dark
+	   sempre agora, não só quando a atividade atual já foi migrada —
+	   isso passou a ser decidido só para o CONTEÚDO (.content-frame
+	   abaixo), via `isContentMigrated`. */
+	.project-shell {
 		--hydra-bg: var(--hydra-dark-bg);
 		--hydra-surface: var(--hydra-dark-surface);
 		--hydra-surface-raised: var(--hydra-dark-surface-raised);
@@ -379,9 +379,57 @@
 		font-family: var(--hydra-dark-font);
 	}
 
-	.dark-activity {
+	.project-shell {
 		background: var(--hydra-bg);
 		min-height: 100vh;
+	}
+
+	/* Contenção visual temporária (S6V) para conteúdo interno ainda não
+	   migrado para a identidade escura: o CSS/tema local da tela (ex.:
+	   Trabalho, papel/tinta/grafite) fica intocado, só passa a viver dentro
+	   de um cartão com o mesmo raio/borda do shell dark — para não colidir
+	   direto com o fundo dark. Puramente visual: nenhum rótulo, selo ou
+	   aviso é exposto ao usuário. Some sozinha quando a tela migrar (basta
+	   `isContentMigrated` passar a valer true para ela). */
+	.content-frame {
+		border-radius: 16px;
+		border: 1px solid var(--hydra-dark-border);
+		overflow: hidden;
+	}
+
+	/* `--hydra-*` são os MESMOS nomes de token usados pelo CSS local de telas
+	   ainda não migradas (ex.: work/+page.svelte lê var(--hydra-surface)).
+	   Sem este reset, o valor dark redefinido em `.project-shell` vazaria por
+	   herança de custom property para dentro do cartão contido e recolori-
+	   ria essas telas — exatamente o que o invariante "CSS/tema local
+	   intocado" proíbe. Os valores abaixo são os mesmos de `:root` em
+	   app.css (paleta papel/tinta/grafite), só re-declarados aqui para
+	   interromper a herança dark na borda do cartão.
+	   `background`/`color`: correção pós-dogfood — resetar só as
+	   variáveis não bastava. Muitas telas legadas não pintam o próprio
+	   fundo (esperavam herdar o canvas claro que `.project-shell` pintava
+	   antes do S6V); sem pintar aqui, o cartão ficava transparente e texto
+	   escuro (herdado de `--hydra-text` já resetado) caía direto sobre o
+	   canvas navy do shell — praticamente ilegível em Agora, Acompanhamento,
+	   Mapa, Documento e Encerramento. Pintar o canvas/superfície claros
+	   aqui é a fronteira certa: nenhuma tela precisou ser tocada. */
+	.content-frame {
+		--hydra-bg: #e8e9e3;
+		--hydra-surface: #f8f8f8;
+		--hydra-surface-raised: #ffffff;
+		--hydra-border: #65686c;
+		--hydra-text: #151918;
+		--hydra-muted: #65686c;
+		--hydra-accent: #151918;
+		--hydra-warning: #8b3227;
+		--hydra-shadow-raised: 0 1px 2px rgba(21, 25, 24, 0.08);
+		background: var(--hydra-bg);
+		color: var(--hydra-text);
+		font-family:
+			'Manrope',
+			system-ui,
+			-apple-system,
+			sans-serif;
 	}
 
 	.project-header {
@@ -435,6 +483,14 @@
 		margin: 0;
 		font-weight: 700;
 		font-size: var(--font-size-subtitle);
+		/* Sem `color` explícito, este texto herdava a cor computada em
+		   `body` (tinta clara #151918, do :root de app.css) em vez de ler
+		   `--hydra-text` no escopo do próprio shell — porque herança de CSS
+		   propaga o valor JÁ COMPUTADO no ancestral, não a variável. Como
+		   `body` fica fora de `.project-shell`, o override dark nunca
+		   alcançava esta regra, e o nome do projeto ficava quase preto sobre
+		   o navy (defeito 2, dogfood pós-S6V). */
+		color: var(--hydra-text);
 	}
 
 	.status {
