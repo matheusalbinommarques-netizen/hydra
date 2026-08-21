@@ -288,6 +288,9 @@
 
 ### Alterado
 
+- Remediação R7 — o histórico de um projeto deixa de recusar tipos de
+  evento novos: projetos criados antes deste corte são convertidos ao abrir,
+  preservando os eventos já registrados.
 - remoção do eixo `ScopeItem.value` (mantém apenas esforço, agora
   obrigatório só para itens em "Agora");
 - navegação do workspace reagrupada em abas primárias (Agora/Cockpit) e

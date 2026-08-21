@@ -147,6 +147,76 @@ function ensureImpedimentWorkItemIdColumn(db: Database.Database): void {
 	db.exec('CREATE INDEX IF NOT EXISTS idx_impediment_work_item_id ON impediment (work_item_id)');
 }
 
+// Sexta evolução do schema desde 0001_init.sql (R1 da remediação) — primeira
+// que precisa RECONSTRUIR uma tabela, não adicionar coluna nem fazer backfill
+// de linhas.
+//
+// project_event nasceu (S7) com CHECK enumerando os quatro tipos de evento do
+// loop WorkItem/Impediment. Como todo corte futuro que introduz um objeto vivo
+// acrescenta tipos, essa enumeração vira um bloqueio: `CREATE TABLE IF NOT
+// EXISTS` é no-op numa tabela existente, então um banco criado antes deste
+// corte manteria o CHECK antigo e recusaria o INSERT de um tipo novo — e, como
+// saveTransaction grava estado e eventos na MESMA transação, o rollback
+// derrubaria a operação de domínio inteira, não só o histórico. Falha de
+// escrita, não de leitura.
+//
+// Por que rebuild e não ALTER: o SQLite embutido aqui (3.53.x) suporta
+// `ALTER TABLE ... DROP CONSTRAINT`, mas só para constraints NOMEADAS — as de
+// project_event são anônimas e não há como endereçá-las (PRAGMA table_info não
+// expõe constraints; só o texto de sqlite_master). Verificado empiricamente
+// contra este runtime antes de escolher o mecanismo.
+//
+// Idempotente pela mesma regra das funções acima: a detecção é a presença de
+// "CHECK" no DDL persistido, então um banco já convertido (ou recém-criado a
+// partir de 0001_init.sql, que não tem mais CHECK aqui) simplesmente não entra.
+function ensureProjectEventTaxonomyOpen(db: Database.Database): void {
+	const row = db
+		.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'project_event'")
+		.get() as { sql: string } | undefined;
+	if (!row || !/\bCHECK\b/i.test(row.sql)) return;
+
+	// foreign_keys precisa ser desligado FORA de qualquer transação (dentro de
+	// uma, o PRAGMA é silenciosamente ignorado) — procedimento oficial de
+	// alteração de schema do SQLite.
+	db.pragma('foreign_keys = OFF');
+	try {
+		db.transaction(() => {
+			db.exec(
+				`CREATE TABLE project_event_new (
+					id TEXT PRIMARY KEY,
+					project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+					type TEXT NOT NULL,
+					entity_type TEXT NOT NULL,
+					entity_id TEXT NOT NULL,
+					payload TEXT NOT NULL,
+					created_at TEXT NOT NULL
+				)`
+			);
+			db.exec(
+				`INSERT INTO project_event_new (id, project_id, type, entity_type, entity_id, payload, created_at)
+				 SELECT id, project_id, type, entity_type, entity_id, payload, created_at FROM project_event`
+			);
+			db.exec('DROP TABLE project_event');
+			db.exec('ALTER TABLE project_event_new RENAME TO project_event');
+			// Índices vivem com a tabela: DROP TABLE levou os antigos junto.
+			db.exec('CREATE INDEX IF NOT EXISTS idx_project_event_project_id ON project_event (project_id)');
+			db.exec('CREATE INDEX IF NOT EXISTS idx_project_event_entity_id ON project_event (entity_id)');
+
+			// Passo 10 do procedimento oficial: confere integridade referencial
+			// antes do commit. Lançar aqui desfaz a transação inteira — um banco
+			// que falhe a conversão continua com a tabela original intacta.
+			const violations = db.pragma('foreign_key_check') as unknown[];
+			if (violations.length > 0) {
+				throw new Error(
+					`Conversão de project_event abortada: ${violations.length} violação(ões) de foreign key detectada(s).`
+				);
+			}
+		})();
+	} finally {
+		db.pragma('foreign_keys = ON');
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -156,6 +226,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureCurrentTreatmentRows(db);
 	ensureCauseExplorationRows(db);
 	ensureImpedimentWorkItemIdColumn(db);
+	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(

@@ -256,18 +256,36 @@ CREATE TABLE IF NOT EXISTS desired_outcome (
 -- ProjectState. Coleção 0:N que legitimamente começa vazia — sem função
 -- ensureX de backfill (mesmo padrão de work_item/impediment na ETAPA 6:
 -- CREATE TABLE IF NOT EXISTS já é suficiente para bancos existentes, um
--- projeto pré-S7 simplesmente não tem nenhuma linha aqui). type/entity_type
--- fechados na taxonomia da primeira versão (só o loop WorkItem/Impediment);
--- ampliar a taxonomia é decisão de corte futura, não uma migração deste
--- CHECK. payload é JSON em TEXT, mesmo padrão de encoding já usado por
+-- projeto pré-S7 simplesmente não tem nenhuma linha aqui). payload é JSON em
+-- TEXT, mesmo padrão de encoding já usado por
 -- treatment_step.actors/external_action.questions acima.
+--
+-- type/entity_type SEM CHECK de enumeração (R1 da remediação): são
+-- discriminantes deliberadamente extensíveis — cada corte futuro que
+-- introduz um objeto vivo novo acrescenta tipos de evento. A validação
+-- continua existindo e é exaustiva, mas no lugar certo: a união fechada
+-- ProjectEvent em app/src/lib/domain/events.ts, checada pelo compilador.
+--
+-- Por que não CHECK aqui: a primeira versão enumerava os quatro tipos do
+-- loop WorkItem/Impediment. Como CREATE TABLE IF NOT EXISTS é no-op numa
+-- tabela que já existe, todo banco criado antes deste corte manteria o CHECK
+-- antigo e passaria a REJEITAR eventos de tipo novo — e, como save() grava
+-- estado e eventos na mesma transação, o INSERT recusado derrubaria a
+-- operação de domínio inteira, não só o log. Bancos existentes são
+-- convertidos por ensureProjectEventTaxonomyOpen em
+-- sqlite-project-repository.ts.
+--
+-- Regra geral derivada deste corte: CHECK de banco para invariante realmente
+-- fechado (ex.: work_item.status); sem CHECK para discriminante extensível
+-- (este caso). Toda CHECK que deliberadamente permanecer no schema daqui em
+-- diante deve ser NOMEADA (CONSTRAINT <nome> CHECK (...)) — o SQLite 3.53+
+-- suporta ALTER TABLE ... DROP CONSTRAINT, mas só alcança constraints com
+-- nome; as anônimas exigem rebuild da tabela inteira.
 CREATE TABLE IF NOT EXISTS project_event (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-	type TEXT NOT NULL CHECK (
-		type IN ('work_item.created', 'work_item.status_changed', 'impediment.registered', 'impediment.status_changed')
-	),
-	entity_type TEXT NOT NULL CHECK (entity_type IN ('work_item', 'impediment')),
+	type TEXT NOT NULL,
+	entity_type TEXT NOT NULL,
 	entity_id TEXT NOT NULL,
 	payload TEXT NOT NULL,
 	created_at TEXT NOT NULL

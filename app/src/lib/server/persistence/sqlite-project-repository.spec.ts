@@ -642,6 +642,97 @@ describe('createSqliteProjectRepository — event log (ETAPA 7 do rework)', () =
 		await expect(repo.listEvents('legacy-1')).resolves.toEqual([]);
 	});
 
+	// R1 da remediação — project_event nasceu (S7) com CHECK enumerando os
+	// quatro tipos do loop WorkItem/Impediment. Como CREATE TABLE IF NOT EXISTS
+	// é no-op numa tabela existente, um banco pré-R1 manteria esse CHECK e
+	// recusaria qualquer tipo novo; e como save() grava estado e eventos na
+	// mesma transação, o INSERT recusado derruba a operação de domínio inteira.
+	// Este é o teste que faltava: o de "banco pré-S7" acima cobre só o caso
+	// fácil (tabela ausente → criada já no formato novo).
+	//
+	// A fixture é construída rebaixando um banco válido ao formato antigo, em
+	// vez de reescrever o schema inteiro no teste: assim ela não sai de sincronia
+	// com 0001_init.sql quando outras tabelas mudarem.
+	it('abre um banco pré-R1 (project_event com CHECK fechado), preserva histórico e estado, e passa a aceitar tipo de evento novo', async () => {
+		const filePath = tempFilePath();
+
+		const seed = createSqliteProjectRepository(filePath);
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		await seed.insert(state);
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Revisar contrato', T1));
+		await seed.save(state, [workItemCreatedEvent()]);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec(
+			`CREATE TABLE project_event_legacy (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+				type TEXT NOT NULL CHECK (
+					type IN ('work_item.created', 'work_item.status_changed', 'impediment.registered', 'impediment.status_changed')
+				),
+				entity_type TEXT NOT NULL CHECK (entity_type IN ('work_item', 'impediment')),
+				entity_id TEXT NOT NULL,
+				payload TEXT NOT NULL,
+				created_at TEXT NOT NULL
+			);
+			INSERT INTO project_event_legacy (id, project_id, type, entity_type, entity_id, payload, created_at)
+				SELECT id, project_id, type, entity_type, entity_id, payload, created_at FROM project_event;
+			DROP TABLE project_event;
+			ALTER TABLE project_event_legacy RENAME TO project_event;`
+		);
+		// A fixture só vale se realmente reproduzir o bloqueio que motivou o corte.
+		expect(() =>
+			legacyDb
+				.prepare(
+					'INSERT INTO project_event (id, project_id, type, entity_type, entity_id, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+				)
+				.run('evt-futuro', 'proj-1', 'dependency.created', 'dependency', 'dep-1', '{}', T2)
+		).toThrow(/CHECK/i);
+		legacyDb.close();
+
+		// A conversão roda na abertura, junto das demais ensureX.
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		// Nada do histórico já gravado se perde...
+		await expect(repo.listEvents('proj-1')).resolves.toEqual([workItemCreatedEvent()]);
+		// ...e o estado do projeto continua íntegro.
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+
+		// Um tipo que ainda nem existe na união ProjectEvent de hoje (o cast
+		// documenta exatamente isso) passa a ser aceito pelo caminho real de
+		// escrita — é o que os cortes seguintes do rework precisam.
+		const futureEvent = {
+			id: 'evt-futuro',
+			projectId: 'proj-1',
+			type: 'dependency.created',
+			entityType: 'dependency',
+			entityId: 'dep-1',
+			payload: { kind: 'external' },
+			createdAt: T2
+		} as unknown as ProjectEvent;
+		await repo.save(state, [futureEvent]);
+
+		const events = await repo.listEvents('proj-1');
+		expect(events.map((event) => event.type)).toContain('dependency.created');
+		// O estado sobreviveu ao save que carregou o evento de tipo novo.
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('reabrir um banco já convertido é no-op — a conversão não roda duas vezes', async () => {
+		const filePath = tempFilePath();
+		const first = createSqliteProjectRepository(filePath);
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		await first.insert(state);
+		await first.save(state, [workItemCreatedEvent()]);
+		first.close();
+
+		const reopened = createSqliteProjectRepository(filePath);
+		openRepos.push(reopened);
+		await expect(reopened.listEvents('proj-1')).resolves.toEqual([workItemCreatedEvent()]);
+	});
+
 	it('save(state, events) grava estado e evento na mesma transação', async () => {
 		const repo = memoryRepo();
 		let state = createInitialProjectState(catalog, 'proj-1', T1);
