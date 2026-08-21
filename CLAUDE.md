@@ -157,22 +157,27 @@ manualmente leituras ou verificações que um script já realizou.
   apresentação, casos de uso, comportamento comum), fora das áreas
   sensíveis do Nível 3: verificação `fast` basta; QA manual rápida quando
   houver interface visivelmente afetada;
-- **Nível 3** — mudança sensível (`domain/`, `catalog/`,
-  `orientation-engine/`, `server/persistence/`, schema/migrations,
-  contratos arquiteturais, dependências, arquitetura, segurança,
-  transformação/migração de dados, comportamento transversal): exige
-  autorização explícita registrada no item ou decisão associada antes de
-  editar; verificação `full` e QA manual quando aplicável, no boundary
-  pós-dogfood (seal/delivery) — o rótulo Nível 3 sozinho não exige `full`
-  antes do dogfood, só quando houver risco concreto que o justifique.
+- **Nível 3** — mudança materialmente sensível: altera regra/contrato de
+  domínio, schema/migration/dado persistido, comportamento de
+  persistência, arquitetura/dependência, segurança, ou comportamento
+  transversal. Tocar `domain/`, `catalog/`, `orientation-engine/`,
+  `server/persistence/` ou schema/migrations é sinal forte que exige
+  inspeção, não classificação automática — comentário, texto, teste ou
+  refactor mecânico que preserva regra/contrato/comportamento/persistência
+  nesses diretórios classifica pelo risco real (Nível 1/2). Em dúvida
+  real, use o nível mais alto. Nível 3 exige autorização explícita
+  registrada no item ou decisão associada antes de editar; verificação
+  `full` e QA manual quando aplicável, no boundary pós-dogfood
+  (seal/delivery) — o rótulo Nível 3 sozinho não exige `full` antes do
+  dogfood, só quando houver risco concreto que o justifique.
 
 `/hydra-work` classifica o nível a partir do que o item pede e do diff
 real, e pede autorização assim que detectar Nível 3 — não é preciso
-decidir o nível antes. Em dúvida, use o nível mais alto. `full` roda no
-boundary pós-dogfood (seal/delivery), inclusive antes de `/hydra-ship`
-quando várias entregas Nível 1/2 forem publicadas juntas, como checagem
-final de lote. O stage só é publicável depois de selado por
-`hydra-delivery-guard.mjs` dentro de `/hydra-work`.
+decidir o nível antes. `full` roda no boundary pós-dogfood
+(seal/delivery), inclusive antes de `/hydra-ship` quando várias entregas
+Nível 1/2 forem publicadas juntas, como checagem final de lote. O stage só
+é publicável depois de selado por `hydra-delivery-guard.mjs` dentro de
+`/hydra-work`.
 
 ### Documentação de acompanhamento
 
@@ -180,8 +185,9 @@ Mínimo necessário para retomar contexto entre sessões — não um registro
 histórico completo:
 
 - backlog do ciclo: status do item e evidência objetiva em uma linha;
-- `CHANGELOG.md`: uma linha por item em `[Unreleased]`, o efeito
-  observável — sem parágrafo, sem lista de subcasos;
+- `CHANGELOG.md`: só quando o item fecha explicitamente um boundary de
+  release/ciclo/etapa — uma linha em `[Unreleased]`, o efeito observável,
+  sem parágrafo, sem lista de subcasos; não é obrigação por microcorte;
 - `PROJECT_STATUS.md`: só a linha de "próxima decisão" quando ela mudar;
 - `docs/07-management/decision-log.md`: só para decisões Nível 3
   (arquitetura, schema, dependências, contratos) — não para itens comuns;

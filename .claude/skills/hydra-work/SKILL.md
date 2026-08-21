@@ -58,13 +58,18 @@ partir do JSON, confirme:
 Antes de editar, leia só o necessário para decompor este item (`acceite`,
 `notasTecnicas` do JSON, contratos/rotas vizinhos que servem de padrão) e
 apresente um plano curto: objetivo, arquivos prováveis, e se o item toca
-alguma área sensível (`domain/`, `catalog/`, `orientation-engine/`,
-`server/persistence/`, schema/migrations, contratos arquiteturais,
-dependências).
+uma mudança materialmente sensível — regra/contrato de domínio,
+schema/migration/dado persistido, comportamento de persistência,
+arquitetura/dependência, segurança, ou comportamento transversal. Tocar
+`domain/`, `catalog/`, `orientation-engine/`, `server/persistence/` ou
+schema/migrations é sinal forte que exige inspeção, não classificação
+automática — comentário, texto, teste ou refactor mecânico que preserva
+regra/contrato/comportamento/persistência nesses diretórios não é, por si
+só, Nível 3. Em dúvida real, use o nível mais alto.
 
-- **Se não tocar área sensível** (Nível 1 ou 2): siga direto para a
+- **Se não for materialmente sensível** (Nível 1 ou 2): siga direto para a
   implementação (§3) na mesma resposta — não espere aprovação do plano.
-- **Se tocar área sensível** (Nível 3): pare aqui e peça autorização
+- **Se for materialmente sensível** (Nível 3): pare aqui e peça autorização
   explícita antes de editar qualquer coisa, a menos que essa autorização
   já esteja registrada no próprio item do backlog ou em decisão associada
   em `docs/07-management/decision-log.md`. Autorização para editar não é
@@ -129,10 +134,14 @@ Reavalie o nível a partir do diff real (`git diff --stat`,
 
 - **Nível 1** — só documentação/testes/tooling interno, sem `app/` nem
   mudança de comportamento;
-- **Nível 2** — mudança normal de produto, fora de área sensível;
-- **Nível 3** — qualquer arquivo em área sensível (ver §2). Se o plano não
-  previa Nível 3 mas o diff real tocou uma dessas áreas, pare e peça
-  autorização antes de prosseguir, mesmo que a mudança pareça pequena.
+- **Nível 2** — mudança normal de produto, sem mudança materialmente
+  sensível;
+- **Nível 3** — mudança materialmente sensível (ver §2): regra/contrato de
+  domínio, schema/migration/dado persistido, comportamento de
+  persistência, arquitetura/dependência, segurança, ou comportamento
+  transversal. Se o plano não previa Nível 3 mas o diff real revelou uma
+  dessas mudanças materiais, pare e peça autorização antes de prosseguir,
+  mesmo que a mudança pareça pequena.
 
 Verificação final, exatamente uma:
 
@@ -172,8 +181,11 @@ diretório temporário que você mesmo criou ao final.
   `**Status:** ✅ concluído` e uma linha de evidência objetiva (arquivos,
   testes, rotas) — sem hash de commit manual, isso vem do trailer
   `Hydra-Item` que `/hydra-ship` cria.
-- **`CHANGELOG.md`**: uma linha em `[Unreleased]` descrevendo o efeito
-  observável — não uma lista de subcasos nem tour pelos detalhes internos.
+- **`CHANGELOG.md`**: só quando `$item` fecha explicitamente um boundary de
+  release/ciclo/etapa — uma linha em `[Unreleased]` descrevendo o efeito
+  observável, não uma lista de subcasos nem tour pelos detalhes internos.
+  Não é obrigação por microcorte; se este item não fecha um boundary,
+  omita.
 - **`PROJECT_STATUS.md`**: só a linha de "próxima decisão", se ela mudou.
 - **Roadmap** (`docs/03-product/product-roadmap.md`): só se este item
   completa objetivamente o resultado de uma etapa numerada — nesse caso

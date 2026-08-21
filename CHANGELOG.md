@@ -4,6 +4,16 @@
 
 ### Adicionado
 
+- R10 (remediação de processo, fecha R7–R10) — simplificação operacional:
+  CHANGELOG deixa de ser obrigação por microcorte e passa a registrar só
+  boundary de release/ciclo/etapa; classificação de Nível 3 passa de path
+  puro para mudança materialmente sensível (regra/contrato de domínio,
+  schema/dado persistido, comportamento de persistência, arquitetura/
+  dependência, segurança, comportamento transversal), com os diretórios
+  sensíveis mantidos como sinal forte de inspeção, não gatilho automático;
+  nenhum nível, gate ou mecânica de permissão novo. `CURRENT_WORK.json`
+  volta a apontar para `S8`.
+
 - Rework, ETAPA 7 ("Event log incremental") — histórico de mudanças do
   loop WorkItem/Impediment (criado/moveu/registrado/resolveu/reabriu),
   visível em Registros ("Atividade recente", filtrável por item) e
