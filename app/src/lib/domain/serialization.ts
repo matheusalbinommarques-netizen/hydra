@@ -700,25 +700,45 @@ function findActivityDefinition(catalog: Catalog, activityId: string): ActivityD
 
 // --- fase 5 + montagem final ------------------------------------------------
 
-function assembleProjectState(
-	catalog: Catalog,
-	project: Project,
-	activityProgress: ActivityProgress[],
-	answers: Answer[],
-	rawPendingItems: RawPendingItem[],
-	scopeItems: ScopeItem[],
-	scopeVersion: ScopeVersion,
-	impediments: Impediment[],
-	workItems: WorkItem[],
-	affectedGroups: AffectedGroup[],
-	externalActions: ExternalAction[],
-	evidences: Evidence[],
-	currentTreatment: CurrentTreatment,
-	treatmentSteps: TreatmentStep[],
-	causeExploration: CauseExploration,
-	causeHypotheses: CauseHypothesis[],
-	desiredOutcomes: DesiredOutcome[]
-): Result<ProjectState, ProjectStateParseError> {
+interface AssembleProjectStateInput {
+	catalog: Catalog;
+	project: Project;
+	activityProgress: ActivityProgress[];
+	answers: Answer[];
+	rawPendingItems: RawPendingItem[];
+	scopeItems: ScopeItem[];
+	scopeVersion: ScopeVersion;
+	impediments: Impediment[];
+	workItems: WorkItem[];
+	affectedGroups: AffectedGroup[];
+	externalActions: ExternalAction[];
+	evidences: Evidence[];
+	currentTreatment: CurrentTreatment;
+	treatmentSteps: TreatmentStep[];
+	causeExploration: CauseExploration;
+	causeHypotheses: CauseHypothesis[];
+	desiredOutcomes: DesiredOutcome[];
+}
+
+function assembleProjectState({
+	catalog,
+	project,
+	activityProgress,
+	answers,
+	rawPendingItems,
+	scopeItems,
+	scopeVersion,
+	impediments,
+	workItems,
+	affectedGroups,
+	externalActions,
+	evidences,
+	currentTreatment,
+	treatmentSteps,
+	causeExploration,
+	causeHypotheses,
+	desiredOutcomes
+}: AssembleProjectStateInput): Result<ProjectState, ProjectStateParseError> {
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
 		if (!catalog.phases.some((phase) => phase.id === project.routeStartPhaseId)) {
@@ -1350,25 +1370,25 @@ export function deserializeProjectState(
 	const desiredOutcomesResult = parseDesiredOutcomeList(state.desiredOutcomes);
 	if (!desiredOutcomesResult.ok) return desiredOutcomesResult;
 
-	return assembleProjectState(
+	return assembleProjectState({
 		catalog,
-		projectResult.value,
-		activityProgressResult.value,
-		answersResult.value,
-		pendingItemsResult.value,
-		scopeItemsResult.value,
-		scopeVersionResult.value,
-		impedimentsResult.value,
-		workItemsResult.value,
-		affectedGroupsResult.value,
-		externalActionsResult.value,
-		evidencesResult.value,
-		currentTreatmentResult.value,
-		treatmentStepsResult.value,
-		causeExplorationResult.value,
-		causeHypothesesResult.value,
-		desiredOutcomesResult.value
-	);
+		project: projectResult.value,
+		activityProgress: activityProgressResult.value,
+		answers: answersResult.value,
+		rawPendingItems: pendingItemsResult.value,
+		scopeItems: scopeItemsResult.value,
+		scopeVersion: scopeVersionResult.value,
+		impediments: impedimentsResult.value,
+		workItems: workItemsResult.value,
+		affectedGroups: affectedGroupsResult.value,
+		externalActions: externalActionsResult.value,
+		evidences: evidencesResult.value,
+		currentTreatment: currentTreatmentResult.value,
+		treatmentSteps: treatmentStepsResult.value,
+		causeExploration: causeExplorationResult.value,
+		causeHypotheses: causeHypothesesResult.value,
+		desiredOutcomes: desiredOutcomesResult.value
+	});
 }
 
 // --- Event log incremental (ETAPA 7 do rework) ----------------------------

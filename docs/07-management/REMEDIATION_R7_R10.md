@@ -47,29 +47,26 @@ Não:
 
 ## R9 — Toil mecânico
 
-Status: NEXT / NOT STARTED
+Status: DONE
 
-Escopo:
-- `assembleProjectState`: 17 parâmetros posicionais → objeto nomeado;
-- triagem semântica dos testes que mantêm listas literais de estrutura:
-  - se só espelham TypeScript → derivar/remover;
-  - se protegem contrato real → manter explícitos.
+Resumo:
+- `assembleProjectState` passou de 17 parâmetros posicionais para um
+  objeto nomeado (`AssembleProjectStateInput`), único call site atualizado
+  em `deserializeProjectState`;
+- os dois testes que espelhavam manualmente as chaves de `ProjectState`
+  (`project-use-cases.spec.ts`, `sqlite-project-repository.spec.ts`) agora
+  derivam a lista de `Object.keys(createInitialProjectState(...))` em vez
+  de listar literalmente — adicionar uma propriedade a `ProjectState` não
+  exige mais editá-los;
+- o teste de fronteira de `ProjectView` (`project-view.spec.ts`) foi
+  mantido explícito, por proteger um contrato real (DTO nunca deve
+  espelhar `ProjectState` bruto), não por espelhar o tipo.
 
-Não:
-- refatorar `transitions.ts`;
-- refatorar `ProjectView`;
-- refatorar repository;
-- atacar "God files";
-- fazer vertical slice architecture.
-
-Critério: adicionar deliberadamente uma propriedade a `ProjectState` não deve exigir
-editar testes cuja única função seja espelhar manualmente `keyof ProjectState`. Erros
-restantes devem corresponder a consumidores/contratos que realmente precisam decidir
-algo.
+Não reabrir R9.
 
 ## R10 — Processo mínimo
 
-Status: NOT STARTED
+Status: NEXT / NOT STARTED
 
 Escopo:
 - `CURRENT_WORK.json` como ponteiro operacional;

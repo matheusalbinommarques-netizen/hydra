@@ -1278,24 +1278,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 
 		const stored = await repo.findById(created.value.projectId);
 		expect(stored && Object.keys(stored).sort()).toEqual(
-			[
-				'project',
-				'activityProgress',
-				'answers',
-				'pendingItems',
-				'scopeItems',
-				'scopeVersion',
-				'impediments',
-				'workItems',
-				'affectedGroups',
-				'externalActions',
-				'evidences',
-				'currentTreatment',
-				'treatmentSteps',
-				'causeExploration',
-				'causeHypotheses',
-				'desiredOutcomes'
-			].sort()
+			Object.keys(createInitialProjectState(catalog, 'irrelevante', '2026-01-01T00:00:00.000Z')).sort()
 		);
 	});
 

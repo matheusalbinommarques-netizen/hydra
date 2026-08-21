@@ -301,6 +301,10 @@
   HISTÓRICO/NÃO AUTORIDADE CORRENTE; comentário em
   `project-repository.ts` deixa de apontar `contracts.md` como contrato
   vigente.
+- Remediação R9 — refactor mecânico sem mudança de comportamento:
+  `assembleProjectState` passa a receber um objeto nomeado em vez de 17
+  parâmetros posicionais; testes que espelhavam manualmente as chaves de
+  `ProjectState` passam a derivá-las de `createInitialProjectState`.
 - remoção do eixo `ScopeItem.value` (mantém apenas esforço, agora
   obrigatório só para itens em "Agora");
 - navegação do workspace reagrupada em abas primárias (Agora/Cockpit) e

@@ -901,24 +901,7 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 		const found = await repo.findById(state.project.id);
 
 		expect(found && Object.keys(found).sort()).toEqual(
-			[
-				'project',
-				'activityProgress',
-				'answers',
-				'pendingItems',
-				'scopeItems',
-				'scopeVersion',
-				'impediments',
-				'workItems',
-				'affectedGroups',
-				'externalActions',
-				'evidences',
-				'currentTreatment',
-				'treatmentSteps',
-				'causeExploration',
-				'causeHypotheses',
-				'desiredOutcomes'
-			].sort()
+			Object.keys(createInitialProjectState(catalog, 'irrelevante', T1)).sort()
 		);
 		expect(found).not.toHaveProperty('phaseStatuses');
 		expect(found).not.toHaveProperty('projectStatus');
