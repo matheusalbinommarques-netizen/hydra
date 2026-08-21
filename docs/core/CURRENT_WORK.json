@@ -1,6 +1,6 @@
 {
-  "id": "R7",
+  "id": "R8",
   "kind": "remediation",
-  "source": "docs/07-management/decision-log.md",
-  "status": "in_progress"
+  "source": "docs/07-management/REMEDIATION_R7_R10.md",
+  "status": "not_started"
 }
