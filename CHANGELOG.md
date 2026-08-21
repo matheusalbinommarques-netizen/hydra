@@ -291,6 +291,16 @@
 - Remediação R7 — o histórico de um projeto deixa de recusar tipos de
   evento novos: projetos criados antes deste corte são convertidos ao abrir,
   preservando os eventos já registrados.
+- Remediação R8 — correção documental de fontes de verdade (sem mudança de
+  comportamento): precedência de autoridade em `CLAUDE.md` passa a ser
+  classificada por tipo de pergunta (produto/semântica, contrato técnico,
+  estado operacional, interface) em vez de lista linear única;
+  `docs/core/README.md` reescrito como mapa curto de autoridade;
+  `docs/core/RELEASE_0_SPEC.md`, `UX_DESIGN_SPEC.md`, `TECHNICAL_BRIEF.md`
+  e `ENGINEERING_REMEDIATION.md` marcados com banner
+  HISTÓRICO/NÃO AUTORIDADE CORRENTE; comentário em
+  `project-repository.ts` deixa de apontar `contracts.md` como contrato
+  vigente.
 - remoção do eixo `ScopeItem.value` (mantém apenas esforço, agora
   obrigatório só para itens em "Agora");
 - navegação do workspace reagrupada em abas primárias (Agora/Cockpit) e

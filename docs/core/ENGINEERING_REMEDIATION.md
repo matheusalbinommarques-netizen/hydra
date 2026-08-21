@@ -1,5 +1,12 @@
 # Hydra Engineering Remediation
 
+> **HISTÓRICO / NÃO AUTORIDADE CORRENTE.** R1–R6 estão concluídos; este
+> documento é registro do programa encerrado, não estado operacional
+> vigente. Em particular, "Product baseline" abaixo afirma que "o
+> roadmap de produto está temporariamente pausado" — isso não é mais
+> verdade, o roadmap foi retomado depois de R1–R6. Para o item/estágio
+> atual, ver `docs/core/CURRENT_WORK.json`.
+
 Status: COMPLETE
 Decision: B — arquitetura atual mantida; correções cirúrgicas
 executadas.

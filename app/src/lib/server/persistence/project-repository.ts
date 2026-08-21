@@ -1,4 +1,7 @@
-// Porta do repositório — ver docs/06-architecture/contracts.md §9.
+// Porta do repositório. Contrato vigente: esta interface (TypeScript).
+// docs/06-architecture/contracts.md §9 é o registro histórico do design
+// original (pré-implementação, presume que app/ ainda não existe) — não
+// é fonte normativa atual; ver docs/core/README.md.
 
 import type { Project, ProjectEvent, ProjectState } from '$lib/domain';
 

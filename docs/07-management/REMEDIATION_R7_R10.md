@@ -20,7 +20,11 @@ Não reabrir R7.
 
 ## R8 — Fontes de verdade
 
-Status: NEXT / NOT STARTED
+Status: DONE — `CLAUDE.md` (precedência por tipo de pergunta),
+`docs/core/README.md` (mapa de autoridade), topo de `PROJECT_STATUS.md`,
+banner HISTÓRICO em `RELEASE_0_SPEC.md`/`UX_DESIGN_SPEC.md`/
+`TECHNICAL_BRIEF.md`/`ENGINEERING_REMEDIATION.md`, comentário em
+`project-repository.ts:1`. Nenhuma mudança de comportamento executável.
 
 Escopo:
 - corrigir topo/data de `PROJECT_STATUS.md`;
@@ -43,7 +47,7 @@ Não:
 
 ## R9 — Toil mecânico
 
-Status: NOT STARTED
+Status: NEXT / NOT STARTED
 
 Escopo:
 - `assembleProjectState`: 17 parâmetros posicionais → objeto nomeado;

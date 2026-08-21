@@ -28,27 +28,63 @@ documentos canônicos por padrão.
 
 Fontes disponíveis:
 
-- `docs/core/PRODUCT_SPEC.md`: visão duradoura do produto;
-- `docs/core/RELEASE_0_SPEC.md`: escopo e critérios do Release 0;
-- `docs/core/UX_DESIGN_SPEC.md`: experiência e comportamento da interface;
-- `docs/core/TECHNICAL_BRIEF.md`: stack e decisões técnicas;
 - `docs/core/HYDRA_PRODUCT_REWORK.md`: semântica e decisões canônicas do
   rework de produto em andamento;
+- `docs/07-management/decision-log.md`: decisões duráveis publicadas;
+- `docs/core/PRODUCT_SPEC.md`, `DOMAIN_MODEL.md`, `STATE_MACHINE.md`,
+  `ORIENTATION_ENGINE.md`: baseline conceitual em sincronia com o código;
 - `docs/core/CURRENT_WORK.json`: ponteiro operacional — qual é o
-  Stage/corte atual, sem interpretar histórico;
-- `PROJECT_STATUS.md`: estado operacional e próxima decisão relevante;
+  Stage/corte atual, e a fonte que define o escopo desse corte;
+- `PROJECT_STATUS.md`: snapshot narrativo de contexto, não contrato;
 - backlog do ciclo vigente: critérios e limites do item;
 - documentação completa em `docs/`: histórico e aprofundamento.
 
-Precedência:
+`docs/core/RELEASE_0_SPEC.md`, `UX_DESIGN_SPEC.md` e `TECHNICAL_BRIEF.md`
+estão marcados como HISTÓRICO / NÃO AUTORIDADE CORRENTE — descrevem
+baseline anterior ao rework. Ver `docs/core/README.md` para o papel de
+cada arquivo.
 
-1. decisão explícita mais recente do usuário;
-2. documentos em `docs/core/`;
-3. backlog vigente e `PROJECT_STATUS.md`;
-4. documentação complementar;
-5. inferência técnica.
+Precedência: não existe uma lista linear válida para toda pergunta.
+Primeiro identifique que tipo de verdade está em disputa.
 
-Não resolver conflitos silenciosamente. Pare e apresente o conflito.
+**Produto e semântica** — o que o Hydra deve ser, o significado de um
+conceito, a direção de produto:
+
+1. decisão explícita atual do usuário;
+2. decisão durável mais recente em `docs/07-management/decision-log.md`;
+3. `docs/core/HYDRA_PRODUCT_REWORK.md`;
+4. demais specs de produto comprovadamente correntes;
+5. inferência.
+
+Código existente não invalida uma decisão de produto apenas porque ela
+ainda não foi implementada.
+
+**Contrato técnico e estado executável** — o que existe hoje, como
+funciona, que contratos precisam ser preservados:
+
+1. código, schema, migrations, testes e comportamento atuais;
+2. decisões arquiteturais duráveis aplicáveis;
+3. documentação técnica comprovadamente corrente;
+4. precedente de implementação semanticamente equivalente;
+5. inferência.
+
+Documento conceitual ou histórico não sobrescreve o comportamento real do
+repo. O inverso também vale: o código atual não prova que uma capacidade
+ausente nunca existirá, nem um documento futuro prova que ela já existe.
+
+**Estado operacional** — `CURRENT_WORK.json` é ponteiro; a fonte indicada
+por `CURRENT_WORK.source` define o escopo do corte; `PROJECT_STATUS.md` é
+snapshot, não contrato nem histórico autoritativo.
+
+**Interface** — produto/decisões definem significado e invariantes; o
+design aprovado define intenção visual e interacional (ver "Referências
+visuais"); o repo define integração, estado, persistência e convenções
+executáveis.
+
+Não resolva conflito pela localização física do arquivo nem por
+precedência genérica. Classifique a pergunta primeiro. Se duas fontes com
+autoridade sobre a mesma pergunta divergirem de verdade, pare e apresente
+o conflito — não reconcilie silenciosamente.
 
 ## Regras permanentes
 

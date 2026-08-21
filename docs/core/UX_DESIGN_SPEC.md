@@ -1,5 +1,14 @@
 # Hydra — UX & Visual Design Specification
 
+> **HISTÓRICO / NÃO AUTORIDADE CORRENTE.** Documento nunca saiu de
+> "direção inicial para exploração visual". A §20 trata
+> `design/approved/release-0-v1/` como referência visual oficial e
+> descreve a navegação do projeto como só `Agora / Mapa / Registros`;
+> `design/approved/` já contém material mais recente do rework, e a
+> navegação atual (`app/src/routes/projects/[projectId]/+layout.svelte`)
+> tem bem mais itens. Para direção visual vigente, ver `design/approved/`
+> e `docs/core/README.md`.
+
 **Versão:** 0.1  
 **Status:** direção inicial para exploração visual  
 **Observação:** decisões visuais definitivas serão atualizadas após aprovação das telas.

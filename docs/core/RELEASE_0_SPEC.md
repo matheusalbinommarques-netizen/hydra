@@ -1,5 +1,16 @@
 # Hydra — Release 0 Specification
 
+> **HISTÓRICO / NÃO AUTORIDADE CORRENTE.** §9 afirma que não há "novas
+> entidades de domínio além das já existentes (`Project`,
+> `ActivityProgress`, `Answer`, `PendingItem`)" — o domínio atual
+> (`app/src/lib/domain/state-types.ts`) já inclui `ScopeItem`,
+> `ScopeVersion`, `Impediment`, `WorkItem`, `AffectedGroup`,
+> `ExternalAction`, `Evidence`, `CurrentTreatment`, `TreatmentStep`,
+> `CauseExploration`, `CauseHypothesis`, `DesiredOutcome`, entre outras. A
+> baseline descrita aqui é anterior ao rework de produto. Para o estado
+> vigente, ver `docs/core/HYDRA_PRODUCT_REWORK.md` e
+> `docs/core/README.md`.
+
 **Versão:** 0.2
 **Status:** canônico para design  
 **Objetivo:** especificar a baseline funcional do Release 0 — a experiência guiada já validada e incorporada ao produto real, agora cobrindo a jornada linear completa, da Descoberta ao encerramento do projeto (fases 1 a 6 do catálogo).

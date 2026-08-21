@@ -1,6 +1,10 @@
 # Status do Projeto Hydra
 
-**Data de referência:** 16/08/2026
+**Data de referência:** 16/08/2026 — snapshot pontual, não atualizado a cada
+corte. Para o item/estágio vigente agora, ver `docs/core/CURRENT_WORK.json`
+(ponteiro operacional, sempre atual). Este arquivo registra apenas a
+narrativa de progresso até a data acima; pode estar desatualizado em
+relação ao ponteiro.
 
 **Versão da baseline:** 0.4.0
 

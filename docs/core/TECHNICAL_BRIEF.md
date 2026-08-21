@@ -1,5 +1,12 @@
 # Hydra — Technical Brief
 
+> **HISTÓRICO / NÃO AUTORIDADE CORRENTE.** Este documento descreve o
+> planejamento técnico anterior à implementação (stack não decidida,
+> `app/` ainda não criado). A stack já foi decidida e implementada
+> (SvelteKit + TypeScript, ver `app/`). Para restrições e contrato
+> técnico vigentes, o código atual é autoridade — ver
+> `docs/core/README.md`.
+
 **Versão:** 0.1  
 **Status:** canônico para planejamento técnico  
 **Stack:** pendente de decisão formal
