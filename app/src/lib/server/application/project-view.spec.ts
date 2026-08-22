@@ -13,6 +13,7 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		scopeVersion: { projectId: 'p1', hypothesis: '', confirmedAt: null },
 		impediments: [],
 		workItems: [],
+		dependencies: [],
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],

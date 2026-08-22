@@ -3,11 +3,13 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
+	addDependency,
 	addCauseHypothesis,
 	addDesiredOutcome,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
+	addWorkItem,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
@@ -1545,5 +1547,116 @@ describe('deserializeProjectEvents', () => {
 		expect(deserializeProjectEvents(json)).toEqual({ ok: true, value: [] });
 		// e o restante do envelope continua intacto
 		expect(deserializeProjectState(json, catalog)).toEqual({ ok: true, value: state });
+	});
+});
+
+// Dependency (ETAPA 8 do rework) — compatibilidade de leitura e invariantes
+// reforçadas contra estado desserializado, mesmo padrão já aplicado a
+// WorkItem/Impediment neste arquivo.
+describe('Dependency (ETAPA 8 do rework)', () => {
+	function stateWithWorkItems(): ProjectState {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		return state;
+	}
+
+	it('preserva as dependências no round-trip completo', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-2', 'wi-b', 'wi-c', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('snapshot anterior à ETAPA 8 (sem a chave "dependencies") importa como coleção vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.dependencies; // simula um export gerado antes da S8
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.dependencies).toEqual([]);
+	});
+
+	it('recusa dependência que referencia um WorkItem inexistente', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		envelope.state.dependencies = [
+			{ id: 'dep-1', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'nao-existe', createdAt: T1 }
+		];
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('recusa auto-dependência e par duplicado vindos de estado persistido', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		envelope.state.dependencies = [
+			{ id: 'dep-1', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'wi-a', createdAt: T1 }
+		];
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+
+		envelope.state.dependencies = [
+			{ id: 'dep-1', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'wi-b', createdAt: T1 },
+			{ id: 'dep-2', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'wi-b', createdAt: T1 }
+		];
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('recusa ciclo direto e ciclo transitivo vindos de estado persistido', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		envelope.state.dependencies = [
+			{ id: 'dep-1', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'wi-b', createdAt: T1 },
+			{ id: 'dep-2', projectId: 'proj-1', workItemId: 'wi-b', dependsOnWorkItemId: 'wi-a', createdAt: T1 }
+		];
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+
+		envelope.state.dependencies = [
+			{ id: 'dep-1', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'wi-b', createdAt: T1 },
+			{ id: 'dep-2', projectId: 'proj-1', workItemId: 'wi-b', dependsOnWorkItemId: 'wi-c', createdAt: T1 },
+			{ id: 'dep-3', projectId: 'proj-1', workItemId: 'wi-c', dependsOnWorkItemId: 'wi-a', createdAt: T1 }
+		];
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('aceita duas dependências que compartilham o mesmo predecessor (não é ciclo)', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		envelope.state.dependencies = [
+			{ id: 'dep-1', projectId: 'proj-1', workItemId: 'wi-a', dependsOnWorkItemId: 'wi-c', createdAt: T1 },
+			{ id: 'dep-2', projectId: 'proj-1', workItemId: 'wi-b', dependsOnWorkItemId: 'wi-c', createdAt: T1 }
+		];
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+	});
+
+	it('não converte o Answer legado dependencias_trabalho em nenhuma Dependency', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(
+			answerActivity(
+				catalog,
+				state,
+				'mapear_dependencias',
+				{ dependencias_trabalho: 'A depende de B; B depende de C' },
+				T1
+			)
+		);
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.dependencies).toEqual([]);
+		// O texto livre continua legível, intacto — READ-LEGACY, nunca promovido.
+		expect(
+			result.value.answers.find((answer) => answer.fieldDefinitionId === 'dependencias_trabalho')?.value
+		).toBe('A depende de B; B depende de C');
 	});
 });

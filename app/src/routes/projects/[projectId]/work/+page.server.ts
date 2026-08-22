@@ -58,6 +58,38 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// Dependency (ETAPA 8 do rework) — precedência planejada, nunca bloqueio:
+	// nada aqui interfere na action `move` acima.
+	addDependency: async ({ request, params }) => {
+		const formData = await request.formData();
+		const workItemId = readString(formData, 'workItemId');
+		const dependsOnWorkItemId = readString(formData, 'dependsOnWorkItemId');
+		if (!workItemId || !dependsOnWorkItemId) {
+			return fail(400, { message: 'Selecione o item do qual este trabalho depende.' });
+		}
+
+		const result = await getProjectUseCases().addDependency({
+			projectId: params.projectId,
+			workItemId,
+			dependsOnWorkItemId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	removeDependency: async ({ request, params }) => {
+		const formData = await request.formData();
+		const dependencyId = readString(formData, 'dependencyId');
+		if (!dependencyId) return fail(400, { message: 'Dependência inválida.' });
+
+		const result = await getProjectUseCases().removeDependency({
+			projectId: params.projectId,
+			dependencyId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	registerImpediment: async ({ request, params }) => {
 		const formData = await request.formData();
 		const workItemId = readString(formData, 'workItemId');

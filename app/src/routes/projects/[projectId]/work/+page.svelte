@@ -2,7 +2,8 @@
 	import { enhance } from '$app/forms';
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { WorkItemStatus } from '$lib/domain';
-	import { nextWorkItemStatus, previousWorkItemStatus } from './work-view';
+	import type { DependencyPresentation } from './work-view';
+	import { dependencyPresentation, nextWorkItemStatus, previousWorkItemStatus } from './work-view';
 
 	let { data, form } = $props();
 	let projectId = $derived(data.view.projectId);
@@ -13,6 +14,11 @@
 		a_fazer: 'A fazer',
 		em_andamento: 'Em andamento',
 		concluido: 'Concluído'
+	};
+	const dependencyStateLabel: Record<DependencyPresentation, string> = {
+		pronto: 'Pronto',
+		aguardando: 'Aguardando',
+		pendente: 'Pendente'
 	};
 	const tipoLabel: Record<string, string> = {
 		dependencia_externa: 'Dependência externa',
@@ -56,6 +62,7 @@
 
 	let selectedItemId = $state<string | null>(null);
 	let blockFormOpen = $state(false);
+	let newDependencyTargetId = $state('');
 	let newImpedText = $state('');
 	let newImpedTipo = $state('');
 
@@ -90,7 +97,29 @@
 		blockFormOpen = false;
 		newImpedText = '';
 		newImpedTipo = '';
+		newDependencyTargetId = '';
 	}
+
+	// Candidatos a predecessor: todo item do projeto menos o próprio e os que
+	// já são predecessores dele. Ciclo transitivo NÃO é filtrado aqui — a
+	// invariante vive no domínio (addDependency), e a tentativa volta como
+	// mensagem de erro; a interface não duplica a regra.
+	let dependencyCandidates = $derived.by(() => {
+		const current = selectedItem;
+		if (!current) return [];
+		return allItems.filter(
+			(candidate) =>
+				candidate.id !== current.id &&
+				!current.dependsOn.some((dependency) => dependency.dependsOnWorkItemId === candidate.id)
+		);
+	});
+	function handleDependencySubmit() {
+		return async ({ result, update }: { result: ActionResult; update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			if (result.type === 'success') newDependencyTargetId = '';
+			await update({ reset: false });
+		};
+	}
+
 	function closeDetail() {
 		selectedItemId = null;
 		blockFormOpen = false;
@@ -135,6 +164,7 @@
 							{@const next = nextWorkItemStatus(item.status)}
 							{@const nextBlocked = next === 'concluido' && item.blockedBy !== null}
 							{@const isMoving = movingItemId === item.id}
+							{@const unsatisfied = item.dependsOn.filter((dependency) => !dependency.satisfied)}
 							<li class="work-card" class:blocked={item.blockedBy}>
 								<button
 									type="button"
@@ -145,6 +175,13 @@
 									<span class="card-open-content">
 										{#if item.blockedBy}
 											<span class="blocked-badge">Bloqueado</span>
+										{/if}
+										{#if unsatisfied.length > 0}
+											<span class="waiting-badge">
+												{dependencyPresentation(item.status, unsatisfied[0]) === 'pendente'
+													? `Dependência pendente${unsatisfied.length === 1 ? `: ${unsatisfied[0].title}` : `: ${unsatisfied.length} itens`}`
+													: `Aguarda${unsatisfied.length === 1 ? `: ${unsatisfied[0].title}` : ` ${unsatisfied.length} itens`}`}
+											</span>
 										{/if}
 										<span class="card-title">{item.title}</span>
 										{#if item.blockedBy}
@@ -299,6 +336,52 @@
 				<button type="button" class="button-secondary" onclick={() => (blockFormOpen = true)}>
 					Este trabalho está bloqueado
 				</button>
+			{/if}
+		</div>
+
+		<!-- Dependências (ETAPA 8 do rework): precedência planejada, NUNCA
+		     bloqueio. Nenhum botão de status acima é desabilitado por causa
+		     desta lista — só impedimento aberto faz isso. -->
+		<div class="panel-section">
+			<p class="panel-label">Depende de</p>
+			{#if selectedItem.dependsOn.length === 0}
+				<p class="panel-hint">Este item não depende da conclusão de nenhum outro.</p>
+			{:else}
+				<ul class="dependency-list">
+					{#each selectedItem.dependsOn as dependency (dependency.dependencyId)}
+						{@const presentation = dependencyPresentation(selectedItem.status, dependency)}
+						<li class="dependency-row">
+							<span class="dependency-state" class:satisfied={dependency.satisfied}>
+								{dependencyStateLabel[presentation]}
+							</span>
+							<span class="dependency-title">{dependency.title}</span>
+							<form method="POST" action="?/removeDependency" use:enhance={handleDependencySubmit}>
+								<input type="hidden" name="dependencyId" value={dependency.dependencyId} />
+								<button type="submit" class="link-button" aria-label="Remover dependência de {dependency.title}">
+									Remover
+								</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if dependencyCandidates.length === 0}
+				<p class="panel-hint">Nenhum outro item disponível para declarar dependência.</p>
+			{:else}
+				<form method="POST" action="?/addDependency" use:enhance={handleDependencySubmit}>
+					<input type="hidden" name="workItemId" value={selectedItem.id} />
+					<label class="visually-hidden" for="new-dependency-target">Depende da conclusão de</label>
+					<select id="new-dependency-target" name="dependsOnWorkItemId" required bind:value={newDependencyTargetId}>
+						<option value="" disabled>Depende da conclusão de...</option>
+						{#each dependencyCandidates as candidate (candidate.id)}
+							<option value={candidate.id}>{candidate.title}</option>
+						{/each}
+					</select>
+					<button type="submit" class="button-secondary" disabled={!newDependencyTargetId}>
+						Adicionar dependência
+					</button>
+				</form>
 			{/if}
 		</div>
 
@@ -714,6 +797,46 @@
 		border: 1px solid var(--hydra-border);
 		background: var(--hydra-surface);
 		color: var(--hydra-text);
+	}
+
+	/* Dependência é informação de precedência, não alarme: deliberadamente
+	   mais discreto que .blocked-badge (que usa --hydra-warning em caixa alta)
+	   — só impedimento representa bloqueio real. */
+	.waiting-badge {
+		align-self: flex-start;
+		font-size: var(--font-size-caption);
+		font-weight: 600;
+		color: var(--hydra-muted);
+	}
+
+	.dependency-list {
+		list-style: none;
+		margin: 0 0 var(--space-4);
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.dependency-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-3);
+	}
+
+	.dependency-state {
+		flex: none;
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		color: var(--hydra-muted);
+	}
+
+	.dependency-state.satisfied {
+		color: var(--hydra-text);
+	}
+
+	.dependency-title {
+		flex: 1;
 	}
 
 	@media (max-width: 860px) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorkView, nextWorkItemStatus, previousWorkItemStatus } from './work-view';
-import type { WorkItemView } from '$lib/server/application/types';
+import { buildWorkView, dependencyPresentation, nextWorkItemStatus, previousWorkItemStatus } from './work-view';
+import type { WorkItemDependencyView, WorkItemView } from '$lib/server/application/types';
 
 function makeItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): WorkItemView {
 	return {
@@ -8,7 +8,8 @@ function makeItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): 
 		title: overrides.title ?? `Item ${overrides.id}`,
 		status: overrides.status ?? 'a_fazer',
 		createdAt: overrides.createdAt ?? '2026-01-01T00:00:00.000Z',
-		blockedBy: overrides.blockedBy ?? null
+		blockedBy: overrides.blockedBy ?? null,
+		dependsOn: overrides.dependsOn ?? []
 	};
 }
 
@@ -67,5 +68,34 @@ describe('nextWorkItemStatus / previousWorkItemStatus', () => {
 		expect(previousWorkItemStatus('concluido')).toBe('em_andamento');
 		expect(previousWorkItemStatus('em_andamento')).toBe('a_fazer');
 		expect(previousWorkItemStatus('a_fazer')).toBeNull();
+	});
+});
+
+// Dependency (ETAPA 8 do rework) — os três estados de apresentação. A regra
+// existe porque Dependency não é hard block: um item pode ser concluído com o
+// predecessor ainda aberto, e nesse caso ele não "aguarda" mais nada — mas a
+// precedência não satisfeita continua sendo fato visível.
+describe('dependencyPresentation', () => {
+	const unsatisfied: WorkItemDependencyView = {
+		dependencyId: 'dep-1',
+		dependsOnWorkItemId: 'wi-b',
+		title: 'Definir schema',
+		satisfied: false
+	};
+	const satisfied: WorkItemDependencyView = { ...unsatisfied, satisfied: true };
+
+	it('predecessor concluído é sempre "pronto", inclusive para dependente concluído', () => {
+		expect(dependencyPresentation('a_fazer', satisfied)).toBe('pronto');
+		expect(dependencyPresentation('em_andamento', satisfied)).toBe('pronto');
+		expect(dependencyPresentation('concluido', satisfied)).toBe('pronto');
+	});
+
+	it('dependente não concluído com predecessor aberto está "aguardando"', () => {
+		expect(dependencyPresentation('a_fazer', unsatisfied)).toBe('aguardando');
+		expect(dependencyPresentation('em_andamento', unsatisfied)).toBe('aguardando');
+	});
+
+	it('dependente concluído com predecessor aberto está "pendente", nunca "aguardando"', () => {
+		expect(dependencyPresentation('concluido', unsatisfied)).toBe('pendente');
 	});
 });

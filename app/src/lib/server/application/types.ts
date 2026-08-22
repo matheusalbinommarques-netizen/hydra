@@ -176,6 +176,21 @@ export interface WorkItemView {
 	status: WorkItemStatus;
 	createdAt: string;
 	blockedBy: { impedimentId: string; text: string; tipo: ImpedimentType } | null;
+	// Dependências declaradas deste item (ETAPA 8 do rework) — precedência
+	// planejada, nunca bloqueio: `satisfied` é derivado do status do
+	// predecessor na montagem da view, exatamente como blockedBy acima, e
+	// nenhuma transição do domínio consulta este campo.
+	dependsOn: WorkItemDependencyView[];
+}
+
+// Uma aresta de precedência vista a partir do item que depende. `title`/
+// `satisfied` são do predecessor — a interface não precisa cruzar a lista
+// de WorkItems para desenhar "Aguarda X".
+export interface WorkItemDependencyView {
+	dependencyId: string;
+	dependsOnWorkItemId: string;
+	title: string;
+	satisfied: boolean;
 }
 
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — view leve de
@@ -498,6 +513,19 @@ export interface MoveWorkItemInput {
 	status: WorkItemStatus;
 }
 
+// Dependency (ETAPA 8 do rework) — mesmo padrão: id gerado pelo caso de uso
+// (idGenerator), nunca recebido do cliente.
+export interface AddDependencyInput {
+	projectId: string;
+	workItemId: string;
+	dependsOnWorkItemId: string;
+}
+
+export interface RemoveDependencyInput {
+	projectId: string;
+	dependencyId: string;
+}
+
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
 // inputs de ScopeItem/Impediment: id gerado pelo caso de uso
 // (idGenerator), nunca recebido do cliente.
@@ -706,6 +734,8 @@ export interface ProjectUseCases {
 	reopenImpediment(input: ReopenImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
 	addWorkItem(input: AddWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
+	addDependency(input: AddDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeDependency(input: RemoveDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

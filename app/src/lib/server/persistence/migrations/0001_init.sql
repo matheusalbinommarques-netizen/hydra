@@ -122,6 +122,27 @@ CREATE TABLE IF NOT EXISTS impediment (
 	)
 );
 
+-- Dependency (ETAPA 8 do rework, primeiro microcorte) — ver
+-- app/src/lib/domain/state-types.ts. Precedência planejada entre dois
+-- work_item do mesmo projeto ("A depende da conclusão de B"), nunca bloqueio
+-- operacional: não existe coluna de status aqui, "aguardando" é sempre
+-- derivado do status do predecessor na leitura, mesmo espírito de
+-- impediment.work_item_id → "bloqueado". Sem updated_at: a relação é
+-- imutável (só nasce e é removida, mesmo molde de evidence).
+-- As duas CHECK/UNIQUE abaixo cobrem invariantes realmente fechados da
+-- própria relação (R7/D038): auto-referência e par duplicado. Ciclo
+-- transitivo NÃO é expressável em CHECK — fica no domínio
+-- (addDependency) e na desserialização.
+CREATE TABLE IF NOT EXISTS dependency (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	work_item_id TEXT NOT NULL REFERENCES work_item (id),
+	depends_on_work_item_id TEXT NOT NULL REFERENCES work_item (id),
+	created_at TEXT NOT NULL,
+	CONSTRAINT dependency_no_self_reference CHECK (work_item_id <> depends_on_work_item_id),
+	CONSTRAINT dependency_unique_pair UNIQUE (work_item_id, depends_on_work_item_id)
+);
+
 -- Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — ver
 -- app/src/lib/domain/state-types.ts. Ligado à atividade `publico` do
 -- catálogo (completion deriva do estado destes grupos, ver
@@ -311,6 +332,7 @@ CREATE INDEX IF NOT EXISTS idx_work_item_project_id ON work_item (project_id);
 -- criados antes da ETAPA 6 — indexá-la aqui quebraria a inicialização desses
 -- bancos (a coluna ainda não existiria neste ponto do exec). O índice é
 -- criado junto com a coluna, na própria função idempotente.
+CREATE INDEX IF NOT EXISTS idx_dependency_project_id ON dependency (project_id);
 CREATE INDEX IF NOT EXISTS idx_affected_group_project_id ON affected_group (project_id);
 CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);

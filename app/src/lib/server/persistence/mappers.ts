@@ -12,6 +12,7 @@ import type {
 	CauseExploration,
 	CauseHypothesis,
 	CurrentTreatment,
+	Dependency,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -171,6 +172,24 @@ export function mapWorkItemRow(row: WorkItemRow): WorkItem {
 		status: row.status,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
+	};
+}
+
+export interface DependencyRow {
+	id: string;
+	project_id: string;
+	work_item_id: string;
+	depends_on_work_item_id: string;
+	created_at: string;
+}
+
+export function mapDependencyRow(row: DependencyRow): Dependency {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		workItemId: row.work_item_id,
+		dependsOnWorkItemId: row.depends_on_work_item_id,
+		createdAt: row.created_at
 	};
 }
 

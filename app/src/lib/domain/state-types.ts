@@ -157,6 +157,40 @@ export interface WorkItem {
 	updatedAt: string;
 }
 
+// Dependency — ETAPA 8 do rework ("Dependency + Milestone + Roadmap/Timeline",
+// docs/core/HYDRA_PRODUCT_REWORK.md §38), primeiro microcorte. Relação de
+// precedência/prontidão planejada entre dois WorkItem do mesmo projeto: "A
+// depende da conclusão de B; enquanto B não estiver concluído, A está
+// aguardando B". NÃO significa "A é tecnicamente proibido de ser concluído
+// enquanto B não concluir" — Dependency nunca é bloqueio operacional. O único
+// mecanismo de bloqueio real continua sendo Impediment (D036): moveWorkItem
+// não ganha nenhuma recusa nova por causa de Dependency.
+//
+// Vive na camada de execução (WorkItem), não na de escopo/priorização —
+// D035 já registra WorkItem como a unidade que teria "Dependency/
+// AcceptanceCriterion/Responsible próprios", e a cadeia conceitual do §12
+// coloca Dependency abaixo de WorkItem. Não é dependência externa: uma
+// espera externa que já bloqueia é um Impediment com tipo
+// `dependencia_externa`, e continua sendo — o vínculo Impediment →
+// Dependency previsto no §13.4 fica explicitamente DEFER neste corte, não
+// reconciliado.
+//
+// Sem status próprio, por design (mesmo espírito de "bloqueado nunca é
+// persistido", D036): "aguardando" vs "pronto" é sempre derivado do status
+// do predecessor (`dependsOnWorkItemId` concluído ou não), nunca gravado.
+// Imutável depois de criada — só existe adicionar e remover (mesmo molde de
+// Evidence, sem `updatedAt`). Nenhum metadado de scheduling (tipo de
+// precedência, lag, datas, responsável) nesta rodada.
+export interface Dependency {
+	id: string;
+	projectId: string;
+	// O WorkItem que depende (o que aguarda).
+	workItemId: string;
+	// O WorkItem que precisa ser concluído antes (o predecessor).
+	dependsOnWorkItemId: string;
+	createdAt: string;
+}
+
 // Mapa de Impacto — Descoberta, "Quem é afetado" (ETAPA 2 do rework, ver
 // docs/core/HYDRA_PRODUCT_REWORK.md §32). Objeto vivo real: substitui o
 // texto livre antes capturado em `publico_detail` (Answer da atividade
@@ -371,6 +405,7 @@ export interface ProjectState {
 	scopeVersion: ScopeVersion;
 	impediments: Impediment[];
 	workItems: WorkItem[];
+	dependencies: Dependency[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];

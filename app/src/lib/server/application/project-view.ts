@@ -30,6 +30,7 @@ import type {
 	ProjectView,
 	ScopeItemView,
 	TreatmentStepView,
+	WorkItemDependencyView,
 	WorkItemView
 } from './types';
 
@@ -123,8 +124,31 @@ function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][
 		title: item.title,
 		status: item.status,
 		createdAt: item.createdAt,
-		blockedBy: blocking ? { impedimentId: blocking.id, text: blocking.text, tipo: blocking.tipo } : null
+		blockedBy: blocking ? { impedimentId: blocking.id, text: blocking.text, tipo: blocking.tipo } : null,
+		dependsOn: buildWorkItemDependencyViews(state, item.id)
 	};
+}
+
+// "Aguardando" nunca é persistido — é sempre derivado aqui do status do
+// predecessor (mesmo espírito de blockedBy acima): a dependência está
+// satisfeita quando o WorkItem do qual se depende está 'concluido'.
+// Dependência órfã não é representável (FK no schema + invariante na
+// desserialização), então um predecessor ausente só poderia vir de estado
+// corrompido — filtrado em vez de quebrar a tela.
+function buildWorkItemDependencyViews(state: ProjectState, workItemId: string): WorkItemDependencyView[] {
+	const views: WorkItemDependencyView[] = [];
+	for (const dependency of state.dependencies) {
+		if (dependency.workItemId !== workItemId) continue;
+		const predecessor = state.workItems.find((item) => item.id === dependency.dependsOnWorkItemId);
+		if (!predecessor) continue;
+		views.push({
+			dependencyId: dependency.id,
+			dependsOnWorkItemId: predecessor.id,
+			title: predecessor.title,
+			satisfied: predecessor.status === 'concluido'
+		});
+	}
+	return views;
 }
 
 function buildAffectedGroupView(group: ProjectState['affectedGroups'][number]): AffectedGroupView {

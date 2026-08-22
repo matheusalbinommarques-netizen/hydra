@@ -39,6 +39,14 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Item de trabalho não encontrado.';
 		case 'work_item_blocked':
 			return 'Marque o impedimento como resolvido antes de concluir este item.';
+		case 'dependency_not_found':
+			return 'Dependência não encontrada.';
+		case 'dependency_self_reference':
+			return 'Um item de trabalho não pode depender dele mesmo.';
+		case 'dependency_already_exists':
+			return 'Esta dependência já foi registrada.';
+		case 'dependency_cycle':
+			return 'Esta dependência criaria um ciclo: o outro item já depende deste, direta ou indiretamente.';
 		case 'phase_not_found':
 			return 'A fase escolhida não existe mais no catálogo.';
 		case 'planning_no_items':

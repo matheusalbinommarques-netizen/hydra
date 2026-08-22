@@ -12,6 +12,7 @@ import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
+	addDependency as addDependencyInDomain,
 	addWorkItem as addWorkItemInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
@@ -33,6 +34,7 @@ import {
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeCauseHypothesis as removeCauseHypothesisInDomain,
+	removeDependency as removeDependencyInDomain,
 	removeDesiredOutcome as removeDesiredOutcomeInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	removeTreatmentStep as removeTreatmentStepInDomain,
@@ -74,6 +76,7 @@ import type {
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AddTreatmentStepInput,
+	AddDependencyInput,
 	AddWorkItemInput,
 	AnswerActivityInput,
 	CompleteExternalActionInput,
@@ -90,6 +93,7 @@ import type {
 	MoveScopeItemInput,
 	MoveTreatmentStepInput,
 	MoveWorkItemInput,
+	RemoveDependencyInput,
 	PrepareExternalActionInput,
 	ProjectListItem,
 	ProjectUseCases,
@@ -721,6 +725,38 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				};
 				await repository.save(result.value, [event]);
 			}
+			return viewOf(result.value);
+		},
+
+		// Dependency (ETAPA 8 do rework) — sem evento de histórico nesta rodada:
+		// a taxonomia de ProjectEvent é fechada e só cobre o loop
+		// WorkItem/Impediment (D037); tipo novo exige decisão explícita de corte.
+		async addDependency(input: AddDependencyInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addDependencyInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.workItemId,
+				input.dependsOnWorkItemId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeDependency(input: RemoveDependencyInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeDependencyInDomain(catalog, state, input.dependencyId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

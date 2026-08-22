@@ -22,6 +22,7 @@ import {
 	mapScopeItemRow,
 	mapScopeVersionRow,
 	mapTreatmentStepRow,
+	mapDependencyRow,
 	mapWorkItemRow,
 	type ActivityProgressRow,
 	type AffectedGroupRow,
@@ -39,6 +40,7 @@ import {
 	type ScopeItemRow,
 	type ScopeVersionRow,
 	type TreatmentStepRow,
+	type DependencyRow,
 	type WorkItemRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
@@ -294,6 +296,16 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertImpediment.run(impediment);
 		}
 
+		// dependency também depende de work_item (duas FKs), então vem depois do
+		// bloco de work_item acima — mesma razão de impediment.
+		const insertDependency = db.prepare(
+			`INSERT INTO dependency (id, project_id, work_item_id, depends_on_work_item_id, created_at)
+			 VALUES (@id, @projectId, @workItemId, @dependsOnWorkItemId, @createdAt)`
+		);
+		for (const dependency of state.dependencies) {
+			insertDependency.run(dependency);
+		}
+
 		const insertAffectedGroup = db.prepare(
 			`INSERT INTO affected_group (id, project_id, label, impact, frequency, created_at, updated_at)
 			 VALUES (@id, @projectId, @label, @impact, @frequency, @createdAt, @updatedAt)`
@@ -424,6 +436,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// impediment antes de work_item: impediment.work_item_id referencia
 		// work_item.id (FK checada imediatamente, foreign_keys = ON).
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM dependency WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM work_item WHERE project_id = ?').run(state.project.id);
 		// evidence/external_action apagados antes de affected_group — ambos
 		// referenciam affected_group (FK sem ON DELETE, checagem imediata).
@@ -501,6 +514,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as WorkItemRow[];
 
+			const dependencyRows = db
+				.prepare(
+					`SELECT id, project_id, work_item_id, depends_on_work_item_id, created_at
+					 FROM dependency WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as DependencyRow[];
+
 			const affectedGroupRows = db
 				.prepare(
 					`SELECT id, project_id, label, impact, frequency, created_at, updated_at
@@ -566,6 +586,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				scopeVersion: mapScopeVersionRow(scopeVersionRow),
 				impediments: impedimentRows.map(mapImpedimentRow),
 				workItems: workItemRows.map(mapWorkItemRow),
+				dependencies: dependencyRows.map(mapDependencyRow),
 				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
 				externalActions: externalActionRows.map(mapExternalActionRow),
 				evidences: evidenceRows.map(mapEvidenceRow),

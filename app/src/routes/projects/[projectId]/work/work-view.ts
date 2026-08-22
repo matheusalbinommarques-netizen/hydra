@@ -7,7 +7,7 @@
 // bruto. Mesmo padrão de buildRecordsView/buildMapView.
 
 import type { WorkItemStatus } from '$lib/domain';
-import type { WorkItemView } from '$lib/server/application/types';
+import type { WorkItemDependencyView, WorkItemView } from '$lib/server/application/types';
 
 export interface WorkItemBoardGroups {
 	a_fazer: WorkItemView[];
@@ -57,4 +57,23 @@ export function nextWorkItemStatus(status: WorkItemStatus): WorkItemStatus | nul
 export function previousWorkItemStatus(status: WorkItemStatus): WorkItemStatus | null {
 	const index = STATUSES.indexOf(status);
 	return index > 0 ? STATUSES[index - 1] : null;
+}
+
+// Como uma Dependency é apresentada (ETAPA 8 do rework). Três estados, nunca
+// persistidos: derivam do par (status do dependente × `satisfied`, que é um
+// fato sobre o predecessor).
+//
+// 'pendente' existe porque Dependency deliberadamente não é hard block: um
+// WorkItem pode ser concluído com o predecessor ainda aberto (moveWorkItem não
+// recusa nada por causa disso). Nesse caso a precedência continua sendo fato
+// visível — a relação não é removida nem satisfeita — mas dizer que um item
+// já concluído "aguarda" alguém é falso: ele não está esperando por nada.
+export type DependencyPresentation = 'pronto' | 'aguardando' | 'pendente';
+
+export function dependencyPresentation(
+	dependentStatus: WorkItemStatus,
+	dependency: WorkItemDependencyView
+): DependencyPresentation {
+	if (dependency.satisfied) return 'pronto';
+	return dependentStatus === 'concluido' ? 'pendente' : 'aguardando';
 }

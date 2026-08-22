@@ -32,6 +32,7 @@ import type {
 	ScopeVersion,
 	TreatmentFriction,
 	TreatmentStep,
+	Dependency,
 	WorkItem,
 	WorkItemStatus
 } from './state-types';
@@ -395,6 +396,34 @@ function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParse
 	return { ok: true, value: result };
 }
 
+// Dependency (ETAPA 8 do rework) — ausente em snapshots exportados antes
+// desta etapa: tratado como coleção vazia, mesmo espírito de
+// parseWorkItemList acima. Nunca inferida do texto livre legado
+// `dependencias_trabalho` (READ-LEGACY, sem auto-conversão — regra §13.2).
+function parseDependencyList(value: unknown): Result<Dependency[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('dependencies deve ser um array');
+	const result: Dependency[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Dependency deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Dependency.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Dependency.projectId deve ser uma string');
+		if (!isString(item.workItemId)) return shapeError('Dependency.workItemId deve ser uma string');
+		if (!isString(item.dependsOnWorkItemId)) {
+			return shapeError('Dependency.dependsOnWorkItemId deve ser uma string');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Dependency.createdAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			workItemId: item.workItemId,
+			dependsOnWorkItemId: item.dependsOnWorkItemId,
+			createdAt: item.createdAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 const AFFECTED_GROUP_IMPACTS: readonly string[] = ['alto', 'medio', 'baixo', 'desconhecido'];
 function isAffectedGroupImpactOrNull(value: unknown): value is AffectedGroupImpact | null {
 	return value === null || (typeof value === 'string' && AFFECTED_GROUP_IMPACTS.includes(value));
@@ -710,6 +739,7 @@ interface AssembleProjectStateInput {
 	scopeVersion: ScopeVersion;
 	impediments: Impediment[];
 	workItems: WorkItem[];
+	dependencies: Dependency[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];
@@ -730,6 +760,7 @@ function assembleProjectState({
 	scopeVersion,
 	impediments,
 	workItems,
+	dependencies,
 	affectedGroups,
 	externalActions,
 	evidences,
@@ -998,6 +1029,77 @@ function assembleProjectState({
 		}
 	}
 
+	// referências + invariantes: Dependency (ETAPA 8 do rework) — as mesmas
+	// invariantes que addDependency aplica em tempo de execução, reforçadas
+	// aqui contra estado desserializado (mesmo padrão do bloco de Impediment
+	// acima): ambos os WorkItem existem no projeto, sem auto-dependência, sem
+	// par duplicado e sem ciclo — direto ou transitivo.
+	const seenDependencyIds = new Set<string>();
+	const seenDependencyPairs = new Set<string>();
+	const dependsOnByWorkItemId = new Map<string, string[]>();
+	for (const dependency of dependencies) {
+		if (dependency.projectId !== project.id) {
+			return invariantError(`Dependency "${dependency.id}" usa projectId diferente do Project`);
+		}
+		if (seenDependencyIds.has(dependency.id)) {
+			return invariantError(`Dependency.id duplicado: "${dependency.id}"`);
+		}
+		seenDependencyIds.add(dependency.id);
+		if (dependency.workItemId === dependency.dependsOnWorkItemId) {
+			return invariantError(`Dependency "${dependency.id}" aponta um WorkItem para ele mesmo`);
+		}
+		if (!workItemById.has(dependency.workItemId)) {
+			return referenceError(
+				`Dependency "${dependency.id}" referencia workItemId "${dependency.workItemId}", que não existe`
+			);
+		}
+		if (!workItemById.has(dependency.dependsOnWorkItemId)) {
+			return referenceError(
+				`Dependency "${dependency.id}" referencia dependsOnWorkItemId "${dependency.dependsOnWorkItemId}", que não existe`
+			);
+		}
+		const pair = `${dependency.workItemId} -> ${dependency.dependsOnWorkItemId}`;
+		if (seenDependencyPairs.has(pair)) {
+			return invariantError(
+				`Dependência duplicada entre os WorkItems "${dependency.workItemId}" e "${dependency.dependsOnWorkItemId}"`
+			);
+		}
+		seenDependencyPairs.add(pair);
+		const edges = dependsOnByWorkItemId.get(dependency.workItemId);
+		if (edges) edges.push(dependency.dependsOnWorkItemId);
+		else dependsOnByWorkItemId.set(dependency.workItemId, [dependency.dependsOnWorkItemId]);
+	}
+
+	// Ciclo é invariante da própria precedência ("A depois de B" + "B depois de
+	// A" não descreve nenhuma ordem possível), não scheduling: detectado por
+	// busca em profundidade com pilha explícita e marcação de estado
+	// (0 = em visita, 1 = fechado), sem recursão.
+	const dependencyVisitState = new Map<string, number>();
+	for (const startId of dependsOnByWorkItemId.keys()) {
+		if (dependencyVisitState.get(startId) === 1) continue;
+		const stack: { id: string; index: number }[] = [{ id: startId, index: 0 }];
+		dependencyVisitState.set(startId, 0);
+		while (stack.length > 0) {
+			const frame = stack[stack.length - 1];
+			const edges = dependsOnByWorkItemId.get(frame.id) ?? [];
+			if (frame.index >= edges.length) {
+				dependencyVisitState.set(frame.id, 1);
+				stack.pop();
+				continue;
+			}
+			const nextId = edges[frame.index];
+			frame.index += 1;
+			const visitState = dependencyVisitState.get(nextId);
+			if (visitState === 0) {
+				return invariantError(`Dependências formam um ciclo envolvendo o WorkItem "${nextId}"`);
+			}
+			if (visitState === undefined) {
+				dependencyVisitState.set(nextId, 0);
+				stack.push({ id: nextId, index: 0 });
+			}
+		}
+	}
+
 	// referências + invariantes: AffectedGroup — ligado à atividade `publico`
 	// do catálogo (ao contrário de Impediment), mas sem activityDefinitionId
 	// próprio: a ligação é fixa (AFFECTED_GROUPS_ACTIVITY_ID em transitions.ts),
@@ -1255,6 +1357,7 @@ function assembleProjectState({
 			scopeVersion,
 			impediments,
 			workItems,
+			dependencies,
 			affectedGroups,
 			externalActions,
 			evidences,
@@ -1323,6 +1426,9 @@ export function deserializeProjectState(
 	const workItemsResult = parseWorkItemList(state.workItems);
 	if (!workItemsResult.ok) return workItemsResult;
 
+	const dependenciesResult = parseDependencyList(state.dependencies);
+	if (!dependenciesResult.ok) return dependenciesResult;
+
 	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
 	if (!affectedGroupsResult.ok) return affectedGroupsResult;
 
@@ -1380,6 +1486,7 @@ export function deserializeProjectState(
 		scopeVersion: scopeVersionResult.value,
 		impediments: impedimentsResult.value,
 		workItems: workItemsResult.value,
+		dependencies: dependenciesResult.value,
 		affectedGroups: affectedGroupsResult.value,
 		externalActions: externalActionsResult.value,
 		evidences: evidencesResult.value,

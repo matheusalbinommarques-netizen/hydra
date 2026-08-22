@@ -1986,3 +1986,171 @@ describe('createProjectUseCases — "Entender as causas" (Stage 4B do rework)', 
 		});
 	});
 });
+
+// Dependency (ETAPA 8 do rework, primeiro microcorte) — precedência planejada
+// entre WorkItems. As invariantes vivem no domínio (addDependency), mas são
+// exercitadas aqui pela mesma porta que a interface usa, seguindo o precedente
+// do loop S6 (moveWorkItem/addImpediment também são cobertos por este arquivo).
+describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
+	async function projectWithWorkItems(titles: string[]) {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const ids: string[] = [];
+		for (const title of titles) {
+			const added = await useCases.addWorkItem({ projectId, title });
+			if (!added.ok) throw new Error('esperado ok');
+			ids.push(added.value.workItems[added.value.workItems.length - 1].id);
+		}
+		return { useCases, repo, projectId, ids };
+	}
+
+	it('addDependency registra a precedência e a view deriva "aguardando" do status do predecessor', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Implementar', 'Definir schema']);
+		const [implementar, schema] = ids;
+
+		const result = await useCases.addDependency({
+			projectId,
+			workItemId: implementar,
+			dependsOnWorkItemId: schema
+		});
+		if (!result.ok) throw new Error('esperado ok');
+
+		const dependent = result.value.workItems.find((item) => item.id === implementar);
+		expect(dependent?.dependsOn).toEqual([
+			{
+				dependencyId: expect.any(String),
+				dependsOnWorkItemId: schema,
+				title: 'Definir schema',
+				satisfied: false
+			}
+		]);
+		// A relação é dirigida: o predecessor não passa a "depender de" ninguém.
+		expect(result.value.workItems.find((item) => item.id === schema)?.dependsOn).toEqual([]);
+	});
+
+	it('a dependência passa a satisfeita quando o predecessor é concluído — sem nenhuma escrita nova', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Implementar', 'Definir schema']);
+		const [implementar, schema] = ids;
+		await useCases.addDependency({ projectId, workItemId: implementar, dependsOnWorkItemId: schema });
+
+		const moved = await useCases.moveWorkItem({ projectId, workItemId: schema, status: 'concluido' });
+		if (!moved.ok) throw new Error('esperado ok');
+
+		expect(moved.value.workItems.find((item) => item.id === implementar)?.dependsOn).toEqual([
+			expect.objectContaining({ dependsOnWorkItemId: schema, satisfied: true })
+		]);
+	});
+
+	it('Dependency não vira bloqueio: o dependente pode ser concluído com o predecessor ainda aberto', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Implementar', 'Definir schema']);
+		const [implementar, schema] = ids;
+		await useCases.addDependency({ projectId, workItemId: implementar, dependsOnWorkItemId: schema });
+
+		const moved = await useCases.moveWorkItem({ projectId, workItemId: implementar, status: 'concluido' });
+		if (!moved.ok) throw new Error('esperado ok');
+		expect(moved.value.workItems.find((item) => item.id === implementar)?.status).toBe('concluido');
+		// Continua aguardando — precedência planejada, não invariante de execução.
+		expect(moved.value.workItems.find((item) => item.id === implementar)?.dependsOn).toEqual([
+			expect.objectContaining({ satisfied: false })
+		]);
+	});
+
+	it('recusa auto-dependência, par duplicado e WorkItem inexistente', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+
+		expect(await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: a })).toEqual({
+			ok: false,
+			error: { kind: 'dependency_self_reference' }
+		});
+		expect(
+			await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: 'nao-existe' })
+		).toEqual({ ok: false, error: { kind: 'work_item_not_found' } });
+
+		const first = await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		expect(first.ok).toBe(true);
+		expect(await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b })).toEqual({
+			ok: false,
+			error: { kind: 'dependency_already_exists' }
+		});
+	});
+
+	it('recusa ciclo direto A ↔ B', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+		const first = await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		expect(first.ok).toBe(true);
+
+		expect(await useCases.addDependency({ projectId, workItemId: b, dependsOnWorkItemId: a })).toEqual({
+			ok: false,
+			error: { kind: 'dependency_cycle' }
+		});
+	});
+
+	it('recusa ciclo transitivo A → B → C → A', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B', 'C']);
+		const [a, b, c] = ids;
+		expect((await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b })).ok).toBe(true);
+		expect((await useCases.addDependency({ projectId, workItemId: b, dependsOnWorkItemId: c })).ok).toBe(true);
+
+		// C depender de A fecharia o ciclo A → B → C → A.
+		expect(await useCases.addDependency({ projectId, workItemId: c, dependsOnWorkItemId: a })).toEqual({
+			ok: false,
+			error: { kind: 'dependency_cycle' }
+		});
+	});
+
+	it('removeDependency apaga só a relação indicada e recusa id inexistente', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B', 'C']);
+		const [a, b, c] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		const second = await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: c });
+		if (!second.ok) throw new Error('esperado ok');
+
+		const dependencies = second.value.workItems.find((item) => item.id === a)?.dependsOn ?? [];
+		expect(dependencies).toHaveLength(2);
+
+		const removed = await useCases.removeDependency({
+			projectId,
+			dependencyId: dependencies[0].dependencyId
+		});
+		if (!removed.ok) throw new Error('esperado ok');
+		expect(removed.value.workItems.find((item) => item.id === a)?.dependsOn).toEqual([
+			expect.objectContaining({ dependencyId: dependencies[1].dependencyId })
+		]);
+
+		expect(await useCases.removeDependency({ projectId, dependencyId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'dependency_not_found' }
+		});
+	});
+
+	it('não emite nenhum ProjectEvent (taxonomia fechada permanece a do loop S6)', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+
+		const events = await useCases.listProjectEvents(projectId);
+		if (!events.ok) throw new Error('esperado ok');
+		expect(events.value.map((event) => event.type)).toEqual(['work_item.created', 'work_item.created']);
+	});
+
+	it('sobrevive a reload do repositório (round-trip de persistência)', async () => {
+		const { useCases, repo, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+
+		const stored = await repo.findById(projectId);
+		expect(stored?.dependencies).toEqual([
+			{
+				id: expect.any(String),
+				projectId,
+				workItemId: a,
+				dependsOnWorkItemId: b,
+				createdAt: '2026-01-01T00:00:00.000Z'
+			}
+		]);
+	});
+});

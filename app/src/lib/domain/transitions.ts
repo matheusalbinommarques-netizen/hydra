@@ -10,6 +10,7 @@ import type {
 	AffectedGroupImpact,
 	CauseHypothesis,
 	CurrentTreatment,
+	Dependency,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -58,6 +59,10 @@ export type DomainTransitionError =
 	| { kind: 'impediment_id_already_exists' }
 	| { kind: 'work_item_not_found' }
 	| { kind: 'work_item_blocked' }
+	| { kind: 'dependency_not_found' }
+	| { kind: 'dependency_self_reference' }
+	| { kind: 'dependency_already_exists' }
+	| { kind: 'dependency_cycle' }
 	| { kind: 'phase_not_found' }
 	| { kind: 'planning_no_items' }
 	| { kind: 'affected_group_not_found' }
@@ -899,6 +904,102 @@ export function moveWorkItem(
 			...state,
 			workItems: state.workItems.map((i) => (i.id === workItemId ? { ...i, status, updatedAt: occurredAt } : i))
 		}
+	};
+}
+
+// --- Dependency (ETAPA 8 do rework, primeiro microcorte) ---
+//
+// Precedência planejada entre dois WorkItem, nunca bloqueio operacional (ver
+// Dependency em state-types.ts): nada aqui altera moveWorkItem, e o único
+// motivo de recusa de conclusão continua sendo Impediment aberto (D036).
+// Dependency é imutável — só existe adicionar e remover.
+
+/**
+ * Existe caminho de precedência de `fromWorkItemId` até `targetWorkItemId`
+ * seguindo as arestas `workItemId → dependsOnWorkItemId` já existentes?
+ *
+ * Busca em profundidade iterativa sobre a coleção atual, com conjunto de
+ * visitados — termina mesmo se o estado persistido já contiver um ciclo
+ * (defesa contra dado antigo/importado, nunca só contra a UI). Não é um
+ * motor de grafo genérico nem scheduling: é a checagem mínima da própria
+ * invariante de precedência, usada só por addDependency.
+ */
+function dependencyPathExists(state: ProjectState, fromWorkItemId: string, targetWorkItemId: string): boolean {
+	const visited = new Set<string>();
+	const queue: string[] = [fromWorkItemId];
+
+	while (queue.length > 0) {
+		const current = queue.pop() as string;
+		if (current === targetWorkItemId) return true;
+		if (visited.has(current)) continue;
+		visited.add(current);
+
+		for (const dependency of state.dependencies) {
+			if (dependency.workItemId === current) queue.push(dependency.dependsOnWorkItemId);
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Registra "workItemId depende da conclusão de dependsOnWorkItemId".
+ *
+ * Invariantes da relação, recusadas no domínio (nunca só na interface):
+ * auto-dependência, par duplicado, WorkItem inexistente e ciclo — direto
+ * (A ↔ B) ou transitivo (A → B → C → A). Ciclo é invariante da própria
+ * precedência: "A depois de B" e "B depois de A" não descrevem nenhuma
+ * ordem possível, independentemente de existir scheduling no produto.
+ */
+export function addDependency(
+	catalog: Catalog,
+	state: ProjectState,
+	dependencyId: string,
+	workItemId: string,
+	dependsOnWorkItemId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (workItemId === dependsOnWorkItemId) {
+		return { ok: false, error: { kind: 'dependency_self_reference' } };
+	}
+	if (!findWorkItem(state, workItemId) || !findWorkItem(state, dependsOnWorkItemId)) {
+		return { ok: false, error: { kind: 'work_item_not_found' } };
+	}
+	const duplicate = state.dependencies.some(
+		(dependency) =>
+			dependency.workItemId === workItemId && dependency.dependsOnWorkItemId === dependsOnWorkItemId
+	);
+	if (duplicate) return { ok: false, error: { kind: 'dependency_already_exists' } };
+
+	// O predecessor já alcança (direta ou transitivamente) quem passaria a
+	// depender dele — fechar esta aresta criaria um ciclo.
+	if (dependencyPathExists(state, dependsOnWorkItemId, workItemId)) {
+		return { ok: false, error: { kind: 'dependency_cycle' } };
+	}
+
+	const dependency: Dependency = {
+		id: dependencyId,
+		projectId: state.project.id,
+		workItemId,
+		dependsOnWorkItemId,
+		createdAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, dependencies: [...state.dependencies, dependency] } };
+}
+
+export function removeDependency(
+	catalog: Catalog,
+	state: ProjectState,
+	dependencyId: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!state.dependencies.some((dependency) => dependency.id === dependencyId)) {
+		return { ok: false, error: { kind: 'dependency_not_found' } };
+	}
+
+	return {
+		ok: true,
+		value: { ...state, dependencies: state.dependencies.filter((dependency) => dependency.id !== dependencyId) }
 	};
 }
 
