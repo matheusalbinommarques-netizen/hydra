@@ -63,6 +63,15 @@ test('banner de conflito critério × escopo: ausente sem conflito, visível qua
 		await page.getByRole('textbox', { name: 'Hipótese' }).press('Tab');
 		await page.getByRole('button', { name: 'Confirmar foco' }).click();
 
+		// Barreira observável antes de navegar: 'Foco confirmado.' só renderiza
+		// depois que a submissão de ?/confirm reaterrissou no cliente
+		// (view.scopeVersion.confirmedAt preenchido). Sem esperar por ela, o
+		// clique no link abaixo dispara uma navegação que o invalidateAll() do
+		// confirm ainda em voo supersede — a página fica em next-version e o
+		// waitForURL seguinte nunca resolve. Mesmo padrão já usado por
+		// walking-skeleton-journey.ts, a journey estável desta transição.
+		await expect(page.getByText('Foco confirmado.')).toBeVisible();
+
 		await page.getByRole('link', { name: 'Agora' }).click();
 		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/now`);
 	});
