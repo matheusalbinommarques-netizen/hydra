@@ -143,6 +143,47 @@ CREATE TABLE IF NOT EXISTS dependency (
 	CONSTRAINT dependency_unique_pair UNIQUE (work_item_id, depends_on_work_item_id)
 );
 
+-- Milestone (ETAPA 8 do rework, segundo microcorte) — ver
+-- app/src/lib/domain/state-types.ts. Checkpoint DECLARADO no nível do
+-- projeto: status é a única autoridade sobre aberto/alcancado, nunca
+-- derivado do trabalho relacionado. Sem planned_date (data planejada
+-- pertence ao microcorte de Timeline, §38), sem description e sem order
+-- (ordenação é Roadmap, §38) — nada aqui é antecipado por uso futuro.
+--
+-- As duas CHECK abaixo cobrem invariantes realmente FECHADAS (R7/D038), não
+-- discriminante extensível: o conjunto de status do lifecycle, e o par
+-- (status, reached_at), que reachMilestone/reopenMilestone sempre alteram
+-- atomicamente — aberto => reached_at IS NULL; alcancado => reached_at IS
+-- NOT NULL. Ambas NOMEADAS, como a regra derivada no fim deste arquivo exige.
+CREATE TABLE IF NOT EXISTS milestone (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	title TEXT NOT NULL,
+	status TEXT NOT NULL,
+	reached_at TEXT,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	CONSTRAINT milestone_status_values CHECK (status IN ('aberto', 'alcancado')),
+	CONSTRAINT milestone_reached_at_matches_status CHECK (
+		(status = 'aberto' AND reached_at IS NULL) OR (status = 'alcancado' AND reached_at IS NOT NULL)
+	)
+);
+
+-- MilestoneWorkItem — "trabalho relacionado/contribuinte para este marco",
+-- N:N opcional dos dois lados. NÃO é conjunto exaustivo de condições: item
+-- aberto não impede alcançar o marco, item concluído não o alcança. Sem
+-- updated_at: a relação é imutável (só nasce e é removida, mesmo molde de
+-- dependency/evidence). A UNIQUE nomeada cobre o único invariante fechado da
+-- relação — o mesmo trabalho não se associa duas vezes ao mesmo marco.
+CREATE TABLE IF NOT EXISTS milestone_work_item (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	milestone_id TEXT NOT NULL REFERENCES milestone (id),
+	work_item_id TEXT NOT NULL REFERENCES work_item (id),
+	created_at TEXT NOT NULL,
+	CONSTRAINT milestone_work_item_unique_pair UNIQUE (milestone_id, work_item_id)
+);
+
 -- Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — ver
 -- app/src/lib/domain/state-types.ts. Ligado à atividade `publico` do
 -- catálogo (completion deriva do estado destes grupos, ver
@@ -333,6 +374,8 @@ CREATE INDEX IF NOT EXISTS idx_work_item_project_id ON work_item (project_id);
 -- bancos (a coluna ainda não existiria neste ponto do exec). O índice é
 -- criado junto com a coluna, na própria função idempotente.
 CREATE INDEX IF NOT EXISTS idx_dependency_project_id ON dependency (project_id);
+CREATE INDEX IF NOT EXISTS idx_milestone_project_id ON milestone (project_id);
+CREATE INDEX IF NOT EXISTS idx_milestone_work_item_project_id ON milestone_work_item (project_id);
 CREATE INDEX IF NOT EXISTS idx_affected_group_project_id ON affected_group (project_id);
 CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);

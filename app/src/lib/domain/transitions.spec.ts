@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addMilestone,
+	addWorkItem,
+	moveWorkItem,
+	linkWorkItemToMilestone,
+	reachMilestone,
+	reopenMilestone,
+	unlinkWorkItemFromMilestone,
 	addAffectedGroup,
 	addCauseHypothesis,
 	addDesiredOutcome,
@@ -1835,5 +1842,144 @@ describe('DesiredOutcome (Stage 4C — "Resultado desejado")', () => {
 		const added = unwrap(addDesiredOutcome(catalog, withSummary, 'do-1', 'Nova mudança', T2));
 		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
+	});
+});
+
+
+// Milestone (ETAPA 8 do rework, segundo microcorte) — o ponto central destes
+// testes é NEGATIVO: nada deriva o estado do marco do trabalho relacionado, em
+// nenhuma direção. A associação significa "trabalho relacionado/contribuinte",
+// nunca conjunto exaustivo de condições necessárias.
+describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
+	function stateWithWorkItems(): ProjectState {
+		let state = freshState();
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		return state;
+	}
+
+	it('addMilestone cria o marco aberto, sem reachedAt e sem vínculo', () => {
+		const state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Fluxo ponta a ponta', T1));
+		expect(state.milestones).toEqual([
+			{
+				id: 'ms-1',
+				projectId: 'proj-1',
+				title: 'Fluxo ponta a ponta',
+				status: 'aberto',
+				reachedAt: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+		expect(state.milestoneWorkItems).toEqual([]);
+	});
+
+	it('marco sem nenhum trabalho relacionado pode ser alcançado explicitamente', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		expect(state.milestoneWorkItems).toEqual([]);
+
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+		expect(state.milestones[0].status).toBe('alcancado');
+		expect(state.milestones[0].reachedAt).toBe(T2);
+	});
+
+	it('trabalho relacionado ainda aberto não impede reachMilestone', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+		expect(state.workItems.find((item) => item.id === 'wi-a')?.status).toBe('a_fazer');
+
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+		expect(state.milestones[0]).toMatchObject({ status: 'alcancado', reachedAt: T2 });
+		// E o trabalho relacionado segue exatamente como estava.
+		expect(state.workItems.find((item) => item.id === 'wi-a')?.status).toBe('a_fazer');
+	});
+
+	it('concluir todos os trabalhos relacionados NÃO alcança o marco', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-1', 'wi-b', T1));
+
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'concluido', T2));
+		state = unwrap(moveWorkItem(catalog, state, 'wi-b', 'concluido', T2));
+
+		expect(state.milestones[0].status).toBe('aberto');
+		expect(state.milestones[0].reachedAt).toBeNull();
+	});
+
+	it('associar/desassociar trabalho nunca altera o status do marco', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T2));
+		expect(state.milestones[0]).toMatchObject({ status: 'alcancado', reachedAt: T2 });
+
+		state = unwrap(unlinkWorkItemFromMilestone(catalog, state, 'mwi-1'));
+		expect(state.milestones[0]).toMatchObject({ status: 'alcancado', reachedAt: T2 });
+		expect(state.milestoneWorkItems).toEqual([]);
+	});
+
+	it('reopenMilestone limpa reachedAt; o par status × reachedAt muda sempre junto', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+		expect(state.milestones[0].reachedAt).toBe(T2);
+
+		state = unwrap(reopenMilestone(catalog, state, 'ms-1', T2));
+		expect(state.milestones[0]).toMatchObject({ status: 'aberto', reachedAt: null });
+	});
+
+	it('reachMilestone/reopenMilestone são idempotentes e não reescrevem o reachedAt original', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T1));
+		const again = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+		expect(again.milestones[0].reachedAt).toBe(T1);
+		expect(again).toBe(state);
+
+		const reopened = unwrap(reopenMilestone(catalog, again, 'ms-1', T2));
+		expect(unwrap(reopenMilestone(catalog, reopened, 'ms-1', T2))).toBe(reopened);
+	});
+
+	it('recusa vínculo duplicado e referências inexistentes', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+
+		expect(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-1', 'wi-a', T2)).toEqual({
+			ok: false,
+			error: { kind: 'milestone_work_item_already_linked' }
+		});
+		expect(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'nao-existe', 'wi-a', T2)).toEqual({
+			ok: false,
+			error: { kind: 'milestone_not_found' }
+		});
+		expect(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-1', 'nao-existe', T2)).toEqual({
+			ok: false,
+			error: { kind: 'work_item_not_found' }
+		});
+		expect(reachMilestone(catalog, state, 'nao-existe', T2)).toEqual({
+			ok: false,
+			error: { kind: 'milestone_not_found' }
+		});
+		expect(unlinkWorkItemFromMilestone(catalog, state, 'nao-existe')).toEqual({
+			ok: false,
+			error: { kind: 'milestone_work_item_not_found' }
+		});
+	});
+
+	// O mesmo trabalho pode contribuir para mais de um marco (N:N): o par
+	// duplicado recusado acima é (marco, trabalho), não o trabalho sozinho.
+	it('permite o mesmo trabalho relacionado a mais de um marco', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(addMilestone(catalog, state, 'ms-1', 'Marco 1', T1));
+		state = unwrap(addMilestone(catalog, state, 'ms-2', 'Marco 2', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-2', 'wi-a', T1));
+		expect(state.milestoneWorkItems).toHaveLength(2);
+	});
+
+	it('marco não interfere em moveWorkItem: nenhuma transição nova é recusada', () => {
+		let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+
+		expect(moveWorkItem(catalog, state, 'wi-a', 'concluido', T2).ok).toBe(true);
 	});
 });

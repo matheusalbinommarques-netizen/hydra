@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorkView, dependencyPresentation, nextWorkItemStatus, previousWorkItemStatus } from './work-view';
+import {
+	allMilestonesLinkedHint,
+	buildWorkView,
+	dependencyPresentation,
+	nextWorkItemStatus,
+	previousWorkItemStatus
+} from './work-view';
 import type { WorkItemDependencyView, WorkItemView } from '$lib/server/application/types';
 
 function makeItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): WorkItemView {
@@ -97,5 +103,16 @@ describe('dependencyPresentation', () => {
 
 	it('dependente concluído com predecessor aberto está "pendente", nunca "aguardando"', () => {
 		expect(dependencyPresentation('concluido', unsatisfied)).toBe('pendente');
+	});
+});
+
+describe('allMilestonesLinkedHint', () => {
+	it('usa singular quando existe exatamente um marco no projeto', () => {
+		expect(allMilestonesLinkedHint(1)).toBe('Este trabalho já está relacionado ao marco existente.');
+	});
+
+	it('preserva o plural com dois ou mais marcos', () => {
+		expect(allMilestonesLinkedHint(2)).toBe('Este trabalho já está relacionado a todos os marcos existentes.');
+		expect(allMilestonesLinkedHint(5)).toBe('Este trabalho já está relacionado a todos os marcos existentes.');
 	});
 });

@@ -11,6 +11,7 @@ import type {
 	EvidenceOutcome,
 	ExternalActionStatus,
 	ImpedimentType,
+	MilestoneStatus,
 	ProjectEvent,
 	ProjectStateParseError,
 	Result,
@@ -194,6 +195,37 @@ export interface WorkItemDependencyView {
 }
 
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — view leve de
+// Milestone (ETAPA 8 do rework, segundo microcorte) — view leve, sem
+// projectId/createdAt/updatedAt, que a interface não precisa (mesmo padrão de
+// WorkItemView/ImpedimentView).
+//
+// `status` é o estado DECLARADO e a única autoridade sobre aberto/alcancado.
+// `relatedWorkItems` são os trabalhos que o usuário associou como
+// relacionados/contribuintes — nunca o conjunto exaustivo de condições do
+// marco. `relatedConcluded` é CONTEXTO derivado ("3 de 5 trabalhos
+// relacionados concluídos"), jamais percentual, progresso ou completion: um
+// marco alcançado com trabalho relacionado aberto é estado legítimo, e um
+// marco sem nenhum trabalho relacionado simplesmente não tem contexto a
+// mostrar (nunca "0 de 0 = pronto").
+export interface MilestoneView {
+	id: string;
+	title: string;
+	status: MilestoneStatus;
+	reachedAt: string | null;
+	relatedWorkItems: MilestoneWorkItemView[];
+	relatedConcluded: number;
+}
+
+// Título e status são do WorkItem relacionado — a interface não precisa
+// cruzar a lista de workItems para exibir a linha (mesmo espírito de
+// WorkItemDependencyView).
+export interface MilestoneWorkItemView {
+	milestoneWorkItemId: string;
+	workItemId: string;
+	title: string;
+	status: WorkItemStatus;
+}
+
 // AffectedGroup, sem projectId/createdAt/updatedAt, que a interface não
 // precisa (mesmo padrão de ScopeItemView/ImpedimentView).
 export interface AffectedGroupView {
@@ -316,6 +348,13 @@ export interface ProjectView {
 	// interface (/work) agrupa por status, Acompanhamento resume por
 	// blockedBy. Sempre computado (mesmo padrão de impediments acima).
 	workItems: WorkItemView[];
+
+	// Marcos do projeto (ETAPA 8 do rework, segundo microcorte). Ao contrário
+	// de Dependency — que D039 deliberadamente NÃO projetou como coleção do
+	// ProjectView por não haver consumidor —, aqui existe consumidor real: a
+	// seção "Marcos" de /work lista marcos, não itens de trabalho, e não há
+	// projeção existente onde eles caibam.
+	milestones: MilestoneView[];
 	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — todos os grupos
 	// afetados do projeto; a interface (MapaDeImpacto.svelte) agrupa em faixas
 	// por `impact` (derivado, nunca persistido, ver
@@ -524,6 +563,32 @@ export interface AddDependencyInput {
 export interface RemoveDependencyInput {
 	projectId: string;
 	dependencyId: string;
+}
+
+export interface AddMilestoneInput {
+	projectId: string;
+	title: string;
+}
+
+export interface ReachMilestoneInput {
+	projectId: string;
+	milestoneId: string;
+}
+
+export interface ReopenMilestoneInput {
+	projectId: string;
+	milestoneId: string;
+}
+
+export interface LinkWorkItemToMilestoneInput {
+	projectId: string;
+	milestoneId: string;
+	workItemId: string;
+}
+
+export interface UnlinkWorkItemFromMilestoneInput {
+	projectId: string;
+	milestoneWorkItemId: string;
 }
 
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
@@ -736,6 +801,11 @@ export interface ProjectUseCases {
 	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDependency(input: AddDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDependency(input: RemoveDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
+	addMilestone(input: AddMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
+	reachMilestone(input: ReachMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
+	reopenMilestone(input: ReopenMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
+	linkWorkItemToMilestone(input: LinkWorkItemToMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
+	unlinkWorkItemFromMilestone(input: UnlinkWorkItemFromMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

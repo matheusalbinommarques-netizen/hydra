@@ -13,6 +13,7 @@ import {
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
 	addDependency as addDependencyInDomain,
+	addMilestone as addMilestoneInDomain,
 	addWorkItem as addWorkItemInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
@@ -34,7 +35,11 @@ import {
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeCauseHypothesis as removeCauseHypothesisInDomain,
+	linkWorkItemToMilestone as linkWorkItemToMilestoneInDomain,
+	reachMilestone as reachMilestoneInDomain,
 	removeDependency as removeDependencyInDomain,
+	reopenMilestone as reopenMilestoneInDomain,
+	unlinkWorkItemFromMilestone as unlinkWorkItemFromMilestoneInDomain,
 	removeDesiredOutcome as removeDesiredOutcomeInDomain,
 	removeScopeItem as removeScopeItemInDomain,
 	removeTreatmentStep as removeTreatmentStepInDomain,
@@ -77,6 +82,11 @@ import type {
 	AddScopeItemInput,
 	AddTreatmentStepInput,
 	AddDependencyInput,
+	AddMilestoneInput,
+	LinkWorkItemToMilestoneInput,
+	ReachMilestoneInput,
+	ReopenMilestoneInput,
+	UnlinkWorkItemFromMilestoneInput,
 	AddWorkItemInput,
 	AnswerActivityInput,
 	CompleteExternalActionInput,
@@ -754,6 +764,74 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = removeDependencyInDomain(catalog, state, input.dependencyId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Milestone (ETAPA 8 do rework, segundo microcorte) — sem evento de
+		// histórico nesta rodada, mesma razão de Dependency acima: a taxonomia
+		// de ProjectEvent é fechada e só cobre o loop WorkItem/Impediment
+		// (D037). Consequência aceita: /records não mostra marcos.
+		async addMilestone(input: AddMilestoneInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addMilestoneInDomain(catalog, state, idGenerator.generate(), input.title, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Alcançar é sempre ação humana explícita: nenhum outro caso de uso
+		// chama isto, e concluir WorkItem relacionado nunca o dispara.
+		async reachMilestone(input: ReachMilestoneInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reachMilestoneInDomain(catalog, state, input.milestoneId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async reopenMilestone(input: ReopenMilestoneInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reopenMilestoneInDomain(catalog, state, input.milestoneId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async linkWorkItemToMilestone(input: LinkWorkItemToMilestoneInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = linkWorkItemToMilestoneInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.milestoneId,
+				input.workItemId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async unlinkWorkItemFromMilestone(input: UnlinkWorkItemFromMilestoneInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = unlinkWorkItemFromMilestoneInDomain(catalog, state, input.milestoneWorkItemId);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

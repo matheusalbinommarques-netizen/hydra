@@ -9,6 +9,8 @@ import {
 	addCauseHypothesis,
 	addDesiredOutcome,
 	addImpediment,
+	addMilestone,
+	linkWorkItemToMilestone,
 	addScopeItem,
 	addTreatmentStep,
 	addWorkItem,
@@ -23,6 +25,7 @@ import {
 	createInitialProjectState,
 	encodeMultiSelectValue,
 	moveScopeItem,
+	reachMilestone,
 	moveWorkItem,
 	prepareExternalAction,
 	renameProject,
@@ -76,7 +79,7 @@ afterEach(() => {
 	}
 });
 
-function nonTrivialState(): ProjectState {
+function nonTrivialStateSemMarcos(): ProjectState {
 	let state = createInitialProjectState(catalog, 'proj-1', T1);
 	state = unwrap(renameProject(catalog, state, 'Portal de Solicitações'));
 	state = unwrap(setRouteStartPhase(catalog, state, 'estruturacao'));
@@ -156,6 +159,20 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(toggleCauseHypothesisEvidence(catalog, state, 'ch-1', 'ev-1', T2));
 	state = unwrap(addCauseHypothesis(catalog, state, 'ch-2', 'O formulário exige anexos difíceis de obter', null, T2));
 	state = unwrap(confirmCauseHypotheses(catalog, state, T2));
+	return state;
+}
+
+// Milestone (ETAPA 8 do rework, segundo microcorte) — dois marcos que cobrem
+// os dois casos que o modelo precisa suportar: um alcançado cujo trabalho
+// relacionado (wi-2) NÃO está concluído (coexistência legítima), e um aberto
+// sem nenhum trabalho relacionado.
+function nonTrivialState(): ProjectState {
+	let state = nonTrivialStateSemMarcos();
+	state = unwrap(addMilestone(catalog, state, 'ms-1', 'Primeira versão utilizável', T1));
+	state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-1', T1));
+	state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-1', 'wi-2', T1));
+	state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+	state = unwrap(addMilestone(catalog, state, 'ms-2', 'Migração concluída', T2));
 	return state;
 }
 
@@ -908,5 +925,118 @@ describe('createSqliteProjectRepository — nenhuma projeção do motor persisti
 		expect(found).not.toHaveProperty('nextActivity');
 		expect(found).not.toHaveProperty('openPendingItems');
 		expect(found).not.toHaveProperty('hypotheses');
+	});
+});
+
+
+// Milestone (ETAPA 8 do rework, segundo microcorte) — o risco concreto aqui é
+// de UPGRADE: um banco criado antes deste corte não tem as tabelas novas, e a
+// invariante fechada do lifecycle passou a ser CONSTRAINT nomeada (D038).
+describe('createSqliteProjectRepository — Milestone (ETAPA 8 do rework)', () => {
+	it('abre um banco anterior a este corte (sem as tabelas de marco) e passa a gravá-los, sem backfill', async () => {
+		const filePath = tempFilePath();
+
+		// banco "antigo": criado pela inicialização atual, depois com as duas
+		// tabelas removidas — simula um arquivo gerado antes deste corte.
+		const legacy = createSqliteProjectRepository(filePath);
+		await legacy.insert(nonTrivialStateSemMarcos());
+		legacy.close();
+
+		const raw = new Database(filePath);
+		raw.exec('DROP TABLE milestone_work_item; DROP TABLE milestone;');
+		raw.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		// o projeto pré-corte continua legível e nasce sem nenhum marco —
+		// nada é sintetizado a partir do Answer legado marcos_principais.
+		const loaded = await repo.findById('proj-1');
+		expect(loaded?.milestones).toEqual([]);
+		expect(loaded?.milestoneWorkItems).toEqual([]);
+
+		// e as tabelas novas passam a aceitar escrita normalmente
+		if (!loaded) throw new Error('esperado estado');
+		let next = unwrap(addMilestone(catalog, loaded, 'ms-1', 'Fluxo ponta a ponta', T2));
+		next = unwrap(linkWorkItemToMilestone(catalog, next, 'mwi-1', 'ms-1', 'wi-1', T2));
+		await repo.save(next);
+
+		await expect(repo.findById('proj-1')).resolves.toEqual(next);
+	});
+
+	it('round-trip preserva marco alcançado com trabalho relacionado ainda aberto', async () => {
+		const repo = memoryRepo();
+		const state = nonTrivialState();
+		await repo.insert(state);
+
+		const found = await repo.findById('proj-1');
+		expect(found).toEqual(state);
+		// o marco alcançado tem um trabalho relacionado que NÃO está concluído —
+		// estado legítimo que a persistência não pode recusar nem "corrigir".
+		const reached = found?.milestones.find((milestone) => milestone.status === 'alcancado');
+		expect(reached?.reachedAt).toBe(T2);
+		const relatedIds = found?.milestoneWorkItems
+			.filter((link) => link.milestoneId === reached?.id)
+			.map((link) => link.workItemId);
+		expect(relatedIds).toContain('wi-2');
+		expect(found?.workItems.find((item) => item.id === 'wi-2')?.status).not.toBe('concluido');
+	});
+
+	it('a CONSTRAINT nomeada recusa o par (status, reached_at) inconsistente', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		await repo.insert(createInitialProjectState(catalog, 'proj-1', T1));
+
+		const raw = new Database(filePath);
+		try {
+			expect(() =>
+				raw
+					.prepare(
+						`INSERT INTO milestone (id, project_id, title, status, reached_at, created_at, updated_at)
+						 VALUES (?, ?, ?, ?, ?, ?, ?)`
+					)
+					.run('ms-x', 'proj-1', 'Marco', 'alcancado', null, T1, T1)
+			).toThrow(/milestone_reached_at_matches_status/);
+			expect(() =>
+				raw
+					.prepare(
+						`INSERT INTO milestone (id, project_id, title, status, reached_at, created_at, updated_at)
+						 VALUES (?, ?, ?, ?, ?, ?, ?)`
+					)
+					.run('ms-y', 'proj-1', 'Marco', 'aberto', T2, T1, T1)
+			).toThrow(/milestone_reached_at_matches_status/);
+		} finally {
+			raw.close();
+		}
+	});
+
+	// A UNIQUE continua NOMEADA no schema (D038 exige nome para permitir
+	// ALTER TABLE ... DROP CONSTRAINT), mas o SQLite reporta violação de UNIQUE
+	// pelas colunas, não pelo nome — ao contrário de CHECK, testada acima pelo
+	// nome. A asserção segue o que o motor realmente emite.
+	it('a UNIQUE recusa o mesmo trabalho associado duas vezes ao mesmo marco', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		await repo.insert(nonTrivialState());
+
+		const raw = new Database(filePath);
+		try {
+			const existing = raw.prepare('SELECT milestone_id, work_item_id FROM milestone_work_item LIMIT 1').get() as {
+				milestone_id: string;
+				work_item_id: string;
+			};
+			expect(() =>
+				raw
+					.prepare(
+						`INSERT INTO milestone_work_item (id, project_id, milestone_id, work_item_id, created_at)
+						 VALUES (?, ?, ?, ?, ?)`
+					)
+					.run('mwi-dup', 'proj-1', existing.milestone_id, existing.work_item_id, T2)
+			).toThrow(/UNIQUE constraint failed: milestone_work_item/);
+		} finally {
+			raw.close();
+		}
 	});
 });

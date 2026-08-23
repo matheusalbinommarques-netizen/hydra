@@ -33,6 +33,9 @@ import type {
 	TreatmentFriction,
 	TreatmentStep,
 	Dependency,
+	Milestone,
+	MilestoneStatus,
+	MilestoneWorkItem,
 	WorkItem,
 	WorkItemStatus
 } from './state-types';
@@ -114,6 +117,11 @@ function isImpedimentType(value: unknown): value is ImpedimentType {
 const IMPEDIMENT_STATUSES: readonly string[] = ['aberto', 'resolvido'];
 function isImpedimentStatus(value: unknown): value is 'aberto' | 'resolvido' {
 	return typeof value === 'string' && IMPEDIMENT_STATUSES.includes(value);
+}
+
+const MILESTONE_STATUSES: readonly string[] = ['aberto', 'alcancado'];
+function isMilestoneStatus(value: unknown): value is MilestoneStatus {
+	return typeof value === 'string' && MILESTONE_STATUSES.includes(value);
 }
 
 const WORK_ITEM_STATUSES: readonly string[] = ['a_fazer', 'em_andamento', 'concluido'];
@@ -418,6 +426,62 @@ function parseDependencyList(value: unknown): Result<Dependency[], ProjectStateP
 			projectId: item.projectId,
 			workItemId: item.workItemId,
 			dependsOnWorkItemId: item.dependsOnWorkItemId,
+			createdAt: item.createdAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+// Milestone (ETAPA 8 do rework, segundo microcorte) — ausente em snapshots
+// exportados antes deste corte: tratado como coleção vazia, mesmo espírito de
+// parseWorkItemList/parseDependencyList acima. Nunca inferido do texto livre
+// legado `marcos_principais` (READ-LEGACY, sem auto-conversão — regra §13.2).
+function parseMilestoneList(value: unknown): Result<Milestone[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('milestones deve ser um array');
+	const result: Milestone[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Milestone deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Milestone.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Milestone.projectId deve ser uma string');
+		if (!isString(item.title)) return shapeError('Milestone.title deve ser uma string');
+		if (!isMilestoneStatus(item.status)) return shapeError('Milestone.status deve ser um dos literais aprovados');
+		if (item.reachedAt !== null && !isIsoDateString(item.reachedAt)) {
+			return shapeError('Milestone.reachedAt deve ser uma data ISO 8601 válida ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Milestone.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('Milestone.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			title: item.title,
+			status: item.status,
+			reachedAt: item.reachedAt,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+function parseMilestoneWorkItemList(value: unknown): Result<MilestoneWorkItem[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('milestoneWorkItems deve ser um array');
+	const result: MilestoneWorkItem[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada MilestoneWorkItem deve ser um objeto');
+		if (!isString(item.id)) return shapeError('MilestoneWorkItem.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('MilestoneWorkItem.projectId deve ser uma string');
+		if (!isString(item.milestoneId)) return shapeError('MilestoneWorkItem.milestoneId deve ser uma string');
+		if (!isString(item.workItemId)) return shapeError('MilestoneWorkItem.workItemId deve ser uma string');
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('MilestoneWorkItem.createdAt deve ser uma data ISO 8601 válida');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			milestoneId: item.milestoneId,
+			workItemId: item.workItemId,
 			createdAt: item.createdAt
 		});
 	}
@@ -740,6 +804,8 @@ interface AssembleProjectStateInput {
 	impediments: Impediment[];
 	workItems: WorkItem[];
 	dependencies: Dependency[];
+	milestones: Milestone[];
+	milestoneWorkItems: MilestoneWorkItem[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];
@@ -761,6 +827,8 @@ function assembleProjectState({
 	impediments,
 	workItems,
 	dependencies,
+	milestones,
+	milestoneWorkItems,
 	affectedGroups,
 	externalActions,
 	evidences,
@@ -1100,6 +1168,62 @@ function assembleProjectState({
 		}
 	}
 
+	// referências + invariantes: Milestone (ETAPA 8 do rework, segundo
+	// microcorte) — a invariante FECHADA do lifecycle (aberto => reachedAt
+	// null; alcancado => reachedAt não-null) é reforçada aqui contra estado
+	// desserializado, mesmo padrão do bloco de Impediment acima. Nada aqui
+	// deriva status de trabalho relacionado: um marco alcançado com
+	// MilestoneWorkItem aberto é estado LEGÍTIMO, nunca inconsistência.
+	const seenMilestoneIds = new Set<string>();
+	for (const milestone of milestones) {
+		if (milestone.projectId !== project.id) {
+			return invariantError(`Milestone "${milestone.id}" usa projectId diferente do Project`);
+		}
+		if (seenMilestoneIds.has(milestone.id)) {
+			return invariantError(`Milestone.id duplicado: "${milestone.id}"`);
+		}
+		seenMilestoneIds.add(milestone.id);
+		if (milestone.status === 'alcancado' && milestone.reachedAt === null) {
+			return invariantError(`Milestone "${milestone.id}" está alcançado mas não possui reachedAt`);
+		}
+		if (milestone.status === 'aberto' && milestone.reachedAt !== null) {
+			return invariantError(`Milestone "${milestone.id}" está aberto mas possui reachedAt`);
+		}
+	}
+
+	// referências + invariantes: MilestoneWorkItem — ambos os lados existem no
+	// projeto e o par (marco, item) não se repete. O vínculo é opcional dos
+	// dois lados: marco sem item e item sem marco são estados normais, nunca
+	// checados aqui.
+	const seenMilestoneWorkItemIds = new Set<string>();
+	const seenMilestoneWorkItemPairs = new Set<string>();
+	for (const link of milestoneWorkItems) {
+		if (link.projectId !== project.id) {
+			return invariantError(`MilestoneWorkItem "${link.id}" usa projectId diferente do Project`);
+		}
+		if (seenMilestoneWorkItemIds.has(link.id)) {
+			return invariantError(`MilestoneWorkItem.id duplicado: "${link.id}"`);
+		}
+		seenMilestoneWorkItemIds.add(link.id);
+		if (!seenMilestoneIds.has(link.milestoneId)) {
+			return referenceError(
+				`MilestoneWorkItem "${link.id}" referencia milestoneId "${link.milestoneId}", que não existe`
+			);
+		}
+		if (!workItemById.has(link.workItemId)) {
+			return referenceError(
+				`MilestoneWorkItem "${link.id}" referencia workItemId "${link.workItemId}", que não existe`
+			);
+		}
+		const pair = `${link.milestoneId} -> ${link.workItemId}`;
+		if (seenMilestoneWorkItemPairs.has(pair)) {
+			return invariantError(
+				`Trabalho "${link.workItemId}" associado mais de uma vez ao marco "${link.milestoneId}"`
+			);
+		}
+		seenMilestoneWorkItemPairs.add(pair);
+	}
+
 	// referências + invariantes: AffectedGroup — ligado à atividade `publico`
 	// do catálogo (ao contrário de Impediment), mas sem activityDefinitionId
 	// próprio: a ligação é fixa (AFFECTED_GROUPS_ACTIVITY_ID em transitions.ts),
@@ -1358,6 +1482,8 @@ function assembleProjectState({
 			impediments,
 			workItems,
 			dependencies,
+			milestones,
+			milestoneWorkItems,
 			affectedGroups,
 			externalActions,
 			evidences,
@@ -1429,6 +1555,12 @@ export function deserializeProjectState(
 	const dependenciesResult = parseDependencyList(state.dependencies);
 	if (!dependenciesResult.ok) return dependenciesResult;
 
+	const milestonesResult = parseMilestoneList(state.milestones);
+	if (!milestonesResult.ok) return milestonesResult;
+
+	const milestoneWorkItemsResult = parseMilestoneWorkItemList(state.milestoneWorkItems);
+	if (!milestoneWorkItemsResult.ok) return milestoneWorkItemsResult;
+
 	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
 	if (!affectedGroupsResult.ok) return affectedGroupsResult;
 
@@ -1487,6 +1619,8 @@ export function deserializeProjectState(
 		impediments: impedimentsResult.value,
 		workItems: workItemsResult.value,
 		dependencies: dependenciesResult.value,
+		milestones: milestonesResult.value,
+		milestoneWorkItems: milestoneWorkItemsResult.value,
 		affectedGroups: affectedGroupsResult.value,
 		externalActions: externalActionsResult.value,
 		evidences: evidencesResult.value,

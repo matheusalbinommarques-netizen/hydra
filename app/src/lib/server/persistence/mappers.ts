@@ -13,6 +13,9 @@ import type {
 	CauseHypothesis,
 	CurrentTreatment,
 	Dependency,
+	Milestone,
+	MilestoneStatus,
+	MilestoneWorkItem,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -189,6 +192,46 @@ export function mapDependencyRow(row: DependencyRow): Dependency {
 		projectId: row.project_id,
 		workItemId: row.work_item_id,
 		dependsOnWorkItemId: row.depends_on_work_item_id,
+		createdAt: row.created_at
+	};
+}
+
+export interface MilestoneRow {
+	id: string;
+	project_id: string;
+	title: string;
+	status: MilestoneStatus;
+	reached_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapMilestoneRow(row: MilestoneRow): Milestone {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		title: row.title,
+		status: row.status,
+		reachedAt: row.reached_at,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
+	};
+}
+
+export interface MilestoneWorkItemRow {
+	id: string;
+	project_id: string;
+	milestone_id: string;
+	work_item_id: string;
+	created_at: string;
+}
+
+export function mapMilestoneWorkItemRow(row: MilestoneWorkItemRow): MilestoneWorkItem {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		milestoneId: row.milestone_id,
+		workItemId: row.work_item_id,
 		createdAt: row.created_at
 	};
 }

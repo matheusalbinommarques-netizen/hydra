@@ -30,6 +30,8 @@ export function createInitialProjectState(
 		impediments: [],
 		workItems: [],
 		dependencies: [],
+		milestones: [],
+		milestoneWorkItems: [],
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],

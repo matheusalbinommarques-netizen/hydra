@@ -23,6 +23,8 @@ import {
 	mapScopeVersionRow,
 	mapTreatmentStepRow,
 	mapDependencyRow,
+	mapMilestoneRow,
+	mapMilestoneWorkItemRow,
 	mapWorkItemRow,
 	type ActivityProgressRow,
 	type AffectedGroupRow,
@@ -41,6 +43,8 @@ import {
 	type ScopeVersionRow,
 	type TreatmentStepRow,
 	type DependencyRow,
+	type MilestoneRow,
+	type MilestoneWorkItemRow,
 	type WorkItemRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
@@ -306,6 +310,25 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertDependency.run(dependency);
 		}
 
+		// milestone antes de milestone_work_item, e ambos depois de work_item:
+		// milestone_work_item tem FK para os dois (checagem imediata,
+		// foreign_keys = ON).
+		const insertMilestone = db.prepare(
+			`INSERT INTO milestone (id, project_id, title, status, reached_at, created_at, updated_at)
+			 VALUES (@id, @projectId, @title, @status, @reachedAt, @createdAt, @updatedAt)`
+		);
+		for (const milestone of state.milestones) {
+			insertMilestone.run(milestone);
+		}
+
+		const insertMilestoneWorkItem = db.prepare(
+			`INSERT INTO milestone_work_item (id, project_id, milestone_id, work_item_id, created_at)
+			 VALUES (@id, @projectId, @milestoneId, @workItemId, @createdAt)`
+		);
+		for (const link of state.milestoneWorkItems) {
+			insertMilestoneWorkItem.run(link);
+		}
+
 		const insertAffectedGroup = db.prepare(
 			`INSERT INTO affected_group (id, project_id, label, impact, frequency, created_at, updated_at)
 			 VALUES (@id, @projectId, @label, @impact, @frequency, @createdAt, @updatedAt)`
@@ -437,6 +460,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// work_item.id (FK checada imediatamente, foreign_keys = ON).
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM dependency WHERE project_id = ?').run(state.project.id);
+		// milestone_work_item antes de milestone e de work_item (FKs para ambos).
+		db.prepare('DELETE FROM milestone_work_item WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM milestone WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM work_item WHERE project_id = ?').run(state.project.id);
 		// evidence/external_action apagados antes de affected_group — ambos
 		// referenciam affected_group (FK sem ON DELETE, checagem imediata).
@@ -521,6 +547,20 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as DependencyRow[];
 
+			const milestoneRows = db
+				.prepare(
+					`SELECT id, project_id, title, status, reached_at, created_at, updated_at
+					 FROM milestone WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as MilestoneRow[];
+
+			const milestoneWorkItemRows = db
+				.prepare(
+					`SELECT id, project_id, milestone_id, work_item_id, created_at
+					 FROM milestone_work_item WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as MilestoneWorkItemRow[];
+
 			const affectedGroupRows = db
 				.prepare(
 					`SELECT id, project_id, label, impact, frequency, created_at, updated_at
@@ -587,6 +627,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				impediments: impedimentRows.map(mapImpedimentRow),
 				workItems: workItemRows.map(mapWorkItemRow),
 				dependencies: dependencyRows.map(mapDependencyRow),
+				milestones: milestoneRows.map(mapMilestoneRow),
+				milestoneWorkItems: milestoneWorkItemRows.map(mapMilestoneWorkItemRow),
 				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
 				externalActions: externalActionRows.map(mapExternalActionRow),
 				evidences: evidenceRows.map(mapEvidenceRow),

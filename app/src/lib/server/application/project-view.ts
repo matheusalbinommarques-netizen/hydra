@@ -30,6 +30,8 @@ import type {
 	ProjectView,
 	ScopeItemView,
 	TreatmentStepView,
+	MilestoneView,
+	MilestoneWorkItemView,
 	WorkItemDependencyView,
 	WorkItemView
 } from './types';
@@ -151,6 +153,41 @@ function buildWorkItemDependencyViews(state: ProjectState, workItemId: string): 
 	return views;
 }
 
+// Milestone (ETAPA 8 do rework, segundo microcorte) — `status` vem do estado
+// DECLARADO, nunca derivado: nenhum trabalho relacionado aberto rebaixa um
+// marco alcançado, e nenhum conjunto de trabalhos concluídos alcança um marco
+// sozinho. O único cálculo aqui é CONTEXTO: quantos dos trabalhos que o
+// usuário associou já estão concluídos. Marco sem trabalho associado produz
+// lista vazia e `relatedConcluded: 0` — a interface não deve ler isso como
+// prontidão (ver +page.svelte, seção Marcos).
+//
+// Vínculo órfão não é representável (FK no schema + invariante na
+// desserialização), então um WorkItem ausente só poderia vir de estado
+// corrompido — filtrado em vez de quebrar a tela, mesmo tratamento de
+// buildWorkItemDependencyViews.
+function buildMilestoneView(state: ProjectState, milestone: ProjectState['milestones'][number]): MilestoneView {
+	const relatedWorkItems: MilestoneWorkItemView[] = [];
+	for (const link of state.milestoneWorkItems) {
+		if (link.milestoneId !== milestone.id) continue;
+		const workItem = state.workItems.find((item) => item.id === link.workItemId);
+		if (!workItem) continue;
+		relatedWorkItems.push({
+			milestoneWorkItemId: link.id,
+			workItemId: workItem.id,
+			title: workItem.title,
+			status: workItem.status
+		});
+	}
+	return {
+		id: milestone.id,
+		title: milestone.title,
+		status: milestone.status,
+		reachedAt: milestone.reachedAt,
+		relatedWorkItems,
+		relatedConcluded: relatedWorkItems.filter((item) => item.status === 'concluido').length
+	};
+}
+
 function buildAffectedGroupView(group: ProjectState['affectedGroups'][number]): AffectedGroupView {
 	return { id: group.id, label: group.label, impact: group.impact, frequency: group.frequency };
 }
@@ -247,6 +284,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems),
 		impediments: state.impediments.map(buildImpedimentView),
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
+		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),
 		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
 		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups),
 		externalActions: state.externalActions.map(buildExternalActionView),

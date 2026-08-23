@@ -1310,6 +1310,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'criteriaScopeConflict',
 				'impediments',
 				'workItems',
+				'milestones',
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',
@@ -2152,5 +2153,174 @@ describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
 				createdAt: '2026-01-01T00:00:00.000Z'
 			}
 		]);
+	});
+});
+
+
+// Milestone (ETAPA 8 do rework, segundo microcorte) — exercitado pela mesma
+// porta que a interface usa. O foco aqui é a PROJEÇÃO: `status` vem do estado
+// declarado, e `relatedConcluded` é contexto derivado, nunca completion.
+describe('createProjectUseCases — Milestone (ETAPA 8 do rework)', () => {
+	async function projectWithWorkItems(titles: string[]) {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const ids: string[] = [];
+		for (const title of titles) {
+			const added = await useCases.addWorkItem({ projectId, title });
+			if (!added.ok) throw new Error('esperado ok');
+			ids.push(added.value.workItems[added.value.workItems.length - 1].id);
+		}
+		return { useCases, repo, projectId, ids };
+	}
+
+	it('addMilestone projeta o marco aberto, sem trabalho relacionado', async () => {
+		const { useCases, projectId } = await projectWithWorkItems([]);
+
+		const result = await useCases.addMilestone({ projectId, title: 'Fluxo ponta a ponta' });
+		if (!result.ok) throw new Error('esperado ok');
+
+		expect(result.value.milestones).toEqual([
+			{
+				id: expect.any(String),
+				title: 'Fluxo ponta a ponta',
+				status: 'aberto',
+				reachedAt: null,
+				relatedWorkItems: [],
+				relatedConcluded: 0
+			}
+		]);
+	});
+
+	it('mover um WorkItem relacionado atualiza SÓ o contexto derivado, nunca o status do marco', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário', 'Listagem']);
+		const [formulario, listagem] = ids;
+
+		const created = await useCases.addMilestone({ projectId, title: 'Abertura ponta a ponta' });
+		if (!created.ok) throw new Error('esperado ok');
+		const milestoneId = created.value.milestones[0].id;
+
+		for (const workItemId of [formulario, listagem]) {
+			const linked = await useCases.linkWorkItemToMilestone({ projectId, milestoneId, workItemId });
+			if (!linked.ok) throw new Error('esperado ok');
+		}
+
+		const moved = await useCases.moveWorkItem({ projectId, workItemId: formulario, status: 'concluido' });
+		if (!moved.ok) throw new Error('esperado ok');
+
+		const milestone = moved.value.milestones[0];
+		expect(milestone.relatedConcluded).toBe(1);
+		expect(milestone.relatedWorkItems).toHaveLength(2);
+		// Contexto mudou; o estado declarado do marco, não.
+		expect(milestone.status).toBe('aberto');
+		expect(milestone.reachedAt).toBeNull();
+
+		// E concluir o restante do trabalho relacionado também não o alcança.
+		const finished = await useCases.moveWorkItem({ projectId, workItemId: listagem, status: 'concluido' });
+		if (!finished.ok) throw new Error('esperado ok');
+		expect(finished.value.milestones[0]).toMatchObject({
+			status: 'aberto',
+			reachedAt: null,
+			relatedConcluded: 2
+		});
+	});
+
+	it('marco alcançado convive com trabalho relacionado aberto (contexto não contradiz o estado)', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+
+		const created = await useCases.addMilestone({ projectId, title: 'Marco' });
+		if (!created.ok) throw new Error('esperado ok');
+		const milestoneId = created.value.milestones[0].id;
+		const linked = await useCases.linkWorkItemToMilestone({ projectId, milestoneId, workItemId: ids[0] });
+		if (!linked.ok) throw new Error('esperado ok');
+
+		const reached = await useCases.reachMilestone({ projectId, milestoneId });
+		if (!reached.ok) throw new Error('esperado ok');
+
+		expect(reached.value.milestones[0]).toMatchObject({
+			status: 'alcancado',
+			relatedConcluded: 0
+		});
+		expect(reached.value.milestones[0].relatedWorkItems[0]).toMatchObject({ status: 'a_fazer' });
+		// O WorkItem relacionado segue exatamente onde estava.
+		expect(reached.value.workItems[0].status).toBe('a_fazer');
+	});
+
+	it('reabrir limpa reachedAt e persiste; desassociar preserva o estado declarado', async () => {
+		const { useCases, repo, projectId, ids } = await projectWithWorkItems(['Formulário']);
+
+		const created = await useCases.addMilestone({ projectId, title: 'Marco' });
+		if (!created.ok) throw new Error('esperado ok');
+		const milestoneId = created.value.milestones[0].id;
+		const linked = await useCases.linkWorkItemToMilestone({ projectId, milestoneId, workItemId: ids[0] });
+		if (!linked.ok) throw new Error('esperado ok');
+		const linkId = linked.value.milestones[0].relatedWorkItems[0].milestoneWorkItemId;
+
+		const reached = await useCases.reachMilestone({ projectId, milestoneId });
+		if (!reached.ok) throw new Error('esperado ok');
+
+		const unlinked = await useCases.unlinkWorkItemFromMilestone({ projectId, milestoneWorkItemId: linkId });
+		if (!unlinked.ok) throw new Error('esperado ok');
+		expect(unlinked.value.milestones[0]).toMatchObject({
+			status: 'alcancado',
+			relatedWorkItems: [],
+			relatedConcluded: 0
+		});
+
+		const reopened = await useCases.reopenMilestone({ projectId, milestoneId });
+		if (!reopened.ok) throw new Error('esperado ok');
+		expect(reopened.value.milestones[0]).toMatchObject({ status: 'aberto', reachedAt: null });
+
+		const stored = await repo.findById(projectId);
+		expect(stored?.milestones[0]).toMatchObject({ status: 'aberto', reachedAt: null });
+		expect(stored?.milestoneWorkItems).toEqual([]);
+	});
+
+	it('projeto sem nenhum marco projeta lista vazia (nada é inferido de WorkItem)', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const moved = await useCases.moveWorkItem({ projectId, workItemId: ids[0], status: 'concluido' });
+		if (!moved.ok) throw new Error('esperado ok');
+		expect(moved.value.milestones).toEqual([]);
+	});
+
+	// O vínculo é sempre intraprojeto: o caso de uso carrega o estado de UM
+	// projeto, então um marco de outro projeto simplesmente não existe ali.
+	it('recusa vínculo entre projetos diferentes', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const other = await useCases.createProject();
+		if (!other.ok) throw new Error('esperado ok');
+		const otherMilestone = await useCases.addMilestone({ projectId: other.value.projectId, title: 'Marco alheio' });
+		if (!otherMilestone.ok) throw new Error('esperado ok');
+		const otherMilestoneId = otherMilestone.value.milestones[0].id;
+
+		const linked = await useCases.linkWorkItemToMilestone({
+			projectId,
+			milestoneId: otherMilestoneId,
+			workItemId: ids[0]
+		});
+		expect(linked).toEqual({ ok: false, error: { kind: 'milestone_not_found' } });
+
+		const createdHere = await useCases.addMilestone({ projectId, title: 'Marco daqui' });
+		if (!createdHere.ok) throw new Error('esperado ok');
+		const crossed = await useCases.linkWorkItemToMilestone({
+			projectId: other.value.projectId,
+			milestoneId: otherMilestoneId,
+			workItemId: ids[0]
+		});
+		expect(crossed).toEqual({ ok: false, error: { kind: 'work_item_not_found' } });
+	});
+
+	it('recusa vínculo duplicado pela mesma porta que a interface usa', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const created = await useCases.addMilestone({ projectId, title: 'Marco' });
+		if (!created.ok) throw new Error('esperado ok');
+		const milestoneId = created.value.milestones[0].id;
+
+		const first = await useCases.linkWorkItemToMilestone({ projectId, milestoneId, workItemId: ids[0] });
+		expect(first.ok).toBe(true);
+
+		const second = await useCases.linkWorkItemToMilestone({ projectId, milestoneId, workItemId: ids[0] });
+		expect(second).toEqual({ ok: false, error: { kind: 'milestone_work_item_already_linked' } });
 	});
 });

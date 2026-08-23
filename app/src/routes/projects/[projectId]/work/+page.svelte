@@ -3,7 +3,12 @@
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { WorkItemStatus } from '$lib/domain';
 	import type { DependencyPresentation } from './work-view';
-	import { dependencyPresentation, nextWorkItemStatus, previousWorkItemStatus } from './work-view';
+	import {
+		allMilestonesLinkedHint,
+		dependencyPresentation,
+		nextWorkItemStatus,
+		previousWorkItemStatus
+	} from './work-view';
 
 	let { data, form } = $props();
 	let projectId = $derived(data.view.projectId);
@@ -98,6 +103,7 @@
 		newImpedText = '';
 		newImpedTipo = '';
 		newDependencyTargetId = '';
+		newMilestoneTargetId = '';
 	}
 
 	// Candidatos a predecessor: todo item do projeto menos o próprio e os que
@@ -119,6 +125,41 @@
 			await update({ reset: false });
 		};
 	}
+
+	// Marcos (ETAPA 8 do rework, segundo microcorte). O estado exibido é o
+	// DECLARADO: nada aqui deriva "alcançado" do trabalho relacionado, e a
+	// contagem abaixo é contexto, nunca percentual/progresso do marco.
+	let milestones = $derived(data.view.milestones);
+	let newMilestoneTitle = $state('');
+	let newMilestoneTargetId = $state('');
+
+	function handleMilestoneSubmit() {
+		return async ({ result, update }: { result: ActionResult; update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			if (result.type === 'success') {
+				newMilestoneTitle = '';
+				newMilestoneTargetId = '';
+			}
+			await update({ reset: false });
+		};
+	}
+
+	// Marcos aos quais o item aberto já foi associado, e os que ainda restam.
+	// Um item pode se relacionar a mais de um marco (N:N) e a nenhum — os dois
+	// são estados normais.
+	let selectedItemMilestones = $derived.by(() => {
+		const current = selectedItem;
+		if (!current) return [];
+		return milestones.flatMap((milestone) => {
+			const link = milestone.relatedWorkItems.find((related) => related.workItemId === current.id);
+			return link
+				? [{ milestoneId: milestone.id, title: milestone.title, milestoneWorkItemId: link.milestoneWorkItemId }]
+				: [];
+		});
+	});
+	let milestoneCandidates = $derived.by(() => {
+		const linked = new Set(selectedItemMilestones.map((entry) => entry.milestoneId));
+		return milestones.filter((milestone) => !linked.has(milestone.id));
+	});
 
 	function closeDetail() {
 		selectedItemId = null;
@@ -229,6 +270,66 @@
 		{/each}
 	</div>
 {/if}
+
+<!-- Marcos (ETAPA 8 do rework, segundo microcorte) — seção no nível do
+     projeto, irmã do board e nunca uma coluna dele: um marco não se move
+     entre estados de execução, é declarado alcançado. O trabalho relacionado
+     é CONTEXTO — não habilita, não bloqueia e não altera o estado do marco. -->
+<section class="milestones" aria-labelledby="milestones-heading">
+	<h2 id="milestones-heading">Marcos</h2>
+	<p class="section-hint">
+		Pontos de checagem que você declara ter alcançado. O trabalho relacionado ajuda a entender o contexto —
+		quem decide se o marco foi alcançado é você.
+	</p>
+
+	{#if milestones.length === 0}
+		<p class="empty-group">Nenhum marco declarado ainda.</p>
+	{:else}
+		<ul class="milestone-list">
+			{#each milestones as milestone (milestone.id)}
+				{@const related = milestone.relatedWorkItems.length}
+				<li class="milestone-row" class:reached={milestone.status === 'alcancado'}>
+					<span class="milestone-state">
+						{milestone.status === 'alcancado' ? 'Alcançado' : 'Em aberto'}
+					</span>
+					<span class="milestone-title">{milestone.title}</span>
+					<span class="milestone-context">
+						{#if related === 0}
+							Sem trabalhos relacionados
+						{:else}
+							{milestone.relatedConcluded} de {related}
+							{related === 1 ? 'trabalho relacionado concluído' : 'trabalhos relacionados concluídos'}
+						{/if}
+					</span>
+					{#if milestone.status === 'alcancado'}
+						<form method="POST" action="?/reopenMilestone" use:enhance={handleMilestoneSubmit}>
+							<input type="hidden" name="milestoneId" value={milestone.id} />
+							<button type="submit" class="link-button">Reabrir</button>
+						</form>
+					{:else}
+						<form method="POST" action="?/reachMilestone" use:enhance={handleMilestoneSubmit}>
+							<input type="hidden" name="milestoneId" value={milestone.id} />
+							<button type="submit" class="button-secondary">Marcar como alcançado</button>
+						</form>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<form class="milestone-create" method="POST" action="?/createMilestone" use:enhance={handleMilestoneSubmit}>
+		<label class="visually-hidden" for="new-milestone-title">Título do marco</label>
+		<input
+			id="new-milestone-title"
+			type="text"
+			name="title"
+			placeholder="O que vai indicar que chegamos a um ponto de checagem?"
+			required
+			bind:value={newMilestoneTitle}
+		/>
+		<button type="submit" class="button-secondary" disabled={!newMilestoneTitle.trim()}>Criar marco</button>
+	</form>
+</section>
 
 <dialog bind:this={createDialog} class="create-dialog" onclose={closeCreate}>
 	<div class="dialog-content">
@@ -380,6 +481,51 @@
 					</select>
 					<button type="submit" class="button-secondary" disabled={!newDependencyTargetId}>
 						Adicionar dependência
+					</button>
+				</form>
+			{/if}
+		</div>
+
+		<!-- Marcos relacionados (ETAPA 8 do rework): associação opcional dos
+		     dois lados. Nenhum botão de status acima muda por causa desta
+		     lista — associar trabalho não alcança marco, e marco não bloqueia
+		     trabalho. -->
+		<div class="panel-section">
+			<p class="panel-label">Marcos relacionados</p>
+			{#if selectedItemMilestones.length === 0}
+				<p class="panel-hint">Este trabalho não está relacionado a nenhum marco.</p>
+			{:else}
+				<ul class="dependency-list">
+					{#each selectedItemMilestones as entry (entry.milestoneWorkItemId)}
+						<li class="dependency-row">
+							<span class="dependency-title">{entry.title}</span>
+							<form method="POST" action="?/unlinkMilestone" use:enhance={handleMilestoneSubmit}>
+								<input type="hidden" name="milestoneWorkItemId" value={entry.milestoneWorkItemId} />
+								<button type="submit" class="link-button" aria-label="Remover relação com o marco {entry.title}">
+									Remover
+								</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if milestones.length === 0}
+				<p class="panel-hint">Crie um marco na seção "Marcos" para poder relacionar trabalho a ele.</p>
+			{:else if milestoneCandidates.length === 0}
+				<p class="panel-hint">{allMilestonesLinkedHint(milestones.length)}</p>
+			{:else}
+				<form method="POST" action="?/linkMilestone" use:enhance={handleMilestoneSubmit}>
+					<input type="hidden" name="workItemId" value={selectedItem.id} />
+					<label class="visually-hidden" for="new-milestone-target">Relacionar ao marco</label>
+					<select id="new-milestone-target" name="milestoneId" required bind:value={newMilestoneTargetId}>
+						<option value="" disabled>Relacionar ao marco...</option>
+						{#each milestoneCandidates as candidate (candidate.id)}
+							<option value={candidate.id}>{candidate.title}</option>
+						{/each}
+					</select>
+					<button type="submit" class="button-secondary" disabled={!newMilestoneTargetId}>
+						Relacionar a um marco
 					</button>
 				</form>
 			{/if}
@@ -839,9 +985,95 @@
 		flex: 1;
 	}
 
+	/* Marcos — mesma paleta papel/tinta/grafite das demais superfícies do
+	   workspace (app.css documenta a ausência deliberada de cor de acento
+	   própria aqui): o estado alcançado se distingue por peso e borda, não
+	   por cor nova. */
+	.milestones {
+		margin-top: var(--space-8);
+		border-top: 1px solid rgba(101, 104, 108, 0.22);
+		padding-top: var(--space-6);
+	}
+
+	.milestones h2 {
+		margin: 0 0 var(--space-2);
+	}
+
+	.section-hint {
+		color: var(--hydra-muted);
+		font-size: var(--font-size-meta);
+		max-width: 46rem;
+		line-height: 1.5;
+		margin: 0 0 var(--space-4);
+	}
+
+	.milestone-list {
+		list-style: none;
+		margin: 0 0 var(--space-5);
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.milestone-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		border: 1px solid rgba(101, 104, 108, 0.22);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-3) var(--space-4);
+	}
+
+	.milestone-row.reached {
+		border-color: rgba(101, 104, 108, 0.4);
+	}
+
+	.milestone-state {
+		flex: none;
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		color: var(--hydra-muted);
+	}
+
+	.milestone-row.reached .milestone-state {
+		color: var(--hydra-text);
+	}
+
+	.milestone-title {
+		flex: 1;
+		min-width: 12rem;
+	}
+
+	/* Contexto, nunca progresso: tipografia de metadado, sem barra, sem
+	   percentual e sem qualquer marca que sugira completion do marco. */
+	.milestone-context {
+		flex: none;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.milestone-create {
+		display: flex;
+		gap: var(--space-3);
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.milestone-create input {
+		flex: 1;
+		min-width: 16rem;
+	}
+
 	@media (max-width: 860px) {
 		.columns {
 			grid-template-columns: 1fr;
+		}
+
+		.milestone-row {
+			align-items: flex-start;
+			flex-direction: column;
 		}
 
 		.card-open {

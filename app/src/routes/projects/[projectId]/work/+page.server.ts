@@ -90,6 +90,68 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// Milestone (ETAPA 8 do rework, segundo microcorte) — checkpoint
+	// declarado. `reachMilestone` NUNCA é chamado a partir da action `move`
+	// acima, e `move` nunca é recusado por causa de marco: as duas coisas são
+	// independentes por design.
+	createMilestone: async ({ request, params }) => {
+		const formData = await request.formData();
+		const title = readString(formData, 'title');
+		if (!title) return fail(400, { message: 'Descreva o marco.' });
+
+		const result = await getProjectUseCases().addMilestone({ projectId: params.projectId, title });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	reachMilestone: async ({ request, params }) => {
+		const formData = await request.formData();
+		const milestoneId = readString(formData, 'milestoneId');
+		if (!milestoneId) return fail(400, { message: 'Marco inválido.' });
+
+		const result = await getProjectUseCases().reachMilestone({ projectId: params.projectId, milestoneId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	reopenMilestone: async ({ request, params }) => {
+		const formData = await request.formData();
+		const milestoneId = readString(formData, 'milestoneId');
+		if (!milestoneId) return fail(400, { message: 'Marco inválido.' });
+
+		const result = await getProjectUseCases().reopenMilestone({ projectId: params.projectId, milestoneId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	linkMilestone: async ({ request, params }) => {
+		const formData = await request.formData();
+		const milestoneId = readString(formData, 'milestoneId');
+		const workItemId = readString(formData, 'workItemId');
+		if (!milestoneId || !workItemId) return fail(400, { message: 'Selecione o marco relacionado.' });
+
+		const result = await getProjectUseCases().linkWorkItemToMilestone({
+			projectId: params.projectId,
+			milestoneId,
+			workItemId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	unlinkMilestone: async ({ request, params }) => {
+		const formData = await request.formData();
+		const milestoneWorkItemId = readString(formData, 'milestoneWorkItemId');
+		if (!milestoneWorkItemId) return fail(400, { message: 'Relação inválida.' });
+
+		const result = await getProjectUseCases().unlinkWorkItemFromMilestone({
+			projectId: params.projectId,
+			milestoneWorkItemId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	registerImpediment: async ({ request, params }) => {
 		const formData = await request.formData();
 		const workItemId = readString(formData, 'workItemId');

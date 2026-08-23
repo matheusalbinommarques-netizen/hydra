@@ -11,6 +11,8 @@ import type {
 	CauseHypothesis,
 	CurrentTreatment,
 	Dependency,
+	Milestone,
+	MilestoneWorkItem,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -63,6 +65,9 @@ export type DomainTransitionError =
 	| { kind: 'dependency_self_reference' }
 	| { kind: 'dependency_already_exists' }
 	| { kind: 'dependency_cycle' }
+	| { kind: 'milestone_not_found' }
+	| { kind: 'milestone_work_item_not_found' }
+	| { kind: 'milestone_work_item_already_linked' }
 	| { kind: 'phase_not_found' }
 	| { kind: 'planning_no_items' }
 	| { kind: 'affected_group_not_found' }
@@ -1000,6 +1005,136 @@ export function removeDependency(
 	return {
 		ok: true,
 		value: { ...state, dependencies: state.dependencies.filter((dependency) => dependency.id !== dependencyId) }
+	};
+}
+
+// --- Milestone (ETAPA 8 do rework, segundo microcorte) --------------------
+//
+// Checkpoint DECLARADO: `status` só muda por ação humana explícita
+// (reachMilestone/reopenMilestone). Nenhuma função aqui deriva o status de
+// trabalho relacionado — nem para alcançar, nem para reabrir, nem para
+// recusar. Concluir todos os WorkItems associados não chama nem produz
+// reachMilestone; associar/desassociar trabalho nunca toca `status`.
+//
+// A associação é "trabalho relacionado/contribuinte", não conjunto exaustivo
+// de condições: WorkItem aberto NÃO impede reachMilestone (ver
+// state-types.ts, MilestoneWorkItem).
+
+function findMilestone(state: ProjectState, milestoneId: string): Milestone | undefined {
+	return state.milestones.find((milestone) => milestone.id === milestoneId);
+}
+
+export function addMilestone(
+	catalog: Catalog,
+	state: ProjectState,
+	milestoneId: string,
+	title: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const milestone: Milestone = {
+		id: milestoneId,
+		projectId: state.project.id,
+		title,
+		status: 'aberto',
+		reachedAt: null,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, milestones: [...state.milestones, milestone] } };
+}
+
+// Idempotente (mesmo espírito de resolveImpediment/moveWorkItem): alcançar um
+// marco já alcançado é no-op, nunca erro — e nunca reescreve o reachedAt
+// original. `status` e `reachedAt` mudam sempre juntos.
+export function reachMilestone(
+	catalog: Catalog,
+	state: ProjectState,
+	milestoneId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const milestone = findMilestone(state, milestoneId);
+	if (!milestone) return { ok: false, error: { kind: 'milestone_not_found' } };
+	if (milestone.status === 'alcancado') return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			milestones: state.milestones.map((item) =>
+				item.id === milestoneId
+					? { ...item, status: 'alcancado', reachedAt: occurredAt, updatedAt: occurredAt }
+					: item
+			)
+		}
+	};
+}
+
+export function reopenMilestone(
+	catalog: Catalog,
+	state: ProjectState,
+	milestoneId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const milestone = findMilestone(state, milestoneId);
+	if (!milestone) return { ok: false, error: { kind: 'milestone_not_found' } };
+	if (milestone.status === 'aberto') return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			milestones: state.milestones.map((item) =>
+				item.id === milestoneId ? { ...item, status: 'aberto', reachedAt: null, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// Associar trabalho relacionado nunca muda o `status` do marco (nem do
+// WorkItem): só registra a relação.
+export function linkWorkItemToMilestone(
+	catalog: Catalog,
+	state: ProjectState,
+	milestoneWorkItemId: string,
+	milestoneId: string,
+	workItemId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!findMilestone(state, milestoneId)) return { ok: false, error: { kind: 'milestone_not_found' } };
+	if (!findWorkItem(state, workItemId)) return { ok: false, error: { kind: 'work_item_not_found' } };
+
+	const duplicate = state.milestoneWorkItems.some(
+		(link) => link.milestoneId === milestoneId && link.workItemId === workItemId
+	);
+	if (duplicate) return { ok: false, error: { kind: 'milestone_work_item_already_linked' } };
+
+	const link: MilestoneWorkItem = {
+		id: milestoneWorkItemId,
+		projectId: state.project.id,
+		milestoneId,
+		workItemId,
+		createdAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, milestoneWorkItems: [...state.milestoneWorkItems, link] } };
+}
+
+export function unlinkWorkItemFromMilestone(
+	catalog: Catalog,
+	state: ProjectState,
+	milestoneWorkItemId: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!state.milestoneWorkItems.some((link) => link.id === milestoneWorkItemId)) {
+		return { ok: false, error: { kind: 'milestone_work_item_not_found' } };
+	}
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			milestoneWorkItems: state.milestoneWorkItems.filter((link) => link.id !== milestoneWorkItemId)
+		}
 	};
 }
 

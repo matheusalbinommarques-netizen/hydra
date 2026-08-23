@@ -47,6 +47,12 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Esta dependência já foi registrada.';
 		case 'dependency_cycle':
 			return 'Esta dependência criaria um ciclo: o outro item já depende deste, direta ou indiretamente.';
+		case 'milestone_not_found':
+			return 'Marco não encontrado.';
+		case 'milestone_work_item_not_found':
+			return 'Trabalho relacionado não encontrado.';
+		case 'milestone_work_item_already_linked':
+			return 'Este trabalho já está relacionado a este marco.';
 		case 'phase_not_found':
 			return 'A fase escolhida não existe mais no catálogo.';
 		case 'planning_no_items':

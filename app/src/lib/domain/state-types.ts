@@ -191,6 +191,69 @@ export interface Dependency {
 	createdAt: string;
 }
 
+// Milestone — ETAPA 8 do rework ("Dependency + Milestone + Roadmap/Timeline",
+// docs/core/HYDRA_PRODUCT_REWORK.md §38), segundo microcorte. Checkpoint de
+// progresso DECLARADO no nível do projeto: um ponto verificável que a equipe
+// reconhece como "chegamos aqui". Um marco não é executado — é alcançado;
+// ninguém trabalha "no marco", trabalha nos itens que o tornam verdadeiro.
+//
+// Distinto de WorkItem (unidade executável que se move no board), de
+// Dependency (precedência entre dois trabalhos) e de ScopeItem (o que entra
+// no escopo). Também não é prazo: data planejada pertence ao microcorte de
+// Timeline (§38, "datas planejadas quando existirem") e NÃO existe aqui —
+// sem Timeline e sem os sinais do §38, uma data seria campo sem leitor e,
+// pior, prometeria um alerta de atraso que o Hydra não daria.
+//
+// `status` declarado é a ÚNICA autoridade sobre aberto/alcancado: nenhum
+// caminho do domínio o deriva de trabalho relacionado (ver
+// MilestoneWorkItem abaixo). Vocabulário deliberadamente distinto de
+// WorkItem — marco é "alcançado", item de trabalho é "concluído".
+//
+// Invariante fechada do lifecycle, garantida por reachMilestone/
+// reopenMilestone (que alteram o par atomicamente), reforçada na
+// desserialização e por CONSTRAINT nomeada no schema:
+//   aberto    => reachedAt === null
+//   alcancado => reachedAt !== null
+//
+// Sem `description`, sem `order` (ordenação é Roadmap, §38) e sem rename/
+// remoção nesta rodada — mesma superfície mínima que WorkItem tem hoje.
+export type MilestoneStatus = 'aberto' | 'alcancado';
+
+export interface Milestone {
+	id: string;
+	projectId: string;
+	title: string;
+	status: MilestoneStatus;
+	reachedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+// MilestoneWorkItem — relação N:N opcional entre Milestone e WorkItem do
+// mesmo projeto. Significa "trabalho relacionado/contribuinte para este
+// marco", e NUNCA "conjunto exaustivo de condições necessárias":
+//
+// - marco pode existir sem nenhum WorkItem associado;
+// - WorkItem pode existir sem nenhum marco;
+// - o usuário associa apenas os trabalhos que considerar relevantes;
+// - WorkItem aberto NÃO impede reachMilestone;
+// - WorkItem concluído NÃO alcança o marco automaticamente.
+//
+// Portanto um marco explicitamente alcançado pode legitimamente coexistir
+// com trabalho relacionado ainda aberto. A contagem derivada na view é
+// CONTEXTO ("3 de 5 trabalhos relacionados concluídos"), nunca percentual,
+// progresso ou status do marco.
+//
+// Imutável depois de criada — só existe associar e desassociar (mesmo molde
+// de Dependency/Evidence, sem `updatedAt`). Par duplicado é inválido.
+export interface MilestoneWorkItem {
+	id: string;
+	projectId: string;
+	milestoneId: string;
+	workItemId: string;
+	createdAt: string;
+}
+
 // Mapa de Impacto — Descoberta, "Quem é afetado" (ETAPA 2 do rework, ver
 // docs/core/HYDRA_PRODUCT_REWORK.md §32). Objeto vivo real: substitui o
 // texto livre antes capturado em `publico_detail` (Answer da atividade
@@ -406,6 +469,8 @@ export interface ProjectState {
 	impediments: Impediment[];
 	workItems: WorkItem[];
 	dependencies: Dependency[];
+	milestones: Milestone[];
+	milestoneWorkItems: MilestoneWorkItem[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];

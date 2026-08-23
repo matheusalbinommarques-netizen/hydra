@@ -4,6 +4,9 @@ import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
 	addDependency,
+	addMilestone,
+	linkWorkItemToMilestone,
+	reachMilestone,
 	addCauseHypothesis,
 	addDesiredOutcome,
 	addImpediment,
@@ -1658,5 +1661,122 @@ describe('Dependency (ETAPA 8 do rework)', () => {
 		expect(
 			result.value.answers.find((answer) => answer.fieldDefinitionId === 'dependencias_trabalho')?.value
 		).toBe('A depende de B; B depende de C');
+	});
+});
+
+// Milestone (ETAPA 8 do rework, segundo microcorte) — checkpoint declarado.
+// Mesmo molde dos blocos de Dependency/WorkItem acima: round-trip,
+// compatibilidade com snapshot anterior ao corte, invariantes de referência e
+// a invariante FECHADA do lifecycle (status × reachedAt) reforçada contra
+// estado persistido.
+describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
+	function stateWithWorkItems(): ProjectState {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		return state;
+	}
+
+	it('preserva marcos e vínculos no round-trip completo', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(addMilestone(catalog, state, 'ms-1', 'Fluxo de abertura ponta a ponta', T1));
+		state = unwrap(addMilestone(catalog, state, 'ms-2', 'Aprovação completa', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-1', 'wi-b', T2));
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('marco alcançado com trabalho relacionado ainda aberto é estado legítimo', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(addMilestone(catalog, state, 'ms-1', 'Marco', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+		// wi-a continua 'a_fazer' — a desserialização não pode recusar isso.
+		expect(state.workItems.find((item) => item.id === 'wi-a')?.status).toBe('a_fazer');
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.milestones[0].status).toBe('alcancado');
+	});
+
+	it('snapshot anterior a este corte (sem as chaves de marco) importa como coleções vazias', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.milestones;
+		delete envelope.state.milestoneWorkItems;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.milestones).toEqual([]);
+		expect(result.value.milestoneWorkItems).toEqual([]);
+	});
+
+	it('recusa marco alcançado sem reachedAt e marco aberto com reachedAt', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+
+		base.state.milestones = [
+			{ id: 'ms-1', projectId: 'proj-1', title: 'M', status: 'alcancado', reachedAt: null, createdAt: T1, updatedAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+
+		base.state.milestones = [
+			{ id: 'ms-1', projectId: 'proj-1', title: 'M', status: 'aberto', reachedAt: T2, createdAt: T1, updatedAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('recusa vínculo órfão e par (marco, trabalho) duplicado vindos de estado persistido', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.milestones = [
+			{ id: 'ms-1', projectId: 'proj-1', title: 'M', status: 'aberto', reachedAt: null, createdAt: T1, updatedAt: T1 }
+		];
+
+		base.state.milestoneWorkItems = [
+			{ id: 'mwi-1', projectId: 'proj-1', milestoneId: 'ms-1', workItemId: 'nao-existe', createdAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invalid_reference');
+
+		base.state.milestoneWorkItems = [
+			{ id: 'mwi-1', projectId: 'proj-1', milestoneId: 'nao-existe', workItemId: 'wi-a', createdAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invalid_reference');
+
+		base.state.milestoneWorkItems = [
+			{ id: 'mwi-1', projectId: 'proj-1', milestoneId: 'ms-1', workItemId: 'wi-a', createdAt: T1 },
+			{ id: 'mwi-2', projectId: 'proj-1', milestoneId: 'ms-1', workItemId: 'wi-a', createdAt: T2 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('não converte o Answer legado marcos_principais em nenhum Milestone', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(
+			answerActivity(
+				catalog,
+				state,
+				'definir_marcos',
+				{ marcos_principais: 'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo' },
+				T1
+			)
+		);
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.milestones).toEqual([]);
+		expect(result.value.milestoneWorkItems).toEqual([]);
+		// O texto livre continua legível, intacto — READ-LEGACY, nunca promovido.
+		expect(result.value.answers.find((answer) => answer.fieldDefinitionId === 'marcos_principais')?.value).toBe(
+			'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo'
+		);
 	});
 });

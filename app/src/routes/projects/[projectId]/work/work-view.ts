@@ -77,3 +77,15 @@ export function dependencyPresentation(
 	if (dependency.satisfied) return 'pronto';
 	return dependentStatus === 'concluido' ? 'pendente' : 'aguardando';
 }
+
+// Texto do painel quando o WorkItem aberto já está relacionado a todos os
+// marcos que existem (ETAPA 8 do rework, segundo microcorte). Fica aqui, e não
+// inline no template, pelo mesmo motivo de dependencyPresentation acima: é
+// escolha de apresentação pura, testável sem montar a página. Achado de
+// dogfood humano: com um único marco no projeto, a formulação plural ("todos
+// os marcos existentes") soava errada.
+export function allMilestonesLinkedHint(milestoneCount: number): string {
+	return milestoneCount === 1
+		? 'Este trabalho já está relacionado ao marco existente.'
+		: 'Este trabalho já está relacionado a todos os marcos existentes.';
+}
