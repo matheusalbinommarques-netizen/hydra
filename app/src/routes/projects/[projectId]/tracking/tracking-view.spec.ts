@@ -46,6 +46,45 @@ function makeWorkItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'
 	};
 }
 
+function dependency(overrides: { dependencyId: string; dependsOnWorkItemId: string; title: string }) {
+	return { ...overrides, satisfied: false };
+}
+
+function blockedItem(
+	overrides: { id?: string; title?: string; impedimentId?: string } = {}
+): WorkItemView {
+	return makeWorkItem({
+		id: overrides.id ?? '1',
+		title: overrides.title ?? 'Migrar base de clientes',
+		status: 'em_andamento',
+		blockedBy: {
+			impedimentId: overrides.impedimentId ?? 'imp-1',
+			text: 'Acesso ao CRM ainda não liberado',
+			tipo: 'dependencia_externa'
+		}
+	});
+}
+
+function dependentItem(overrides: {
+	id: string;
+	title: string;
+	dependsOnId: string;
+	status?: WorkItemView['status'];
+}): WorkItemView {
+	return makeWorkItem({
+		id: overrides.id,
+		title: overrides.title,
+		status: overrides.status ?? 'a_fazer',
+		dependsOn: [
+			dependency({
+				dependencyId: `dep-${overrides.id}`,
+				dependsOnWorkItemId: overrides.dependsOnId,
+				title: 'predecessor'
+			})
+		]
+	});
+}
+
 describe('buildTrackingView — situação e continuidade', () => {
 	it('resume fase, atividade e progresso a partir de journeyContext/phaseProgress', () => {
 		const result = buildTrackingView(baseInput());
@@ -167,9 +206,89 @@ describe('buildTrackingView — Bloqueios (Precisa de você)', () => {
 				impedimentId: 'imp-1',
 				impedimentText: 'Acesso ao CRM ainda não liberado',
 				impedimentTipo: 'dependencia_externa',
-				why: 'Este impedimento está bloqueando trabalho atualmente em "Em andamento".'
+				why: 'Este impedimento está bloqueando trabalho atualmente em "Em andamento".',
+				waitingWorkItems: [],
+				waitingLabel: null
 			}
 		]);
+	});
+
+	it('não acrescenta impacto quando ninguém depende do item bloqueado', () => {
+		const result = buildTrackingView(baseInput({ workItems: [blockedItem(), makeWorkItem({ id: '2' })] }));
+		expect(result.blockedWorkItems).toHaveLength(1);
+		expect(result.blockedWorkItems[0].waitingWorkItems).toEqual([]);
+		expect(result.blockedWorkItems[0].waitingLabel).toBeNull();
+	});
+
+	it('expõe o WorkItem aberto que depende do item bloqueado, nomeando-o quando é só um', () => {
+		const result = buildTrackingView(
+			baseInput({
+				workItems: [blockedItem(), dependentItem({ id: '2', title: 'Integrar gateway', dependsOnId: '1' })]
+			})
+		);
+		expect(result.blockedWorkItems).toHaveLength(1);
+		expect(result.blockedWorkItems[0].waitingWorkItems).toEqual([{ workItemId: '2', title: 'Integrar gateway' }]);
+		expect(result.blockedWorkItems[0].waitingLabel).toBe('Também mantém Integrar gateway aguardando.');
+	});
+
+	it('não conta como aguardando um dependente já concluído', () => {
+		const result = buildTrackingView(
+			baseInput({
+				workItems: [
+					blockedItem(),
+					dependentItem({ id: '2', title: 'Já entregue', dependsOnId: '1', status: 'concluido' })
+				]
+			})
+		);
+		expect(result.blockedWorkItems[0].waitingWorkItems).toEqual([]);
+		expect(result.blockedWorkItems[0].waitingLabel).toBeNull();
+	});
+
+	it('mantém um único card do item bloqueado quando vários dependentes aguardam, com contagem', () => {
+		const result = buildTrackingView(
+			baseInput({
+				workItems: [
+					blockedItem(),
+					dependentItem({ id: '2', title: 'Integrar gateway', dependsOnId: '1' }),
+					dependentItem({ id: '3', title: 'Publicar cobrança', dependsOnId: '1', status: 'em_andamento' })
+				]
+			})
+		);
+		expect(result.blockedWorkItems).toHaveLength(1);
+		expect(result.blockedWorkItems[0].waitingWorkItems).toEqual([
+			{ workItemId: '2', title: 'Integrar gateway' },
+			{ workItemId: '3', title: 'Publicar cobrança' }
+		]);
+		expect(result.blockedWorkItems[0].waitingLabel).toBe('Também mantém 2 trabalhos aguardando.');
+	});
+
+	it('mostra o mesmo dependente no impacto de cada predecessor bloqueado, sem duplicar a ação de um impedimento', () => {
+		const result = buildTrackingView(
+			baseInput({
+				workItems: [
+					blockedItem({ id: '1', title: 'Definir contrato', impedimentId: 'imp-1' }),
+					blockedItem({ id: '2', title: 'Aprovar orçamento', impedimentId: 'imp-2' }),
+					makeWorkItem({
+						id: '3',
+						title: 'Integrar gateway',
+						dependsOn: [
+							dependency({ dependencyId: 'dep-1', dependsOnWorkItemId: '1', title: 'Definir contrato' }),
+							dependency({ dependencyId: 'dep-2', dependsOnWorkItemId: '2', title: 'Aprovar orçamento' })
+						]
+					})
+				]
+			})
+		);
+		expect(result.blockedWorkItems.map((blocked) => blocked.impedimentId)).toEqual(['imp-1', 'imp-2']);
+		expect(result.blockedWorkItems[0].waitingLabel).toBe('Também mantém Integrar gateway aguardando.');
+		expect(result.blockedWorkItems[1].waitingLabel).toBe('Também mantém Integrar gateway aguardando.');
+	});
+
+	it('remove o impacto por derivação quando a Dependency deixa de existir', () => {
+		const semDependencia = buildTrackingView(
+			baseInput({ workItems: [blockedItem(), makeWorkItem({ id: '2', title: 'Integrar gateway' })] })
+		);
+		expect(semDependencia.blockedWorkItems[0].waitingLabel).toBeNull();
 	});
 });
 

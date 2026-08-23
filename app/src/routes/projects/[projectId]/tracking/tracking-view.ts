@@ -61,6 +61,23 @@ export interface TrackingBlockedWorkItem {
 	impedimentText: string;
 	impedimentTipo: ImpedimentType;
 	why: string;
+	// Impacto downstream (ETAPA 8 do rework, terceiro microcorte) — WorkItems
+	// ainda abertos que declararam depender deste item bloqueado. Derivado
+	// aqui, nunca persistido, e composto só a partir de fatos que a projeção
+	// já recebe: A.dependsOn -> B.id -> B.blockedBy. Os itens afetados reais
+	// ficam expostos (não só uma contagem) para a derivação continuar
+	// explicável e testável. Não é um sinal novo nem um card novo: enriquece
+	// o card do impedimento que já existe, para não oferecer duas ações
+	// concorrentes sobre o mesmo Impediment.
+	waitingWorkItems: TrackingBlockedWaitingWorkItem[];
+	waitingLabel: string | null;
+}
+
+// Um WorkItem afetado, visto a partir do item bloqueado (mesmo espírito de
+// WorkItemDependencyView: título junto, para a interface não cruzar listas).
+export interface TrackingBlockedWaitingWorkItem {
+	workItemId: string;
+	title: string;
 }
 
 export interface TrackingContinuityView {
@@ -148,16 +165,49 @@ function buildWork(workItems: WorkItemView[]): TrackingWorkView {
 function buildBlockedWorkItems(workItems: WorkItemView[]): TrackingBlockedWorkItem[] {
 	return workItems
 		.filter((item) => item.blockedBy !== null)
-		.map((item) => ({
-			workItemId: item.id,
-			title: item.title,
-			status: item.status,
-			// filter acima já garante blockedBy !== null.
-			impedimentId: item.blockedBy!.impedimentId,
-			impedimentText: item.blockedBy!.text,
-			impedimentTipo: item.blockedBy!.tipo,
-			why: `Este impedimento está bloqueando trabalho atualmente em "${WORK_STATUS_LABEL[item.status]}".`
-		}));
+		.map((item) => {
+			const waitingWorkItems = buildWaitingWorkItems(workItems, item.id);
+			return {
+				workItemId: item.id,
+				title: item.title,
+				status: item.status,
+				// filter acima já garante blockedBy !== null.
+				impedimentId: item.blockedBy!.impedimentId,
+				impedimentText: item.blockedBy!.text,
+				impedimentTipo: item.blockedBy!.tipo,
+				why: `Este impedimento está bloqueando trabalho atualmente em "${WORK_STATUS_LABEL[item.status]}".`,
+				waitingWorkItems,
+				waitingLabel: buildWaitingLabel(waitingWorkItems)
+			};
+		});
+}
+
+// Quem depende deste item bloqueado e ainda está aberto. `status !==
+// 'concluido'` não é detalhe: um WorkItem já concluído não aguarda ninguém —
+// Dependency deliberadamente não impede a conclusão (D039), e afirmar que ele
+// aguarda seria falso, o mesmo defeito que produziu a apresentação 'pendente'
+// em Trabalho. Nenhuma condição extra sobre a aresta é necessária: um item
+// bloqueado por Impediment aberto nunca está 'concluido' (moveWorkItem recusa
+// a transição), logo a precedência é sempre insatisfeita aqui.
+function buildWaitingWorkItems(workItems: WorkItemView[], blockedWorkItemId: string): TrackingBlockedWaitingWorkItem[] {
+	return workItems
+		.filter(
+			(candidate) =>
+				candidate.status !== 'concluido' &&
+				candidate.dependsOn.some((dependency) => dependency.dependsOnWorkItemId === blockedWorkItemId)
+		)
+		.map((candidate) => ({ workItemId: candidate.id, title: candidate.title }));
+}
+
+// "Mantém aguardando", nunca "destrava"/"libera": resolver o impedimento não
+// satisfaz a Dependency — os afetados continuam aguardando até o predecessor
+// ser CONCLUÍDO. Escolha pura e testável (mesmo padrão de
+// allMilestonesLinkedHint em work-view.ts); `null` quando não há afetados, e a
+// interface simplesmente não desenha a linha.
+function buildWaitingLabel(waitingWorkItems: TrackingBlockedWaitingWorkItem[]): string | null {
+	if (waitingWorkItems.length === 0) return null;
+	if (waitingWorkItems.length === 1) return `Também mantém ${waitingWorkItems[0].title} aguardando.`;
+	return `Também mantém ${waitingWorkItems.length} trabalhos aguardando.`;
 }
 
 function buildAttentionPendingItems(openPendingItems: PendingItemView[]): TrackingAttentionPendingItem[] {

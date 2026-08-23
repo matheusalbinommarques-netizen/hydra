@@ -119,6 +119,14 @@
 					<p class="blocked-headline">{blocked.title} está bloqueado</p>
 					<p class="blocked-impediment">Impedimento ({tipoLabel[blocked.impedimentTipo]})</p>
 					<p class="blocked-text">{blocked.impedimentText}</p>
+					{#if blocked.waitingLabel}
+						<!-- Impacto downstream (ETAPA 8 do rework): consequência do MESMO
+						     bloqueio, não um sinal novo — sem badge, sem cor de severidade,
+						     sem ação própria. "Mantém aguardando" é deliberado: resolver o
+						     impedimento não satisfaz a Dependency, o dependente só fica
+						     pronto quando este item for concluído. -->
+						<p class="blocked-waiting">{blocked.waitingLabel}</p>
+					{/if}
 					<p class="blocked-why">Por que importa: {blocked.why}</p>
 
 					{#if confirmingWorkItemId === blocked.workItemId}
@@ -808,6 +816,18 @@
 	.blocked-text {
 		margin: 0 0 var(--space-3);
 		font-size: var(--font-size-meta);
+	}
+
+	/* Complementa o card sem competir com ele: sem badge, sem peso extra e sem
+	   cor nova — reusa o tom de conteúdo DERIVADO pelo Hydra (mesma cor de
+	   .blocked-why), para não se confundir com o texto do impedimento logo
+	   acima, que é escrito pelo usuário. Sem itálico: itálico já marca o
+	   "Por que importa". */
+	.blocked-waiting {
+		margin: 0 0 var(--space-3);
+		font-size: var(--font-size-meta);
+		color: var(--hydra-muted);
+		overflow-wrap: anywhere;
 	}
 
 	.blocked-why {
