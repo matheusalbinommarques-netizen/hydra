@@ -3,6 +3,7 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addMilestone,
+	setMilestonePlannedDate,
 	addWorkItem,
 	moveWorkItem,
 	linkWorkItemToMilestone,
@@ -73,6 +74,8 @@ import type { ProjectState } from './state-types';
 
 const T1 = '2026-01-01T00:00:00.000Z';
 const T2 = '2026-01-02T00:00:00.000Z';
+const T3 = '2026-01-03T00:00:00.000Z';
+const T4 = '2026-01-04T00:00:00.000Z';
 
 function freshState(): ProjectState {
 	return createInitialProjectState(catalog, 'proj-1', T1);
@@ -1867,6 +1870,7 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 				title: 'Fluxo ponta a ponta',
 				status: 'aberto',
 				reachedAt: null,
+				plannedDate: null,
 				createdAt: T1,
 				updatedAt: T1
 			}
@@ -1981,5 +1985,101 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 		state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
 
 		expect(moveWorkItem(catalog, state, 'wi-a', 'concluido', T2).ok).toBe(true);
+	});
+
+	// Data planejada (microcorte de Timeline) — o ponto central destes testes
+	// também é NEGATIVO: a data é intenção declarada e não toca nada além dela
+	// mesma. Se algum dia definir/limpar data alterar status, reachedAt ou
+	// trabalho, o contrato do §38 foi quebrado aqui.
+	describe('plannedDate', () => {
+		it('define, reagenda e limpa pela mesma operação, sempre atualizando updatedAt', () => {
+			let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			expect(state.milestones[0].plannedDate).toBeNull();
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-09-01', T2));
+			expect(state.milestones[0].plannedDate).toBe('2026-09-01');
+			expect(state.milestones[0].updatedAt).toBe(T2);
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-10-15', T3));
+			expect(state.milestones[0].plannedDate).toBe('2026-10-15');
+			expect(state.milestones[0].updatedAt).toBe(T3);
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', null, T4));
+			expect(state.milestones[0].plannedDate).toBeNull();
+			expect(state.milestones[0].updatedAt).toBe(T4);
+		});
+
+		it('é idempotente de verdade: repetir o mesmo valor não reescreve updatedAt', () => {
+			let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-09-01', T2));
+
+			const again = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-09-01', T3));
+			expect(again.milestones[0].updatedAt).toBe(T2);
+
+			// Limpar duas vezes segue a mesma regra.
+			const cleared = unwrap(setMilestonePlannedDate(catalog, again, 'ms-1', null, T3));
+			const clearedAgain = unwrap(setMilestonePlannedDate(catalog, cleared, 'ms-1', null, T4));
+			expect(clearedAgain.milestones[0].updatedAt).toBe(T3);
+		});
+
+		it('recusa data que não é dia civil real', () => {
+			const state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			for (const invalid of ['2026-02-30', '2026-13-01', '2026-09-01T00:00:00.000Z', '01/09/2026', '2026-9-1', '']) {
+				expect(setMilestonePlannedDate(catalog, state, 'ms-1', invalid, T2)).toEqual({
+					ok: false,
+					error: { kind: 'milestone_planned_date_invalid' }
+				});
+			}
+		});
+
+		it('não toca status, reachedAt, trabalho relacionado nem dependências', () => {
+			let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-1', 'ms-1', 'wi-a', T1));
+			const before = { workItems: state.workItems, links: state.milestoneWorkItems, deps: state.dependencies };
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-09-01', T2));
+			expect(state.milestones[0].status).toBe('aberto');
+			expect(state.milestones[0].reachedAt).toBeNull();
+			expect(state.workItems).toEqual(before.workItems);
+			expect(state.milestoneWorkItems).toEqual(before.links);
+			expect(state.dependencies).toEqual(before.deps);
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', null, T3));
+			expect(state.milestones[0].status).toBe('aberto');
+			expect(state.milestones[0].reachedAt).toBeNull();
+		});
+
+		// Data futura e data passada num marco já alcançado são estado
+		// LEGÍTIMO: o Hydra não corrige, não recusa e não interpreta.
+		it('marco alcançado aceita data planejada futura e passada', () => {
+			let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2099-12-31', T3));
+			expect(state.milestones[0]).toMatchObject({ status: 'alcancado', reachedAt: T2, plannedDate: '2099-12-31' });
+
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '1999-01-01', T3));
+			expect(state.milestones[0]).toMatchObject({ status: 'alcancado', reachedAt: T2, plannedDate: '1999-01-01' });
+		});
+
+		// Simétrico: alcançar/reabrir também nunca mexem na data planejada.
+		it('reachMilestone e reopenMilestone preservam a data planejada', () => {
+			let state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-09-01', T2));
+
+			state = unwrap(reachMilestone(catalog, state, 'ms-1', T3));
+			expect(state.milestones[0].plannedDate).toBe('2026-09-01');
+
+			state = unwrap(reopenMilestone(catalog, state, 'ms-1', T4));
+			expect(state.milestones[0].plannedDate).toBe('2026-09-01');
+		});
+
+		it('marco inexistente é recusado', () => {
+			const state = unwrap(addMilestone(catalog, stateWithWorkItems(), 'ms-1', 'Marco', T1));
+			expect(setMilestonePlannedDate(catalog, state, 'nao-existe', '2026-09-01', T2)).toEqual({
+				ok: false,
+				error: { kind: 'milestone_not_found' }
+			});
+		});
 	});
 });

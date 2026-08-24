@@ -49,6 +49,8 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Esta dependência criaria um ciclo: o outro item já depende deste, direta ou indiretamente.';
 		case 'milestone_not_found':
 			return 'Marco não encontrado.';
+		case 'milestone_planned_date_invalid':
+			return 'Informe uma data válida (dia, mês e ano).';
 		case 'milestone_work_item_not_found':
 			return 'Trabalho relacionado não encontrado.';
 		case 'milestone_work_item_already_linked':

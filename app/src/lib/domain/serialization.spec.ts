@@ -5,6 +5,7 @@ import {
 	addAffectedGroup,
 	addDependency,
 	addMilestone,
+	setMilestonePlannedDate,
 	linkWorkItemToMilestone,
 	reachMilestone,
 	addCauseHypothesis,
@@ -1755,6 +1756,54 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 			{ id: 'mwi-2', projectId: 'proj-1', milestoneId: 'ms-1', workItemId: 'wi-a', createdAt: T2 }
 		];
 		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	// plannedDate (microcorte de Timeline) — o snapshot anterior ao corte não
+	// tem a chave, e "sem chave" significa marco SEM data planejada. Nenhuma
+	// data é sintetizada de createdAt nem inferida de texto legado.
+	it('marco de snapshot anterior, sem a chave plannedDate, importa com data nula', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.milestones = [
+			{ id: 'ms-1', projectId: 'proj-1', title: 'M', status: 'aberto', reachedAt: null, createdAt: T1, updatedAt: T1 }
+		];
+
+		const result = deserializeProjectState(JSON.stringify(base), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.milestones[0].plannedDate).toBeNull();
+	});
+
+	it('preserva plannedDate no round-trip, sem deslocamento de dia', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(addMilestone(catalog, state, 'ms-1', 'Marco', T1));
+		state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-1', '2026-01-01', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+		if (result.ok) expect(result.value.milestones[0].plannedDate).toBe('2026-01-01');
+	});
+
+	it('recusa plannedDate persistida que não é dia civil real', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		for (const invalid of ['2026-02-30', '2026-13-01', '2026-09-01T00:00:00.000Z', '01/09/2026']) {
+			base.state.milestones = [
+				{
+					id: 'ms-1',
+					projectId: 'proj-1',
+					title: 'M',
+					status: 'aberto',
+					reachedAt: null,
+					plannedDate: invalid,
+					createdAt: T1,
+					updatedAt: T1
+				}
+			];
+			expectError(JSON.stringify(base), 'invalid_shape');
+		}
 	});
 
 	it('não converte o Answer legado marcos_principais em nenhum Milestone', () => {

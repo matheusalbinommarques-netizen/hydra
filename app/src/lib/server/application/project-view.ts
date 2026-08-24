@@ -183,6 +183,8 @@ function buildMilestoneView(state: ProjectState, milestone: ProjectState['milest
 		title: milestone.title,
 		status: milestone.status,
 		reachedAt: milestone.reachedAt,
+		plannedDate: milestone.plannedDate,
+		createdAt: milestone.createdAt,
 		relatedWorkItems,
 		relatedConcluded: relatedWorkItems.filter((item) => item.status === 'concluido').length
 	};

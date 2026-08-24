@@ -146,26 +146,42 @@ CREATE TABLE IF NOT EXISTS dependency (
 -- Milestone (ETAPA 8 do rework, segundo microcorte) — ver
 -- app/src/lib/domain/state-types.ts. Checkpoint DECLARADO no nível do
 -- projeto: status é a única autoridade sobre aberto/alcancado, nunca
--- derivado do trabalho relacionado. Sem planned_date (data planejada
--- pertence ao microcorte de Timeline, §38), sem description e sem order
--- (ordenação é Roadmap, §38) — nada aqui é antecipado por uso futuro.
+-- derivado do trabalho relacionado. Sem description e sem order (ordenação é
+-- Roadmap, §38) — nada aqui é antecipado por uso futuro.
 --
--- As duas CHECK abaixo cobrem invariantes realmente FECHADAS (R7/D038), não
--- discriminante extensível: o conjunto de status do lifecycle, e o par
--- (status, reached_at), que reachMilestone/reopenMilestone sempre alteram
--- atomicamente — aberto => reached_at IS NULL; alcancado => reached_at IS
--- NOT NULL. Ambas NOMEADAS, como a regra derivada no fim deste arquivo exige.
+-- planned_date (microcorte de Timeline, §38) — data CIVIL YYYY-MM-DD, o dia
+-- em que a equipe planeja alcançar o marco. NULL é o caso normal e
+-- permanentemente válido. Deliberadamente NÃO participa de nenhuma CHECK
+-- cruzada com status/reached_at: marco alcançado com data planejada futura ou
+-- passada é estado legítimo, não inconsistência.
+--
+-- As três CHECK abaixo são NOMEADAS, como a regra derivada no fim deste
+-- arquivo exige. As duas primeiras cobrem invariantes realmente FECHADAS
+-- (R7/D038), não discriminante extensível: o conjunto de status do lifecycle,
+-- e o par (status, reached_at), que reachMilestone/reopenMilestone sempre
+-- alteram atomicamente — aberto => reached_at IS NULL; alcancado =>
+-- reached_at IS NOT NULL.
+--
+-- A terceira é honestamente só defesa de FORMATO, não validação calendárica:
+-- o GLOB recusa timestamp ISO completo e formato local, mas aceitaria
+-- 2026-02-30. A validade real da data continua garantida em um único lugar —
+-- isCivilDate (domain/civil-date.ts), aplicado na transição e na
+-- desserialização. Nenhuma segunda implementação da regra vive aqui.
 CREATE TABLE IF NOT EXISTS milestone (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
 	title TEXT NOT NULL,
 	status TEXT NOT NULL,
 	reached_at TEXT,
+	planned_date TEXT,
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	CONSTRAINT milestone_status_values CHECK (status IN ('aberto', 'alcancado')),
 	CONSTRAINT milestone_reached_at_matches_status CHECK (
 		(status = 'aberto' AND reached_at IS NULL) OR (status = 'alcancado' AND reached_at IS NOT NULL)
+	),
+	CONSTRAINT milestone_planned_date_format CHECK (
+		planned_date IS NULL OR planned_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
 	)
 );
 

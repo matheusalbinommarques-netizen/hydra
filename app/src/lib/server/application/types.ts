@@ -212,6 +212,15 @@ export interface MilestoneView {
 	title: string;
 	status: MilestoneStatus;
 	reachedAt: string | null;
+	// Data civil YYYY-MM-DD declarada pelo usuário, ou null. Vai crua para a
+	// interface (é o valor que <input type="date"> consome) e é formatada como
+	// dia, sem nunca virar Date — ver domain/civil-date.ts.
+	plannedDate: string | null;
+	// Exceção deliberada ao "view leve": createdAt existe aqui só como fato de
+	// DESEMPATE determinístico da Linha do tempo (dois marcos com a mesma data
+	// planejada mantêm a ordem de criação). Não é exibido em lugar nenhum, e
+	// não é ordenação de produto — `order` continua pertencendo a Roadmap (§38).
+	createdAt: string;
 	relatedWorkItems: MilestoneWorkItemView[];
 	relatedConcluded: number;
 }
@@ -580,6 +589,14 @@ export interface ReopenMilestoneInput {
 	milestoneId: string;
 }
 
+// Uma única entrada cobre definir, reagendar e limpar (plannedDate: null) —
+// mesmo molde de SetImpedimentNextActionInput.
+export interface SetMilestonePlannedDateInput {
+	projectId: string;
+	milestoneId: string;
+	plannedDate: string | null;
+}
+
 export interface LinkWorkItemToMilestoneInput {
 	projectId: string;
 	milestoneId: string;
@@ -804,6 +821,7 @@ export interface ProjectUseCases {
 	addMilestone(input: AddMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	reachMilestone(input: ReachMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenMilestone(input: ReopenMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
+	setMilestonePlannedDate(input: SetMilestonePlannedDateInput): Promise<UseCaseOutcome<ProjectView>>;
 	linkWorkItemToMilestone(input: LinkWorkItemToMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	unlinkWorkItemFromMilestone(input: UnlinkWorkItemFromMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;

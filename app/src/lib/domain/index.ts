@@ -7,5 +7,6 @@ export type * from './result';
 export * from './factory';
 export * from './transitions';
 export * from './serialization';
+export * from './civil-date';
 export * from './multi-select';
 export * from './planning-items';

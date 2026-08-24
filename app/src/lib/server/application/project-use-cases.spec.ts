@@ -2187,10 +2187,46 @@ describe('createProjectUseCases — Milestone (ETAPA 8 do rework)', () => {
 				title: 'Fluxo ponta a ponta',
 				status: 'aberto',
 				reachedAt: null,
+				// Marco nasce sem data planejada — a data é um segundo ato explícito.
+				plannedDate: null,
+				createdAt: expect.any(String),
 				relatedWorkItems: [],
 				relatedConcluded: 0
 			}
 		]);
+	});
+
+	it('setMilestonePlannedDate projeta a data, aceita limpar, e nunca toca status/reachedAt', async () => {
+		const { useCases, projectId } = await projectWithWorkItems([]);
+		const created = await useCases.addMilestone({ projectId, title: 'Marco' });
+		if (!created.ok) throw new Error('esperado ok');
+		const milestoneId = created.value.milestones[0].id;
+
+		const dated = await useCases.setMilestonePlannedDate({ projectId, milestoneId, plannedDate: '2026-09-01' });
+		if (!dated.ok) throw new Error('esperado ok');
+		expect(dated.value.milestones[0]).toMatchObject({ plannedDate: '2026-09-01', status: 'aberto', reachedAt: null });
+
+		const reached = await useCases.reachMilestone({ projectId, milestoneId });
+		if (!reached.ok) throw new Error('esperado ok');
+		expect(reached.value.milestones[0].plannedDate).toBe('2026-09-01');
+
+		const cleared = await useCases.setMilestonePlannedDate({ projectId, milestoneId, plannedDate: null });
+		if (!cleared.ok) throw new Error('esperado ok');
+		expect(cleared.value.milestones[0]).toMatchObject({ plannedDate: null, status: 'alcancado' });
+		expect(cleared.value.milestones[0].reachedAt).not.toBeNull();
+	});
+
+	it('setMilestonePlannedDate recusa data que não é dia civil real, sem gravar nada', async () => {
+		const { useCases, repo, projectId } = await projectWithWorkItems([]);
+		const created = await useCases.addMilestone({ projectId, title: 'Marco' });
+		if (!created.ok) throw new Error('esperado ok');
+		const milestoneId = created.value.milestones[0].id;
+
+		const result = await useCases.setMilestonePlannedDate({ projectId, milestoneId, plannedDate: '2026-02-30' });
+		expect(result).toEqual({ ok: false, error: { kind: 'milestone_planned_date_invalid' } });
+
+		const state = await repo.findById(projectId);
+		expect(state?.milestones[0].plannedDate).toBeNull();
 	});
 
 	it('mover um WorkItem relacionado atualiza SÓ o contexto derivado, nunca o status do marco', async () => {

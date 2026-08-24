@@ -223,6 +223,31 @@ function ensureProjectEventTaxonomyOpen(db: Database.Database): void {
 	}
 }
 
+// Sétima evolução do schema desde 0001_init.sql (ETAPA 8 do rework,
+// microcorte de Timeline) — mesmo caso de ensureImpedimentWorkItemIdColumn:
+// planned_date é uma COLUNA nova numa tabela existente (milestone), e
+// `CREATE TABLE IF NOT EXISTS milestone` é no-op num banco que já tem a
+// tabela — inclusive nos bancos criados entre o corte de Milestone (D040) e
+// este. Idempotente, isolado da inicialização, mesmo padrão.
+//
+// Marcos já persistidos ficam com planned_date NULL: nenhuma data é
+// sintetizada, nem de created_at, nem do texto livre legado. A CHECK nomeada
+// acompanha a coluna (ALTER TABLE ADD COLUMN com CONSTRAINT nomeada é aceito
+// por este runtime — verificado empiricamente contra o SQLite 3.53.x embutido
+// antes de escolher o mecanismo), e é só defesa de FORMATO: a validade
+// calendárica vive em isCivilDate (domain/civil-date.ts), não aqui.
+function ensureMilestonePlannedDateColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(milestone)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'planned_date');
+	if (!hasColumn) {
+		db.exec(
+			`ALTER TABLE milestone ADD COLUMN planned_date TEXT
+			 CONSTRAINT milestone_planned_date_format
+			 CHECK (planned_date IS NULL OR planned_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')`
+		);
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -232,6 +257,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureCurrentTreatmentRows(db);
 	ensureCauseExplorationRows(db);
 	ensureImpedimentWorkItemIdColumn(db);
+	ensureMilestonePlannedDateColumn(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -314,8 +340,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// milestone_work_item tem FK para os dois (checagem imediata,
 		// foreign_keys = ON).
 		const insertMilestone = db.prepare(
-			`INSERT INTO milestone (id, project_id, title, status, reached_at, created_at, updated_at)
-			 VALUES (@id, @projectId, @title, @status, @reachedAt, @createdAt, @updatedAt)`
+			`INSERT INTO milestone (id, project_id, title, status, reached_at, planned_date, created_at, updated_at)
+			 VALUES (@id, @projectId, @title, @status, @reachedAt, @plannedDate, @createdAt, @updatedAt)`
 		);
 		for (const milestone of state.milestones) {
 			insertMilestone.run(milestone);
@@ -549,7 +575,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const milestoneRows = db
 				.prepare(
-					`SELECT id, project_id, title, status, reached_at, created_at, updated_at
+					`SELECT id, project_id, title, status, reached_at, planned_date, created_at, updated_at
 					 FROM milestone WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as MilestoneRow[];

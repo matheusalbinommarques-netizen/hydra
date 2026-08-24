@@ -38,6 +38,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		phaseProgress,
 		nextActivity: view.nextActivity,
 		workItems: view.workItems,
+		milestones: view.milestones,
 		impediments: view.impediments,
 		openPendingItems: view.openPendingItems
 	});

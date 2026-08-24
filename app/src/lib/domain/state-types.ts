@@ -199,10 +199,33 @@ export interface Dependency {
 //
 // Distinto de WorkItem (unidade executável que se move no board), de
 // Dependency (precedência entre dois trabalhos) e de ScopeItem (o que entra
-// no escopo). Também não é prazo: data planejada pertence ao microcorte de
-// Timeline (§38, "datas planejadas quando existirem") e NÃO existe aqui —
-// sem Timeline e sem os sinais do §38, uma data seria campo sem leitor e,
-// pior, prometeria um alerta de atraso que o Hydra não daria.
+// no escopo).
+//
+// `plannedDate` (ETAPA 8 do rework, terceiro microcorte de Milestone) é "o
+// dia em que a equipe planeja alcançar este marco": INTENÇÃO declarada pelo
+// usuário, opcional, e nada além disso. Nasce junto do seu primeiro leitor
+// real (a Linha do tempo em Acompanhamento) — sem leitor, seria campo morto,
+// e foi por isso que o corte anterior deliberadamente não o criou.
+//
+// Não é prazo (compromisso com consequência), não é duração, não é baseline,
+// não é atraso e não é scheduling: nenhum outro objeto lê esta data para
+// decidir nada, não existe início/fim, não existe propagação e não existe
+// comparação automática com reachedAt (variação é §42). Também é distinta de
+// createdAt/updatedAt (fatos de sistema, escritos pelo Clock) e de reachedAt
+// (fato consumado, instante gravado pelo Clock).
+//
+// Representação: data CIVIL estrita `YYYY-MM-DD`, nunca timestamp — a
+// semântica é dia, não instante, e um instante seria deslocado de um dia por
+// qualquer formatação com timezone. Validada por isCivilDate (transitions.ts)
+// no domínio e na desserialização, nunca por Date.parse, que aceitaria
+// timestamp completo. Nunca deve passar por `new Date(...)` em round-trip ou
+// formatação.
+//
+// Completamente ortogonal ao lifecycle abaixo: definir, reagendar ou limpar a
+// data não muda `status`, não muda `reachedAt`, não alcança nem reabre o
+// marco, não altera WorkItem e não afeta Dependency. Um marco alcançado com
+// plannedDate futura OU passada é estado legítimo, exibido como fato
+// declarado — o Hydra não corrige nem interpreta essa combinação.
 //
 // `status` declarado é a ÚNICA autoridade sobre aberto/alcancado: nenhum
 // caminho do domínio o deriva de trabalho relacionado (ver
@@ -225,6 +248,9 @@ export interface Milestone {
 	title: string;
 	status: MilestoneStatus;
 	reachedAt: string | null;
+	// Data civil YYYY-MM-DD, ou null quando o marco não tem data planejada
+	// (caso normal e permanentemente válido). Ver comentário acima.
+	plannedDate: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

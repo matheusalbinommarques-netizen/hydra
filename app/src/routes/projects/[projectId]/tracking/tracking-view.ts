@@ -7,8 +7,8 @@
 // diretamente, não decide nada (isso já foi decidido por orientation-engine/
 // e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
-import type { ImpedimentType, WorkItemStatus } from '$lib/domain';
-import type { ImpedimentView, WorkItemView } from '$lib/server/application/types';
+import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
+import type { ImpedimentView, MilestoneView, WorkItemView } from '$lib/server/application/types';
 import type { NextActivityResult, PendingItemView } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
@@ -80,6 +80,35 @@ export interface TrackingBlockedWaitingWorkItem {
 	title: string;
 }
 
+// Linha do tempo (ETAPA 8 do rework, microcorte de Timeline;
+// HYDRA_PRODUCT_REWORK.md §16 "Linha do tempo" e §17, prontidão "datas/marcos").
+// LISTA cronológica declarada, nunca gráfico de scheduling: sem duração, sem
+// barra, sem escala espacial, sem "hoje", sem atraso, sem folga e sem
+// comparação entre plannedDate e reachedAt — variação é §42.
+//
+// `status` é o estado DECLARADO do marco e continua sendo a única autoridade
+// (D040): a Timeline não corrige nem interpreta um marco alcançado com data
+// futura ou passada, só mostra os dois fatos.
+export interface TrackingTimelineEntry {
+	milestoneId: string;
+	title: string;
+	// Data civil crua (YYYY-MM-DD), preservada para ordenação/teste.
+	plannedDate: string;
+	// Mesmo dia em pt-BR (dd/mm/aaaa), formatado por manipulação de string —
+	// plannedDate nunca vira Date, que deslocaria o dia por timezone.
+	plannedDateLabel: string;
+	status: MilestoneStatus;
+	statusLabel: string;
+	// Instante real do alcance, cru: é timestamp (fato do sistema), não dia
+	// civil, e a interface o formata com o tratamento de timestamp já usado no
+	// repo. null enquanto o marco está aberto.
+	reachedAt: string | null;
+	// Só desempate (ver compareTimelineEntries). Nunca exibido: a Linha do
+	// tempo afirma data planejada e estado declarado, não quando o marco foi
+	// cadastrado.
+	createdAt: string;
+}
+
 export interface TrackingContinuityView {
 	completed: boolean;
 	label: string;
@@ -88,6 +117,10 @@ export interface TrackingContinuityView {
 export interface TrackingView {
 	situation: TrackingSituationView | undefined;
 	work: TrackingWorkView;
+	// Vazia quando nenhum marco tem data planejada — nesse caso a seção
+	// simplesmente não existe na página (§17: surface só aparece quando há
+	// dados suficientes; nada de aba/placeholder vazio).
+	timeline: TrackingTimelineEntry[];
 	blockedWorkItems: TrackingBlockedWorkItem[];
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
@@ -99,6 +132,7 @@ export interface TrackingViewInput {
 	phaseProgress: PhaseProgressView | undefined;
 	nextActivity: NextActivityResult;
 	workItems: WorkItemView[];
+	milestones: MilestoneView[];
 	impediments: ImpedimentView[];
 	openPendingItems: PendingItemView[];
 }
@@ -210,6 +244,55 @@ function buildWaitingLabel(waitingWorkItems: TrackingBlockedWaitingWorkItem[]): 
 	return `Também mantém ${waitingWorkItems.length} trabalhos aguardando.`;
 }
 
+const MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
+	aberto: 'Em aberto',
+	alcancado: 'Alcançado'
+};
+
+// dd/mm/aaaa a partir das partes da própria string. Deliberadamente sem Date e
+// sem Intl: a semântica é dia civil, e converter para instante desloca o dia em
+// qualquer fuso a oeste de Greenwich (2026-09-01 viraria 31/08). A string já
+// chegou aqui validada por isCivilDate (domain/civil-date.ts).
+function formatCivilDate(plannedDate: string): string {
+	const [year, month, day] = plannedDate.split('-');
+	return `${day}/${month}/${year}`;
+}
+
+// Só marcos COM data planejada: um marco sem data não tem fato temporal e
+// continua existindo normalmente em Trabalho.
+//
+// Ordenação totalmente determinística, sem depender da estabilidade do `sort`
+// nem da ordem incidental em que a projeção recebeu os marcos:
+//   1. plannedDate ASC — comparação lexicográfica de YYYY-MM-DD é exatamente a
+//      ordem cronológica, sem construir Date;
+//   2. createdAt ASC — mesma data planejada mantém a ordem de criação;
+//   3. id ASC — resolve o caso extremo restante (mesma data e mesmo instante
+//      de criação), para a lista nunca depender de acaso.
+// Nenhum dos três é ordenação de PRODUTO: não existe campo `order` em
+// Milestone, e prioridade/recorte continuam pertencendo a Roadmap (§38).
+function compareTimelineEntries(a: TrackingTimelineEntry, b: TrackingTimelineEntry): number {
+	if (a.plannedDate !== b.plannedDate) return a.plannedDate < b.plannedDate ? -1 : 1;
+	if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+	return a.milestoneId < b.milestoneId ? -1 : a.milestoneId > b.milestoneId ? 1 : 0;
+}
+
+function buildTimeline(milestones: MilestoneView[]): TrackingTimelineEntry[] {
+	return milestones
+		.filter((milestone) => milestone.plannedDate !== null)
+		.map((milestone) => ({
+			milestoneId: milestone.id,
+			// filter acima já garante plannedDate !== null.
+			plannedDate: milestone.plannedDate!,
+			plannedDateLabel: formatCivilDate(milestone.plannedDate!),
+			title: milestone.title,
+			status: milestone.status,
+			statusLabel: MILESTONE_STATUS_LABEL[milestone.status],
+			reachedAt: milestone.reachedAt,
+			createdAt: milestone.createdAt
+		}))
+		.sort(compareTimelineEntries);
+}
+
 function buildAttentionPendingItems(openPendingItems: PendingItemView[]): TrackingAttentionPendingItem[] {
 	return openPendingItems.map((item) => ({
 		id: item.id,
@@ -252,6 +335,7 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 	return {
 		situation,
 		work: buildWork(input.workItems),
+		timeline: buildTimeline(input.milestones),
 		blockedWorkItems: buildBlockedWorkItems(input.workItems),
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
 		impediments: buildImpediments(input.impediments),

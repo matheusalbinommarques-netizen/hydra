@@ -124,6 +124,25 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// Data planejada do marco (microcorte de Timeline). Campo vazio significa
+	// LIMPAR (null), não erro — definir, reagendar e limpar são a mesma ação.
+	// A validade da data é decidida pelo domínio (isCivilDate), não aqui: esta
+	// action só distingue "veio vazio" de "veio algo".
+	setMilestonePlannedDate: async ({ request, params }) => {
+		const formData = await request.formData();
+		const milestoneId = readString(formData, 'milestoneId');
+		if (!milestoneId) return fail(400, { message: 'Marco inválido.' });
+		const plannedDate = readString(formData, 'plannedDate');
+
+		const result = await getProjectUseCases().setMilestonePlannedDate({
+			projectId: params.projectId,
+			milestoneId,
+			plannedDate
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	linkMilestone: async ({ request, params }) => {
 		const formData = await request.formData();
 		const milestoneId = readString(formData, 'milestoneId');

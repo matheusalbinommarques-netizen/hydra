@@ -202,6 +202,7 @@ export interface MilestoneRow {
 	title: string;
 	status: MilestoneStatus;
 	reached_at: string | null;
+	planned_date: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -213,6 +214,7 @@ export function mapMilestoneRow(row: MilestoneRow): Milestone {
 		title: row.title,
 		status: row.status,
 		reachedAt: row.reached_at,
+		plannedDate: row.planned_date,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

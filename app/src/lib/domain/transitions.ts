@@ -32,6 +32,7 @@ import type {
 	WorkItemStatus
 } from './state-types';
 import type { Result } from './result';
+import { isCivilDate } from './civil-date';
 import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
 import { decodePlanningItems } from './planning-items';
 
@@ -66,6 +67,7 @@ export type DomainTransitionError =
 	| { kind: 'dependency_already_exists' }
 	| { kind: 'dependency_cycle' }
 	| { kind: 'milestone_not_found' }
+	| { kind: 'milestone_planned_date_invalid' }
 	| { kind: 'milestone_work_item_not_found' }
 	| { kind: 'milestone_work_item_already_linked' }
 	| { kind: 'phase_not_found' }
@@ -1037,6 +1039,9 @@ export function addMilestone(
 		title,
 		status: 'aberto',
 		reachedAt: null,
+		// Marco nasce sem data planejada — a data é sempre um segundo ato
+		// explícito do usuário (setMilestonePlannedDate), nunca sintetizada.
+		plannedDate: null,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
@@ -1086,6 +1091,44 @@ export function reopenMilestone(
 			...state,
 			milestones: state.milestones.map((item) =>
 				item.id === milestoneId ? { ...item, status: 'aberto', reachedAt: null, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// Data planejada (ETAPA 8 do rework, microcorte de Timeline) — uma única
+// operação cobre definir, reagendar e limpar (`plannedDate: null`), pelo mesmo
+// molde de setImpedimentNextAction: são o mesmo fato sendo escrito, não três
+// transições distintas. Não existe histórico de reagendamento, razão de
+// mudança, Change nem baseline — replanejamento com rastro é §41/§42.
+//
+// Ortogonal ao lifecycle declarado: NÃO toca `status`, NÃO toca `reachedAt`,
+// não alcança nem reabre o marco, não altera WorkItem e não afeta Dependency.
+// Marco alcançado aceita data futura e passada, sem correção nem alerta.
+//
+// Idempotência real: pedir o valor que já está gravado preserva o objeto
+// inteiro, inclusive `updatedAt` — só uma mudança real de valor marca o marco
+// como atualizado.
+export function setMilestonePlannedDate(
+	catalog: Catalog,
+	state: ProjectState,
+	milestoneId: string,
+	plannedDate: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const milestone = findMilestone(state, milestoneId);
+	if (!milestone) return { ok: false, error: { kind: 'milestone_not_found' } };
+	if (plannedDate !== null && !isCivilDate(plannedDate)) {
+		return { ok: false, error: { kind: 'milestone_planned_date_invalid' } };
+	}
+	if (milestone.plannedDate === plannedDate) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			milestones: state.milestones.map((item) =>
+				item.id === milestoneId ? { ...item, plannedDate, updatedAt: occurredAt } : item
 			)
 		}
 	};

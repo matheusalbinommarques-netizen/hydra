@@ -39,6 +39,7 @@ import {
 	reachMilestone as reachMilestoneInDomain,
 	removeDependency as removeDependencyInDomain,
 	reopenMilestone as reopenMilestoneInDomain,
+	setMilestonePlannedDate as setMilestonePlannedDateInDomain,
 	unlinkWorkItemFromMilestone as unlinkWorkItemFromMilestoneInDomain,
 	removeDesiredOutcome as removeDesiredOutcomeInDomain,
 	removeScopeItem as removeScopeItemInDomain,
@@ -85,6 +86,7 @@ import type {
 	AddMilestoneInput,
 	LinkWorkItemToMilestoneInput,
 	ReachMilestoneInput,
+	SetMilestonePlannedDateInput,
 	ReopenMilestoneInput,
 	UnlinkWorkItemFromMilestoneInput,
 	AddWorkItemInput,
@@ -803,6 +805,26 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = reopenMilestoneInDomain(catalog, state, input.milestoneId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Data planejada do marco (microcorte de Timeline): definir, reagendar e
+		// limpar são a mesma escrita. Nunca chama reach/reopen, e reach/reopen
+		// nunca chamam isto — status e data são fatos independentes.
+		async setMilestonePlannedDate(input: SetMilestonePlannedDateInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setMilestonePlannedDateInDomain(
+				catalog,
+				state,
+				input.milestoneId,
+				input.plannedDate,
+				clock.now()
+			);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

@@ -301,6 +301,48 @@
 							{related === 1 ? 'trabalho relacionado concluído' : 'trabalhos relacionados concluídos'}
 						{/if}
 					</span>
+					<!-- Data planejada (microcorte de Timeline): intenção declarada, e só
+					     isso. Definir, reagendar e limpar são a mesma escrita, e nenhuma
+					     delas toca o estado do marco — Trabalho continua sendo o único
+					     lugar onde a data se edita. Submete na mudança, mesmo padrão do
+					     campo "Próxima ação" do impedimento. -->
+					<form
+						class="milestone-date"
+						method="POST"
+						action="?/setMilestonePlannedDate"
+						use:enhance={handleMilestoneSubmit}
+					>
+						<input type="hidden" name="milestoneId" value={milestone.id} />
+						<!-- Rótulo VISÍVEL: plannedDate é conceito novo para o usuário, e um
+						     label só acessível deixaria o campo de data sem significado na
+						     tela. "Planejado para" e nunca "prazo"/"vencimento"/"data
+						     limite" — a data é intenção declarada, não compromisso com
+						     consequência. O texto completo (com o título do marco) fica no
+						     aria-label, para o leitor de tela saber de qual marco é. -->
+						<label class="milestone-date-label" for="milestone-date-{milestone.id}">Planejado para</label>
+						<input
+							aria-label="Planejado para — data do marco {milestone.title}"
+							id="milestone-date-{milestone.id}"
+							type="date"
+							name="plannedDate"
+							value={milestone.plannedDate ?? ''}
+							onchange={(event) => {
+								const next = event.currentTarget.value;
+								if (next !== (milestone.plannedDate ?? '')) {
+									event.currentTarget.form?.requestSubmit();
+								}
+							}}
+						/>
+					</form>
+					{#if milestone.plannedDate !== null}
+						<form method="POST" action="?/setMilestonePlannedDate" use:enhance={handleMilestoneSubmit}>
+							<input type="hidden" name="milestoneId" value={milestone.id} />
+							<input type="hidden" name="plannedDate" value="" />
+							<button type="submit" class="link-button" aria-label="Limpar a data planejada do marco {milestone.title}">
+								Limpar data
+							</button>
+						</form>
+					{/if}
 					{#if milestone.status === 'alcancado'}
 						<form method="POST" action="?/reopenMilestone" use:enhance={handleMilestoneSubmit}>
 							<input type="hidden" name="milestoneId" value={milestone.id} />
@@ -1041,9 +1083,12 @@
 		color: var(--hydra-text);
 	}
 
+	/* min-width menor que antes: a linha do marco agora carrega também
+	   "Planejado para" + campo de data, e a 1280px o título precisa poder
+	   encolher para a ação não quebrar sozinha numa segunda linha. */
 	.milestone-title {
 		flex: 1;
-		min-width: 12rem;
+		min-width: 8rem;
 	}
 
 	/* Contexto, nunca progresso: tipografia de metadado, sem barra, sem
@@ -1051,6 +1096,24 @@
 	.milestone-context {
 		flex: none;
 		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	/* Rótulo + campo na mesma linha, em tipografia de metadado: a data é
+	   informação secundária do marco, não uma hierarquia visual nova. */
+	.milestone-date {
+		flex: none;
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2);
+	}
+
+	.milestone-date-label,
+	.milestone-date input {
+		font-size: var(--font-size-caption);
+	}
+
+	.milestone-date-label {
 		color: var(--hydra-muted);
 	}
 

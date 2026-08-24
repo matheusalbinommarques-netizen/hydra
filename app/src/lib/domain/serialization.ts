@@ -3,6 +3,7 @@
 // exceção, sempre retorna Result; nenhum cast é usado para presumir validade.
 
 import type { ActivityDefinition, Catalog } from './catalog-types';
+import { isCivilDate } from './civil-date';
 import type { ProjectEvent, ProjectEventType } from './events';
 import type {
 	ActivityProgress,
@@ -449,6 +450,14 @@ function parseMilestoneList(value: unknown): Result<Milestone[], ProjectStatePar
 		if (item.reachedAt !== null && !isIsoDateString(item.reachedAt)) {
 			return shapeError('Milestone.reachedAt deve ser uma data ISO 8601 válida ou null');
 		}
+		// plannedDate: ausente em snapshots exportados antes do microcorte de
+		// Timeline — tratado como null (marco sem data planejada), NUNCA
+		// sintetizado a partir de createdAt nem do texto livre legado. Validado
+		// como data CIVIL estrita, não por isIsoDateString: este contrato precisa
+		// recusar timestamp completo, que Date.parse aceitaria.
+		if (item.plannedDate !== undefined && item.plannedDate !== null && !isCivilDate(item.plannedDate)) {
+			return shapeError('Milestone.plannedDate deve ser uma data civil YYYY-MM-DD válida ou null');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('Milestone.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('Milestone.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -457,6 +466,7 @@ function parseMilestoneList(value: unknown): Result<Milestone[], ProjectStatePar
 			title: item.title,
 			status: item.status,
 			reachedAt: item.reachedAt,
+			plannedDate: item.plannedDate === undefined ? null : item.plannedDate,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});

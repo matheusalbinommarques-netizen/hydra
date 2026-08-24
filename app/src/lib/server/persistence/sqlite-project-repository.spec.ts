@@ -10,6 +10,7 @@ import {
 	addDesiredOutcome,
 	addImpediment,
 	addMilestone,
+	setMilestonePlannedDate,
 	linkWorkItemToMilestone,
 	addScopeItem,
 	addTreatmentStep,
@@ -173,6 +174,8 @@ function nonTrivialState(): ProjectState {
 	state = unwrap(linkWorkItemToMilestone(catalog, state, 'mwi-2', 'ms-1', 'wi-2', T1));
 	state = unwrap(reachMilestone(catalog, state, 'ms-1', T2));
 	state = unwrap(addMilestone(catalog, state, 'ms-2', 'Migração concluída', T2));
+	// Um marco datado e outro sem data: o round-trip precisa preservar os dois.
+	state = unwrap(setMilestonePlannedDate(catalog, state, 'ms-2', '2026-09-01', T2));
 	return state;
 }
 
@@ -1006,6 +1009,112 @@ describe('createSqliteProjectRepository — Milestone (ETAPA 8 do rework)', () =
 					)
 					.run('ms-y', 'proj-1', 'Marco', 'aberto', T2, T1, T1)
 			).toThrow(/milestone_reached_at_matches_status/);
+		} finally {
+			raw.close();
+		}
+	});
+
+	// Data planejada (microcorte de Timeline) — o risco concreto aqui é de
+	// UPGRADE de COLUNA: bancos criados antes deste corte (inclusive os criados
+	// entre o corte de Milestone e este) têm a tabela milestone sem
+	// planned_date, e `CREATE TABLE IF NOT EXISTS` é no-op neles.
+	it('abre um banco cuja tabela milestone não tem planned_date, sem sintetizar data, e volta a aceitar escrita', async () => {
+		const filePath = tempFilePath();
+
+		const legacy = createSqliteProjectRepository(filePath);
+		await legacy.insert(nonTrivialStateSemMarcos());
+		legacy.close();
+
+		// Reconstrói milestone/milestone_work_item na forma anterior a este
+		// corte (sem planned_date) e grava um marco "antigo" direto no SQL —
+		// DROP COLUMN não serve aqui porque a coluna participa de uma CHECK.
+		const raw = new Database(filePath);
+		raw.exec('DROP TABLE milestone_work_item; DROP TABLE milestone;');
+		raw.exec(
+			`CREATE TABLE milestone (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+				title TEXT NOT NULL,
+				status TEXT NOT NULL,
+				reached_at TEXT,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL,
+				CONSTRAINT milestone_status_values CHECK (status IN ('aberto', 'alcancado'))
+			);
+			CREATE TABLE milestone_work_item (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+				milestone_id TEXT NOT NULL REFERENCES milestone (id),
+				work_item_id TEXT NOT NULL REFERENCES work_item (id),
+				created_at TEXT NOT NULL,
+				CONSTRAINT milestone_work_item_unique_pair UNIQUE (milestone_id, work_item_id)
+			);`
+		);
+		raw
+			.prepare(
+				`INSERT INTO milestone (id, project_id, title, status, reached_at, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			)
+			.run('ms-legacy', 'proj-1', 'Marco antigo', 'aberto', null, T1, T1);
+		raw.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		// O marco pré-coluna continua válido e simplesmente não tem data: nada
+		// é sintetizado a partir de created_at nem de texto livre legado.
+		const loaded = await repo.findById('proj-1');
+		expect(loaded?.milestones).toEqual([
+			{
+				id: 'ms-legacy',
+				projectId: 'proj-1',
+				title: 'Marco antigo',
+				status: 'aberto',
+				reachedAt: null,
+				plannedDate: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+
+		if (!loaded) throw new Error('esperado estado');
+		const next = unwrap(setMilestonePlannedDate(catalog, loaded, 'ms-legacy', '2026-09-01', T2));
+		await repo.save(next);
+		await expect(repo.findById('proj-1')).resolves.toEqual(next);
+	});
+
+	it('round-trip preserva a data planejada exatamente como dia civil, sem deslocamento', async () => {
+		const repo = memoryRepo();
+		const state = nonTrivialState();
+		await repo.insert(state);
+
+		const found = await repo.findById('proj-1');
+		expect(found?.milestones.find((milestone) => milestone.id === 'ms-2')?.plannedDate).toBe('2026-09-01');
+		expect(found?.milestones.find((milestone) => milestone.id === 'ms-1')?.plannedDate).toBeNull();
+	});
+
+	// Honestamente só defesa de FORMATO: recusa timestamp e formato local, mas
+	// não valida calendário (2026-02-30 passaria aqui). A validade real vive em
+	// isCivilDate, coberta em domain/civil-date.spec.ts — nenhuma segunda
+	// implementação da regra existe no schema.
+	it('a CONSTRAINT de formato recusa planned_date que não tem o shape de data civil', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		await repo.insert(createInitialProjectState(catalog, 'proj-1', T1));
+
+		const raw = new Database(filePath);
+		try {
+			for (const invalid of ['2026-09-01T00:00:00.000Z', '01/09/2026', '2026-9-1']) {
+				expect(() =>
+					raw
+						.prepare(
+							`INSERT INTO milestone (id, project_id, title, status, reached_at, planned_date, created_at, updated_at)
+							 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+						)
+						.run('ms-x', 'proj-1', 'Marco', 'aberto', null, invalid, T1, T1)
+				).toThrow(/milestone_planned_date_format/);
+			}
 		} finally {
 			raw.close();
 		}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ImpedimentView, WorkItemView } from '$lib/server/application/types';
+import type { ImpedimentView, MilestoneView, WorkItemView } from '$lib/server/application/types';
 import type { PendingItemView } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
@@ -29,9 +29,23 @@ function baseInput(overrides: Partial<TrackingViewInput> = {}): TrackingViewInpu
 		},
 		nextActivity: { kind: 'recommendation', activityDefinitionId: 'impedimentos' },
 		workItems: [],
+		milestones: [],
 		impediments: [],
 		openPendingItems: [],
 		...overrides
+	};
+}
+
+function makeMilestone(overrides: Partial<MilestoneView> & Pick<MilestoneView, 'id'>): MilestoneView {
+	return {
+		id: overrides.id,
+		title: overrides.title ?? `Marco ${overrides.id}`,
+		status: overrides.status ?? 'aberto',
+		reachedAt: overrides.reachedAt ?? null,
+		plannedDate: overrides.plannedDate ?? null,
+		createdAt: overrides.createdAt ?? '2026-01-01T00:00:00.000Z',
+		relatedWorkItems: overrides.relatedWorkItems ?? [],
+		relatedConcluded: overrides.relatedConcluded ?? 0
 	};
 }
 
@@ -369,5 +383,113 @@ describe('buildTrackingView — impedimentos', () => {
 		const result = buildTrackingView(baseInput({ impediments }));
 		expect(result.impediments.open.map((i) => i.id)).toEqual(['i1']);
 		expect(result.impediments.resolved.map((i) => i.id)).toEqual(['i3']);
+	});
+});
+
+
+// Linha do tempo (ETAPA 8 do rework, microcorte de Timeline) — projeção
+// cronológica de marcos DATADOS. Os testes abaixo são os falsificadores da
+// promessa: se algum deles passar a afirmar atraso, proximidade ou progresso,
+// o corte deixou de ser Timeline e virou scheduling.
+describe('buildTrackingView — Linha do tempo', () => {
+	it('omite marco sem data planejada', () => {
+		const milestones = [
+			makeMilestone({ id: 'm1', plannedDate: '2026-09-10' }),
+			makeMilestone({ id: 'm2', plannedDate: null })
+		];
+		const result = buildTrackingView(baseInput({ milestones }));
+		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['m1']);
+	});
+
+	it('ordena por data civil ascendente, independente da ordem de criação', () => {
+		const milestones = [
+			makeMilestone({ id: 'm1', plannedDate: '2026-12-01' }),
+			makeMilestone({ id: 'm2', plannedDate: '2026-02-28' }),
+			makeMilestone({ id: 'm3', plannedDate: '2026-09-30' })
+		];
+		const result = buildTrackingView(baseInput({ milestones }));
+		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['m2', 'm3', 'm1']);
+	});
+
+	// Desempate por FATO, não por acaso: a ordem em que a projeção recebe os
+	// marcos é deliberadamente invertida em relação à ordem de criação, para o
+	// teste falhar se a ordenação voltar a depender da estabilidade do sort.
+	it('desempata data igual pela ordem de criação, independente da ordem recebida', () => {
+		const milestones = [
+			makeMilestone({ id: 'zz', plannedDate: '2026-09-01', createdAt: '2026-03-01T00:00:00.000Z' }),
+			makeMilestone({ id: 'aa', plannedDate: '2026-09-01', createdAt: '2026-01-01T00:00:00.000Z' }),
+			makeMilestone({ id: 'mm', plannedDate: '2026-09-01', createdAt: '2026-02-01T00:00:00.000Z' }),
+			makeMilestone({ id: 'anterior', plannedDate: '2026-08-31', createdAt: '2026-12-01T00:00:00.000Z' })
+		];
+		const result = buildTrackingView(baseInput({ milestones }));
+		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['anterior', 'aa', 'mm', 'zz']);
+	});
+
+	// Caso extremo restante: mesma data planejada E mesmo instante de criação.
+	// O id resolve deterministicamente — a lista nunca fica à mercê da ordem de
+	// entrada.
+	it('desempata por id quando data planejada e createdAt são idênticos', () => {
+		const createdAt = '2026-01-01T00:00:00.000Z';
+		const milestones = [
+			makeMilestone({ id: 'ms-c', plannedDate: '2026-09-01', createdAt }),
+			makeMilestone({ id: 'ms-a', plannedDate: '2026-09-01', createdAt }),
+			makeMilestone({ id: 'ms-b', plannedDate: '2026-09-01', createdAt })
+		];
+		const result = buildTrackingView(baseInput({ milestones }));
+		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['ms-a', 'ms-b', 'ms-c']);
+	});
+
+	it('um único marco datado já produz Linha do tempo', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-01' })];
+		expect(buildTrackingView(baseInput({ milestones })).timeline).toHaveLength(1);
+	});
+
+	it('nenhum marco datado produz Linha do tempo vazia (a seção não existe na página)', () => {
+		const milestones = [makeMilestone({ id: 'm1' }), makeMilestone({ id: 'm2' })];
+		expect(buildTrackingView(baseInput({ milestones })).timeline).toEqual([]);
+		expect(buildTrackingView(baseInput({ milestones: [] })).timeline).toEqual([]);
+	});
+
+	it('formata a data como dia civil pt-BR, sem deslocamento de dia', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-01-01' })];
+		const [entry] = buildTrackingView(baseInput({ milestones })).timeline;
+		expect(entry.plannedDate).toBe('2026-01-01');
+		expect(entry.plannedDateLabel).toBe('01/01/2026');
+	});
+
+	it('mostra status declarado e reachedAt como fatos, sem afirmar atraso nem adiantamento', () => {
+		// Alcançado depois da data planejada e alcançado antes dela: os dois são
+		// estado legítimo, exibidos igual. A entrada não carrega nenhum campo de
+		// variação/atraso/proximidade — e é isso que este teste protege.
+		const milestones = [
+			makeMilestone({
+				id: 'atrasado',
+				plannedDate: '2026-01-10',
+				status: 'alcancado',
+				reachedAt: '2026-03-02T10:00:00.000Z'
+			}),
+			makeMilestone({
+				id: 'adiantado',
+				plannedDate: '2026-06-10',
+				status: 'alcancado',
+				reachedAt: '2026-02-01T10:00:00.000Z'
+			})
+		];
+		const result = buildTrackingView(baseInput({ milestones }));
+		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['atrasado', 'adiantado']);
+		for (const entry of result.timeline) {
+			expect(entry.statusLabel).toBe('Alcançado');
+			expect(Object.keys(entry).sort()).toEqual(
+				['createdAt', 'milestoneId', 'plannedDate', 'plannedDateLabel', 'reachedAt', 'status', 'statusLabel', 'title'].sort()
+			);
+		}
+	});
+
+	it('marco aberto aparece com reachedAt null e status declarado', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-01' })];
+		const [entry] = buildTrackingView(baseInput({ milestones })).timeline;
+		expect(entry.status).toBe('aberto');
+		expect(entry.statusLabel).toBe('Em aberto');
+		expect(entry.reachedAt).toBeNull();
 	});
 });

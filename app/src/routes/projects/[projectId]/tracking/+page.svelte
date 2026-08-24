@@ -40,6 +40,11 @@
 		editingImpedimentId = editingImpedimentId === id ? null : id;
 	}
 
+	// reachedAt é INSTANTE (timestamp gravado pelo Clock), então aqui Date/Intl
+	// é o tratamento correto — ao contrário de plannedDate, que é dia civil e
+	// chega da projeção já formatado como string, sem nunca virar Date.
+	const timestampFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+
 	let hasAttentions = $derived(tracking.attentionPendingItems.length > 0 || tracking.impediments.open.length > 0);
 	let hasBlocked = $derived(tracking.blockedWorkItems.length > 0);
 
@@ -255,6 +260,44 @@
 		{/if}
 	</section>
 </div>
+
+<!-- Linha do tempo (ETAPA 8 do rework, microcorte de Timeline;
+     HYDRA_PRODUCT_REWORK.md §16). Só existe quando algum marco tem data
+     planejada — §17: surface aparece por prontidão de dados, e uma seção vazia
+     prometendo feature futura é exatamente o que a regra proíbe.
+
+     Lista cronológica declarada, não Gantt: sem barra, sem escala, sem "hoje",
+     sem atraso e sem comparar data planejada com data de alcance. Acompanhamento
+     apenas PROJETA — quem edita a data é Trabalho, dono do marco. -->
+{#if tracking.timeline.length > 0}
+	<section class="card timeline" aria-labelledby="timeline-heading">
+		<h2 id="timeline-heading">Linha do tempo</h2>
+		<p class="subtitle-inline">
+			Marcos com data planejada, do mais próximo ao mais distante. A data é o que você planejou; o estado é o
+			que você declarou.
+		</p>
+
+		<ul class="timeline-list">
+			{#each tracking.timeline as entry (entry.milestoneId)}
+				<li class="timeline-row" class:reached={entry.status === 'alcancado'}>
+					<span class="timeline-date">{entry.plannedDateLabel}</span>
+					<span class="timeline-title">{entry.title}</span>
+					<!-- O estado declarado aparece uma vez só: quando o marco foi
+					     alcançado, a própria frase com a data já É o estado. -->
+					{#if entry.reachedAt === null}
+						<span class="timeline-state">{entry.statusLabel}</span>
+					{:else}
+						<span class="timeline-state">
+							{entry.statusLabel} em {timestampFormatter.format(new Date(entry.reachedAt))}
+						</span>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+
+		<a class="section-link" href="/projects/{projectId}/work">Ver Trabalho →</a>
+	</section>
+{/if}
 
 <section class="card impediment-management" aria-labelledby="impediment-management-heading">
 	<h2 id="impediment-management-heading">Gestão de impedimentos</h2>
@@ -501,6 +544,46 @@
 	   primeiro), via CSS `order`; a ordem do DOM permanece estável porque as
 	   duas seções são independentes entre si, sem dependência de foco ou de
 	   leitura sequencial que a inversão visual possa prejudicar. */
+	.timeline-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.timeline-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		padding: var(--space-2) 0;
+		border-bottom: 1px solid rgba(101, 104, 108, 0.18);
+	}
+
+	.timeline-row:last-child {
+		border-bottom: none;
+	}
+
+	/* Tipografia de data tabular: alinha a coluna sem virar escala gráfica. */
+	.timeline-date {
+		flex: none;
+		font-variant-numeric: tabular-nums;
+		font-weight: 700;
+	}
+
+	.timeline-title {
+		flex: 1;
+		min-width: 10rem;
+	}
+
+	.timeline-state {
+		flex: none;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
 	.summary-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
