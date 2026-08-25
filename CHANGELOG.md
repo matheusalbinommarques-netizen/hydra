@@ -4,6 +4,18 @@
 
 ### Adicionado
 
+- Rework, ETAPA 8 ("Dependency + Milestone + Roadmap/Timeline") —
+  `Dependency` e `Milestone` passam a estruturar precedência e
+  checkpoints do trabalho: um item pode declarar que depende da conclusão
+  de outro e mostrar sua prontidão sem ficar impedido de avançar,
+  Acompanhamento explica o impacto downstream de um predecessor
+  bloqueado, marcos são alcançados e reabertos explicitamente sem inferir
+  progresso a partir do trabalho relacionado, e a primeira Linha do tempo
+  aparece a partir das datas planejadas dos marcos. Ver D039–D042
+  (`docs/07-management/decision-log.md`) e
+  `docs/08-delivery/s8-dependency-milestone-timeline.md`; D042 fecha a
+  etapa e registra o que permanece adiado.
+
 - R10 (remediação de processo, fecha R7–R10) — simplificação operacional:
   CHANGELOG deixa de ser obrigação por microcorte e passa a registrar só
   boundary de release/ciclo/etapa; classificação de Nível 3 passa de path
