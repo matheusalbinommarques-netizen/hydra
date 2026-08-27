@@ -36,6 +36,41 @@
 
 	let pendingDelete = $state<{ id: string; title: string } | null>(null);
 
+	// Detalhe da entrega (ETAPA 9 do rework, segundo microcorte, D043/D044) —
+	// ESTADO da própria surface Entregas (nunca nova rota): abrir mantém a
+	// lista visível, fechar volta ao mesmo lugar. Client-side, sem query
+	// param — não precisa sobreviver a um reload.
+	let openDeliverableId = $state<string | null>(null);
+	let newWorkItemTitle = $state('');
+	let selectedExistingWorkItemId = $state('');
+
+	const statusLabel: Record<string, string> = {
+		a_fazer: 'A fazer',
+		em_andamento: 'Em andamento',
+		concluido: 'Concluído'
+	};
+	const tipoLabel: Record<string, string> = {
+		dependencia_externa: 'Dependência externa',
+		decisao_pendente: 'Decisão pendente',
+		falta_de_recurso: 'Falta de recurso',
+		bloqueio_tecnico: 'Bloqueio técnico',
+		outro: 'Outro'
+	};
+
+	function workItemsOf(deliverableId: string) {
+		return view.workItems.filter((item) => item.deliverable?.deliverableId === deliverableId);
+	}
+
+	function unassociatedWorkItems() {
+		return view.workItems.filter((item) => item.deliverable === null);
+	}
+
+	function toggleDetail(deliverableId: string) {
+		openDeliverableId = openDeliverableId === deliverableId ? null : deliverableId;
+		newWorkItemTitle = '';
+		selectedExistingWorkItemId = '';
+	}
+
 	type EnhanceCallback = (opts: {
 		result: ActionResult;
 		update: (opts?: { reset?: boolean }) => Promise<void>;
@@ -225,6 +260,14 @@
 							</div>
 
 							<div class="card-actions">
+								<button
+									type="button"
+									class="ghost detail-toggle"
+									aria-expanded={openDeliverableId === deliverable.id}
+									onclick={() => toggleDetail(deliverable.id)}
+								>
+									{openDeliverableId === deliverable.id ? 'Fechar' : 'Abrir'}
+								</button>
 								{#if band.bucket === 'agora'}
 									<form method="POST" action="?/moveUp" use:enhance={handleAutosaveSubmit}>
 										<input type="hidden" name="deliverableId" value={deliverable.id} />
@@ -254,6 +297,100 @@
 								</button>
 							</div>
 						</li>
+
+						{#if openDeliverableId === deliverable.id}
+							{@const deliverableWorkItems = workItemsOf(deliverable.id)}
+							{@const candidates = unassociatedWorkItems()}
+							<li class="detail">
+								<h3>Trabalho desta entrega</h3>
+
+								{#if deliverableWorkItems.length === 0}
+									<p class="detail-empty">Nenhum item de trabalho associado ainda.</p>
+								{:else}
+									<ul class="detail-work-items">
+										{#each deliverableWorkItems as workItem (workItem.id)}
+											{@const unsatisfied = workItem.dependsOn.filter((dependency) => !dependency.satisfied)}
+											<li class="detail-work-item">
+												<div class="detail-work-item-main">
+													<span class="detail-work-item-title">{workItem.title}</span>
+													<span class="status-badge">{statusLabel[workItem.status]}</span>
+													{#if workItem.blockedBy}
+														<span class="blocked-badge"
+															>Bloqueado — {tipoLabel[workItem.blockedBy.tipo]}</span
+														>
+													{/if}
+													{#if unsatisfied.length > 0}
+														<span class="waiting-badge"
+															>Aguarda {unsatisfied.length === 1
+																? unsatisfied[0].title
+																: `${unsatisfied.length} itens`}</span
+														>
+													{/if}
+												</div>
+												<form method="POST" action="?/unassociateWorkItem" use:enhance={handleAutosaveSubmit}>
+													<input type="hidden" name="workItemId" value={workItem.id} />
+													<button type="submit" class="ghost small">Remover desta entrega</button>
+												</form>
+											</li>
+										{/each}
+									</ul>
+								{/if}
+
+								<div class="detail-actions">
+									<form
+										method="POST"
+										action="?/createWorkItem"
+										use:enhance={() => {
+											return async ({ result, update }) => {
+												await update();
+												if (result.type === 'success') newWorkItemTitle = '';
+											};
+										}}
+										class="detail-create"
+									>
+										<input type="hidden" name="deliverableId" value={deliverable.id} />
+										<input
+											name="title"
+											bind:value={newWorkItemTitle}
+											placeholder="Novo item de trabalho…"
+											aria-label="Novo item de trabalho"
+										/>
+										<button type="submit" class="ghost small" disabled={newWorkItemTitle.trim().length === 0}>
+											Criar aqui
+										</button>
+									</form>
+
+									{#if candidates.length > 0}
+										<form
+											method="POST"
+											action="?/associateWorkItem"
+											use:enhance={() => {
+												return async ({ result, update }) => {
+													await update();
+													if (result.type === 'success') selectedExistingWorkItemId = '';
+												};
+											}}
+											class="detail-associate"
+										>
+											<input type="hidden" name="deliverableId" value={deliverable.id} />
+											<select
+												name="workItemId"
+												bind:value={selectedExistingWorkItemId}
+												aria-label="Associar item de trabalho existente"
+											>
+												<option value="" disabled>Associar item existente…</option>
+												{#each candidates as candidate (candidate.id)}
+													<option value={candidate.id}>{candidate.title}</option>
+												{/each}
+											</select>
+											<button type="submit" class="ghost small" disabled={selectedExistingWorkItemId === ''}>
+												Associar
+											</button>
+										</form>
+									{/if}
+								</div>
+							</li>
+						{/if}
 					{/each}
 				</ul>
 			</section>
@@ -603,6 +740,128 @@
 	.icon.danger {
 		color: var(--danger);
 		border-color: rgba(249, 112, 102, 0.4);
+	}
+
+	.detail-toggle {
+		min-height: 2rem;
+		padding: var(--space-1) var(--space-3);
+		font-size: 0.75rem;
+	}
+
+	.small {
+		min-height: 2rem;
+		padding: var(--space-1) var(--space-3);
+		font-size: 0.75rem;
+	}
+
+	.detail {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		padding: var(--space-4);
+		margin-left: 1.5rem;
+		border: 1px solid var(--hydra-dark-border, var(--hydra-border));
+		border-left: 2px solid var(--accent);
+		border-radius: var(--hydra-radius);
+		background: var(--hydra-dark-surface-raised, rgba(255, 255, 255, 0.03));
+	}
+
+	.detail h3 {
+		margin: 0;
+		font-size: 0.8125rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--hydra-dark-muted, var(--hydra-muted));
+	}
+
+	.detail-empty {
+		margin: 0;
+		font-size: 0.8125rem;
+		color: var(--hydra-dark-muted, var(--hydra-muted));
+	}
+
+	.detail-work-items {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.detail-work-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		padding: var(--space-2) var(--space-3);
+		border: 1px solid var(--hydra-dark-border, var(--hydra-border));
+		border-radius: var(--hydra-radius);
+	}
+
+	.detail-work-item form {
+		margin: 0;
+	}
+
+	.detail-work-item-main {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		flex-wrap: wrap;
+		font-size: 0.8125rem;
+	}
+
+	.detail-work-item-title {
+		font-weight: 600;
+	}
+
+	.status-badge {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: var(--hydra-dark-muted, var(--hydra-muted));
+		border: 1px solid var(--hydra-dark-border, var(--hydra-border));
+		border-radius: var(--hydra-radius-pill, 999px);
+		padding: 0.125rem 0.5rem;
+	}
+
+	.blocked-badge {
+		font-size: 0.6875rem;
+		font-weight: 700;
+		color: var(--danger);
+		border: 1px solid rgba(249, 112, 102, 0.4);
+		border-radius: var(--hydra-radius-pill, 999px);
+		padding: 0.125rem 0.5rem;
+	}
+
+	.waiting-badge {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: var(--accent-light);
+		border: 1px solid rgba(45, 212, 196, 0.4);
+		border-radius: var(--hydra-radius-pill, 999px);
+		padding: 0.125rem 0.5rem;
+	}
+
+	.detail-actions {
+		display: flex;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+	}
+
+	.detail-actions form {
+		display: flex;
+		gap: var(--space-2);
+		margin: 0;
+		flex: 1 1 16rem;
+	}
+
+	.detail-actions input,
+	.detail-actions select {
+		min-height: 2rem;
+		font-size: 0.8125rem;
 	}
 
 	.confirm-overlay {

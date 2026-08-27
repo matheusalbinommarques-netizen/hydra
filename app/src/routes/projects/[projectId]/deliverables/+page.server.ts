@@ -136,5 +136,57 @@ export const actions: Actions = {
 		});
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
+	},
+
+	// Detalhe da entrega (ETAPA 9 do rework, segundo microcorte, D043/D044) —
+	// as três ações abaixo materializam o corredor "Entregas → detalhe →
+	// mesmo trabalho em Trabalho". Nenhuma delas move status: isso continua
+	// responsabilidade de Trabalho.
+	createWorkItem: async ({ request, params }) => {
+		const formData = await request.formData();
+		const deliverableId = readString(formData, 'deliverableId');
+		const title = readString(formData, 'title');
+		if (!deliverableId || !title) {
+			return fail(400, { message: 'Escreva o que precisa ser feito.' });
+		}
+
+		const result = await getProjectUseCases().addWorkItem({
+			projectId: params.projectId,
+			title,
+			deliverableId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	associateWorkItem: async ({ request, params }) => {
+		const formData = await request.formData();
+		const deliverableId = readString(formData, 'deliverableId');
+		const workItemId = readString(formData, 'workItemId');
+		if (!deliverableId || !workItemId) {
+			return fail(400, { message: 'Escolha um item de trabalho para associar.' });
+		}
+
+		const result = await getProjectUseCases().setWorkItemDeliverable({
+			projectId: params.projectId,
+			workItemId,
+			deliverableId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	unassociateWorkItem: async ({ request, params }) => {
+		const formData = await request.formData();
+		const workItemId = readString(formData, 'workItemId');
+		if (!workItemId) return fail(400, { message: 'Item de trabalho inválido.' });
+
+		const result = await getProjectUseCases().setWorkItemDeliverable({
+			projectId: params.projectId,
+			workItemId,
+			deliverableId: null
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
 	}
 };

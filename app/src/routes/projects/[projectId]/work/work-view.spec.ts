@@ -15,7 +15,8 @@ function makeItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): 
 		status: overrides.status ?? 'a_fazer',
 		createdAt: overrides.createdAt ?? '2026-01-01T00:00:00.000Z',
 		blockedBy: overrides.blockedBy ?? null,
-		dependsOn: overrides.dependsOn ?? []
+		dependsOn: overrides.dependsOn ?? [],
+		deliverable: overrides.deliverable ?? null
 	};
 }
 

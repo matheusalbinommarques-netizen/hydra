@@ -31,6 +31,7 @@ import {
 	moveWorkItem,
 	prepareExternalAction,
 	promoteScopeItemToDeliverable,
+	removeDeliverable,
 	removeScopeItem,
 	renameProject,
 	reopenImpediment,
@@ -46,6 +47,7 @@ import {
 	setRouteStartPhase,
 	setScopeItemEffort,
 	setScopeItemExecutionStatus,
+	setWorkItemDeliverable,
 	skipActivity,
 	toggleCauseHypothesisEvidence
 } from '$lib/domain';
@@ -1250,5 +1252,84 @@ describe('createSqliteProjectRepository — Deliverable (ETAPA 9 do rework)', ()
 		await expect(repo.save(duplicated)).rejects.toThrow();
 		// Rollback atômico: o estado anterior continua íntegro.
 		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+});
+
+describe('createSqliteProjectRepository — WorkItem.deliverableId (ETAPA 9, segundo microcorte)', () => {
+	it('abre um banco pós-D043 sem a coluna deliverable_id, adiciona-a de forma idempotente, e WorkItems existentes ficam desassociados', async () => {
+		const filePath = tempFilePath();
+
+		// Fixture construída rebaixando um banco válido (mesmo espírito do teste
+		// de deliverable acima): o projeto já tem WorkItems, e a coluna
+		// deliverable_id — introduzida só neste corte — é removida para simular
+		// o estado do primeiro microcorte de Deliverable (D043), quando
+		// work_item ainda não tinha nenhuma relação com ela.
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addWorkItem(catalog, state, 'wi-legacy', 'Item pré-existente', T1));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		// O índice criado por ensureWorkItemDeliverableIdColumn referencia a
+		// coluna — precisa ser removido antes, senão DROP COLUMN falha.
+		legacyDb.exec('DROP INDEX idx_work_item_deliverable_id');
+		legacyDb.exec('ALTER TABLE work_item DROP COLUMN deliverable_id');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const restored = await repo.findById('proj-1');
+		const legacyItem = restored?.workItems.find((item) => item.id === 'wi-legacy');
+		expect(legacyItem?.deliverableId).toBeNull();
+
+		// Reabrir de novo não falha nem duplica a coluna/índice.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
+	});
+
+	it('round-trip preserva a associação WorkItem → Deliverable', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDeliverable(catalog, state, 'del-1', 'Portal', 'agora', T2));
+		state = unwrap(addWorkItem(catalog, state, 'wi-new', 'Tarefa', T2, 'del-1'));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('remover a Deliverable persiste o WorkItem sobrevivente e desassociado', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDeliverable(catalog, state, 'del-1', 'Portal', 'agora', T2));
+		state = unwrap(addWorkItem(catalog, state, 'wi-new', 'Tarefa', T2, 'del-1'));
+		await repo.insert(state);
+
+		state = unwrap(removeDeliverable(catalog, state, 'del-1', T2));
+		await repo.save(state);
+
+		const restored = await repo.findById('proj-1');
+		expect(restored?.deliverables).toHaveLength(0);
+		expect(restored?.workItems.find((item) => item.id === 'wi-1')?.deliverableId).toBeNull();
+	});
+
+	it('associar/desassociar via setWorkItemDeliverable persiste corretamente', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDeliverable(catalog, state, 'del-1', 'Portal', 'agora', T2));
+		state = unwrap(addWorkItem(catalog, state, 'wi-new', 'Tarefa', T2));
+		await repo.insert(state);
+
+		state = unwrap(setWorkItemDeliverable(catalog, state, 'wi-new', 'del-1', T2));
+		await repo.save(state);
+		let restored = await repo.findById('proj-1');
+		expect(restored?.workItems.find((item) => item.id === 'wi-new')?.deliverableId).toBe('del-1');
+
+		state = unwrap(setWorkItemDeliverable(catalog, state, 'wi-new', null, T2));
+		await repo.save(state);
+		restored = await repo.findById('proj-1');
+		expect(restored?.workItems.find((item) => item.id === 'wi-new')?.deliverableId).toBeNull();
 	});
 });

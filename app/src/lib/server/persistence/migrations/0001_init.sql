@@ -115,15 +115,29 @@ CREATE TABLE IF NOT EXISTS deliverable (
 
 -- Trabalho — ETAPA 6 do rework ("Primeiro loop operacional", D035,
 -- docs/core/HYDRA_PRODUCT_REWORK.md §35/§36). Camada de execução, distinta de
--- Deliverable (ainda não introduzida): unidade executável mínima, sem
--- activity_definition_id, sem colunas de responsável/prazo/prioridade/
--- estimativa (fora desta etapa). "Bloqueado" nunca é uma coluna aqui — é
--- sempre derivado de impediment.work_item_id (ver abaixo).
+-- Deliverable: unidade executável mínima, sem activity_definition_id, sem
+-- colunas de responsável/prazo/prioridade/estimativa (fora desta etapa).
+-- "Bloqueado" nunca é uma coluna aqui — é sempre derivado de
+-- impediment.work_item_id (ver abaixo).
+--
+-- deliverable_id (ETAPA 9 do rework, segundo microcorte, D043/D044) —
+-- vínculo real e opcional com a Deliverable de origem, ao contrário de
+-- deliverable.source_scope_item_id (proveniência, sem FK): aqui a relação é
+-- de pertencimento real, então tem REFERENCES de verdade. Cardinalidade 1
+-- Deliverable → 0..N WorkItem, WorkItem → 0..1 Deliverable. Sem
+-- ON DELETE CASCADE nem ON DELETE SET NULL: excluir uma Deliverable não pode
+-- apagar o WorkItem, e o `null` que resulta da desassociação é sempre
+-- escrito pelo domínio (removeDeliverable/setWorkItemDeliverable em
+-- transitions.ts) antes da gravação, nunca pelo SQLite. Bancos criados antes
+-- deste corte recebem esta coluna via ALTER TABLE idempotente em
+-- sqlite-project-repository.ts, não aqui (mesmo padrão de
+-- ensureImpedimentWorkItemIdColumn/ETAPA 6).
 CREATE TABLE IF NOT EXISTS work_item (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
 	title TEXT NOT NULL,
 	status TEXT NOT NULL CHECK (status IN ('a_fazer', 'em_andamento', 'concluido')),
+	deliverable_id TEXT REFERENCES deliverable (id),
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL
 );

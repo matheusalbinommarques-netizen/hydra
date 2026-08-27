@@ -225,6 +225,9 @@
 											</span>
 										{/if}
 										<span class="card-title">{item.title}</span>
+										{#if item.deliverable}
+											<span class="deliverable-badge">{item.deliverable.title}</span>
+										{/if}
 										{#if item.blockedBy}
 											<span class="blocked-detail">
 												Impedimento ({tipoLabel[item.blockedBy.tipo]}): {item.blockedBy.text}
@@ -402,6 +405,9 @@
 			<button type="button" class="link-button" onclick={closeDetail}>Fechar</button>
 		</div>
 		<h2 class="panel-title">{selectedItem.title}</h2>
+		{#if selectedItem.deliverable}
+			<span class="deliverable-badge">{selectedItem.deliverable.title}</span>
+		{/if}
 
 		<p class="panel-label">Status</p>
 		<div class="status-options">
@@ -995,6 +1001,19 @@
 		font-size: var(--font-size-caption);
 		font-weight: 600;
 		color: var(--hydra-muted);
+	}
+
+	/* Origem, não status: só torna perceptível de qual Entrega este item veio
+	   (ETAPA 9, segundo microcorte, D043/D044) — sem cor de alerta, sem
+	   implicar prioridade ou progresso. */
+	.deliverable-badge {
+		align-self: flex-start;
+		font-size: var(--font-size-caption);
+		font-weight: 600;
+		color: var(--hydra-muted);
+		border: 1px solid var(--hydra-border);
+		border-radius: var(--hydra-radius-pill, 999px);
+		padding: 0.0625rem 0.5rem;
 	}
 
 	.dependency-list {

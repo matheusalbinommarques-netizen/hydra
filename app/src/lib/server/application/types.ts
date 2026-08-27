@@ -184,6 +184,12 @@ export interface WorkItemView {
 	// predecessor na montagem da view, exatamente como blockedBy acima, e
 	// nenhuma transição do domínio consulta este campo.
 	dependsOn: WorkItemDependencyView[];
+	// deliverable (ETAPA 9 do rework, segundo microcorte, D043/D044) — a
+	// Deliverable de origem, quando existir; null é estado normal e
+	// permanece legítimo (WorkItem pode existir sem entrega). `title` é
+	// denormalizado aqui só para leitura (Trabalho tornar perceptível a
+	// origem sem cruzar listas na interface) — nunca sincronizado de volta.
+	deliverable: { deliverableId: string; title: string } | null;
 }
 
 // Uma aresta de precedência vista a partir do item que depende. `title`/
@@ -575,15 +581,28 @@ export interface ReopenImpedimentInput {
 // Trabalho (ETAPA 6 do rework) — mesmo padrão dos inputs de ScopeItem/
 // Impediment: id gerado pelo caso de uso (idGenerator), nunca recebido do
 // cliente.
+// deliverableId (ETAPA 9 do rework, segundo microcorte, D043/D044) — opcional,
+// permite criar o WorkItem já dentro de uma Deliverable ("criar trabalho
+// diretamente dentro dela"). Ausente/null preserva o comportamento anterior.
 export interface AddWorkItemInput {
 	projectId: string;
 	title: string;
+	deliverableId?: string | null;
 }
 
 export interface MoveWorkItemInput {
 	projectId: string;
 	workItemId: string;
 	status: WorkItemStatus;
+}
+
+// Associa, reassocia ou desassocia (deliverableId: null) um WorkItem já
+// existente a uma Deliverable — ação explícita e mutável (ETAPA 9, segundo
+// microcorte, D043/D044).
+export interface SetWorkItemDeliverableInput {
+	projectId: string;
+	workItemId: string;
+	deliverableId: string | null;
 }
 
 // Dependency (ETAPA 8 do rework) — mesmo padrão: id gerado pelo caso de uso
@@ -885,6 +904,7 @@ export interface ProjectUseCases {
 	reopenImpediment(input: ReopenImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
 	addWorkItem(input: AddWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
+	setWorkItemDeliverable(input: SetWorkItemDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDependency(input: AddDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDependency(input: RemoveDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDeliverable(input: AddDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;

@@ -384,6 +384,13 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 // etapa (mesmo espírito de currentTreatment/causeExploration): tratado como
 // coleção vazia, nunca inferido de PlanningItem ou ScopeItem legados (D035
 // proíbe promoção silenciosa).
+//
+// deliverableId (ETAPA 9, segundo microcorte, D043/D044) — ausente/undefined
+// em snapshots exportados antes deste corte: tratado como `null`, mesmo
+// espírito de campo aditivo opcional no envelope `version: 1` (precedente
+// D037/D043). A integridade referencial (a Deliverable referenciada existe
+// no mesmo snapshot) é checada depois, junto às demais invariantes
+// cruzadas — ver validateCrossReferences.
 function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParseError> {
 	if (value === undefined) return { ok: true, value: [] };
 	if (!Array.isArray(value)) return shapeError('workItems deve ser um array');
@@ -394,6 +401,9 @@ function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParse
 		if (!isString(item.projectId)) return shapeError('WorkItem.projectId deve ser uma string');
 		if (!isString(item.title)) return shapeError('WorkItem.title deve ser uma string');
 		if (!isWorkItemStatus(item.status)) return shapeError('WorkItem.status deve ser um dos literais aprovados');
+		if (item.deliverableId !== undefined && item.deliverableId !== null && !isString(item.deliverableId)) {
+			return shapeError('WorkItem.deliverableId deve ser uma string ou null');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('WorkItem.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('WorkItem.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -401,6 +411,7 @@ function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParse
 			projectId: item.projectId,
 			title: item.title,
 			status: item.status,
+			deliverableId: (item.deliverableId as string | null | undefined) ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});
@@ -1182,6 +1193,23 @@ function assembleProjectState({
 		}
 		seenWorkItemIds.add(item.id);
 		workItemById.set(item.id, item);
+	}
+
+	// referência: WorkItem.deliverableId (ETAPA 9 do rework, segundo
+	// microcorte, D043/D044) — ao contrário de Deliverable.sourceScopeItemId
+	// (proveniência, deliberadamente sem integridade referencial), este é um
+	// vínculo real: quando presente, precisa apontar para uma Deliverable
+	// existente no mesmo projeto. Um snapshot nunca deveria conter proveniência
+	// órfã aqui, porque removeDeliverable sempre põe o vínculo a null antes de
+	// gravar — um valor apontando para uma Deliverable inexistente só poderia
+	// vir de estado corrompido, e é recusado, não silenciado.
+	for (const item of workItems) {
+		if (item.deliverableId === null) continue;
+		if (!seenDeliverableIds.has(item.deliverableId)) {
+			return referenceError(
+				`WorkItem "${item.id}" referencia deliverableId "${item.deliverableId}", que não existe`
+			);
+		}
 	}
 
 	// referência: Impediment.workItemId (ETAPA 6) — quando presente, precisa

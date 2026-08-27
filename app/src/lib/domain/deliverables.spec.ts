@@ -7,9 +7,14 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addDeliverable,
+	addImpediment,
+	addMilestone,
 	addScopeItem,
+	addWorkItem,
 	confirmScopeVersion,
+	linkWorkItemToMilestone,
 	moveDeliverable,
+	moveWorkItem,
 	promoteScopeItemToDeliverable,
 	removeDeliverable,
 	removeScopeItem,
@@ -18,7 +23,8 @@ import {
 	setDeliverableTitle,
 	setHypothesis,
 	setScopeItemEffort,
-	setScopeItemText
+	setScopeItemText,
+	setWorkItemDeliverable
 } from './transitions';
 import { deserializeProjectState, serializeProjectState } from './serialization';
 import type { ProjectState } from './state-types';
@@ -116,7 +122,7 @@ describe('Deliverable nativa', () => {
 		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Um', 'agora', T1));
 		state = unwrap(addDeliverable(catalog, state, 'd2', 'Dois', 'agora', T1));
 		state = unwrap(addDeliverable(catalog, state, 'd3', 'Três', 'agora', T1));
-		state = unwrap(removeDeliverable(catalog, state, 'd2'));
+		state = unwrap(removeDeliverable(catalog, state, 'd2', T2));
 		expect(agoraOrders(state)).toEqual([
 			['Um', 0],
 			['Três', 1]
@@ -136,7 +142,7 @@ describe('Deliverable nativa', () => {
 
 	it('operação sobre entrega inexistente é erro explícito', () => {
 		expectError(setDeliverableTitle(catalog, freshState(), 'nope', 'x', T1), 'deliverable_not_found');
-		expectError(removeDeliverable(catalog, freshState(), 'nope'), 'deliverable_not_found');
+		expectError(removeDeliverable(catalog, freshState(), 'nope', T1), 'deliverable_not_found');
 	});
 });
 
@@ -269,5 +275,114 @@ describe('prioridade relativa na promoção', () => {
 		// precisa nascer em 0 para "agora" continuar contíguo.
 		const state = unwrap(promoteScopeItemToDeliverable(catalog, stateWithScope(), 'd-2', 'scope-2', T2));
 		expect(state.deliverables[0].order).toBe(0);
+	});
+});
+
+// Falsificadores da relação WorkItem ↔ Deliverable (ETAPA 9 do rework,
+// segundo microcorte, D043/D044). Mesma razão de concentrar num arquivo
+// próprio: o que está sob teste é a INDEPENDÊNCIA e a sobrevivência mútua
+// entre as duas camadas, não o comportamento interno de nenhuma delas.
+describe('WorkItem ↔ Deliverable (ETAPA 9, segundo microcorte)', () => {
+	it('WorkItem nasce sem Deliverable por padrão — estado legítimo preservado', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Tarefa solta', T1));
+		expect(state.workItems[0].deliverableId).toBeNull();
+	});
+
+	it('criar WorkItem já dentro de uma Deliverable persiste a relação', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		expect(state.workItems[0].deliverableId).toBe('d1');
+	});
+
+	it('addWorkItem recusa Deliverable inexistente', () => {
+		expectError(addWorkItem(catalog, freshState(), 'wi-1', 'Tarefa', T1, 'nope'), 'deliverable_not_found');
+	});
+
+	it('associa um WorkItem já existente e sem entrega', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1));
+		state = unwrap(setWorkItemDeliverable(catalog, state, 'wi-1', 'd1', T2));
+		expect(state.workItems[0].deliverableId).toBe('d1');
+		expect(state.workItems[0].updatedAt).toBe(T2);
+	});
+
+	it('desassocia sem apagar o WorkItem', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		state = unwrap(setWorkItemDeliverable(catalog, state, 'wi-1', null, T2));
+		expect(state.workItems).toHaveLength(1);
+		expect(state.workItems[0].deliverableId).toBeNull();
+	});
+
+	it('trocar de Deliverable nunca duplica o pertencimento — só o campo muda', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addDeliverable(catalog, state, 'd2', 'App', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		state = unwrap(setWorkItemDeliverable(catalog, state, 'wi-1', 'd2', T2));
+		expect(state.workItems).toHaveLength(1);
+		expect(state.workItems[0].deliverableId).toBe('d2');
+	});
+
+	it('setWorkItemDeliverable recusa WorkItem ou Deliverable inexistentes', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		expectError(setWorkItemDeliverable(catalog, state, 'nope', 'd1', T1), 'work_item_not_found');
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1));
+		expectError(setWorkItemDeliverable(catalog, state, 'wi-1', 'nope', T1), 'deliverable_not_found');
+	});
+
+	it('reassociar ao mesmo valor é no-op idempotente (identidade do estado preservada)', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		const result = unwrap(setWorkItemDeliverable(catalog, state, 'wi-1', 'd1', T2));
+		expect(result).toBe(state);
+	});
+
+	it('remover a Deliverable preserva o WorkItem associado, agora sem entrega, e não toca status/Impediment/Dependency/Milestone', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		state = unwrap(moveWorkItem(catalog, state, 'wi-1', 'em_andamento', T1));
+		state = unwrap(addImpediment(catalog, state, 'imp-1', 'Falta acesso', 'outro', T1, 'wi-1'));
+		state = unwrap(addMilestone(catalog, state, 'm-1', 'Marco', T1));
+		state = unwrap(linkWorkItemToMilestone(catalog, state, 'link-1', 'm-1', 'wi-1', T1));
+
+		state = unwrap(removeDeliverable(catalog, state, 'd1', T2));
+
+		expect(state.deliverables).toHaveLength(0);
+		expect(state.workItems).toHaveLength(1);
+		const item = state.workItems[0];
+		expect(item.deliverableId).toBeNull();
+		expect(item.status).toBe('em_andamento');
+		expect(state.impediments[0]).toMatchObject({ id: 'imp-1', status: 'aberto', workItemId: 'wi-1' });
+		expect(state.milestoneWorkItems).toHaveLength(1);
+		expect(state.milestones[0].status).toBe('aberto');
+	});
+
+	it('remover uma Deliverable sem WorkItems associados não altera nenhum WorkItem existente', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-solto', 'Solto', T1));
+		const before = state.workItems[0];
+		state = unwrap(removeDeliverable(catalog, state, 'd1', T2));
+		expect(state.workItems[0]).toBe(before);
+	});
+
+	it('export/import preserva a associação; snapshot antigo sem deliverableId abre com WorkItems desassociados', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		const restored = unwrap(deserializeProjectState(serializeProjectState(state), catalog));
+		expect(restored.workItems[0].deliverableId).toBe('d1');
+
+		const legacySnapshot = JSON.parse(serializeProjectState(state));
+		for (const item of legacySnapshot.state.workItems) delete item.deliverableId;
+		const restoredLegacy = unwrap(deserializeProjectState(JSON.stringify(legacySnapshot), catalog));
+		expect(restoredLegacy.workItems[0].deliverableId).toBeNull();
+	});
+
+	it('recusa snapshot com deliverableId apontando para Deliverable inexistente', () => {
+		let state = unwrap(addDeliverable(catalog, freshState(), 'd1', 'Portal', 'agora', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-1', 'Tarefa', T1, 'd1'));
+		const snapshot = JSON.parse(serializeProjectState(state));
+		snapshot.state.deliverables = [];
+		const result = deserializeProjectState(JSON.stringify(snapshot), catalog);
+		expect(result.ok).toBe(false);
 	});
 });

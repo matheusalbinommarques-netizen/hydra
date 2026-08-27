@@ -22,6 +22,7 @@ import {
 	setDeliverableTitle as setDeliverableTitleInDomain,
 	addMilestone as addMilestoneInDomain,
 	addWorkItem as addWorkItemInDomain,
+	setWorkItemDeliverable as setWorkItemDeliverableInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
@@ -104,6 +105,7 @@ import type {
 	ReopenMilestoneInput,
 	UnlinkWorkItemFromMilestoneInput,
 	AddWorkItemInput,
+	SetWorkItemDeliverableInput,
 	AnswerActivityInput,
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
@@ -708,7 +710,14 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 
 			const workItemId = idGenerator.generate();
 			const occurredAt = clock.now();
-			const result = addWorkItemInDomain(catalog, state, workItemId, input.title, occurredAt);
+			const result = addWorkItemInDomain(
+				catalog,
+				state,
+				workItemId,
+				input.title,
+				occurredAt,
+				input.deliverableId ?? null
+			);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			const event: ProjectEvent = {
@@ -751,6 +760,28 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				};
 				await repository.save(result.value, [event]);
 			}
+			return viewOf(result.value);
+		},
+
+		// setWorkItemDeliverable (ETAPA 9 do rework, segundo microcorte,
+		// D043/D044) — associa, reassocia ou desassocia (deliverableId: null).
+		// Sem evento de histórico, mesma razão do bloco de Deliverable abaixo: a
+		// taxonomia de ProjectEvent é fechada e cobre só o loop WorkItem/
+		// Impediment (D037). Associação não é um passo desse loop.
+		async setWorkItemDeliverable(input: SetWorkItemDeliverableInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setWorkItemDeliverableInDomain(
+				catalog,
+				state,
+				input.workItemId,
+				input.deliverableId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
 			return viewOf(result.value);
 		},
 
@@ -843,7 +874,7 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			const state = await repository.findById(input.projectId);
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
-			const result = removeDeliverableInDomain(catalog, state, input.deliverableId);
+			const result = removeDeliverableInDomain(catalog, state, input.deliverableId, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

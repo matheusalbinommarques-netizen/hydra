@@ -865,14 +865,25 @@ export function reorderDeliverables(
 export function removeDeliverable(
 	catalog: Catalog,
 	state: ProjectState,
-	deliverableId: string
+	deliverableId: string,
+	occurredAt: string
 ): Result<ProjectState, DomainTransitionError> {
 	const deliverable = findDeliverable(state, deliverableId);
 	if (!deliverable) return { ok: false, error: { kind: 'deliverable_not_found' } };
 
 	const remaining = state.deliverables.filter((item) => item.id !== deliverableId);
 	const orderedAgora = agoraDeliverablesSorted(remaining);
-	return { ok: true, value: { ...state, deliverables: withAgoraOrder(remaining, orderedAgora) } };
+	// WorkItems associados sobrevivem desassociados (D043/D044, ETAPA 9,
+	// segundo microcorte) — nunca removidos, nunca cascade-delete. Status,
+	// Dependency, Impediment e Milestone desses itens permanecem intocados.
+	const workItems = state.workItems.map((item) =>
+		item.deliverableId === deliverableId ? { ...item, deliverableId: null, updatedAt: occurredAt } : item
+	);
+
+	return {
+		ok: true,
+		value: { ...state, deliverables: withAgoraOrder(remaining, orderedAgora), workItems }
+	};
 }
 
 /**
@@ -1125,23 +1136,64 @@ export function reopenImpediment(
 // Mesmo espírito de Impediment: coleção independente do catálogo, sem
 // activityDefinitionId, `catalog` recebido só por consistência de assinatura.
 
+// deliverableId (ETAPA 9 do rework, segundo microcorte, D043/D044) —
+// associação opcional já na criação, para "criar um WorkItem diretamente
+// dentro daquela Deliverable" sem um segundo passo. null (padrão) preserva
+// integralmente o comportamento anterior: WorkItem nasce sem entrega.
 export function addWorkItem(
 	catalog: Catalog,
 	state: ProjectState,
 	workItemId: string,
 	title: string,
-	occurredAt: string
+	occurredAt: string,
+	deliverableId: string | null = null
 ): Result<ProjectState, DomainTransitionError> {
+	if (deliverableId !== null && !findDeliverable(state, deliverableId)) {
+		return { ok: false, error: { kind: 'deliverable_not_found' } };
+	}
+
 	const item: WorkItem = {
 		id: workItemId,
 		projectId: state.project.id,
 		title,
 		status: 'a_fazer',
+		deliverableId,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
 
 	return { ok: true, value: { ...state, workItems: [...state.workItems, item] } };
+}
+
+// Associa, reassocia ou desassocia (deliverableId === null) o WorkItem a uma
+// Deliverable — ação explícita e mutável (ETAPA 9, segundo microcorte,
+// D043/D044). Nunca inferida por título, ScopeItem, PlanningItem, posição,
+// bucket ou Milestone. Não altera status, Dependency, Impediment nem
+// Milestone — só este campo (e updatedAt do próprio WorkItem). Idempotente:
+// reassociar ao mesmo valor é no-op.
+export function setWorkItemDeliverable(
+	catalog: Catalog,
+	state: ProjectState,
+	workItemId: string,
+	deliverableId: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findWorkItem(state, workItemId);
+	if (!item) return { ok: false, error: { kind: 'work_item_not_found' } };
+	if (deliverableId !== null && !findDeliverable(state, deliverableId)) {
+		return { ok: false, error: { kind: 'deliverable_not_found' } };
+	}
+	if (item.deliverableId === deliverableId) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			workItems: state.workItems.map((i) =>
+				i.id === workItemId ? { ...i, deliverableId, updatedAt: occurredAt } : i
+			)
+		}
+	};
 }
 
 // Recusa a transição para 'concluido' enquanto existir um Impediment aberto

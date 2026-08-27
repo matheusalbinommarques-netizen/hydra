@@ -250,6 +250,26 @@ function ensureMilestonePlannedDateColumn(db: Database.Database): void {
 	}
 }
 
+// Oitava evolução do schema desde 0001_init.sql (ETAPA 9 do rework, segundo
+// microcorte, D043/D044) — mesmo caso de ensureImpedimentWorkItemIdColumn:
+// deliverable_id é uma COLUNA nova numa tabela existente (work_item), então
+// `CREATE TABLE IF NOT EXISTS work_item` é no-op num banco criado antes deste
+// corte (inclusive os criados entre o primeiro microcorte de Deliverable,
+// D043, e este). Idempotente, isolado da inicialização, mesmo padrão.
+// WorkItems já persistidos ficam com deliverable_id NULL — nenhum vínculo é
+// inferido ou sintetizado a partir de título, ScopeItem, PlanningItem,
+// posição, bucket ou Milestone.
+function ensureWorkItemDeliverableIdColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(work_item)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'deliverable_id');
+	if (!hasColumn) {
+		db.exec('ALTER TABLE work_item ADD COLUMN deliverable_id TEXT REFERENCES deliverable (id)');
+	}
+	// Precisa rodar depois de garantir a coluna acima — 0001_init.sql não
+	// indexa deliverable_id (mesma razão de idx_impediment_work_item_id).
+	db.exec('CREATE INDEX IF NOT EXISTS idx_work_item_deliverable_id ON work_item (deliverable_id)');
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -260,6 +280,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureCauseExplorationRows(db);
 	ensureImpedimentWorkItemIdColumn(db);
 	ensureMilestonePlannedDateColumn(db);
+	ensureWorkItemDeliverableIdColumn(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -321,11 +342,12 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertDeliverable.run(deliverable);
 		}
 
-		// work_item precisa ser inserido antes de impediment: impediment.work_item_id
+		// work_item precisa ser inserido depois de deliverable (deliverable_id
+		// referencia deliverable.id) e antes de impediment: impediment.work_item_id
 		// referencia work_item.id (FK checada imediatamente, foreign_keys = ON).
 		const insertWorkItem = db.prepare(
-			`INSERT INTO work_item (id, project_id, title, status, created_at, updated_at)
-			 VALUES (@id, @projectId, @title, @status, @createdAt, @updatedAt)`
+			`INSERT INTO work_item (id, project_id, title, status, deliverable_id, created_at, updated_at)
+			 VALUES (@id, @projectId, @title, @status, @deliverableId, @createdAt, @updatedAt)`
 		);
 		for (const item of state.workItems) {
 			insertWorkItem.run(item);
@@ -496,15 +518,17 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM pending_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
-		db.prepare('DELETE FROM deliverable WHERE project_id = ?').run(state.project.id);
-		// impediment antes de work_item: impediment.work_item_id referencia
-		// work_item.id (FK checada imediatamente, foreign_keys = ON).
+		// impediment/dependency/milestone_work_item antes de work_item: todos
+		// referenciam work_item.id (FK checada imediatamente, foreign_keys = ON).
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM dependency WHERE project_id = ?').run(state.project.id);
 		// milestone_work_item antes de milestone e de work_item (FKs para ambos).
 		db.prepare('DELETE FROM milestone_work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM milestone WHERE project_id = ?').run(state.project.id);
+		// work_item antes de deliverable (ETAPA 9, segundo microcorte):
+		// work_item.deliverable_id referencia deliverable.id.
 		db.prepare('DELETE FROM work_item WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM deliverable WHERE project_id = ?').run(state.project.id);
 		// evidence/external_action apagados antes de affected_group — ambos
 		// referenciam affected_group (FK sem ON DELETE, checagem imediata).
 		db.prepare('DELETE FROM evidence WHERE project_id = ?').run(state.project.id);
@@ -583,7 +607,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const workItemRows = db
 				.prepare(
-					`SELECT id, project_id, title, status, created_at, updated_at
+					`SELECT id, project_id, title, status, deliverable_id, created_at, updated_at
 					 FROM work_item WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as WorkItemRow[];

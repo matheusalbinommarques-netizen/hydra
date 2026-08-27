@@ -148,11 +148,25 @@ export interface Impediment {
 // (responsável, prazo, prioridade, estimativa ficam para etapas futuras).
 export type WorkItemStatus = 'a_fazer' | 'em_andamento' | 'concluido';
 
+// deliverableId (ETAPA 9 do rework, "Estruturação e Planejamento
+// reworkados", segundo microcorte, D043/D044) — vínculo opcional com a
+// Deliverable de origem. Cardinalidade: 1 Deliverable → 0..N WorkItem,
+// WorkItem → 0..1 Deliverable (contrato já congelado em D043). null é
+// estado normal e permanece totalmente legítimo — WorkItem sempre pôde
+// (e continua podendo) existir sem nenhuma entrega. Associação é
+// mutável e explícita (setWorkItemDeliverable em transitions.ts), nunca
+// inferida por título, ScopeItem, PlanningItem, posição, bucket ou
+// Milestone. Remover a Deliverable NÃO remove o WorkItem: o vínculo é
+// posto a null (removeDeliverable em transitions.ts), o WorkItem
+// sobrevive desassociado. Associar/desassociar/trocar nunca altera
+// status, Dependency, Impediment, Milestone ou timestamps de outros
+// objetos — só este campo (e updatedAt do próprio WorkItem) muda.
 export interface WorkItem {
 	id: string;
 	projectId: string;
 	title: string;
 	status: WorkItemStatus;
+	deliverableId: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

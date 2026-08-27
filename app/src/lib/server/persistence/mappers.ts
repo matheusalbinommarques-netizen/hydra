@@ -166,6 +166,7 @@ export interface WorkItemRow {
 	project_id: string;
 	title: string;
 	status: WorkItemStatus;
+	deliverable_id: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -176,6 +177,7 @@ export function mapWorkItemRow(row: WorkItemRow): WorkItem {
 		projectId: row.project_id,
 		title: row.title,
 		status: row.status,
+		deliverableId: row.deliverable_id,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

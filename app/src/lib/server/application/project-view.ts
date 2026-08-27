@@ -138,13 +138,20 @@ function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][
 	const blocking = hasOpenImpediment(state, item.id)
 		? state.impediments.find((impediment) => impediment.workItemId === item.id && impediment.status === 'aberto')
 		: undefined;
+	const deliverable =
+		item.deliverableId !== null ? state.deliverables.find((d) => d.id === item.deliverableId) : undefined;
 	return {
 		id: item.id,
 		title: item.title,
 		status: item.status,
 		createdAt: item.createdAt,
 		blockedBy: blocking ? { impedimentId: blocking.id, text: blocking.text, tipo: blocking.tipo } : null,
-		dependsOn: buildWorkItemDependencyViews(state, item.id)
+		dependsOn: buildWorkItemDependencyViews(state, item.id),
+		// Proveniência órfã (Deliverable removida de outro caminho que não
+		// removeDeliverable, ou inconsistência de estado) é tratada como
+		// ausência de origem, mesmo espírito de buildWorkItemDependencyViews —
+		// nunca quebra a tela.
+		deliverable: deliverable ? { deliverableId: deliverable.id, title: deliverable.title } : null
 	};
 }
 
