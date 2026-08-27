@@ -22,6 +22,7 @@ import {
 	mapScopeItemRow,
 	mapScopeVersionRow,
 	mapTreatmentStepRow,
+	mapDeliverableRow,
 	mapDependencyRow,
 	mapMilestoneRow,
 	mapMilestoneWorkItemRow,
@@ -42,6 +43,7 @@ import {
 	type ScopeItemRow,
 	type ScopeVersionRow,
 	type TreatmentStepRow,
+	type DeliverableRow,
 	type DependencyRow,
 	type MilestoneRow,
 	type MilestoneWorkItemRow,
@@ -307,6 +309,18 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			 VALUES (@projectId, @hypothesis, @confirmedAt)`
 		).run(state.scopeVersion);
 
+		// deliverable não tem FK para scope_item (proveniência, não integridade
+		// referencial — ver 0001_init.sql), então a ordem de inserção em relação
+		// a scope_item é indiferente.
+		const insertDeliverable = db.prepare(
+			`INSERT INTO deliverable
+			   (id, project_id, title, bucket, effort, item_order, source_scope_item_id, created_at, updated_at)
+			 VALUES (@id, @projectId, @title, @bucket, @effort, @order, @sourceScopeItemId, @createdAt, @updatedAt)`
+		);
+		for (const deliverable of state.deliverables) {
+			insertDeliverable.run(deliverable);
+		}
+
 		// work_item precisa ser inserido antes de impediment: impediment.work_item_id
 		// referencia work_item.id (FK checada imediatamente, foreign_keys = ON).
 		const insertWorkItem = db.prepare(
@@ -482,6 +496,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM pending_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM scope_version WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM deliverable WHERE project_id = ?').run(state.project.id);
 		// impediment antes de work_item: impediment.work_item_id referencia
 		// work_item.id (FK checada imediatamente, foreign_keys = ON).
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
@@ -551,6 +566,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			if (!scopeVersionRow) {
 				throw new Error(`Projeto "${projectId}" não tem scope_version (violação do schema — 1:1 com project)`);
 			}
+
+			const deliverableRows = db
+				.prepare(
+					`SELECT id, project_id, title, bucket, effort, item_order, source_scope_item_id, created_at, updated_at
+					 FROM deliverable WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as DeliverableRow[];
 
 			const impedimentRows = db
 				.prepare(
@@ -650,6 +672,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				pendingItems: pendingItemRows.map(mapPendingItemRow),
 				scopeItems: scopeItemRows.map(mapScopeItemRow),
 				scopeVersion: mapScopeVersionRow(scopeVersionRow),
+				deliverables: deliverableRows.map(mapDeliverableRow),
 				impediments: impedimentRows.map(mapImpedimentRow),
 				workItems: workItemRows.map(mapWorkItemRow),
 				dependencies: dependencyRows.map(mapDependencyRow),

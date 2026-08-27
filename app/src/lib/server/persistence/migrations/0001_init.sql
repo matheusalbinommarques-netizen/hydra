@@ -80,6 +80,39 @@ CREATE TABLE IF NOT EXISTS scope_version (
 	confirmed_at TEXT
 );
 
+-- Entregas — ETAPA 9 do rework ("Do escopo ao trabalho — corredor de
+-- entrega", Design Gate S9). Camada de priorização/escopo, distinta de
+-- scope_item e de work_item: nenhuma coluna de status, progresso,
+-- responsável, critério de aceite ou data, e nenhuma relação com work_item
+-- neste corte.
+--
+-- source_scope_item_id é PROVENIÊNCIA, não integridade referencial: é
+-- deliberadamente uma coluna TEXT sem REFERENCES, porque remover o
+-- scope_item de origem NÃO pode remover nem impedir a entrega (proveniência
+-- órfã é estado válido) — uma FK operacional, com ou sem ON DELETE, mudaria
+-- essa semântica. A unicidade (uma origem promove no máximo uma entrega) é
+-- garantida por índice único parcial, que ignora as entregas nativas (NULL).
+--
+-- Tabela NOVA: `CREATE TABLE IF NOT EXISTS` basta para bancos já existentes,
+-- que passam a abrir com a coleção vazia. Nenhum backfill é feito nem seria
+-- correto: promover scope_item é CONFIRM-TO-CONVERT, ato explícito do
+-- usuário, nunca migration.
+CREATE TABLE IF NOT EXISTS deliverable (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	title TEXT NOT NULL,
+	bucket TEXT NOT NULL CHECK (bucket IN ('agora', 'depois', 'fora')),
+	effort TEXT CHECK (effort IN ('pequeno', 'medio', 'grande')),
+	item_order INTEGER,
+	source_scope_item_id TEXT,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	CONSTRAINT deliverable_order_matches_bucket CHECK (
+		(bucket = 'agora' AND item_order IS NOT NULL) OR
+		(bucket != 'agora' AND item_order IS NULL)
+	)
+);
+
 -- Trabalho — ETAPA 6 do rework ("Primeiro loop operacional", D035,
 -- docs/core/HYDRA_PRODUCT_REWORK.md §35/§36). Camada de execução, distinta de
 -- Deliverable (ainda não introduzida): unidade executável mínima, sem
@@ -382,6 +415,11 @@ CREATE INDEX IF NOT EXISTS idx_project_event_entity_id ON project_event (entity_
 -- createSqliteProjectRepository), então também cobre bancos já existentes.
 CREATE INDEX IF NOT EXISTS idx_scope_item_project_id ON scope_item (project_id);
 CREATE INDEX IF NOT EXISTS idx_impediment_project_id ON impediment (project_id);
+CREATE INDEX IF NOT EXISTS idx_deliverable_project_id ON deliverable (project_id);
+-- Uma origem promove no máximo uma entrega (CONFIRM-TO-CONVERT). Parcial: as
+-- entregas nativas (NULL) não competem entre si.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deliverable_source_scope_item_id
+	ON deliverable (source_scope_item_id) WHERE source_scope_item_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_work_item_project_id ON work_item (project_id);
 -- idx_impediment_work_item_id NÃO fica aqui: work_item_id é uma coluna nova
 -- em impediment, adicionada via ALTER TABLE idempotente em

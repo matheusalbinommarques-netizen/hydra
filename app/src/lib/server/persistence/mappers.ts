@@ -14,6 +14,9 @@ import type {
 	CurrentTreatment,
 	Dependency,
 	Milestone,
+	Deliverable,
+	DeliverableBucket,
+	DeliverableEffort,
 	MilestoneStatus,
 	MilestoneWorkItem,
 	DesiredOutcome,
@@ -193,6 +196,32 @@ export function mapDependencyRow(row: DependencyRow): Dependency {
 		workItemId: row.work_item_id,
 		dependsOnWorkItemId: row.depends_on_work_item_id,
 		createdAt: row.created_at
+	};
+}
+
+export interface DeliverableRow {
+	id: string;
+	project_id: string;
+	title: string;
+	bucket: DeliverableBucket;
+	effort: DeliverableEffort | null;
+	item_order: number | null;
+	source_scope_item_id: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapDeliverableRow(row: DeliverableRow): Deliverable {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		title: row.title,
+		bucket: row.bucket,
+		effort: row.effort,
+		order: row.item_order,
+		sourceScopeItemId: row.source_scope_item_id,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
 	};
 }
 

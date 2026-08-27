@@ -30,6 +30,7 @@ import type {
 	ProjectView,
 	ScopeItemView,
 	TreatmentStepView,
+	DeliverableView,
 	MilestoneView,
 	MilestoneWorkItemView,
 	WorkItemDependencyView,
@@ -95,6 +96,22 @@ function buildScopeItemView(item: ProjectState['scopeItems'][number]): ScopeItem
 		order: item.order,
 		sourceSuggestionId: item.sourceSuggestionId,
 		executionStatus: item.executionStatus ?? 'a_fazer'
+	};
+}
+
+// Deliverable (ETAPA 9 do rework, primeiro microcorte) — projeção direta,
+// sem nenhum agregado derivado: entrega não tem status, progresso nem
+// contagem de trabalho neste contrato. O ScopeItem de origem NÃO é
+// consultado aqui: nada da entrega é recalculado a partir dele, e ele pode
+// nem existir mais.
+function buildDeliverableView(deliverable: ProjectState['deliverables'][number]): DeliverableView {
+	return {
+		id: deliverable.id,
+		title: deliverable.title,
+		bucket: deliverable.bucket,
+		effort: deliverable.effort,
+		order: deliverable.order,
+		sourceScopeItemId: deliverable.sourceScopeItemId
 	};
 }
 
@@ -284,6 +301,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		scopeSuggestions: computeScopeSuggestions(state.answers, state.scopeItems),
 		fieldSuggestions: computeFieldSuggestions(catalog, state.answers),
 		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems),
+		deliverables: state.deliverables.map(buildDeliverableView),
 		impediments: state.impediments.map(buildImpedimentView),
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),

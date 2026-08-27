@@ -12,7 +12,14 @@ import {
 	addImpediment as addImpedimentInDomain,
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
+	addDeliverable as addDeliverableInDomain,
 	addDependency as addDependencyInDomain,
+	moveDeliverable as moveDeliverableInDomain,
+	promoteScopeItemToDeliverable as promoteScopeItemToDeliverableInDomain,
+	removeDeliverable as removeDeliverableInDomain,
+	reorderDeliverables as reorderDeliverablesInDomain,
+	setDeliverableEffort as setDeliverableEffortInDomain,
+	setDeliverableTitle as setDeliverableTitleInDomain,
 	addMilestone as addMilestoneInDomain,
 	addWorkItem as addWorkItemInDomain,
 	answerActivity as answerActivityInDomain,
@@ -82,7 +89,14 @@ import type {
 	AddImpedimentInput,
 	AddScopeItemInput,
 	AddTreatmentStepInput,
+	AddDeliverableInput,
 	AddDependencyInput,
+	MoveDeliverableInput,
+	PromoteScopeItemToDeliverableInput,
+	RemoveDeliverableInput,
+	ReorderDeliverablesInput,
+	SetDeliverableEffortInput,
+	SetDeliverableTitleInput,
 	AddMilestoneInput,
 	LinkWorkItemToMilestoneInput,
 	ReachMilestoneInput,
@@ -737,6 +751,124 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				};
 				await repository.save(result.value, [event]);
 			}
+			return viewOf(result.value);
+		},
+
+		// Entregas (ETAPA 9 do rework, primeiro microcorte) — sem evento de
+		// histórico nesta rodada, mesma razão de Dependency/Milestone: a
+		// taxonomia de ProjectEvent é fechada e só cobre o loop
+		// WorkItem/Impediment (D037). Consequência aceita: /records não mostra
+		// entregas.
+		async addDeliverable(input: AddDeliverableInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addDeliverableInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.title,
+				input.bucket,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setDeliverableTitle(input: SetDeliverableTitleInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setDeliverableTitleInDomain(
+				catalog,
+				state,
+				input.deliverableId,
+				input.title,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setDeliverableEffort(input: SetDeliverableEffortInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setDeliverableEffortInDomain(
+				catalog,
+				state,
+				input.deliverableId,
+				input.effort,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async moveDeliverable(input: MoveDeliverableInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = moveDeliverableInDomain(
+				catalog,
+				state,
+				input.deliverableId,
+				input.bucket,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async reorderDeliverables(input: ReorderDeliverablesInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reorderDeliverablesInDomain(catalog, state, input.orderedIds, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async removeDeliverable(input: RemoveDeliverableInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = removeDeliverableInDomain(catalog, state, input.deliverableId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// CONFIRM-TO-CONVERT: único ponto da aplicação que converte ScopeItem em
+		// Deliverable, e só é alcançável por uma ação explícita do usuário —
+		// nenhum load, import, confirmação de escopo ou outro caso de uso chama
+		// isto. O estado do escopo (ScopeItem, ScopeVersion, sourceSuggestionId,
+		// executionStatus) não é tocado aqui.
+		async promoteScopeItemToDeliverable(input: PromoteScopeItemToDeliverableInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = promoteScopeItemToDeliverableInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.scopeItemId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

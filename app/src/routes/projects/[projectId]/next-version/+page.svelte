@@ -46,6 +46,17 @@
 		document.getElementById('add-item-text')?.focus();
 	}
 
+	// "Já promovido" é FATO derivado da proveniência da entrega
+	// (Deliverable.sourceScopeItemId), nunca um campo novo no ScopeItem: a
+	// promoção não escreve nada do lado do escopo.
+	let promotedScopeItemIds = $derived(
+		new Set(
+			view.deliverables
+				.map((deliverable) => deliverable.sourceScopeItemId)
+				.filter((id): id is string => id !== null)
+		)
+	);
+
 	function itemsIn(bucket: Bucket) {
 		return view.scopeItems
 			.filter((item) => item.bucket === bucket)
@@ -312,6 +323,18 @@
 						<button type="submit" class="button-secondary" aria-label="Mover para baixo">↓</button>
 					</form>
 				</div>
+			{/if}
+
+			{#if promotedScopeItemIds.has(item.id)}
+				<span class="promoted">
+					Já é uma entrega ·
+					<a href="/projects/{view.projectId}/deliverables">ver em Entregas</a>
+				</span>
+			{:else}
+				<form method="POST" action="?/promote" use:enhance={handleAutosaveSubmit}>
+					<input type="hidden" name="itemId" value={item.id} />
+					<button type="submit" class="button-secondary">Promover para entrega</button>
+				</form>
 			{/if}
 
 			<button type="button" class="button-secondary remove" onclick={() => openDeleteDialog(item)}>
@@ -634,6 +657,12 @@
 	   gerado/derivado pelo sistema — --hydra-warning (vermelho de lápis) é
 	   reservado a sugestões/alertas/conflitos. Herda a cor de texto padrão
 	   de .button-secondary. */
+	.promoted {
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+		white-space: nowrap;
+	}
+
 	.remove {
 		margin-left: auto;
 	}

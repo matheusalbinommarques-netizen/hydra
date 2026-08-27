@@ -7,6 +7,7 @@ import { catalog } from '../../catalog';
 import {
 	addAffectedGroup,
 	addCauseHypothesis,
+	addDeliverable,
 	addDesiredOutcome,
 	addImpediment,
 	addMilestone,
@@ -29,6 +30,8 @@ import {
 	reachMilestone,
 	moveWorkItem,
 	prepareExternalAction,
+	promoteScopeItemToDeliverable,
+	removeScopeItem,
 	renameProject,
 	reopenImpediment,
 	resolveImpediment,
@@ -36,6 +39,7 @@ import {
 	setAffectedGroupImpact,
 	setCauseHypothesisExpectedIfTrue,
 	setCauseHypothesisWhatWeakensIt,
+	setDeliverableEffort,
 	setDesiredOutcomeTarget,
 	setHypothesis,
 	setImpedimentNextAction,
@@ -1147,5 +1151,104 @@ describe('createSqliteProjectRepository — Milestone (ETAPA 8 do rework)', () =
 		} finally {
 			raw.close();
 		}
+	});
+});
+
+// Risco específico deste corte (ETAPA 9 do rework): deliverable é uma TABELA
+// nova. `CREATE TABLE IF NOT EXISTS` cria a tabela vazia num banco já
+// existente, e é exatamente isso que o contrato pede — coleção vazia, zero
+// backfill, nenhum ScopeItem promovido pela abertura. Ao contrário de
+// current_treatment/cause_exploration (1:1 com project, que exigiram
+// ensureX), aqui NÃO existe linha a inventar.
+describe('createSqliteProjectRepository — Deliverable (ETAPA 9 do rework)', () => {
+	it('abre um banco pré-S9 (sem a tabela deliverable) com coleção vazia, sem promover nenhum ScopeItem', async () => {
+		const filePath = tempFilePath();
+
+		// Fixture construída rebaixando um banco válido: o projeto já tem
+		// ScopeItems e uma ScopeVersion confirmada, e a tabela deliverable é
+		// removida para simular o estado anterior a este corte.
+		const seed = createSqliteProjectRepository(filePath);
+		const state = nonTrivialState();
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('DROP TABLE deliverable');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const restored = await repo.findById('proj-1');
+		expect(restored).not.toBeNull();
+		expect(restored?.deliverables).toEqual([]);
+		// O escopo continua exatamente como estava — nada foi convertido.
+		expect(restored?.scopeItems).toEqual(state.scopeItems);
+		expect(restored?.scopeVersion).toEqual(state.scopeVersion);
+	});
+
+	it('round-trip preserva entregas nativas e promovidas, com bucket/effort/order e proveniência', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDeliverable(catalog, state, 'del-nativa', 'Portal', 'agora', T2));
+		state = unwrap(setDeliverableEffort(catalog, state, 'del-nativa', 'grande', T2));
+		state = unwrap(promoteScopeItemToDeliverable(catalog, state, 'del-promovida', 'scope-1', T2));
+		state = unwrap(addDeliverable(catalog, state, 'del-fora', 'Relatórios', 'fora', T2));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('proveniência órfã sobrevive: remover o ScopeItem de origem não remove nem altera a entrega', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(promoteScopeItemToDeliverable(catalog, state, 'del-1', 'scope-1', T2));
+		await repo.insert(state);
+
+		const promoted = state.deliverables[0];
+		state = unwrap(removeScopeItem(catalog, state, 'scope-1'));
+		await repo.save(state);
+
+		const restored = await repo.findById('proj-1');
+		expect(restored?.deliverables).toEqual([promoted]);
+		expect(restored?.scopeItems.some((item) => item.id === 'scope-1')).toBe(false);
+	});
+
+	it('o schema recusa duas entregas com a mesma origem (índice único parcial)', async () => {
+		const repo = memoryRepo();
+		const state = nonTrivialState();
+		await repo.insert(state);
+
+		const duplicated: ProjectState = {
+			...state,
+			deliverables: [
+				{
+					id: 'del-1',
+					projectId: 'proj-1',
+					title: 'A',
+					bucket: 'depois',
+					effort: null,
+					order: null,
+					sourceScopeItemId: 'scope-1',
+					createdAt: T2,
+					updatedAt: T2
+				},
+				{
+					id: 'del-2',
+					projectId: 'proj-1',
+					title: 'B',
+					bucket: 'depois',
+					effort: null,
+					order: null,
+					sourceScopeItemId: 'scope-1',
+					createdAt: T2,
+					updatedAt: T2
+				}
+			]
+		};
+
+		await expect(repo.save(duplicated)).rejects.toThrow();
+		// Rollback atômico: o estado anterior continua íntegro.
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
 	});
 });

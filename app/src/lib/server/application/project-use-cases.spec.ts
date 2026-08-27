@@ -1316,6 +1316,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'externalActions',
 				'evidences',
 				'currentTreatment',
+				'deliverables',
 				'treatmentSteps',
 				'treatmentConfirmationIssues',
 				'causeExploration',

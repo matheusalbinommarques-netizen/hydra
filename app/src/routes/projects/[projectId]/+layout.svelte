@@ -77,8 +77,13 @@
 	// atividade dentro de /now, é sua própria rota (/summary), então entra por
 	// pathname em vez de page.data.activity.id.
 	let isCheckpointRoute = $derived(pathname === `/projects/${projectId}/summary`);
+	// Entregas (ETAPA 9 do rework, Design Gate S9) — nasce já na identidade
+	// escura, mesmo caso de /summary acima.
+	let isDeliverablesRoute = $derived(pathname === `/projects/${projectId}/deliverables`);
 	let isContentMigrated = $derived(
-		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '') || isCheckpointRoute
+		DARK_ACTIVITY_IDS.has((page.data as { activity?: { id?: string } })?.activity?.id ?? '') ||
+			isCheckpointRoute ||
+			isDeliverablesRoute
 	);
 
 	// Ativo tanto na rota exata quanto em subrotas (ex.: /work/x),
@@ -88,13 +93,14 @@
 		return pathname === target || pathname.startsWith(`${target}/`);
 	}
 
-	// Lista única dos dez destinos reais do workspace — reaproveitada pelo
+	// Lista única dos destinos reais do workspace — reaproveitada pelo
 	// menu mobile e pelo rótulo "área atual" do cabeçalho compacto. A
 	// navegação desktop abaixo continua com sua própria marcação (dois
 	// grupos com pesos visuais diferentes) e não usa esta lista, para não
 	// mudar nada do que já está aprovado nela.
 	const NAV_ITEMS = [
 		{ key: 'now', label: 'Agora' },
+		{ key: 'deliverables', label: 'Entregas' },
 		{ key: 'tracking', label: 'Acompanhamento' },
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
@@ -144,6 +150,12 @@
 					aria-current={isCurrentRoute(`/projects/${projectId}/now`) ? 'page' : undefined}
 				>
 					Agora
+				</a>
+				<a
+					href="/projects/{projectId}/deliverables"
+					aria-current={isCurrentRoute(`/projects/${projectId}/deliverables`) ? 'page' : undefined}
+				>
+					Entregas
 				</a>
 				<a
 					href="/projects/{projectId}/tracking"

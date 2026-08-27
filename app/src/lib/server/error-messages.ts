@@ -31,6 +31,12 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Somente itens de "Agora" têm status de execução.';
 		case 'scope_version_not_confirmed':
 			return 'Confirme a versão do escopo antes de alterar o status de execução.';
+		case 'deliverable_not_found':
+			return 'Entrega não encontrada.';
+		case 'deliverable_reorder_mismatch':
+			return 'A nova ordem enviada não corresponde às entregas atuais do recorte.';
+		case 'deliverable_already_promoted':
+			return 'Este item já virou uma entrega. Abra Entregas para editá-la.';
 		case 'impediment_not_found':
 			return 'Impedimento não encontrado.';
 		case 'impediment_id_already_exists':

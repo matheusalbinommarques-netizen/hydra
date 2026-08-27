@@ -34,6 +34,9 @@ import type {
 	TreatmentFriction,
 	TreatmentStep,
 	Dependency,
+	Deliverable,
+	DeliverableBucket,
+	DeliverableEffort,
 	Milestone,
 	MilestoneStatus,
 	MilestoneWorkItem,
@@ -398,6 +401,57 @@ function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParse
 			projectId: item.projectId,
 			title: item.title,
 			status: item.status,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+const DELIVERABLE_BUCKETS: readonly string[] = ['agora', 'depois', 'fora'];
+function isDeliverableBucket(value: unknown): value is DeliverableBucket {
+	return typeof value === 'string' && DELIVERABLE_BUCKETS.includes(value);
+}
+
+const DELIVERABLE_EFFORTS: readonly string[] = ['pequeno', 'medio', 'grande'];
+function isDeliverableEffortOrNull(value: unknown): value is DeliverableEffort | null {
+	return value === null || (typeof value === 'string' && DELIVERABLE_EFFORTS.includes(value));
+}
+
+// Deliverable (ETAPA 9 do rework, primeiro microcorte) — ausente em snapshots
+// exportados antes desta etapa: tratado como coleção VAZIA, mesmo espírito de
+// parseWorkItemList/parseMilestoneList. Nenhum ScopeItem é convertido na
+// leitura: CONFIRM-TO-CONVERT proíbe promoção automática em load, migration
+// ou import, então um snapshot antigo sempre volta com zero entregas.
+function parseDeliverableList(value: unknown): Result<Deliverable[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('deliverables deve ser um array');
+	const result: Deliverable[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Deliverable deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Deliverable.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Deliverable.projectId deve ser uma string');
+		if (!isString(item.title)) return shapeError('Deliverable.title deve ser uma string');
+		if (!isDeliverableBucket(item.bucket)) return shapeError('Deliverable.bucket deve ser agora, depois ou fora');
+		if (!isDeliverableEffortOrNull(item.effort)) {
+			return shapeError('Deliverable.effort deve ser pequeno, medio, grande ou null');
+		}
+		if (item.order !== null && (typeof item.order !== 'number' || !Number.isInteger(item.order) || item.order < 0)) {
+			return shapeError('Deliverable.order deve ser um inteiro não negativo ou null');
+		}
+		if (item.sourceScopeItemId !== null && !isString(item.sourceScopeItemId)) {
+			return shapeError('Deliverable.sourceScopeItemId deve ser uma string ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Deliverable.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('Deliverable.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			title: item.title,
+			bucket: item.bucket,
+			effort: item.effort,
+			order: item.order as number | null,
+			sourceScopeItemId: item.sourceScopeItemId as string | null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});
@@ -811,6 +865,7 @@ interface AssembleProjectStateInput {
 	rawPendingItems: RawPendingItem[];
 	scopeItems: ScopeItem[];
 	scopeVersion: ScopeVersion;
+	deliverables: Deliverable[];
 	impediments: Impediment[];
 	workItems: WorkItem[];
 	dependencies: Dependency[];
@@ -834,6 +889,7 @@ function assembleProjectState({
 	rawPendingItems,
 	scopeItems,
 	scopeVersion,
+	deliverables,
 	impediments,
 	workItems,
 	dependencies,
@@ -1049,6 +1105,48 @@ function assembleProjectState({
 			return invariantError(
 				`ScopeVersion está confirmada (confirmedAt definido) mas não atende aos critérios de confirmação: ${issueKinds}`
 			);
+		}
+	}
+
+	// referências + invariantes: Deliverable (ETAPA 9 do rework, primeiro
+	// microcorte). `sourceScopeItemId` é proveniência, não integridade
+	// referencial: deliberadamente NÃO é validado contra os ScopeItems do
+	// estado — remover o ScopeItem de origem não remove nem invalida a
+	// entrega, e proveniência órfã é estado legítimo. O que é validado é a
+	// unicidade: duas entregas nunca podem declarar a mesma origem.
+	const seenDeliverableIds = new Set<string>();
+	const seenDeliverableSources = new Set<string>();
+	for (const deliverable of deliverables) {
+		if (deliverable.projectId !== project.id) {
+			return invariantError(`Deliverable "${deliverable.id}" usa projectId diferente do Project`);
+		}
+		if (seenDeliverableIds.has(deliverable.id)) {
+			return invariantError(`Deliverable.id duplicado: "${deliverable.id}"`);
+		}
+		seenDeliverableIds.add(deliverable.id);
+		if (deliverable.sourceScopeItemId !== null) {
+			if (seenDeliverableSources.has(deliverable.sourceScopeItemId)) {
+				return invariantError(
+					`Deliverable.sourceScopeItemId duplicado: "${deliverable.sourceScopeItemId}"`
+				);
+			}
+			seenDeliverableSources.add(deliverable.sourceScopeItemId);
+		}
+		if (deliverable.bucket === 'agora' && deliverable.order === null) {
+			return invariantError(`Deliverable "${deliverable.id}" está em "agora" mas não tem order`);
+		}
+		if (deliverable.bucket !== 'agora' && deliverable.order !== null) {
+			return invariantError(`Deliverable "${deliverable.id}" não está em "agora" mas tem order definido`);
+		}
+	}
+
+	const deliverableAgoraOrders = deliverables
+		.filter((deliverable) => deliverable.bucket === 'agora')
+		.map((deliverable) => deliverable.order as number)
+		.sort((a, b) => a - b);
+	for (let i = 0; i < deliverableAgoraOrders.length; i++) {
+		if (deliverableAgoraOrders[i] !== i) {
+			return invariantError('As entregas de "agora" não têm order contíguo começando em 0');
 		}
 	}
 
@@ -1489,6 +1587,7 @@ function assembleProjectState({
 			pendingItems,
 			scopeItems,
 			scopeVersion,
+			deliverables,
 			impediments,
 			workItems,
 			dependencies,
@@ -1555,6 +1654,9 @@ export function deserializeProjectState(
 
 	const scopeVersionResult = parseScopeVersion(state.scopeVersion);
 	if (!scopeVersionResult.ok) return scopeVersionResult;
+
+	const deliverablesResult = parseDeliverableList(state.deliverables);
+	if (!deliverablesResult.ok) return deliverablesResult;
 
 	const impedimentsResult = parseImpedimentList(state.impediments);
 	if (!impedimentsResult.ok) return impedimentsResult;
@@ -1626,6 +1728,7 @@ export function deserializeProjectState(
 		rawPendingItems: pendingItemsResult.value,
 		scopeItems: scopeItemsResult.value,
 		scopeVersion: scopeVersionResult.value,
+		deliverables: deliverablesResult.value,
 		impediments: impedimentsResult.value,
 		workItems: workItemsResult.value,
 		dependencies: dependenciesResult.value,

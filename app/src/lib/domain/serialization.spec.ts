@@ -3,7 +3,9 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
+	addDeliverable,
 	addDependency,
+	promoteScopeItemToDeliverable,
 	addMilestone,
 	setMilestonePlannedDate,
 	linkWorkItemToMilestone,
@@ -1827,5 +1829,129 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 		expect(result.value.answers.find((answer) => answer.fieldDefinitionId === 'marcos_principais')?.value).toBe(
 			'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo'
 		);
+	});
+});
+
+describe('Deliverable (ETAPA 9 do rework)', () => {
+	function stateWithDeliverables(): ProjectState {
+		let state = nonTrivialState();
+		state = unwrap(addDeliverable(catalog, state, 'del-1', 'Portal de autoatendimento', 'agora', T2));
+		state = unwrap(promoteScopeItemToDeliverable(catalog, state, 'del-2', 'scope-1', T2));
+		state = unwrap(addDeliverable(catalog, state, 'del-3', 'Relatórios', 'fora', T2));
+		return state;
+	}
+
+	it('round-trip preserva entregas nativas e promovidas', () => {
+		const original = stateWithDeliverables();
+		const result = deserializeProjectState(serializeProjectState(original), catalog);
+		expect(result).toEqual({ ok: true, value: original });
+	});
+
+	it('snapshot anterior a este corte (sem a chave deliverables) importa como coleção vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(nonTrivialState())) as {
+			version: number;
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.deliverables;
+		// Campo aditivo opcional: o envelope permanece version 1.
+		expect(envelope.version).toBe(1);
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.deliverables).toEqual([]);
+		// Nenhum ScopeItem foi convertido na leitura.
+		expect(result.value.scopeItems).toEqual(nonTrivialState().scopeItems);
+	});
+
+	it('recusa duas entregas com o mesmo sourceScopeItemId', () => {
+		const base = JSON.parse(serializeProjectState(nonTrivialState())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.deliverables = [
+			{
+				id: 'del-1',
+				projectId: 'proj-1',
+				title: 'A',
+				bucket: 'depois',
+				effort: null,
+				order: null,
+				sourceScopeItemId: 'scope-1',
+				createdAt: T1,
+				updatedAt: T1
+			},
+			{
+				id: 'del-2',
+				projectId: 'proj-1',
+				title: 'B',
+				bucket: 'depois',
+				effort: null,
+				order: null,
+				sourceScopeItemId: 'scope-1',
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('aceita proveniência órfã: sourceScopeItemId sem ScopeItem correspondente', () => {
+		const base = JSON.parse(serializeProjectState(nonTrivialState())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.deliverables = [
+			{
+				id: 'del-1',
+				projectId: 'proj-1',
+				title: 'Origem removida',
+				bucket: 'depois',
+				effort: 'medio',
+				order: null,
+				sourceScopeItemId: 'scope-que-nao-existe-mais',
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+
+		const result = deserializeProjectState(JSON.stringify(base), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.deliverables[0].sourceScopeItemId).toBe('scope-que-nao-existe-mais');
+	});
+
+	it('recusa order fora de "agora" e "agora" sem order contíguo', () => {
+		const base = JSON.parse(serializeProjectState(nonTrivialState())) as {
+			state: Record<string, unknown>;
+		};
+
+		base.state.deliverables = [
+			{
+				id: 'del-1',
+				projectId: 'proj-1',
+				title: 'A',
+				bucket: 'depois',
+				effort: null,
+				order: 0,
+				sourceScopeItemId: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+
+		base.state.deliverables = [
+			{
+				id: 'del-1',
+				projectId: 'proj-1',
+				title: 'A',
+				bucket: 'agora',
+				effort: null,
+				order: 1,
+				sourceScopeItemId: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
 	});
 });

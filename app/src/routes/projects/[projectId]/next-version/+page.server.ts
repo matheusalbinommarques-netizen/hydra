@@ -136,6 +136,23 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// Ponte CONFIRM-TO-CONVERT (ETAPA 9 do rework) — única forma de um
+	// ScopeItem virar Deliverable, e sempre por ação explícita do usuário
+	// nesta tela. Não remove o ScopeItem, não invalida a ScopeVersion e não
+	// cria dual-write: a partir daqui os dois objetos são independentes.
+	promote: async ({ request, params }) => {
+		const formData = await request.formData();
+		const itemId = readString(formData, 'itemId');
+		if (!itemId) return fail(400, { message: 'Item inválido.' });
+
+		const result = await getProjectUseCases().promoteScopeItemToDeliverable({
+			projectId: params.projectId,
+			scopeItemId: itemId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	setHypothesis: async ({ request, params }) => {
 		const formData = await request.formData();
 		const hypothesis = readString(formData, 'hypothesis') ?? '';

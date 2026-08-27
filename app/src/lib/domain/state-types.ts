@@ -485,6 +485,57 @@ export interface DesiredOutcome {
 	updatedAt: string;
 }
 
+// Deliverable — ETAPA 9 do rework ("Do escopo ao trabalho — corredor de
+// entrega", Design Gate S9), primeiro microcorte. Camada de
+// priorização/escopo, distinta de ScopeItem e de WorkItem: é o que este
+// projeto DECIDIU entregar, com recorte (bucket) e prioridade relativa
+// próprios. D035 já registrava Deliverable como a camada que faltava entre
+// escopo e execução; aqui ela nasce como objeto vivo canônico.
+//
+// Deliberadamente ausentes neste corte (não são "ainda não implementados"
+// por esquecimento — são fora do contrato): description, status, progress,
+// responsible, acceptance criteria, datas e qualquer relação com WorkItem.
+// Concluir trabalho nunca conclui uma entrega, e nenhum agregado/percentual
+// é derivado daqui. O contrato futuro já congelado é 1 Deliverable → 0..N
+// WorkItem e WorkItem → 0..1 Deliverable, ainda NÃO implementado.
+//
+// bucket/effort usam tipos PRÓPRIOS, mesmo que os literais coincidam hoje
+// com ScopeBucket/ScopeEffort: são vocabulários de objetos diferentes e
+// devem poder divergir sem arrastar o outro.
+export type DeliverableBucket = 'agora' | 'depois' | 'fora';
+export type DeliverableEffort = 'pequeno' | 'medio' | 'grande';
+
+export interface Deliverable {
+	id: string;
+	projectId: string;
+	title: string;
+	bucket: DeliverableBucket;
+	// null = "esforço ainda não estimado" (estado normal e permanentemente
+	// válido, inclusive em 'agora' — ao contrário de ScopeItem, nada aqui
+	// exige effort para confirmar coisa alguma).
+	effort: DeliverableEffort | null;
+	// Só definido para bucket === 'agora', em sequência contígua começando em
+	// 0 (mesma regra de ScopeItem.order). Fora de 'agora' é sempre null: a
+	// ordem só é semanticamente válida no recorte atual.
+	order: number | null;
+	// PROVENIÊNCIA imutável, nunca canal de sincronização (CONFIRM-TO-CONVERT):
+	// registra de qual ScopeItem esta entrega foi promovida por ação explícita
+	// do usuário. null para entrega nativa. Único quando não-null.
+	//
+	// Não existe propagação em nenhuma direção: editar a Deliverable nunca
+	// reescreve o ScopeItem, editar o ScopeItem nunca altera a Deliverable, e
+	// remover o ScopeItem de origem NÃO remove nem altera a Deliverable —
+	// proveniência órfã é estado VÁLIDO. Por isso a persistência
+	// deliberadamente não cria FK operacional para scope_item.
+	//
+	// sourceSuggestionId e executionStatus do ScopeItem NÃO atravessam a
+	// promoção: são semântica da camada de escopo (D025 / sugestões
+	// estruturadas) e não têm equivalente aqui.
+	sourceScopeItemId: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface ProjectState {
 	project: Project;
 	activityProgress: ActivityProgress[];
@@ -492,6 +543,7 @@ export interface ProjectState {
 	pendingItems: PendingItem[];
 	scopeItems: ScopeItem[];
 	scopeVersion: ScopeVersion;
+	deliverables: Deliverable[];
 	impediments: Impediment[];
 	workItems: WorkItem[];
 	dependencies: Dependency[];

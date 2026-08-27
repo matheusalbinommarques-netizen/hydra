@@ -11,6 +11,8 @@ import type {
 	EvidenceOutcome,
 	ExternalActionStatus,
 	ImpedimentType,
+	DeliverableBucket,
+	DeliverableEffort,
 	MilestoneStatus,
 	ProjectEvent,
 	ProjectStateParseError,
@@ -194,6 +196,28 @@ export interface WorkItemDependencyView {
 	satisfied: boolean;
 }
 
+// Deliverable (ETAPA 9 do rework, primeiro microcorte) — view leve, sem
+// projectId/createdAt/updatedAt, que a interface não precisa (mesmo padrão de
+// ScopeItemView/WorkItemView).
+//
+// `sourceScopeItemId` chega à interface só como FATO de proveniência — é o
+// que permite a tela de escopo dizer "já promovido" e recusar uma segunda
+// promoção. Nunca é usado para sincronizar texto, bucket ou effort com o
+// ScopeItem de origem, e a origem pode não existir mais (proveniência órfã é
+// estado válido).
+//
+// Sem status, progresso, percentual, contagem de trabalho ou responsável:
+// esses campos não existem no contrato desta etapa e não devem ser derivados
+// aqui "só para a tela".
+export interface DeliverableView {
+	id: string;
+	title: string;
+	bucket: DeliverableBucket;
+	effort: DeliverableEffort | null;
+	order: number | null;
+	sourceScopeItemId: string | null;
+}
+
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — view leve de
 // Milestone (ETAPA 8 do rework, segundo microcorte) — view leve, sem
 // projectId/createdAt/updatedAt, que a interface não precisa (mesmo padrão de
@@ -363,6 +387,7 @@ export interface ProjectView {
 	// ProjectView por não haver consumidor —, aqui existe consumidor real: a
 	// seção "Marcos" de /work lista marcos, não itens de trabalho, e não há
 	// projeção existente onde eles caibam.
+	deliverables: DeliverableView[];
 	milestones: MilestoneView[];
 	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — todos os grupos
 	// afetados do projeto; a interface (MapaDeImpacto.svelte) agrupa em faixas
@@ -572,6 +597,50 @@ export interface AddDependencyInput {
 export interface RemoveDependencyInput {
 	projectId: string;
 	dependencyId: string;
+}
+
+// Entregas (ETAPA 9 do rework) — mesmo padrão dos demais inputs: o id é
+// gerado pelo caso de uso (idGenerator), nunca recebido do cliente.
+export interface AddDeliverableInput {
+	projectId: string;
+	title: string;
+	bucket: DeliverableBucket;
+}
+
+export interface SetDeliverableTitleInput {
+	projectId: string;
+	deliverableId: string;
+	title: string;
+}
+
+// effort: null é "ainda não estimado" — limpar é a mesma escrita de definir.
+export interface SetDeliverableEffortInput {
+	projectId: string;
+	deliverableId: string;
+	effort: DeliverableEffort | null;
+}
+
+export interface MoveDeliverableInput {
+	projectId: string;
+	deliverableId: string;
+	bucket: DeliverableBucket;
+}
+
+export interface ReorderDeliverablesInput {
+	projectId: string;
+	orderedIds: string[];
+}
+
+export interface RemoveDeliverableInput {
+	projectId: string;
+	deliverableId: string;
+}
+
+// CONFIRM-TO-CONVERT: a única entrada que cria Deliverable a partir de
+// ScopeItem, e só existe atrás de uma ação explícita do usuário.
+export interface PromoteScopeItemToDeliverableInput {
+	projectId: string;
+	scopeItemId: string;
 }
 
 export interface AddMilestoneInput {
@@ -818,6 +887,15 @@ export interface ProjectUseCases {
 	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDependency(input: AddDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDependency(input: RemoveDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
+	addDeliverable(input: AddDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
+	setDeliverableTitle(input: SetDeliverableTitleInput): Promise<UseCaseOutcome<ProjectView>>;
+	setDeliverableEffort(input: SetDeliverableEffortInput): Promise<UseCaseOutcome<ProjectView>>;
+	moveDeliverable(input: MoveDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
+	reorderDeliverables(input: ReorderDeliverablesInput): Promise<UseCaseOutcome<ProjectView>>;
+	removeDeliverable(input: RemoveDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
+	promoteScopeItemToDeliverable(
+		input: PromoteScopeItemToDeliverableInput
+	): Promise<UseCaseOutcome<ProjectView>>;
 	addMilestone(input: AddMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	reachMilestone(input: ReachMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenMilestone(input: ReopenMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;

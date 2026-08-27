@@ -389,8 +389,9 @@ que o reabre, sem congelar arquitetura ainda não decidida.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 `S9` (ETAPA 9, "Estruturação e Planejamento reworkados", §39) com status
-`not_started`. A S9 ainda NÃO foi iniciada nem autorizada para
-implementação.
+`in_progress`. O primeiro microcorte da S9 — `Deliverable` como objeto
+vivo e a superfície "Entregas", com promoção explícita de `ScopeItem`
+(CONFIRM-TO-CONVERT, D043) — foi entregue; a S9 permanece em andamento.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

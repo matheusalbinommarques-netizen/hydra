@@ -10,6 +10,9 @@ import type {
 	AffectedGroupImpact,
 	CauseHypothesis,
 	CurrentTreatment,
+	Deliverable,
+	DeliverableBucket,
+	DeliverableEffort,
 	Dependency,
 	Milestone,
 	MilestoneWorkItem,
@@ -58,6 +61,9 @@ export type DomainTransitionError =
 	| { kind: 'scope_confirmation_invalid'; issues: ScopeConfirmationIssue[] }
 	| { kind: 'scope_item_not_agora' }
 	| { kind: 'scope_version_not_confirmed' }
+	| { kind: 'deliverable_not_found' }
+	| { kind: 'deliverable_reorder_mismatch' }
+	| { kind: 'deliverable_already_promoted' }
 	| { kind: 'impediment_not_found' }
 	| { kind: 'impediment_id_already_exists' }
 	| { kind: 'work_item_not_found' }
@@ -693,6 +699,258 @@ export function removeScopeItem(
 	let next: ProjectState = { ...state, scopeItems: items };
 	next = invalidateScopeConfirmation(catalog, next);
 	return { ok: true, value: next };
+}
+
+// --- Entregas (Deliverable) -----------------------------------------------
+//
+// Camada de priorização/escopo (ETAPA 9 do rework, Design Gate S9). Nenhuma
+// transição deste bloco chama invalidateScopeConfirmation: Deliverable NÃO é
+// ScopeItem, e mexer numa entrega jamais pode reabrir a confirmação da versão
+// de escopo nem tocar ScopeVersion.confirmedAt. Pelo mesmo motivo, nenhuma
+// delas escreve em state.scopeItems — a promoção é cópia por valor, uma vez,
+// e nunca um canal de sincronização (ver Deliverable.sourceScopeItemId em
+// state-types.ts).
+//
+// `catalog` entra na assinatura só por consistência com as demais transições
+// (mesmo padrão de Milestone/Impediment) — nenhuma função aqui o consulta.
+
+function findDeliverable(state: ProjectState, deliverableId: string): Deliverable | undefined {
+	return state.deliverables.find((item) => item.id === deliverableId);
+}
+
+function agoraDeliverablesSorted(deliverables: Deliverable[]): Deliverable[] {
+	return deliverables
+		.filter((item) => item.bucket === 'agora')
+		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/**
+ * Reescreve `order` das entregas em 'agora' a partir da sequência informada
+ * (0..N-1 contíguo) e zera o das demais. Único ponto do domínio que grava
+ * `order` de Deliverable — todas as operações abaixo montam a lista desejada
+ * e delegam aqui, para que a invariante de contiguidade não dependa de cada
+ * chamador lembrar dela. Preserva a identidade do objeto quando nada muda,
+ * para que os chamadores consigam detectar no-op.
+ */
+function withAgoraOrder(deliverables: Deliverable[], orderedAgora: Deliverable[]): Deliverable[] {
+	const orderById = new Map(orderedAgora.map((item, index) => [item.id, index]));
+	return deliverables.map((item) => {
+		const order = orderById.get(item.id);
+		if (order === undefined) return item.order === null ? item : { ...item, order: null };
+		return item.order === order ? item : { ...item, order };
+	});
+}
+
+export function addDeliverable(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string,
+	title: string,
+	bucket: DeliverableBucket,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	// Entrega nativa em 'agora' entra no fim da fila (append) — só a promoção
+	// de ScopeItem tem regra de posição própria.
+	const deliverable: Deliverable = {
+		id: deliverableId,
+		projectId: state.project.id,
+		title,
+		bucket,
+		effort: null,
+		order: bucket === 'agora' ? agoraDeliverablesSorted(state.deliverables).length : null,
+		sourceScopeItemId: null,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, deliverables: [...state.deliverables, deliverable] } };
+}
+
+export function setDeliverableTitle(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string,
+	title: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const deliverable = findDeliverable(state, deliverableId);
+	if (!deliverable) return { ok: false, error: { kind: 'deliverable_not_found' } };
+	if (deliverable.title === title) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			deliverables: state.deliverables.map((item) =>
+				item.id === deliverableId ? { ...item, title, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+export function setDeliverableEffort(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string,
+	effort: DeliverableEffort | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const deliverable = findDeliverable(state, deliverableId);
+	if (!deliverable) return { ok: false, error: { kind: 'deliverable_not_found' } };
+	if (deliverable.effort === effort) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			deliverables: state.deliverables.map((item) =>
+				item.id === deliverableId ? { ...item, effort, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+export function moveDeliverable(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string,
+	bucket: DeliverableBucket,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const deliverable = findDeliverable(state, deliverableId);
+	if (!deliverable) return { ok: false, error: { kind: 'deliverable_not_found' } };
+	if (deliverable.bucket === bucket) return { ok: true, value: state };
+
+	// Mover para 'agora' é ato do usuário, não promoção: entra no fim da fila,
+	// mesma regra da criação nativa. Sair de 'agora' recompacta o restante.
+	const moved = { ...deliverable, bucket, updatedAt: occurredAt };
+	const withBucket = state.deliverables.map((item) => (item.id === deliverableId ? moved : item));
+	const orderedAgora = agoraDeliverablesSorted(withBucket.filter((item) => item.id !== deliverableId));
+	if (bucket === 'agora') orderedAgora.push(moved);
+
+	return { ok: true, value: { ...state, deliverables: withAgoraOrder(withBucket, orderedAgora) } };
+}
+
+/** orderedIds deve conter exatamente os ids atualmente em 'agora', na nova ordem desejada. */
+export function reorderDeliverables(
+	catalog: Catalog,
+	state: ProjectState,
+	orderedIds: string[],
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const currentAgora = agoraDeliverablesSorted(state.deliverables);
+	const currentIds = currentAgora.map((item) => item.id);
+	const sameSet =
+		orderedIds.length === currentIds.length &&
+		new Set(orderedIds).size === orderedIds.length &&
+		currentIds.every((id) => orderedIds.includes(id));
+	if (!sameSet) return { ok: false, error: { kind: 'deliverable_reorder_mismatch' } };
+
+	const byId = new Map(currentAgora.map((item) => [item.id, item]));
+	const reordered = orderedIds.map((id) => byId.get(id)!);
+	const reindexed = withAgoraOrder(state.deliverables, reordered);
+
+	// withAgoraOrder preserva a identidade do objeto quando o order não muda —
+	// então "mudou" é exatamente "algum objeto foi substituído".
+	const deliverables = reindexed.map((item, index) =>
+		item === state.deliverables[index] ? item : { ...item, updatedAt: occurredAt }
+	);
+	if (deliverables.every((item, index) => item === state.deliverables[index])) {
+		return { ok: true, value: state };
+	}
+
+	return { ok: true, value: { ...state, deliverables } };
+}
+
+export function removeDeliverable(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string
+): Result<ProjectState, DomainTransitionError> {
+	const deliverable = findDeliverable(state, deliverableId);
+	if (!deliverable) return { ok: false, error: { kind: 'deliverable_not_found' } };
+
+	const remaining = state.deliverables.filter((item) => item.id !== deliverableId);
+	const orderedAgora = agoraDeliverablesSorted(remaining);
+	return { ok: true, value: { ...state, deliverables: withAgoraOrder(remaining, orderedAgora) } };
+}
+
+/**
+ * CONFIRM-TO-CONVERT: ÚNICO caminho ScopeItem → Deliverable, e sempre a
+ * partir de uma ação explícita do usuário. Nenhum load, migration, factory,
+ * abertura de página ou confirmação de ScopeVersion promove nada — não existe
+ * chamador automático desta função em lugar nenhum do código.
+ *
+ * Promover a mesma origem duas vezes é RECUSADO com erro de domínio explícito
+ * (nunca no-op silencioso): a segunda tentativa é um engano do usuário e
+ * precisa ser dito, não absorvido.
+ *
+ * Preservação: title é cópia POR VALOR de ScopeItem.text; bucket e effort são
+ * preservados exatamente (inclusive 'fora' e null). O ScopeItem permanece
+ * intacto, ScopeVersion.confirmedAt permanece intacto, e sourceSuggestionId/
+ * executionStatus não atravessam.
+ *
+ * Ordem em 'agora': a prioridade RELATIVA de origem sobrevive à ordem em que
+ * o usuário clica em "promover" — a entrega é inserida antes da primeira
+ * entrega promovida cuja origem tenha ScopeItem.order maior; não havendo
+ * nenhuma, depois da última promovida (ou no fim, quando ainda não há
+ * nenhuma). O número escalar de ScopeItem.order NUNCA é copiado: são
+ * sequências independentes, e copiá-lo quebraria a contiguidade de 'agora'.
+ * Entregas nativas preservam sua posição relativa.
+ */
+export function promoteScopeItemToDeliverable(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string,
+	scopeItemId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const scopeItem = findScopeItem(state, scopeItemId);
+	if (!scopeItem) return { ok: false, error: { kind: 'scope_item_not_found' } };
+	if (state.deliverables.some((item) => item.sourceScopeItemId === scopeItemId)) {
+		return { ok: false, error: { kind: 'deliverable_already_promoted' } };
+	}
+
+	const deliverable: Deliverable = {
+		id: deliverableId,
+		projectId: state.project.id,
+		title: scopeItem.text,
+		bucket: scopeItem.bucket,
+		effort: scopeItem.effort,
+		order: null,
+		sourceScopeItemId: scopeItemId,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	const deliverables = [...state.deliverables, deliverable];
+	if (deliverable.bucket !== 'agora') {
+		return { ok: true, value: { ...state, deliverables } };
+	}
+
+	const currentAgora = agoraDeliverablesSorted(state.deliverables);
+	// Origem removida (proveniência órfã) é estado válido: sem ScopeItem para
+	// comparar, a entrega não participa da comparação de prioridade, mas
+	// continua contando como "promovida" para o fallback abaixo.
+	const sourceOrderOf = (item: Deliverable): number | null =>
+		item.sourceScopeItemId === null ? null : (findScopeItem(state, item.sourceScopeItemId)?.order ?? null);
+
+	const sourceOrder = scopeItem.order ?? 0;
+	let insertAt = currentAgora.findIndex((item) => {
+		const order = sourceOrderOf(item);
+		return order !== null && order > sourceOrder;
+	});
+	if (insertAt < 0) {
+		const lastPromoted = currentAgora.reduce(
+			(found, item, index) => (item.sourceScopeItemId !== null ? index : found),
+			-1
+		);
+		insertAt = lastPromoted < 0 ? currentAgora.length : lastPromoted + 1;
+	}
+
+	const orderedAgora = [...currentAgora];
+	orderedAgora.splice(insertAt, 0, deliverable);
+	return { ok: true, value: { ...state, deliverables: withAgoraOrder(deliverables, orderedAgora) } };
 }
 
 export function setHypothesis(
