@@ -529,27 +529,80 @@ describe('createProjectUseCases — confirmSummary', () => {
 	});
 });
 
-describe('createProjectUseCases — confirmPlanningPriority (C5-01)', () => {
-	it('erro planning_no_items quando "Decompor o trabalho" está vazia', async () => {
+describe('createProjectUseCases — confirmDecomposition (S9)', () => {
+	it('erro decomposition_no_work_items quando o projeto não tem nenhum WorkItem', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
 
-		const result = await useCases.confirmPlanningPriority({ projectId: created.value.projectId });
-		expect(result).toEqual({ ok: false, error: { kind: 'planning_no_items' } });
+		const result = await useCases.confirmDecomposition({ projectId: created.value.projectId });
+		expect(result).toEqual({ ok: false, error: { kind: 'decomposition_no_work_items' } });
 	});
 
-	it('conclui "Priorizar entregas" quando há ao menos um PlanningItem', async () => {
+	it('conclui "Decompor o trabalho" quando há ao menos um WorkItem real', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
 		const projectId = created.value.projectId;
 
-		await useCases.answerActivity({
-			projectId,
+		await useCases.addWorkItem({ projectId, title: 'Item real' });
+
+		const result = await useCases.confirmDecomposition({ projectId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.activityStatuses.decompor_trabalho).toBe('concluída');
+	});
+
+	it('skip → pending → WorkItem canônico → confirmação resolve a pendência (falsificador do fluxo completo)', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.skipActivity({ projectId, activityDefinitionId: 'decompor_trabalho' });
+		await useCases.addWorkItem({ projectId, title: 'Item real' });
+
+		const result = await useCases.confirmDecomposition({ projectId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.activityStatuses.decompor_trabalho).toBe('concluída');
+		expect(result.value.openPendingItems).toHaveLength(0);
+		expect(result.value.pendingItemHistory.find((p) => p.activityDefinitionId === 'decompor_trabalho')?.status).toBe(
+			'resolvida'
+		);
+	});
+
+	it('answerActivity recusa "decompor_trabalho" com wrong_completion_mode — não é mais required_fields', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.answerActivity({
+			projectId: created.value.projectId,
 			activityDefinitionId: 'decompor_trabalho',
-			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) }
+			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte nova' }]) }
 		});
+		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });
+	});
+});
+
+describe('createProjectUseCases — confirmPlanningPriority (S9)', () => {
+	it('erro priorization_no_deliverables quando o projeto não tem nenhuma Deliverable', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+
+		const result = await useCases.confirmPlanningPriority({ projectId: created.value.projectId });
+		expect(result).toEqual({ ok: false, error: { kind: 'priorization_no_deliverables' } });
+	});
+
+	it('conclui "Priorizar entregas" quando há ao menos uma Deliverable real', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		await useCases.addDeliverable({ projectId, title: 'Entrega real', bucket: 'agora' });
 
 		const result = await useCases.confirmPlanningPriority({ projectId });
 		expect(result.ok).toBe(true);
@@ -563,45 +616,30 @@ describe('createProjectUseCases — confirmPlanningPriority (C5-01)', () => {
 		if (!created.ok) throw new Error('esperado ok');
 		const projectId = created.value.projectId;
 
-		await useCases.answerActivity({
-			projectId,
-			activityDefinitionId: 'decompor_trabalho',
-			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) }
-		});
+		await useCases.addDeliverable({ projectId, title: 'Entrega real', bucket: 'agora' });
 		await useCases.confirmPlanningPriority({ projectId });
 
 		const result = await useCases.confirmPlanningPriority({ projectId });
 		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
 	});
 
-	it('editar "Decompor o trabalho" depois de "Priorizar entregas" confirmada NÃO reabre nem sinaliza (comportamento silencioso, C5-01)', async () => {
+	it('skip → pending → Deliverable canônica → confirmação resolve a pendência (falsificador do fluxo completo)', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
 		const projectId = created.value.projectId;
 
-		await useCases.answerActivity({
-			projectId,
-			activityDefinitionId: 'decompor_trabalho',
-			values: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) }
-		});
-		await useCases.confirmPlanningPriority({ projectId });
+		await useCases.skipActivity({ projectId, activityDefinitionId: 'priorizar_entregas' });
+		await useCases.addDeliverable({ projectId, title: 'Entrega real', bucket: 'agora' });
 
-		const edited = await useCases.answerActivity({
-			projectId,
-			activityDefinitionId: 'decompor_trabalho',
-			values: {
-				partes_trabalho: encodePlanningItems([
-					{ id: 'p1', text: 'Parte 1' },
-					{ id: 'p2', text: 'Parte 2 adicionada depois' }
-				])
-			}
-		});
-		expect(edited.ok).toBe(true);
-		if (!edited.ok) return;
-		expect(edited.value.activityStatuses.priorizar_entregas).toBe('concluída');
-		expect(edited.value.openPendingItems).toHaveLength(0);
-		expect(edited.value.pendingItemHistory).toHaveLength(0);
+		const result = await useCases.confirmPlanningPriority({ projectId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.activityStatuses.priorizar_entregas).toBe('concluída');
+		expect(result.value.openPendingItems).toHaveLength(0);
+		expect(
+			result.value.pendingItemHistory.find((p) => p.activityDefinitionId === 'priorizar_entregas')?.status
+		).toBe('resolvida');
 	});
 });
 

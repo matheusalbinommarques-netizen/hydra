@@ -79,8 +79,8 @@ describe('buildProjectView — pendingItemHistory', () => {
 		expect(view.pendingItemHistory[0]).toEqual({
 			id: 'pend-priorizar',
 			activityDefinitionId: 'priorizar_entregas',
-			label: 'As entregas não foram priorizadas',
-			detail: 'Sem prioridade clara, o trabalho pode avançar em várias frentes sem nenhuma pronta.',
+			label: 'As entregas não foram priorizadas aqui',
+			detail: 'Crie e ordene entregas em Entregas e volte para confirmar — ou pule esta etapa.',
 			status: 'aberta',
 			createdAt: '2026-01-02T00:00:00.000Z'
 		});

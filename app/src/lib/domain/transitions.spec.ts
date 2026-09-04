@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addDeliverable,
 	addMilestone,
 	setMilestonePlannedDate,
 	addWorkItem,
@@ -20,6 +21,7 @@ import {
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDecomposition,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -149,37 +151,73 @@ describe('isActivityFieldsValid', () => {
 		expect(complete.answers.some((a) => a.fieldDefinitionId === 'nome_provisorio')).toBe(false);
 	});
 
-	it('lista_partes (C5-01): é false quando a coleção está vazia', () => {
-		const decompor = findActivity('decompor_trabalho');
-		expect(isActivityFieldsValid(decompor, freshState())).toBe(false);
+	// Nenhuma atividade do catálogo real usa mais dataTarget: 'answer'/type:
+	// 'lista_partes' desde S9 (reconciliação da decomposição legada) —
+	// "Decompor o trabalho" virou explicit_confirmation contra WorkItem
+	// (domain/transitions.ts, confirmDecomposition). O tipo de campo em si
+	// continua suportado genericamente por isActivityFieldsValid (infra
+	// compartilhada com o formato legado de PlanningItem[] gravado antes
+	// desta mudança) — cobrir via fixture local, mesmo padrão de
+	// fixture_project_property acima.
+	const listaPartesActivity: RequiredFieldsActivity = {
+		id: 'fixture_lista_partes',
+		phaseId: 'planejamento',
+		order: 1,
+		title: 'Fixture de teste',
+		mainQuestion: 'Pergunta fabricada de teste?',
+		why: 'Fixture de teste.',
+		example: 'Fixture de teste.',
+		completionCriteria: 'Ao menos uma parte com texto próprio.',
+		completionMode: 'required_fields',
+		allowsSkip: true,
+		pendingItemLabel: 'Pendência fabricada de teste',
+		pendingItemDetail: 'Fixture de teste.',
+		fields: [
+			{
+				id: 'partes_trabalho',
+				activityId: 'fixture_lista_partes',
+				label: 'Partes do trabalho',
+				required: true,
+				dataTarget: 'answer',
+				type: 'lista_partes'
+			}
+		]
+	};
+	const listaPartesCatalog: Catalog = {
+		phases: [{ id: 'planejamento', order: 1, label: 'Planejamento', catalogStatus: 'complete', activities: [listaPartesActivity] }]
+	};
+
+	it('lista_partes (C5-01, infra genérica): é false quando a coleção está vazia', () => {
+		const state = createInitialProjectState(listaPartesCatalog, 'proj-1', T1);
+		expect(isActivityFieldsValid(listaPartesActivity, state)).toBe(false);
 	});
 
 	it('lista_partes: é true quando há ao menos um item com texto não vazio', () => {
-		const decompor = findActivity('decompor_trabalho');
+		const state = createInitialProjectState(listaPartesCatalog, 'proj-1', T1);
 		const answered = unwrap(
 			answerActivity(
-				catalog,
-				freshState(),
-				'decompor_trabalho',
+				listaPartesCatalog,
+				state,
+				'fixture_lista_partes',
 				{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Tela de abertura' }]) },
 				T1
 			)
 		);
-		expect(isActivityFieldsValid(decompor, answered)).toBe(true);
+		expect(isActivityFieldsValid(listaPartesActivity, answered)).toBe(true);
 	});
 
 	it('lista_partes: é false quando todo item tem texto vazio (defesa contra escrita malformada)', () => {
-		const decompor = findActivity('decompor_trabalho');
+		const state = createInitialProjectState(listaPartesCatalog, 'proj-1', T1);
 		const answered = unwrap(
 			answerActivity(
-				catalog,
-				freshState(),
-				'decompor_trabalho',
+				listaPartesCatalog,
+				state,
+				'fixture_lista_partes',
 				{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: '   ' }]) },
 				T1
 			)
 		);
-		expect(isActivityFieldsValid(decompor, answered)).toBe(false);
+		expect(isActivityFieldsValid(listaPartesActivity, answered)).toBe(false);
 	});
 });
 
@@ -697,35 +735,117 @@ describe('ExternalAction / Evidence (ETAPA 3 — "Evidence + primeira External A
 	});
 });
 
-describe('confirmPlanningPriority (C5-01)', () => {
-	function withPlanningItems(state: ProjectState, items: { id: string; text: string }[]): ProjectState {
-		return unwrap(
-			answerActivity(catalog, state, 'decompor_trabalho', { partes_trabalho: encodePlanningItems(items) }, T1)
-		);
-	}
-
-	it('rejeita com planning_no_items quando a coleção de "Decompor o trabalho" está vazia', () => {
-		const result = confirmPlanningPriority(catalog, freshState(), T1);
-		expect(result).toEqual({ ok: false, error: { kind: 'planning_no_items' } });
+describe('confirmDecomposition (S9)', () => {
+	it('rejeita com decomposition_no_work_items quando o projeto não tem nenhum WorkItem', () => {
+		const result = confirmDecomposition(catalog, freshState(), T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'decomposition_no_work_items' } });
 	});
 
-	it('conclui "Priorizar entregas" quando há ao menos um item', () => {
-		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
-		const state = unwrap(confirmPlanningPriority(catalog, withItems, T1));
+	it('PlanningItem legado (partes_trabalho) sozinho NÃO basta para confirmar — só WorkItem conta', () => {
+		// Simula um projeto antigo: Answer legado gravado diretamente no estado
+		// (não via answerActivity — decompor_trabalho não é mais required_fields,
+		// ver teste "answerActivity recusa..." abaixo), sem nenhum WorkItem real.
+		const legacyState: ProjectState = {
+			...freshState(),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'decompor_trabalho',
+					fieldDefinitionId: 'partes_trabalho',
+					value: encodePlanningItems([{ id: 'p1', text: 'Parte legada' }]),
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+		const result = confirmDecomposition(catalog, legacyState, T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'decomposition_no_work_items' } });
+	});
+
+	it('conclui "Decompor o trabalho" quando há ao menos um WorkItem real', () => {
+		const withWorkItem = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item real', T1));
+		const state = unwrap(confirmDecomposition(catalog, withWorkItem, T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'decompor_trabalho');
+		expect(progress?.status).toBe('concluída');
+	});
+
+	it('erro transition_not_allowed ao confirmar uma decomposição já concluída', () => {
+		const withWorkItem = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item real', T1));
+		const state = unwrap(confirmDecomposition(catalog, withWorkItem, T1));
+		const result = confirmDecomposition(catalog, state, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('permite pular "Decompor o trabalho" mesmo sendo explicit_confirmation (allowsSkip true)', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'decompor_trabalho', 'pend-1', T1));
+		const progress = skipped.activityProgress.find((p) => p.activityDefinitionId === 'decompor_trabalho');
+		expect(progress?.status).toBe('pulada');
+		expect(skipped.pendingItems).toEqual([
+			{ id: 'pend-1', projectId: 'proj-1', activityDefinitionId: 'decompor_trabalho', status: 'aberta', createdAt: T1 }
+		]);
+	});
+
+	it('skip → pending → WorkItem canônico → confirmação resolve a pendência (falsificador do fluxo completo)', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'decompor_trabalho', 'pend-1', T1));
+		const withWorkItem = unwrap(addWorkItem(catalog, skipped, 'wi-1', 'Item real', T2));
+		const confirmed = unwrap(confirmDecomposition(catalog, withWorkItem, T3));
+		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'decompor_trabalho');
+		expect(progress?.status).toBe('concluída');
+		expect(confirmed.pendingItems[0].status).toBe('resolvida');
+	});
+
+	it('answerActivity recusa "decompor_trabalho" com wrong_completion_mode — não é mais required_fields, nunca escreve PlanningItem novo', () => {
+		const result = answerActivity(
+			catalog,
+			freshState(),
+			'decompor_trabalho',
+			{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte nova' }]) },
+			T1
+		);
+		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });
+	});
+});
+
+describe('confirmPlanningPriority (S9)', () => {
+	it('rejeita com priorization_no_deliverables quando o projeto não tem nenhuma Deliverable', () => {
+		const result = confirmPlanningPriority(catalog, freshState(), T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'priorization_no_deliverables' } });
+	});
+
+	it('PlanningItem legado (partes_trabalho) sozinho NÃO basta para confirmar — só Deliverable conta', () => {
+		const legacyState: ProjectState = {
+			...freshState(),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'decompor_trabalho',
+					fieldDefinitionId: 'partes_trabalho',
+					value: encodePlanningItems([{ id: 'p1', text: 'Parte legada' }]),
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+		const result = confirmPlanningPriority(catalog, legacyState, T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'priorization_no_deliverables' } });
+	});
+
+	it('conclui "Priorizar entregas" quando há ao menos uma Deliverable real', () => {
+		const withDeliverable = unwrap(addDeliverable(catalog, freshState(), 'd-1', 'Entrega real', 'agora', T1));
+		const state = unwrap(confirmPlanningPriority(catalog, withDeliverable, T1));
 		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
 		expect(progress?.status).toBe('concluída');
 	});
 
 	it('erro transition_not_allowed ao confirmar uma prioridade já concluída', () => {
-		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
-		const state = unwrap(confirmPlanningPriority(catalog, withItems, T1));
+		const withDeliverable = unwrap(addDeliverable(catalog, freshState(), 'd-1', 'Entrega real', 'agora', T1));
+		const state = unwrap(confirmPlanningPriority(catalog, withDeliverable, T1));
 		const result = confirmPlanningPriority(catalog, state, T2);
 		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
 	});
 
 	it('permite pular "Priorizar entregas" mesmo sendo explicit_confirmation (allowsSkip true)', () => {
-		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
-		const skipped = unwrap(skipActivity(catalog, withItems, 'priorizar_entregas', 'pend-1', T1));
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'priorizar_entregas', 'pend-1', T1));
 		const progress = skipped.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
 		expect(progress?.status).toBe('pulada');
 		expect(skipped.pendingItems).toEqual([
@@ -733,37 +853,13 @@ describe('confirmPlanningPriority (C5-01)', () => {
 		]);
 	});
 
-	it('resolve a pendência aberta ao confirmar uma prioridade que estava pulada', () => {
-		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
-		const skipped = unwrap(skipActivity(catalog, withItems, 'priorizar_entregas', 'pend-1', T1));
-		const confirmed = unwrap(confirmPlanningPriority(catalog, skipped, T2));
+	it('skip → pending → Deliverable canônica → confirmação resolve a pendência (falsificador do fluxo completo)', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'priorizar_entregas', 'pend-1', T1));
+		const withDeliverable = unwrap(addDeliverable(catalog, skipped, 'd-1', 'Entrega real', 'agora', T2));
+		const confirmed = unwrap(confirmPlanningPriority(catalog, withDeliverable, T3));
 		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
 		expect(progress?.status).toBe('concluída');
 		expect(confirmed.pendingItems[0].status).toBe('resolvida');
-	});
-
-	it('editar "Decompor o trabalho" depois de "Priorizar entregas" confirmada NÃO reabre a confirmação nem cria pendência (comportamento silencioso, C5-01)', () => {
-		const withItems = withPlanningItems(freshState(), [{ id: 'p1', text: 'Parte 1' }]);
-		const confirmed = unwrap(confirmPlanningPriority(catalog, withItems, T1));
-
-		const edited = unwrap(
-			answerActivity(
-				catalog,
-				confirmed,
-				'decompor_trabalho',
-				{
-					partes_trabalho: encodePlanningItems([
-						{ id: 'p1', text: 'Parte 1' },
-						{ id: 'p2', text: 'Parte 2 adicionada depois' }
-					])
-				},
-				T2
-			)
-		);
-
-		const priorizarProgress = edited.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
-		expect(priorizarProgress?.status).toBe('concluída');
-		expect(edited.pendingItems).toHaveLength(0);
 	});
 });
 

@@ -117,11 +117,22 @@ export interface RecordsView {
 }
 
 const EDITABLE_PHASE_ID = 'descoberta';
-// Exceção nominal fora da Descoberta (C5-01) — mesma exceção e mesmo
-// comentário de now/+page.server.ts (REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA):
-// a próxima exceção fora desta lista deve provocar generalização da regra,
-// não a adição de outro id aqui.
-const EDITABLE_ACTIVITY_IDS_OUTSIDE_PHASE = new Set(['decompor_trabalho']);
+// S9 (reconciliação da decomposição legada) retirou "Decompor o trabalho"
+// desta exceção: `partes_trabalho` é READ-LEGACY (§13.2) — continua
+// legível aqui, mas não é mais editável a partir de Registros. Nenhuma
+// exceção nominal permanece fora da Descoberta hoje; o próximo caso real
+// decide se vale reintroduzir o mecanismo.
+const EDITABLE_ACTIVITY_IDS_OUTSIDE_PHASE = new Set<string>([]);
+
+// S9 — "Decompor o trabalho" deixou de ser `required_fields` (virou
+// `explicit_confirmation` contra WorkItem, ver domain/transitions.ts), então
+// o loop genérico abaixo (que só olha `completionMode === 'required_fields'`)
+// não a alcança mais. O Answer legado (`partes_trabalho`) continua
+// READ-LEGACY e precisa seguir visível aqui — por isso este caso é montado à
+// parte, nunca editável (editHref sempre null).
+const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
+const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
+const PARTES_TRABALHO_FIELD_LABEL = 'Partes do trabalho';
 
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -242,6 +253,25 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 
 	for (const phase of catalog.phases) {
 		const activities: RecordsActivityAnswersView[] = [];
+
+		const decomporTrabalho = phase.activities.find((activity) => activity.id === DECOMPOR_TRABALHO_ACTIVITY_ID);
+		if (decomporTrabalho && input.answers[PARTES_TRABALHO_FIELD_ID]) {
+			const items = decodePlanningItems(input.answers[PARTES_TRABALHO_FIELD_ID]);
+			if (items.length > 0) {
+				activities.push({
+					activityId: DECOMPOR_TRABALHO_ACTIVITY_ID,
+					title: decomporTrabalho.title,
+					fields: [
+						{
+							id: PARTES_TRABALHO_FIELD_ID,
+							label: PARTES_TRABALHO_FIELD_LABEL,
+							value: items.map((item, index) => `${index + 1}. ${item.text}`).join('; ')
+						}
+					],
+					editHref: null
+				});
+			}
+		}
 
 		for (const activity of phase.activities) {
 			if (activity.completionMode !== 'required_fields') continue;

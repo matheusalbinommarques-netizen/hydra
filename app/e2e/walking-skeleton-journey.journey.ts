@@ -248,48 +248,85 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		);
 	});
 
-	const planningParts = [
-		'Tela de abertura de solicitação',
-		'Fluxo de aprovação',
-		'Notificação por e-mail'
-	];
+	// S9 (reconciliação da decomposição legada, D045) — "Decompor o trabalho"
+	// e "Priorizar entregas" viraram explicit_confirmation contra a camada
+	// canônica: nunca mais criam/reordenam PlanningItem. Prova aqui o fluxo
+	// completo: sem WorkItem/Deliverable real não confirma; pular cria
+	// pendência; criar o objeto canônico na surface real habilita a
+	// confirmação ao retomar; a pendência é resolvida pelo mecanismo já
+	// existente.
+	const workItemTitles = ['Tela de abertura de solicitação', 'Fluxo de aprovação', 'Notificação por e-mail'];
 
-	async function clickAndWaitForAnswer(locator: ReturnType<Page['getByRole']>): Promise<void> {
-		await Promise.all([
-			page.waitForResponse((response) => response.url().includes('?/answer') && response.request().method() === 'POST'),
-			locator.click()
-		]);
-	}
-
-	await test.step('Decompor o trabalho — Construir (3 partes, uma única vez)', async () => {
+	await test.step('Decompor o trabalho (S9) — sem WorkItem real não confirma; nunca escreve partes_trabalho; pular cria pendência', async () => {
 		await expect(page.getByRole('heading', { name: 'Decompor o trabalho' })).toBeVisible();
+		await expect(page.getByText('Ainda não há nenhum WorkItem neste projeto')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Confirmar decomposição' })).toHaveCount(0);
+		await expect(page.locator('input[name="partes_trabalho"]')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Adicionar parte' })).toHaveCount(0);
 
-		for (let i = 0; i < planningParts.length; i++) {
-			await page.getByRole('button', { name: 'Adicionar parte' }).click();
-			await page
-				.getByRole('textbox', { name: /Nome da parte/ })
-				.nth(i)
-				.fill(planningParts[i]);
-		}
-
-		await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+		await page.getByRole('button', { name: 'Pular etapa' }).click();
+		await page.locator('dialog[open]').getByRole('button', { name: 'Confirmar' }).click();
+		await expect(page.getByText('O trabalho do projeto não foi decomposto aqui')).toBeVisible();
 	});
 
-	await test.step('Priorizar entregas — Operar (mesmos itens, sem redigitação, reordenar e confirmar)', async () => {
-		await expect(page.getByRole('heading', { name: 'Priorizar entregas' })).toBeVisible();
+	await test.step('Trabalho — cria os WorkItems reais (fonte canônica de decomposição, S9)', async () => {
+		await page.getByRole('link', { name: 'Trabalho' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/work`);
 
-		// Recebe exatamente os mesmos itens de "Decompor o trabalho" — nomes
-		// somente leitura, nenhum campo de texto na tela.
-		for (const part of planningParts) {
-			await expect(page.getByText(part, { exact: true })).toBeVisible();
+		for (const title of workItemTitles) {
+			await page.getByRole('button', { name: '+ Criar item de trabalho' }).click();
+			await page.getByPlaceholder('O que precisa ser feito?').fill(title);
+			await Promise.all([
+				page.waitForResponse((response) => response.url().includes('?/create') && response.request().method() === 'POST'),
+				page.getByRole('button', { name: 'Criar', exact: true }).click()
+			]);
+			await expect(page.getByText(title, { exact: true })).toBeVisible();
 		}
-		await expect(page.getByRole('textbox', { name: /Nome da parte/ })).toHaveCount(0);
+	});
 
-		// Reordena só com ↑/↓: sobe "Notificação por e-mail" (3ª posição) até o
-		// topo, duas vezes — a ordem final vira Notificação, Tela, Fluxo.
-		const moveNotificacaoUp = page.getByRole('button', { name: 'Mover "Notificação por e-mail" para cima' });
-		await clickAndWaitForAnswer(moveNotificacaoUp);
-		await clickAndWaitForAnswer(moveNotificacaoUp);
+	await test.step('retomar "Decompor o trabalho" e confirmar — resolve a pendência', async () => {
+		await page.goto(`${serverA.baseUrl}/projects/${projectId}/now`);
+		await page.getByRole('link', { name: 'Retomar etapa' }).click();
+		await expect(page.getByRole('heading', { name: 'Decompor o trabalho' })).toBeVisible();
+		await expect(page.getByText(`Existe(m) ${workItemTitles.length} item(ns) de trabalho neste projeto.`)).toBeVisible();
+
+		await page.getByRole('button', { name: 'Confirmar decomposição' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
+		await expect(page.getByRole('heading', { name: 'Priorizar entregas' })).toBeVisible();
+		await expect(page.getByText('O trabalho do projeto não foi decomposto aqui')).toHaveCount(0);
+	});
+
+	await test.step('Priorizar entregas (S9) — sem Deliverable real não confirma; pular cria pendência', async () => {
+		await expect(page.getByText('Ainda não há nenhuma entrega (Deliverable) neste projeto')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Confirmar prioridade' })).toHaveCount(0);
+
+		await page.getByRole('button', { name: 'Pular etapa' }).click();
+		await page.locator('dialog[open]').getByRole('button', { name: 'Confirmar' }).click();
+		await expect(page.getByText('As entregas não foram priorizadas aqui')).toBeVisible();
+	});
+
+	await test.step('Entregas — cria a Deliverable real (fonte canônica de priorização, S9)', async () => {
+		await page.getByRole('link', { name: 'Entregas' }).click();
+		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/deliverables`);
+
+		await page.getByRole('button', { name: 'Declarar primeira entrega' }).click();
+		await page.getByLabel('O que será entregue').fill('Entrega real do projeto');
+		await page.getByLabel('Recorte').selectOption('agora');
+		await Promise.all([
+			page.waitForResponse((response) => response.url().includes('?/add') && response.request().method() === 'POST'),
+			page.getByRole('button', { name: 'Adicionar entrega' }).click()
+		]);
+		// A entrega criada aparece como linha editável (input de título, não
+		// texto estático) — mesmo padrão de '.item-row input[type="text"]' já
+		// usado acima para ScopeItem.
+		await expect(page.getByRole('textbox', { name: 'Título da entrega' })).toHaveValue('Entrega real do projeto');
+	});
+
+	await test.step('retomar "Priorizar entregas" e confirmar — resolve a pendência', async () => {
+		await page.goto(`${serverA.baseUrl}/projects/${projectId}/now`);
+		await page.getByRole('link', { name: 'Retomar etapa' }).click();
+		await expect(page.getByRole('heading', { name: 'Priorizar entregas' })).toBeVisible();
+		await expect(page.getByText('Existe(m) 1 entrega(s) neste projeto.')).toBeVisible();
 
 		await page.getByRole('button', { name: 'Confirmar prioridade' }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/now`);
@@ -300,6 +337,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		// passo genérico corre risco de preencher/submeter um formulário ainda
 		// não pronto (falha real observada: "Please fill out this field.").
 		await expect(page.getByRole('heading', { name: 'Mapear dependências' })).toBeVisible();
+		await expect(page.getByText('As entregas não foram priorizadas aqui')).toHaveCount(0);
 	});
 
 	await test.step('demais atividades do catálogo (Planejamento restante, Execução, Validação) respondidas genericamente até o encerramento', async () => {
@@ -370,18 +408,14 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		);
 		expect(necessidadeCentralAnswer?.value).toBe('Centralizar e priorizar solicitações internas.');
 
-		// C5-01 — prova que a ordem reorganizada em "Priorizar entregas"
-		// persistiu na MESMA Answer de "Decompor o trabalho" (partes_trabalho),
-		// nunca uma representação textual própria de prioridade.
+		// S9 (D045) — "Decompor o trabalho"/"Priorizar entregas" nunca escrevem
+		// PlanningItem: projeto novo, ponta a ponta, não deve ter nenhum Answer
+		// em partes_trabalho — decomposição real vive em WorkItem, prioridade
+		// real vive em Deliverable.bucket/order.
 		const partesTrabalhoAnswer = exportedJson.state.answers.find(
 			(answer) => answer.fieldDefinitionId === 'partes_trabalho'
 		);
-		const planningItems = JSON.parse(partesTrabalhoAnswer?.value ?? '[]') as Array<{ text: string }>;
-		expect(planningItems.map((item) => item.text)).toEqual([
-			'Notificação por e-mail',
-			'Tela de abertura de solicitação',
-			'Fluxo de aprovação'
-		]);
+		expect(partesTrabalhoAnswer).toBeUndefined();
 
 		// prova que a última atividade da última fase (Validação e
 		// encerramento) foi de fato alcançada e respondida — o encerramento

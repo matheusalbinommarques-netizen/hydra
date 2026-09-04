@@ -8,12 +8,15 @@
 
 import {
 	addAffectedGroup,
+	addDeliverable,
 	addDesiredOutcome,
 	addScopeItem,
 	addTreatmentStep,
+	addWorkItem,
 	answerActivity,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDecomposition,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -142,6 +145,38 @@ export function confirmTreatmentMinimally(
 }
 
 /**
+ * Confirma "Decompor o trabalho" (S9 — explicit_confirmation contra WorkItem)
+ * com o mínimo que {@link confirmDecomposition} exige: um WorkItem real —
+ * para quando o teste só precisa que a atividade fique `concluída`, sem se
+ * importar com o conteúdo do WorkItem.
+ */
+export function confirmDecompositionMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	workItemId: string,
+	occurredAt: string
+): ProjectState {
+	const next = unwrapResult(addWorkItem(catalog, state, workItemId, 'Item de trabalho de teste', occurredAt));
+	return unwrapResult(confirmDecomposition(catalog, next, occurredAt));
+}
+
+/**
+ * Confirma "Priorizar entregas" (S9 — explicit_confirmation contra
+ * Deliverable) com o mínimo que {@link confirmPlanningPriority} exige: uma
+ * Deliverable real — para quando o teste só precisa que a atividade fique
+ * `concluída`, sem se importar com o conteúdo da entrega.
+ */
+export function confirmPlanningPriorityMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	deliverableId: string,
+	occurredAt: string
+): ProjectState {
+	const next = unwrapResult(addDeliverable(catalog, state, deliverableId, 'Entrega de teste', 'agora', occurredAt));
+	return unwrapResult(confirmPlanningPriority(catalog, next, occurredAt));
+}
+
+/**
  * Confirma "Resultado desejado" (`resultado`, Stage 4C do rework) com o
  * mínimo que satisfaz {@link getDesiredOutcomeConfirmationIssues}: um
  * DesiredOutcome com `change` preenchido — para quando o teste só precisa
@@ -161,9 +196,11 @@ export function confirmDesiredOutcomesMinimally(
 /**
  * Completa todas as atividades de uma fase, na ordem do catálogo:
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
- * via `confirmSummary` (Resumo), `confirmPlanningPriority` (Priorizar
- * entregas, C5-01) ou {@link confirmAffectedGroupsMinimally} (Quem é afetado,
- * ETAPA 2), `scope_confirmation` via {@link confirmScopeVersionMinimally}.
+ * via `confirmSummary` (Resumo), {@link confirmDecompositionMinimally}
+ * (Decompor o trabalho, S9), {@link confirmPlanningPriorityMinimally}
+ * (Priorizar entregas, S9) ou {@link confirmAffectedGroupsMinimally} (Quem é
+ * afetado, ETAPA 2), `scope_confirmation` via
+ * {@link confirmScopeVersionMinimally}.
  */
 export function completePhase(catalog: Catalog, state: ProjectState, phaseId: string, occurredAt: string): ProjectState {
 	const phase = catalog.phases.find((p) => p.id === phaseId);
@@ -171,12 +208,14 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 	let next = state;
 	for (const activity of phase.activities) {
 		if (activity.completionMode === 'explicit_confirmation') {
-			// Três atividades explicit_confirmation no catálogo (C5-01 + ETAPA 2)
-			// — cada uma tem sua própria transição de confirmação, localizada por
-			// id explícito; nunca uma seleção genérica "a explicit_confirmation
-			// desta fase".
-			if (activity.id === 'priorizar_entregas') {
-				next = unwrapResult(confirmPlanningPriority(catalog, next, occurredAt));
+			// Atividades explicit_confirmation no catálogo (C5-01/S9 + ETAPA 2) —
+			// cada uma tem sua própria transição de confirmação, localizada por id
+			// explícito; nunca uma seleção genérica "a explicit_confirmation desta
+			// fase".
+			if (activity.id === 'decompor_trabalho') {
+				next = confirmDecompositionMinimally(catalog, next, `${activity.id}-work-item-1`, occurredAt);
+			} else if (activity.id === 'priorizar_entregas') {
+				next = confirmPlanningPriorityMinimally(catalog, next, `${activity.id}-deliverable-1`, occurredAt);
 			} else if (activity.id === 'publico') {
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else if (activity.id === 'estado_atual') {

@@ -11,20 +11,74 @@
 // o passo específico de "Confirmar resumo" em cada jornada.
 //
 // Duas interações adicionais reconhecidas por affordance observável, não por
-// id de atividade (C5-01):
-// - um campo `lista_partes` (ex.: "Decompor o trabalho") se revela pelo
-//   botão "Adicionar parte" dentro do próprio formulário — adiciona uma
-//   parte, preenche um texto não vazio e segue o fluxo normal de "Salvar e
-//   continuar";
-// - uma confirmação de prioridade sobre coleção já existente (ex.:
-//   "Priorizar entregas") não tem formulário com "Salvar e continuar": se
-//   revela pelo botão "Confirmar prioridade", que já opera sobre os itens
-//   herdados da atividade anterior, sem necessidade de reordenar nada aqui
-//   (a reordenação por ↑/↓ já é coberta pela walking-skeleton).
+// id de atividade (S9 — reconciliação da decomposição legada, D045):
+// - "Decompor o trabalho" (explicit_confirmation contra WorkItem) se revela
+//   pela mensagem "Ainda não há nenhum WorkItem neste projeto" quando ainda
+//   não há nenhum — navega para Trabalho, cria um WorkItem real pela UI
+//   (mesma action canônica que um usuário usaria) e volta, para então clicar
+//   "Confirmar decomposição"; nunca escreve PlanningItem/partes_trabalho.
+//   Precisa ser a UI real, não uma chamada direta à action: o form action de
+//   SvelteKit recusa POST sem o header Origin correto (proteção CSRF nativa),
+//   que só uma navegação/submissão real do browser envia;
+// - "Priorizar entregas" (explicit_confirmation contra Deliverable) segue o
+//   mesmo padrão: revela-se pela mensagem "Ainda não há nenhuma entrega
+//   (Deliverable) neste projeto", cria uma Deliverable real em Entregas pela
+//   UI e volta, para então clicar "Confirmar prioridade".
 
 import type { Page } from '@playwright/test';
 
+function projectIdFromUrl(page: Page): string {
+	const match = new URL(page.url()).pathname.match(/^\/projects\/([^/]+)\//);
+	if (!match) throw new Error(`answerCurrentActivityGenerically: não foi possível extrair projectId de ${page.url()}`);
+	return match[1];
+}
+
+function originFromUrl(page: Page): string {
+	return new URL(page.url()).origin;
+}
+
 export async function answerCurrentActivityGenerically(page: Page): Promise<void> {
+	const noWorkItemMessage = page.getByText('Ainda não há nenhum WorkItem neste projeto');
+	if (await noWorkItemMessage.count()) {
+		const origin = originFromUrl(page);
+		const projectId = projectIdFromUrl(page);
+		await page.goto(`${origin}/projects/${projectId}/work`);
+		await page.getByRole('button', { name: '+ Criar item de trabalho' }).click();
+		await page.getByPlaceholder('O que precisa ser feito?').fill('Item de trabalho automático');
+		await Promise.all([
+			page.waitForResponse((response) => response.url().includes('?/create') && response.request().method() === 'POST'),
+			page.getByRole('button', { name: 'Criar', exact: true }).click()
+		]);
+		await page.goto(`${origin}/projects/${projectId}/now`);
+	}
+
+	const confirmDecompositionButton = page.getByRole('button', { name: 'Confirmar decomposição' });
+	if (await confirmDecompositionButton.count()) {
+		await Promise.all([
+			page.waitForResponse(
+				(response) => response.url().includes('?/confirmDecomposition') && response.request().method() === 'POST'
+			),
+			confirmDecompositionButton.click()
+		]);
+		await page.waitForTimeout(200);
+		return;
+	}
+
+	const noDeliverableMessage = page.getByText('Ainda não há nenhuma entrega (Deliverable) neste projeto');
+	if (await noDeliverableMessage.count()) {
+		const origin = originFromUrl(page);
+		const projectId = projectIdFromUrl(page);
+		await page.goto(`${origin}/projects/${projectId}/deliverables`);
+		await page.getByRole('button', { name: 'Declarar primeira entrega' }).click();
+		await page.getByLabel('O que será entregue').fill('Entrega automática');
+		await page.getByLabel('Recorte').selectOption('agora');
+		await Promise.all([
+			page.waitForResponse((response) => response.url().includes('?/add') && response.request().method() === 'POST'),
+			page.getByRole('button', { name: 'Adicionar entrega' }).click()
+		]);
+		await page.goto(`${origin}/projects/${projectId}/now`);
+	}
+
 	const confirmPriorityButton = page.getByRole('button', { name: 'Confirmar prioridade' });
 	if (await confirmPriorityButton.count()) {
 		await Promise.all([
@@ -39,12 +93,6 @@ export async function answerCurrentActivityGenerically(page: Page): Promise<void
 	}
 
 	const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Salvar e continuar' }) });
-
-	const addPartButton = form.getByRole('button', { name: 'Adicionar parte' });
-	if (await addPartButton.count()) {
-		await addPartButton.click();
-		await form.getByRole('textbox', { name: /Nome da parte/ }).last().fill('Resposta de teste automatizada.');
-	}
 
 	const textInputs = form.locator('input[type="text"][required]');
 	for (let i = 0; i < (await textInputs.count()); i++) {

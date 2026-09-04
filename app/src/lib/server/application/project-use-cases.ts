@@ -27,6 +27,7 @@ import {
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmCauseHypotheses as confirmCauseHypothesesInDomain,
+	confirmDecomposition as confirmDecompositionInDomain,
 	confirmDesiredOutcomes as confirmDesiredOutcomesInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
@@ -110,6 +111,7 @@ import type {
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmCauseHypothesesInput,
+	ConfirmDecompositionInput,
 	ConfirmDesiredOutcomesInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
@@ -463,6 +465,17 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmSummaryInDomain(catalog, state);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmDecomposition(input: ConfirmDecompositionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmDecompositionInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

@@ -77,7 +77,8 @@ export type DomainTransitionError =
 	| { kind: 'milestone_work_item_not_found' }
 	| { kind: 'milestone_work_item_already_linked' }
 	| { kind: 'phase_not_found' }
-	| { kind: 'planning_no_items' }
+	| { kind: 'decomposition_no_work_items' }
+	| { kind: 'priorization_no_deliverables' }
 	| { kind: 'affected_group_not_found' }
 	| { kind: 'affected_group_confirmation_invalid'; issues: AffectedGroupConfirmationIssue[] }
 	| { kind: 'affected_group_has_references' }
@@ -370,18 +371,49 @@ export function confirmSummary(
 	return { ok: true, value: setActivityStatus(state, resumo.id, 'concluída') };
 }
 
-// C5-01 — "Priorizar entregas" (explicit_confirmation, allowsSkip: true).
-// Localiza a atividade por id explícito, nunca via
-// findExplicitConfirmationActivity: agora que há duas atividades
-// explicit_confirmation no catálogo (Resumo da Descoberta e esta), aquele
-// helper resolveria de forma ambígua — continua servindo só ao fluxo do
-// Resumo, sem alteração. A coleção de PlanningItem pertence à Answer de
-// "Decompor o trabalho" (partes_trabalho); esta função só lê essa Answer
-// para validar, nunca a modifica.
-const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
+// S9 (reconciliação da decomposição legada) — "Decompor o trabalho" e
+// "Priorizar entregas" (explicit_confirmation, allowsSkip: true) confirmam
+// contra a camada canônica (WorkItem/Deliverable), nunca contra
+// PlanningItem/Answer — localizadas por id explícito, nunca via
+// findExplicitConfirmationActivity: com três atividades explicit_confirmation
+// no catálogo (Resumo da Descoberta e estas duas), aquele helper resolveria
+// de forma ambígua — continua servindo só ao fluxo do Resumo, sem alteração.
 const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
-const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
+const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
 
+// Confirma "Decompor o trabalho" quando existe ao menos um WorkItem real —
+// nunca cria, edita nem lê PlanningItem. Só altera ActivityProgress (e
+// resolve a pendência, se estava pulada); nunca cria/associa WorkItem.
+export function confirmDecomposition(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, DECOMPOR_TRABALHO_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	if (state.workItems.length === 0) {
+		return { ok: false, error: { kind: 'decomposition_no_work_items' } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
+}
+
+// Confirma "Priorizar entregas" quando existe ao menos uma Deliverable real
+// — nunca cria, edita nem lê PlanningItem. Só altera ActivityProgress (e
+// resolve a pendência, se estava pulada); nunca cria/reordena Deliverable.
 export function confirmPlanningPriority(
 	catalog: Catalog,
 	state: ProjectState,
@@ -398,13 +430,8 @@ export function confirmPlanningPriority(
 		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
 	}
 
-	const answer = state.answers.find(
-		(a) =>
-			a.activityDefinitionId === DECOMPOR_TRABALHO_ACTIVITY_ID && a.fieldDefinitionId === PARTES_TRABALHO_FIELD_ID
-	);
-	const items = decodePlanningItems(answer?.value);
-	if (items.length === 0) {
-		return { ok: false, error: { kind: 'planning_no_items' } };
+	if (state.deliverables.length === 0) {
+		return { ok: false, error: { kind: 'priorization_no_deliverables' } };
 	}
 
 	let nextState = setActivityStatus(state, activity.id, 'concluída');

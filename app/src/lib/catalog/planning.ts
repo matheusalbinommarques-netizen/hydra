@@ -3,11 +3,19 @@
 // compreensível em texto estruturado — não é o objetivo reproduzir um
 // quadro de gestão de tarefas completo dentro do Hydra.
 //
-// "Decompor o trabalho" e "Priorizar entregas" (C5-01): laboratório da
-// mecânica CONSTRUIR → OPERAR — uma atividade cria dados vivos do projeto
-// (PlanningItem[], ver domain/planning-items.ts), a seguinte trabalha sobre
-// exatamente os mesmos dados, sem redigitação. Ver docs/06-architecture/
-// contracts.md e o backlog do Ciclo 5 para o desenho completo.
+// "Decompor o trabalho" e "Priorizar entregas" (C5-01) foram o laboratório
+// original da mecânica CONSTRUIR → OPERAR sobre PlanningItem[] (ver
+// domain/planning-items.ts). Desde S9 (reconciliação da decomposição
+// legada, docs/07-management/decision-log.md), `partes_trabalho` é
+// READ-LEGACY (§13.2 do rework): a responsabilidade operacional de
+// decompor/priorizar foi absorvida por WorkItem/Deliverable, e as duas
+// Activities viraram `explicit_confirmation` — intervenções/checkpoints
+// guiados, nunca fonte de dados. "Decompor o trabalho" confirma quando há
+// ao menos um WorkItem real (`confirmDecomposition`); "Priorizar entregas"
+// confirma quando há ao menos uma Deliverable real (`confirmPlanningPriority`,
+// domain/transitions.ts) — nenhuma das duas lê nem escreve PlanningItem
+// mais. PlanningItems antigos continuam legíveis só como histórico (Agora,
+// Registros, export/import), sem nenhuma autoridade operacional.
 
 import type { ActivityDefinition } from '$lib/domain';
 
@@ -17,24 +25,13 @@ const decomporTrabalho: ActivityDefinition = {
 	order: 1,
 	title: 'Decompor o trabalho',
 	mainQuestion: 'Como o trabalho deste projeto pode ser dividido em partes menores?',
-	why: 'Dividir o trabalho em partes menores torna o esforço mais fácil de estimar, priorizar e acompanhar. Cada parte criada aqui passa a existir no projeto e será usada nas próximas atividades, sem precisar ser digitada de novo.',
-	example: 'Partes: tela de abertura de solicitação, fluxo de aprovação, notificação por e-mail, painel de acompanhamento.',
-	completionCriteria: 'Ao menos uma parte do trabalho foi adicionada, com texto próprio.',
-	completionMode: 'required_fields',
+	why: 'Dividir o trabalho em partes executáveis torna o esforço mais fácil de estimar, priorizar e acompanhar. Decompor de verdade acontece em WorkItem, criado em Entregas ou em Trabalho — aqui você só confirma que já fez isso.',
+	example: 'Criar WorkItem em Entregas ou Trabalho: tela de abertura de solicitação, fluxo de aprovação, notificação por e-mail, painel de acompanhamento.',
+	completionCriteria: 'Existe ao menos um WorkItem real no projeto, e o usuário confirmou que a decomposição foi feita.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'O trabalho do projeto não foi decomposto',
-	pendingItemDetail: 'Sem isso, fica difícil estimar esforço ou priorizar o que fazer primeiro.',
-	fields: [
-		{
-			id: 'partes_trabalho',
-			activityId: 'decompor_trabalho',
-			label: 'Partes do trabalho',
-			required: true,
-			help: 'Adicione uma parte por vez. Você pode renomear ou remover a qualquer momento.',
-			dataTarget: 'answer',
-			type: 'lista_partes'
-		}
-	]
+	pendingItemLabel: 'O trabalho do projeto não foi decomposto aqui',
+	pendingItemDetail: 'Crie ao menos um WorkItem em Entregas ou Trabalho e volte para confirmar — ou pule esta etapa.'
 };
 
 const priorizarEntregas: ActivityDefinition = {
@@ -42,14 +39,14 @@ const priorizarEntregas: ActivityDefinition = {
 	phaseId: 'planejamento',
 	order: 2,
 	title: 'Priorizar entregas',
-	mainQuestion: 'Qual é a ordem de prioridade entre essas partes do trabalho?',
-	why: 'Priorizar evita tentar avançar tudo ao mesmo tempo e ajuda a entregar valor mais cedo. Estas são as partes que você criou em "Decompor o trabalho" — nada precisa ser digitado de novo, só a ordem muda.',
-	example: 'As mesmas partes definidas em "Decompor o trabalho", reordenadas por prioridade — a ordem da coleção é a própria prioridade.',
-	completionCriteria: 'A ordem das partes do trabalho foi revisada e a prioridade confirmada.',
+	mainQuestion: 'Qual é a ordem de prioridade entre as entregas deste projeto?',
+	why: 'Priorizar evita tentar avançar tudo ao mesmo tempo e ajuda a entregar valor mais cedo. Priorizar de verdade acontece em Entregas, pela ordem entre Agora/Depois/Fora — aqui você só confirma que já revisou essa prioridade.',
+	example: 'Entregas ordenadas em Agora/Depois/Fora, em Entregas — aqui você confirma que revisou essa ordem.',
+	completionCriteria: 'Existe ao menos uma Deliverable real no projeto, e o usuário confirmou que revisou a prioridade em Entregas.',
 	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'As entregas não foram priorizadas',
-	pendingItemDetail: 'Sem prioridade clara, o trabalho pode avançar em várias frentes sem nenhuma pronta.'
+	pendingItemLabel: 'As entregas não foram priorizadas aqui',
+	pendingItemDetail: 'Crie e ordene entregas em Entregas e volte para confirmar — ou pule esta etapa.'
 };
 
 const mapearDependencias: ActivityDefinition = {

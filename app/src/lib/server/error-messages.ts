@@ -63,8 +63,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Este trabalho já está relacionado a este marco.';
 		case 'phase_not_found':
 			return 'A fase escolhida não existe mais no catálogo.';
-		case 'planning_no_items':
-			return 'Adicione ao menos uma parte em "Decompor o trabalho" antes de confirmar a prioridade.';
+		case 'decomposition_no_work_items':
+			return 'Crie ao menos um item de trabalho (WorkItem), em Entregas ou em Trabalho, antes de confirmar.';
+		case 'priorization_no_deliverables':
+			return 'Crie ao menos uma entrega (Deliverable) em Entregas antes de confirmar a prioridade.';
 		case 'affected_group_not_found':
 			return 'Grupo afetado não encontrado.';
 		case 'affected_group_confirmation_invalid':

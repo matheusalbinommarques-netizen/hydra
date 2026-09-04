@@ -1,17 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { tick } from 'svelte';
 	import ActivityForm from '$lib/components/ActivityForm.svelte';
 	import ComoETratadoHoje from '$lib/components/ComoETratadoHoje.svelte';
 	import EntenderCausas from '$lib/components/EntenderCausas.svelte';
 	import EntenderSituacao from '$lib/components/EntenderSituacao.svelte';
 	import MapaDeImpacto from '$lib/components/MapaDeImpacto.svelte';
-	import PlanningItemsEditor from '$lib/components/PlanningItemsEditor.svelte';
 	import ResultadoDesejado from '$lib/components/ResultadoDesejado.svelte';
 	import SkipActivityConfirm from '$lib/components/SkipActivityConfirm.svelte';
-	import { encodePlanningItems } from '$lib/domain';
-	import type { PlanningItem } from '$lib/domain';
 	import type { PhaseProgressGroupKey } from '$lib/phase-progress';
 
 	let { data, form } = $props();
@@ -37,30 +33,9 @@
 
 	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
 
-	// C5-01 — "Priorizar entregas": estado local da MESMA coleção que
-	// "Decompor o trabalho" produziu. Cada ↑/↓ atualiza este estado e submete
-	// o form escondido abaixo, que reaproveita a action genérica `?/answer`
-	// gravando na Answer de "Decompor o trabalho" — nunca uma representação
-	// textual própria da prioridade.
-	// svelte-ignore state_referenced_locally -- seed intencional de montagem.
-	let priorityItems = $state<PlanningItem[]>(data.planningItems ?? []);
-	let priorityReorderForm = $state<HTMLFormElement | undefined>();
-
-	// A navegação entre atividades dentro de Agora é client-side (AJAX, via
-	// use:enhance) — o componente da página não remonta, então o seed acima
-	// não é suficiente sozinho: sem isto, priorityItems ficaria preso ao
-	// valor do primeiro carregamento (ex.: `[]`, se a página abriu em
-	// "Decompor o trabalho") e nunca refletiria os itens reais ao chegar em
-	// "Priorizar entregas" por essa navegação — só um recarregamento
-	// completo da página "corrigia" o sintoma, mascarando o bug. Resincroniza
-	// só quando a atividade atual É "Priorizar entregas": o efeito também
-	// re-executa depois do próprio autosave de reordenação (data.planningItems
-	// muda), o que é inofensivo — o servidor já confirma o mesmo conteúdo.
-	$effect(() => {
-		if (data.activity?.id === 'priorizar_entregas') {
-			priorityItems = data.planningItems ?? [];
-		}
-	});
+	// S9 — `partes_trabalho` é READ-LEGACY (§13.2): "Priorizar entregas" só
+	// apresenta o legado somente leitura agora, direto de `data.planningItems`
+	// (sem estado local nem reordenação — ver mainContent abaixo).
 
 	// Mesmo vocabulário de ícone já usado pelo Mapa (Concluída/Atual ~
 	// em_andamento/Pendente/Pulada) — coerência de linguagem visual entre as
@@ -129,57 +104,70 @@
 		</section>
 	{/if}
 
-	{#if data.activity?.id === 'priorizar_entregas'}
+	{#if data.activity?.id === 'decompor_trabalho'}
 		<section class="next-action">
-			{#if priorityItems.length === 0}
-				<p class="eyebrow">Priorizar entregas</p>
-				<h2>{data.activity.title}</h2>
-				<p>Nenhuma parte foi definida.</p>
-				<p>
-					<a href="/projects/{view.projectId}/now?activity=decompor_trabalho"
-						>Voltar para decompor o trabalho →</a
-					>
-				</p>
-			{:else}
-				<p class="eyebrow">Atividade atual · dados já no projeto</p>
-				<h2>{data.activity.title}</h2>
-				<p class="main-question">{data.activity.mainQuestion}</p>
+			<p class="eyebrow">Planejamento</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				Decompor o trabalho acontece em WorkItem, com identidade e progresso próprios — crie em <a
+					href="/projects/{view.projectId}/deliverables">Entregas</a
+				>, dentro de uma entrega, ou direto em <a href="/projects/{view.projectId}/work">Trabalho</a
+				>.
+			</p>
+			{#if (data.planningItems ?? []).length > 0}
+				<p>As partes registradas aqui antes dessa mudança continuam preservadas, somente leitura:</p>
+				<ol class="legacy-planning-list">
+					{#each data.planningItems ?? [] as item (item.id)}
+						<li>{item.text}</li>
+					{/each}
+				</ol>
+			{/if}
 
-				<!-- Reaproveita a action genérica `?/answer`, gravando na Answer de
-				     "Decompor o trabalho" mesmo estando em "Priorizar entregas" — a
-				     coleção é a mesma, nunca uma cópia. -->
-				<form
-					method="POST"
-					action="?/answer"
-					bind:this={priorityReorderForm}
-					use:enhance={() => async ({ update }) => update({ reset: false })}
-				>
-					<input type="hidden" name="activityDefinitionId" value="decompor_trabalho" />
-					<input type="hidden" name="partes_trabalho" value={encodePlanningItems(priorityItems)} />
+			{#if view.workItems.length > 0}
+				<p>Existe(m) {view.workItems.length} item(ns) de trabalho neste projeto.</p>
+				<form method="POST" action="?/confirmDecomposition" use:enhance>
+					<button type="submit">Confirmar decomposição</button>
 				</form>
+			{:else}
+				<p>Ainda não há nenhum WorkItem neste projeto — crie ao menos um para poder confirmar.</p>
+			{/if}
 
-				<PlanningItemsEditor
-					items={priorityItems}
-					mode="operate"
-					onchange={async (items) => {
-						priorityItems = items;
-						// tick() é necessário aqui: requestSubmit() lê o DOM
-						// imediatamente, mas o <input type="hidden"> acima só reflete
-						// priorityItems depois que o Svelte aplica a atualização — sem
-						// aguardar, o form submeteria a ordem ANTERIOR (bug real,
-						// encontrado ao reproduzir manualmente antes desta correção).
-						await tick();
-						priorityReorderForm?.requestSubmit();
-					}}
-				/>
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
+			{/if}
 
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
+		</section>
+	{:else if data.activity?.id === 'priorizar_entregas'}
+		<section class="next-action">
+			<p class="eyebrow">Planejamento</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				Priorizar entregas acontece em <a href="/projects/{view.projectId}/deliverables">Entregas</a
+				>, pela ordem entre Agora/Depois/Fora.
+			</p>
+			{#if (data.planningItems ?? []).length > 0}
+				<p>A ordem definida aqui antes dessa mudança continua preservada, somente leitura:</p>
+				<ol class="legacy-planning-list">
+					{#each data.planningItems ?? [] as item (item.id)}
+						<li>{item.text}</li>
+					{/each}
+				</ol>
+			{/if}
+
+			{#if view.deliverables.length > 0}
+				<p>Existe(m) {view.deliverables.length} entrega(s) neste projeto.</p>
 				<form method="POST" action="?/confirmPlanningPriority" use:enhance>
 					<button type="submit">Confirmar prioridade</button>
 				</form>
+			{:else}
+				<p>Ainda não há nenhuma entrega (Deliverable) neste projeto — crie e ordene em Entregas para poder confirmar.</p>
+			{/if}
 
-				{#if form?.message}
-					<p role="alert">{form.message}</p>
-				{/if}
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
 			{/if}
 
 			{#if data.activity.allowsSkip}
@@ -495,6 +483,16 @@
 	.example {
 		color: var(--hydra-muted);
 		font-size: 0.9rem;
+	}
+
+	.legacy-planning-list {
+		margin: 0.75rem 0 0;
+		padding-left: 1.5rem;
+		color: var(--hydra-muted);
+		font-size: 0.9rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
 	}
 
 	form {

@@ -36,7 +36,6 @@ import {
 } from './transitions';
 import { deserializeProjectEvents, deserializeProjectState, serializeProjectState } from './serialization';
 import type { ProjectEvent } from './events';
-import { encodePlanningItems } from './planning-items';
 import type { Catalog, RequiredFieldsActivity } from './catalog-types';
 import type { ProjectState } from './state-types';
 import type { ProjectStateParseError } from './serialization';
@@ -253,17 +252,8 @@ describe('deserializeProjectState — invariant_violation', () => {
 		expectError(JSON.stringify(envelope), 'invariant_violation');
 	});
 
-	it('C5-01: aceita "Priorizar entregas" (explicit_confirmation, allowsSkip true) com status pulada', () => {
+	it('S9: aceita "Priorizar entregas" (explicit_confirmation, allowsSkip true) com status pulada', () => {
 		let state = createInitialProjectState(catalog, 'proj-1', T1);
-		state = unwrap(
-			answerActivity(
-				catalog,
-				state,
-				'decompor_trabalho',
-				{ partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) },
-				T1
-			)
-		);
 		state = unwrap(skipActivity(catalog, state, 'priorizar_entregas', 'pend-priorizar', T1));
 
 		const json = serializeProjectState(state);

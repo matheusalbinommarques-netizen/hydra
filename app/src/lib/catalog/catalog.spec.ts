@@ -120,18 +120,17 @@ describe('catalog', () => {
 		expect('fields' in (montar ?? {})).toBe(false);
 	});
 
-	it('C5-01: "Decompor o trabalho" tem um único campo lista_partes, required_fields, allowsSkip true', () => {
+	it('S9: "Decompor o trabalho" é explicit_confirmation (contra WorkItem), allowsSkip true, sem fields', () => {
 		const planejamento = catalog.phases.find((phase) => phase.id === 'planejamento');
 		const decompor = planejamento?.activities.find((activity) => activity.id === 'decompor_trabalho');
-		if (!decompor || decompor.completionMode !== 'required_fields') {
-			throw new Error('atividade "decompor_trabalho" deveria ser required_fields');
-		}
-		expect(decompor.allowsSkip).toBe(true);
-		expect(decompor.fields.map((field) => field.id)).toEqual(['partes_trabalho']);
-		expect(decompor.fields[0].type).toBe('lista_partes');
+		expect(decompor?.completionMode).toBe('explicit_confirmation');
+		expect(decompor?.allowsSkip).toBe(true);
+		expect('fields' in (decompor ?? {})).toBe(false);
+		expect(decompor?.pendingItemLabel).toBeTruthy();
+		expect(decompor?.pendingItemDetail).toBeTruthy();
 	});
 
-	it('C5-01: "Priorizar entregas" é explicit_confirmation, allowsSkip true, sem fields, com pendingItemLabel/Detail', () => {
+	it('S9: "Priorizar entregas" é explicit_confirmation (contra Deliverable), allowsSkip true, sem fields, com pendingItemLabel/Detail', () => {
 		const planejamento = catalog.phases.find((phase) => phase.id === 'planejamento');
 		const priorizar = planejamento?.activities.find((activity) => activity.id === 'priorizar_entregas');
 		expect(priorizar?.completionMode).toBe('explicit_confirmation');
@@ -141,11 +140,12 @@ describe('catalog', () => {
 		expect(priorizar?.pendingItemDetail).toBeTruthy();
 	});
 
-	it('há exatamente seis atividades explicit_confirmation, com allowsSkip diferentes', () => {
+	it('há exatamente sete atividades explicit_confirmation, com allowsSkip diferentes', () => {
 		const explicitConfirmationActivities = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.completionMode === 'explicit_confirmation');
 		expect(explicitConfirmationActivities.map((activity) => activity.id).sort()).toEqual([
+			'decompor_trabalho',
 			'entender_causas',
 			'estado_atual',
 			'priorizar_entregas',
@@ -155,6 +155,7 @@ describe('catalog', () => {
 		]);
 		const byId = Object.fromEntries(explicitConfirmationActivities.map((activity) => [activity.id, activity]));
 		expect(byId.resumo.allowsSkip).toBe(false);
+		expect(byId.decompor_trabalho.allowsSkip).toBe(true);
 		expect(byId.priorizar_entregas.allowsSkip).toBe(true);
 		expect(byId.publico.allowsSkip).toBe(true);
 		expect(byId.estado_atual.allowsSkip).toBe(true);

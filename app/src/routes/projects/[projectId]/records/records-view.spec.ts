@@ -151,7 +151,7 @@ describe('buildRecordsView', () => {
 		expect(decomporActivity.fields[0].value).not.toContain('"id"');
 	});
 
-	it('C5-01: editHref é a URL completa (com from=records) para "Decompor o trabalho" concluída, fora da Descoberta', () => {
+	it('S9: "Decompor o trabalho" concluída, fora da Descoberta, não tem editHref (partes_trabalho é READ-LEGACY)', () => {
 		const result = buildRecordsView(catalog, {
 			projectId: PROJECT_ID,
 			answers: { partes_trabalho: encodePlanningItems([{ id: 'p1', text: 'Parte 1' }]) },
@@ -161,7 +161,7 @@ describe('buildRecordsView', () => {
 
 		const planejamento = result.phases.find((phase) => phase.phaseId === 'planejamento')!;
 		const decomporActivity = planejamento.activities.find((activity) => activity.activityId === 'decompor_trabalho')!;
-		expect(decomporActivity.editHref).toBe(`/projects/${PROJECT_ID}/now?activity=decompor_trabalho&from=records`);
+		expect(decomporActivity.editHref).toBeNull();
 	});
 
 	it('C5-01: "Priorizar entregas" (explicit_confirmation, sem fields) nunca aparece em Registros', () => {

@@ -19,6 +19,7 @@ const DESCOBERTA_PHASE_ID = 'descoberta';
 // planning-items.ts como o único lugar que conhece o formato JSON interno —
 // a rota só repassa um array já decodificado para o template.
 const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
+const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
 const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
 
 // S4D — "Resumo da descoberta" agora é representada pela tela dedicada
@@ -72,13 +73,12 @@ function findActivityDefinition(activityId: string): ActivityDefinition | undefi
 // uma pulada (essa continua exclusiva do fluxo de retomada de pendência,
 // acima).
 //
-// "Decompor o trabalho" entra aqui, fora da Descoberta, para viabilizar
-// "voltar para editar" depois de "Priorizar entregas" já confirmada (C5-01,
-// item 7 da decisão de implementação). É uma exceção nominal, não uma
-// política geral de edição por fase. A próxima exceção fora desta lista deve
-// provocar generalização da regra (ex.: um sinal explícito no catálogo,
-// tipo "editableAfterConclusion"), não a adição de outro id aqui.
-const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set(['decompor_trabalho']);
+// S9 (reconciliação da decomposição legada) retirou "Decompor o trabalho"
+// desta exceção: `partes_trabalho` é READ-LEGACY (§13.2) — o legado
+// continua visível em Registros/Agora, mas não é mais reaberto para edição
+// a partir daqui. Nenhuma exceção nominal permanece fora da Descoberta
+// hoje; o próximo caso real decide se vale reintroduzir o mecanismo.
+const REVIEWABLE_ACTIVITY_IDS_OUTSIDE_DESCOBERTA = new Set<string>([]);
 
 // "Quem é afetado" (publico) e "Como é tratado hoje" (estado_atual) são as
 // exceções não required_fields: o Mapa de Impacto (MapaDeImpacto.svelte,
@@ -273,12 +273,12 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		// rede de segurança, nunca uma tela sem nenhum campo.
 	}
 
-	// C5-01 — "Priorizar entregas" não tem fields próprios (explicit_confirmation):
-	// a coleção que ela apresenta/reordena é a mesma Answer de "Decompor o
-	// trabalho", decodificada aqui para o template não precisar conhecer o
-	// formato JSON interno.
+	// S9 — `partes_trabalho` é READ-LEGACY: tanto "Decompor o trabalho" quanto
+	// "Priorizar entregas" agora só apresentam o legado somente leitura (sem
+	// form de criação nem de reordenação), decodificado aqui para o template
+	// não precisar conhecer o formato JSON interno.
 	const planningItems =
-		activity?.id === PRIORIZAR_ENTREGAS_ACTIVITY_ID
+		activity?.id === PRIORIZAR_ENTREGAS_ACTIVITY_ID || activity?.id === DECOMPOR_TRABALHO_ACTIVITY_ID
 			? decodePlanningItems(view.answers[PARTES_TRABALHO_FIELD_ID])
 			: undefined;
 
@@ -430,10 +430,22 @@ export const actions: Actions = {
 		redirect(303, `/projects/${params.projectId}/now`);
 	},
 
-	// C5-01 — confirma "Priorizar entregas". Não recebe nenhum dado de
-	// PlanningItem: a coleção pertence à Answer de "Decompor o trabalho" e
-	// não é tocada por esta action; a recusa por coleção vazia acontece no
-	// domínio (confirmPlanningPriority → planning_no_items).
+	// S9 — confirma "Decompor o trabalho". Não recebe nenhum dado de
+	// WorkItem/PlanningItem: a recusa por ausência de WorkItem real acontece
+	// no domínio (confirmDecomposition → decomposition_no_work_items).
+	confirmDecomposition: async ({ params }) => {
+		const result = await getProjectUseCases().confirmDecomposition({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// S9 — confirma "Priorizar entregas". Não recebe nenhum dado de
+	// Deliverable/PlanningItem: a recusa por ausência de Deliverable real
+	// acontece no domínio (confirmPlanningPriority → priorization_no_deliverables).
 	confirmPlanningPriority: async ({ params }) => {
 		const result = await getProjectUseCases().confirmPlanningPriority({ projectId: params.projectId });
 
