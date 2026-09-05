@@ -380,6 +380,10 @@ export function confirmSummary(
 // de forma ambígua — continua servindo só ao fluxo do Resumo, sem alteração.
 const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
 const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
+// S9 (reconciliação de dependências legadas) — localizada por id explícito,
+// mesmo motivo de DECOMPOR_TRABALHO_ACTIVITY_ID/PRIORIZAR_ENTREGAS_ACTIVITY_ID
+// acima: várias atividades explicit_confirmation coexistem no catálogo.
+const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
 
 // Confirma "Decompor o trabalho" quando existe ao menos um WorkItem real —
 // nunca cria, edita nem lê PlanningItem. Só altera ActivityProgress (e
@@ -432,6 +436,34 @@ export function confirmPlanningPriority(
 
 	if (state.deliverables.length === 0) {
 		return { ok: false, error: { kind: 'priorization_no_deliverables' } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
+}
+
+// Confirma "Mapear dependências" — nunca cria, edita, lê nem exige nenhuma
+// Dependency: ao contrário de confirmDecomposition/confirmPlanningPriority,
+// ZERO Dependency é resultado legítimo (a confirmação é "revisei o estado
+// real", não "existe pelo menos um fato"). Só altera ActivityProgress (e
+// resolve a pendência, se estava pulada).
+export function confirmDependencyMapping(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, MAPEAR_DEPENDENCIAS_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
 	}
 
 	let nextState = setActivityStatus(state, activity.id, 'concluída');

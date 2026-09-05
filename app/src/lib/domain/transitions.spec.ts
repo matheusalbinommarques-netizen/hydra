@@ -3,6 +3,7 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addDeliverable,
+	addDependency,
 	addMilestone,
 	setMilestonePlannedDate,
 	addWorkItem,
@@ -22,6 +23,7 @@ import {
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
 	confirmDecomposition,
+	confirmDependencyMapping,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -860,6 +862,85 @@ describe('confirmPlanningPriority (S9)', () => {
 		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'priorizar_entregas');
 		expect(progress?.status).toBe('concluída');
 		expect(confirmed.pendingItems[0].status).toBe('resolvida');
+	});
+});
+
+// S9 (reconciliação de dependências legadas) — ao contrário de
+// confirmDecomposition/confirmPlanningPriority acima, ZERO Dependency é
+// resultado válido: confirmar significa "revisei o estado real", nunca
+// "existe pelo menos um fato". Falsificadores centrais: confirma com zero,
+// confirma com uma Dependency real, nunca cria/altera Dependency, e o Answer
+// legado nunca ganha autoridade (nem impede, nem substitui a confirmação).
+describe('confirmDependencyMapping (S9)', () => {
+	it('conclui "Mapear dependências" com ZERO Dependency — 0 é resultado válido, nunca recusado', () => {
+		const state = unwrap(confirmDependencyMapping(catalog, freshState(), T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'mapear_dependencias');
+		expect(progress?.status).toBe('concluída');
+		expect(state.dependencies).toEqual([]);
+	});
+
+	it('conclui "Mapear dependências" quando existe uma Dependency real, sem alterá-la', () => {
+		let withDependency = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		withDependency = unwrap(addWorkItem(catalog, withDependency, 'wi-b', 'B', T1));
+		withDependency = unwrap(addDependency(catalog, withDependency, 'dep-1', 'wi-a', 'wi-b', T1));
+		const state = unwrap(confirmDependencyMapping(catalog, withDependency, T2));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'mapear_dependencias');
+		expect(progress?.status).toBe('concluída');
+		expect(state.dependencies).toEqual(withDependency.dependencies);
+	});
+
+	it('Answer legado (dependencias_trabalho) sozinho não impede nem é exigido para confirmar', () => {
+		const legacyState: ProjectState = {
+			...freshState(),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'mapear_dependencias',
+					fieldDefinitionId: 'dependencias_trabalho',
+					value: 'A depende de B; B depende de C',
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+		const state = unwrap(confirmDependencyMapping(catalog, legacyState, T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'mapear_dependencias');
+		expect(progress?.status).toBe('concluída');
+		expect(state.dependencies).toEqual([]);
+	});
+
+	it('erro transition_not_allowed ao confirmar uma revisão já concluída', () => {
+		const state = unwrap(confirmDependencyMapping(catalog, freshState(), T1));
+		const result = confirmDependencyMapping(catalog, state, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('permite pular "Mapear dependências" mesmo sendo explicit_confirmation (allowsSkip true)', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'mapear_dependencias', 'pend-1', T1));
+		const progress = skipped.activityProgress.find((p) => p.activityDefinitionId === 'mapear_dependencias');
+		expect(progress?.status).toBe('pulada');
+		expect(skipped.pendingItems).toEqual([
+			{ id: 'pend-1', projectId: 'proj-1', activityDefinitionId: 'mapear_dependencias', status: 'aberta', createdAt: T1 }
+		]);
+	});
+
+	it('skip → pending → retomar → confirmação resolve a pendência, mesmo com ZERO Dependency', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'mapear_dependencias', 'pend-1', T1));
+		const confirmed = unwrap(confirmDependencyMapping(catalog, skipped, T2));
+		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'mapear_dependencias');
+		expect(progress?.status).toBe('concluída');
+		expect(confirmed.pendingItems[0].status).toBe('resolvida');
+	});
+
+	it('answerActivity recusa "mapear_dependencias" com wrong_completion_mode — não é mais required_fields, nunca escreve Answer novo', () => {
+		const result = answerActivity(
+			catalog,
+			freshState(),
+			'mapear_dependencias',
+			{ dependencias_trabalho: 'Nova dependência via texto livre' },
+			T1
+		);
+		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });
 	});
 });
 

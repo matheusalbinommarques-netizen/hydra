@@ -49,31 +49,29 @@ const priorizarEntregas: ActivityDefinition = {
 	pendingItemDetail: 'Crie e ordene entregas em Entregas e volte para confirmar — ou pule esta etapa.'
 };
 
+// S9 (reconciliação de dependências legadas) — `dependencias_trabalho` é
+// READ-LEGACY (§13.2): continua legível, mas nunca ganha nova escrita. A
+// responsabilidade operacional de dependência real pertence a `Dependency`
+// (D039, Trabalho). "Mapear dependências" vira `explicit_confirmation`
+// contra o estado canônico — mas, ao contrário de "Decompor o trabalho"/
+// "Priorizar entregas" (D045), ZERO Dependency é resultado válido: confirmar
+// significa "revisei as dependências reais e o estado atual está correto",
+// nunca "existe pelo menos uma". `confirmDependencyMapping`
+// (domain/transitions.ts) nunca recusa por ausência de Dependency.
 const mapearDependencias: ActivityDefinition = {
 	id: 'mapear_dependencias',
 	phaseId: 'planejamento',
 	order: 3,
 	title: 'Mapear dependências',
 	mainQuestion: 'Existe alguma dependência entre as partes do trabalho?',
-	why: 'Conhecer dependências evita começar algo que só pode ser concluído depois de outra parte estar pronta.',
-	example: 'O fluxo de aprovação depende da tela de abertura de solicitação já existir.',
+	why: 'Conhecer dependências evita começar algo que só pode ser concluído depois de outra parte estar pronta. Mapear de verdade acontece em Trabalho, como Dependency entre WorkItems — aqui você só confirma que revisou o estado atual, mesmo que ele seja "nenhuma dependência".',
+	example: 'O fluxo de aprovação depende da tela de abertura de solicitação já existir — declarado em Trabalho.',
 	completionCriteria:
-		'Dependências relevantes entre as partes do trabalho estão descritas, mesmo que a resposta seja que não há nenhuma.',
-	completionMode: 'required_fields',
+		'O usuário confirmou que revisou as dependências reais do trabalho em Trabalho, mesmo que nenhuma exista.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'As dependências do trabalho não foram mapeadas',
-	pendingItemDetail: 'Sem isso, o projeto corre risco de iniciar algo fora de ordem.',
-	fields: [
-		{
-			id: 'dependencias_trabalho',
-			activityId: 'mapear_dependencias',
-			label: 'Quais dependências existem entre as partes do trabalho?',
-			required: true,
-			placeholder: "Ex.: o fluxo de aprovação depende da tela de abertura existir; ou 'nenhuma dependência identificada'",
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'As dependências do trabalho não foram revisadas aqui',
+	pendingItemDetail: 'Revise as dependências em Trabalho e volte para confirmar — ou pule esta etapa.'
 };
 
 const estimarEsforcoCapacidade: ActivityDefinition = {

@@ -22,6 +22,13 @@ const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
 const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
 const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
 
+// S9 (reconciliação de dependências legadas) — `dependencias_trabalho` é
+// READ-LEGACY, texto livre simples (nunca uma coleção codificada como
+// `partes_trabalho`), então não precisa de decode: repassado direto de
+// `view.answers` para o template.
+const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
+const DEPENDENCIAS_TRABALHO_FIELD_ID = 'dependencias_trabalho';
+
 // S4D — "Resumo da descoberta" agora é representada pela tela dedicada
 // /summary (Checkpoint da Descoberta), não mais por uma superfície própria
 // dentro de /now. `resumo` nunca é allowsSkip, então nunca chega aqui via
@@ -282,6 +289,9 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 			? decodePlanningItems(view.answers[PARTES_TRABALHO_FIELD_ID])
 			: undefined;
 
+	const dependenciasTrabalho =
+		activity?.id === MAPEAR_DEPENDENCIAS_ACTIVITY_ID ? (view.answers[DEPENDENCIAS_TRABALHO_FIELD_ID] ?? null) : undefined;
+
 	return {
 		activity,
 		isResuming: Boolean(resumingPendingItem),
@@ -290,7 +300,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		bancadaOverview,
 		journeyContext,
 		phaseProgress,
-		planningItems
+		planningItems,
+		dependenciasTrabalho
 	};
 };
 
@@ -448,6 +459,21 @@ export const actions: Actions = {
 	// acontece no domínio (confirmPlanningPriority → priorization_no_deliverables).
 	confirmPlanningPriority: async ({ params }) => {
 		const result = await getProjectUseCases().confirmPlanningPriority({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// S9 (reconciliação de dependências legadas) — confirma "Mapear
+	// dependências". Não recebe nenhum dado de Dependency: ZERO é resultado
+	// válido, então o domínio (confirmDependencyMapping) nunca recusa por
+	// ausência de Dependency, ao contrário de confirmDecomposition/
+	// confirmPlanningPriority acima.
+	confirmDependencyMapping: async ({ params }) => {
+		const result = await getProjectUseCases().confirmDependencyMapping({ projectId: params.projectId });
 
 		if (!result.ok) {
 			return fail(400, { message: mapUseCaseError(result.error) });

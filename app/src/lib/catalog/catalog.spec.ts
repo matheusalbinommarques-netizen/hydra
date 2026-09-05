@@ -140,7 +140,17 @@ describe('catalog', () => {
 		expect(priorizar?.pendingItemDetail).toBeTruthy();
 	});
 
-	it('há exatamente sete atividades explicit_confirmation, com allowsSkip diferentes', () => {
+	it('S9: "Mapear dependências" é explicit_confirmation (contra Dependency, mas ZERO é válido), allowsSkip true, sem fields, com pendingItemLabel/Detail', () => {
+		const planejamento = catalog.phases.find((phase) => phase.id === 'planejamento');
+		const mapear = planejamento?.activities.find((activity) => activity.id === 'mapear_dependencias');
+		expect(mapear?.completionMode).toBe('explicit_confirmation');
+		expect(mapear?.allowsSkip).toBe(true);
+		expect('fields' in (mapear ?? {})).toBe(false);
+		expect(mapear?.pendingItemLabel).toBeTruthy();
+		expect(mapear?.pendingItemDetail).toBeTruthy();
+	});
+
+	it('há exatamente oito atividades explicit_confirmation, com allowsSkip diferentes', () => {
 		const explicitConfirmationActivities = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.completionMode === 'explicit_confirmation');
@@ -148,6 +158,7 @@ describe('catalog', () => {
 			'decompor_trabalho',
 			'entender_causas',
 			'estado_atual',
+			'mapear_dependencias',
 			'priorizar_entregas',
 			'publico',
 			'resultado',
@@ -157,6 +168,7 @@ describe('catalog', () => {
 		expect(byId.resumo.allowsSkip).toBe(false);
 		expect(byId.decompor_trabalho.allowsSkip).toBe(true);
 		expect(byId.priorizar_entregas.allowsSkip).toBe(true);
+		expect(byId.mapear_dependencias.allowsSkip).toBe(true);
 		expect(byId.publico.allowsSkip).toBe(true);
 		expect(byId.estado_atual.allowsSkip).toBe(true);
 		expect(byId.entender_causas.allowsSkip).toBe(true);

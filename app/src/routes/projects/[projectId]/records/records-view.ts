@@ -134,6 +134,15 @@ const DECOMPOR_TRABALHO_ACTIVITY_ID = 'decompor_trabalho';
 const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
 const PARTES_TRABALHO_FIELD_LABEL = 'Partes do trabalho';
 
+// S9 (reconciliação de dependências legadas) — "Mapear dependências" segue o
+// mesmo padrão de DECOMPOR_TRABALHO acima: virou explicit_confirmation
+// (confirmDependencyMapping, ver domain/transitions.ts), então o loop
+// genérico não a alcança mais. `dependencias_trabalho` é texto livre simples
+// (nunca uma coleção codificada), então não precisa de decode.
+const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
+const DEPENDENCIAS_TRABALHO_FIELD_ID = 'dependencias_trabalho';
+const DEPENDENCIAS_TRABALHO_FIELD_LABEL = 'Dependências do trabalho';
+
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
 		const found = phase.activities.find((activity) => activity.id === activityDefinitionId);
@@ -271,6 +280,22 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 					editHref: null
 				});
 			}
+		}
+
+		const mapearDependencias = phase.activities.find((activity) => activity.id === MAPEAR_DEPENDENCIAS_ACTIVITY_ID);
+		if (mapearDependencias && input.answers[DEPENDENCIAS_TRABALHO_FIELD_ID]) {
+			activities.push({
+				activityId: MAPEAR_DEPENDENCIAS_ACTIVITY_ID,
+				title: mapearDependencias.title,
+				fields: [
+					{
+						id: DEPENDENCIAS_TRABALHO_FIELD_ID,
+						label: DEPENDENCIAS_TRABALHO_FIELD_LABEL,
+						value: input.answers[DEPENDENCIAS_TRABALHO_FIELD_ID]
+					}
+				],
+				editHref: null
+			});
 		}
 
 		for (const activity of phase.activities) {

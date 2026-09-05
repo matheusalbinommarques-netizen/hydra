@@ -92,6 +92,24 @@ export async function answerCurrentActivityGenerically(page: Page): Promise<void
 		return;
 	}
 
+	// "Mapear dependências" (S9 — explicit_confirmation contra Dependency, mas
+	// ZERO Dependency é resultado válido, D046): ao contrário de
+	// confirmDecomposition/confirmPlanningPriority acima, não há affordance de
+	// "ainda não há nenhum X" a esperar — o botão de confirmação já está
+	// sempre disponível, então basta reconhecê-lo e clicar.
+	const confirmDependencyMappingButton = page.getByRole('button', { name: 'Confirmar revisão das dependências' });
+	if (await confirmDependencyMappingButton.count()) {
+		await Promise.all([
+			page.waitForResponse(
+				(response) =>
+					response.url().includes('?/confirmDependencyMapping') && response.request().method() === 'POST'
+			),
+			confirmDependencyMappingButton.click()
+		]);
+		await page.waitForTimeout(200);
+		return;
+	}
+
 	const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Salvar e continuar' }) });
 
 	const textInputs = form.locator('input[type="text"][required]');

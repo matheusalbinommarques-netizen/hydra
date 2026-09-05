@@ -35,6 +35,7 @@ import {
 	skipActivity
 } from './transitions';
 import { deserializeProjectEvents, deserializeProjectState, serializeProjectState } from './serialization';
+import { encodePlanningItems } from './planning-items';
 import type { ProjectEvent } from './events';
 import type { Catalog, RequiredFieldsActivity } from './catalog-types';
 import type { ProjectState } from './state-types';
@@ -1546,6 +1547,52 @@ describe('deserializeProjectEvents', () => {
 	});
 });
 
+// Decompor o trabalho (S9, D045 — correção de compatibilidade) — D045
+// prometeu que partes_trabalho/PlanningItem legado "continuam legíveis em
+// Answer, Agora e Registros, e preservados integralmente em export/import",
+// mas `decompor_trabalho::partes_trabalho` nunca foi registrado em
+// legacy-answers.ts depois que a atividade virou explicit_confirmation —
+// falsificador que prova o defeito estava presente (sem a entrada em
+// DEPRECATED_ANSWER_FIELDS, este teste falha com result.ok === false) e
+// que a correção cumpre exatamente o que D045 já havia decidido, sem
+// promover PlanningItem a WorkItem/Deliverable.
+describe('Decompor o trabalho (S9, D045 — correção de compatibilidade de partes_trabalho legado)', () => {
+	it('snapshot anterior a D045 com Answer legada partes_trabalho continua importável, intacta, sem criar WorkItem/Deliverable', () => {
+		const legacyValue = encodePlanningItems([
+			{ id: 'p1', text: 'Tela de abertura' },
+			{ id: 'p2', text: 'Fluxo de aprovação' }
+		]);
+		const state: ProjectState = {
+			...createInitialProjectState(catalog, 'proj-1', T1),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'decompor_trabalho',
+					fieldDefinitionId: 'partes_trabalho',
+					value: legacyValue,
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// Intacto — READ-LEGACY, nunca reescrito.
+		expect(
+			result.value.answers.find(
+				(answer) => answer.activityDefinitionId === 'decompor_trabalho' && answer.fieldDefinitionId === 'partes_trabalho'
+			)?.value
+		).toBe(legacyValue);
+		// Nunca promovido a nenhum objeto canônico — D045 proíbe conversão
+		// automática de PlanningItem legado em WorkItem/Deliverable.
+		expect(result.value.workItems).toEqual([]);
+		expect(result.value.deliverables).toEqual([]);
+	});
+});
+
 // Dependency (ETAPA 8 do rework) — compatibilidade de leitura e invariantes
 // reforçadas contra estado desserializado, mesmo padrão já aplicado a
 // WorkItem/Impediment neste arquivo.
@@ -1635,16 +1682,24 @@ describe('Dependency (ETAPA 8 do rework)', () => {
 	});
 
 	it('não converte o Answer legado dependencias_trabalho em nenhuma Dependency', () => {
-		let state = stateWithWorkItems();
-		state = unwrap(
-			answerActivity(
-				catalog,
-				state,
-				'mapear_dependencias',
-				{ dependencias_trabalho: 'A depende de B; B depende de C' },
-				T1
-			)
-		);
+		// S9 (reconciliação de dependências legadas) — `mapear_dependencias` não
+		// é mais required_fields (virou explicit_confirmation, ver
+		// domain/transitions.ts), então answerActivity recusa escrita nova aqui
+		// com wrong_completion_mode. Simula um projeto antigo: Answer legado
+		// gravado diretamente no estado, mesmo padrão de transitions.spec.ts.
+		const state: ProjectState = {
+			...stateWithWorkItems(),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'mapear_dependencias',
+					fieldDefinitionId: 'dependencias_trabalho',
+					value: 'A depende de B; B depende de C',
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
 
 		const result = deserializeProjectState(serializeProjectState(state), catalog);
 		expect(result.ok).toBe(true);

@@ -473,6 +473,14 @@ export interface ConfirmPlanningPriorityInput {
 	projectId: string;
 }
 
+// S9 (reconciliação de dependências legadas) — confirmação de "Mapear
+// dependências" (explicit_confirmation contra Dependency real, D039). Não
+// recebe nenhum dado de Dependency: ZERO é resultado válido, então nenhum
+// campo de contagem/estado é necessário aqui — só marca a Activity concluída.
+export interface ConfirmDependencyMappingInput {
+	projectId: string;
+}
+
 export interface RenameProjectInput {
 	projectId: string;
 	name: string;
@@ -896,6 +904,7 @@ export interface ProjectUseCases {
 	confirmSummary(input: ConfirmSummaryInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmDecomposition(input: ConfirmDecompositionInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmPlanningPriority(input: ConfirmPlanningPriorityInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmDependencyMapping(input: ConfirmDependencyMappingInput): Promise<UseCaseOutcome<ProjectView>>;
 	addScopeItem(input: AddScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setScopeItemText(input: SetScopeItemTextInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveScopeItem(input: MoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;

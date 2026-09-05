@@ -33,6 +33,14 @@
 
 	let openImpedimentsCount = $derived(view.impediments.filter((i) => i.status === 'aberto').length);
 
+	// S9 (reconciliação de dependências legadas) — "Mapear dependências" torna
+	// perceptível o estado canônico de Dependency sem projeção nova: cada
+	// Dependency aparece exatamente uma vez em WorkItemView.dependsOn (a
+	// aresta é vista a partir de quem depende, ver D039) — somar essas
+	// listas é o total real de dependências do projeto, sem precisar de
+	// ProjectView.dependencies (nunca criada, D039: sem consumidor próprio).
+	let dependencyCount = $derived(view.workItems.reduce((total, item) => total + item.dependsOn.length, 0));
+
 	// S9 — `partes_trabalho` é READ-LEGACY (§13.2): "Priorizar entregas" só
 	// apresenta o legado somente leitura agora, direto de `data.planningItems`
 	// (sem estado local nem reordenação — ver mainContent abaixo).
@@ -165,6 +173,40 @@
 			{:else}
 				<p>Ainda não há nenhuma entrega (Deliverable) neste projeto — crie e ordene em Entregas para poder confirmar.</p>
 			{/if}
+
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
+			{/if}
+
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
+		</section>
+	{:else if data.activity?.id === 'mapear_dependencias'}
+		<section class="next-action">
+			<p class="eyebrow">Planejamento</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				As dependências reais são geridas em <a href="/projects/{view.projectId}/work">Trabalho</a>, como
+				relações entre itens de trabalho.
+			</p>
+			{#if data.dependenciasTrabalho}
+				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
+				<p class="legacy-dependencias-text">{data.dependenciasTrabalho}</p>
+			{/if}
+
+			<p>
+				{#if dependencyCount === 0}
+					Não há nenhuma dependência declarada neste projeto.
+				{:else}
+					{dependencyCount} {dependencyCount === 1 ? 'dependência declarada' : 'dependências declaradas'} neste
+					projeto.
+				{/if}
+			</p>
+
+			<form method="POST" action="?/confirmDependencyMapping" use:enhance>
+				<button type="submit">Confirmar revisão das dependências</button>
+			</form>
 
 			{#if form?.message}
 				<p role="alert">{form.message}</p>
@@ -493,6 +535,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
+	}
+
+	.legacy-dependencias-text {
+		margin: 0.75rem 0 0;
+		color: var(--hydra-muted);
+		font-size: 0.9rem;
+		white-space: pre-wrap;
 	}
 
 	form {

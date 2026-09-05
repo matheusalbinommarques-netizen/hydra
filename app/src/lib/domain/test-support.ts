@@ -17,6 +17,7 @@ import {
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
 	confirmDecomposition,
+	confirmDependencyMapping,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -177,6 +178,17 @@ export function confirmPlanningPriorityMinimally(
 }
 
 /**
+ * Confirma "Mapear dependências" (S9 — explicit_confirmation contra
+ * Dependency, mas ZERO é resultado válido) — {@link confirmDependencyMapping}
+ * nunca exige nenhuma Dependency, então não há "mínimo" a fabricar aqui,
+ * ao contrário de {@link confirmDecompositionMinimally}/
+ * {@link confirmPlanningPriorityMinimally}.
+ */
+export function confirmDependencyMappingMinimally(catalog: Catalog, state: ProjectState, occurredAt: string): ProjectState {
+	return unwrapResult(confirmDependencyMapping(catalog, state, occurredAt));
+}
+
+/**
  * Confirma "Resultado desejado" (`resultado`, Stage 4C do rework) com o
  * mínimo que satisfaz {@link getDesiredOutcomeConfirmationIssues}: um
  * DesiredOutcome com `change` preenchido — para quando o teste só precisa
@@ -198,7 +210,8 @@ export function confirmDesiredOutcomesMinimally(
  * `required_fields` via {@link answerActivityMinimally}, `explicit_confirmation`
  * via `confirmSummary` (Resumo), {@link confirmDecompositionMinimally}
  * (Decompor o trabalho, S9), {@link confirmPlanningPriorityMinimally}
- * (Priorizar entregas, S9) ou {@link confirmAffectedGroupsMinimally} (Quem é
+ * (Priorizar entregas, S9), {@link confirmDependencyMappingMinimally}
+ * (Mapear dependências, S9) ou {@link confirmAffectedGroupsMinimally} (Quem é
  * afetado, ETAPA 2), `scope_confirmation` via
  * {@link confirmScopeVersionMinimally}.
  */
@@ -216,6 +229,8 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				next = confirmDecompositionMinimally(catalog, next, `${activity.id}-work-item-1`, occurredAt);
 			} else if (activity.id === 'priorizar_entregas') {
 				next = confirmPlanningPriorityMinimally(catalog, next, `${activity.id}-deliverable-1`, occurredAt);
+			} else if (activity.id === 'mapear_dependencias') {
+				next = confirmDependencyMappingMinimally(catalog, next, occurredAt);
 			} else if (activity.id === 'publico') {
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else if (activity.id === 'estado_atual') {

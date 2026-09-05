@@ -340,6 +340,28 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await expect(page.getByText('As entregas não foram priorizadas aqui')).toHaveCount(0);
 	});
 
+	// S9 (reconciliação de dependências legadas) — "Mapear dependências" virou
+	// explicit_confirmation contra Dependency (D039), mas ao contrário de
+	// Decompor/Priorizar acima, ZERO Dependency é resultado válido: confirma
+	// direto, sem precisar criar nada em Trabalho antes. Nenhum textarea
+	// legado (`dependencias_trabalho`) é exibido.
+	await test.step('Mapear dependências (S9) — confirma com ZERO dependências, sem textarea legado', async () => {
+		await expect(page.getByText('Não há nenhuma dependência declarada neste projeto.')).toBeVisible();
+		await expect(page.locator('textarea[name="dependencias_trabalho"]')).toHaveCount(0);
+		// Escopado a `main` — "Trabalho" também aparece no campo de busca
+		// global do cabeçalho (`getByLabel('Consulta')`), então o locator sem
+		// escopo resolve a dois elementos.
+		await expect(page.getByRole('main').getByRole('link', { name: 'Trabalho' })).toBeVisible();
+
+		await Promise.all([
+			page.waitForResponse(
+				(response) => response.url().includes('?/confirmDependencyMapping') && response.request().method() === 'POST'
+			),
+			page.getByRole('button', { name: 'Confirmar revisão das dependências' }).click()
+		]);
+		await expect(page.getByRole('heading', { name: 'Mapear dependências' })).toHaveCount(0);
+	});
+
 	await test.step('demais atividades do catálogo (Planejamento restante, Execução, Validação) respondidas genericamente até o encerramento', async () => {
 		// Sem contagem fixa: avança até o catálogo sinalizar
 		// catalog_limit_reached (heading abaixo), qualquer que seja a
