@@ -143,6 +143,15 @@ const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
 const DEPENDENCIAS_TRABALHO_FIELD_ID = 'dependencias_trabalho';
 const DEPENDENCIAS_TRABALHO_FIELD_LABEL = 'Dependências do trabalho';
 
+// S9 (reconciliação de marcos legados) — "Definir marcos" segue o mesmo
+// padrão de MAPEAR_DEPENDENCIAS acima: virou explicit_confirmation
+// (confirmMilestoneReview, ver domain/transitions.ts), então o loop genérico
+// não a alcança mais. `marcos_principais` é texto livre simples (nunca uma
+// coleção codificada), então não precisa de decode.
+const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
+const MARCOS_PRINCIPAIS_FIELD_ID = 'marcos_principais';
+const MARCOS_PRINCIPAIS_FIELD_LABEL = 'Marcos principais';
+
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
 		const found = phase.activities.find((activity) => activity.id === activityDefinitionId);
@@ -292,6 +301,22 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 						id: DEPENDENCIAS_TRABALHO_FIELD_ID,
 						label: DEPENDENCIAS_TRABALHO_FIELD_LABEL,
 						value: input.answers[DEPENDENCIAS_TRABALHO_FIELD_ID]
+					}
+				],
+				editHref: null
+			});
+		}
+
+		const definirMarcos = phase.activities.find((activity) => activity.id === DEFINIR_MARCOS_ACTIVITY_ID);
+		if (definirMarcos && input.answers[MARCOS_PRINCIPAIS_FIELD_ID]) {
+			activities.push({
+				activityId: DEFINIR_MARCOS_ACTIVITY_ID,
+				title: definirMarcos.title,
+				fields: [
+					{
+						id: MARCOS_PRINCIPAIS_FIELD_ID,
+						label: MARCOS_PRINCIPAIS_FIELD_LABEL,
+						value: input.answers[MARCOS_PRINCIPAIS_FIELD_ID]
 					}
 				],
 				editHref: null

@@ -1854,16 +1854,24 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 	});
 
 	it('não converte o Answer legado marcos_principais em nenhum Milestone', () => {
-		let state = stateWithWorkItems();
-		state = unwrap(
-			answerActivity(
-				catalog,
-				state,
-				'definir_marcos',
-				{ marcos_principais: 'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo' },
-				T1
-			)
-		);
+		// S9 (reconciliação de marcos legados) — `definir_marcos` não é mais
+		// required_fields (virou explicit_confirmation, ver domain/transitions.ts),
+		// então answerActivity recusa escrita nova aqui com wrong_completion_mode.
+		// Simula um projeto antigo: Answer legado gravado diretamente no estado,
+		// mesmo padrão do teste de dependencias_trabalho acima.
+		const state: ProjectState = {
+			...stateWithWorkItems(),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'definir_marcos',
+					fieldDefinitionId: 'marcos_principais',
+					value: 'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo',
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
 
 		const result = deserializeProjectState(serializeProjectState(state), catalog);
 		expect(result.ok).toBe(true);

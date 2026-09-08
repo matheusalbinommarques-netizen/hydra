@@ -29,6 +29,13 @@ const PARTES_TRABALHO_FIELD_ID = 'partes_trabalho';
 const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
 const DEPENDENCIAS_TRABALHO_FIELD_ID = 'dependencias_trabalho';
 
+// S9 (reconciliação de marcos legados) — mesmo raciocínio de
+// MAPEAR_DEPENDENCIAS_ACTIVITY_ID/DEPENDENCIAS_TRABALHO_FIELD_ID acima:
+// `marcos_principais` é READ-LEGACY, texto livre simples, repassado direto de
+// `view.answers` para o template.
+const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
+const MARCOS_PRINCIPAIS_FIELD_ID = 'marcos_principais';
+
 // S4D — "Resumo da descoberta" agora é representada pela tela dedicada
 // /summary (Checkpoint da Descoberta), não mais por uma superfície própria
 // dentro de /now. `resumo` nunca é allowsSkip, então nunca chega aqui via
@@ -292,6 +299,9 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const dependenciasTrabalho =
 		activity?.id === MAPEAR_DEPENDENCIAS_ACTIVITY_ID ? (view.answers[DEPENDENCIAS_TRABALHO_FIELD_ID] ?? null) : undefined;
 
+	const marcosPrincipais =
+		activity?.id === DEFINIR_MARCOS_ACTIVITY_ID ? (view.answers[MARCOS_PRINCIPAIS_FIELD_ID] ?? null) : undefined;
+
 	return {
 		activity,
 		isResuming: Boolean(resumingPendingItem),
@@ -301,7 +311,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		journeyContext,
 		phaseProgress,
 		planningItems,
-		dependenciasTrabalho
+		dependenciasTrabalho,
+		marcosPrincipais
 	};
 };
 
@@ -474,6 +485,20 @@ export const actions: Actions = {
 	// confirmPlanningPriority acima.
 	confirmDependencyMapping: async ({ params }) => {
 		const result = await getProjectUseCases().confirmDependencyMapping({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// S9 (reconciliação de marcos legados) — confirma "Definir marcos". Não
+	// recebe nenhum dado de Milestone: ZERO é resultado válido, então o
+	// domínio (confirmMilestoneReview) nunca recusa por ausência de Milestone,
+	// mesmo molde de confirmDependencyMapping acima.
+	confirmMilestoneReview: async ({ params }) => {
+		const result = await getProjectUseCases().confirmMilestoneReview({ projectId: params.projectId });
 
 		if (!result.ok) {
 			return fail(400, { message: mapUseCaseError(result.error) });

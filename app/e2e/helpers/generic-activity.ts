@@ -24,6 +24,11 @@
 //   mesmo padrão: revela-se pela mensagem "Ainda não há nenhuma entrega
 //   (Deliverable) neste projeto", cria uma Deliverable real em Entregas pela
 //   UI e volta, para então clicar "Confirmar prioridade".
+//
+// "Mapear dependências" (D046) e "Definir marcos" (D047) — ao contrário das
+// duas acima, ZERO Dependency/Milestone é resultado válido: não há
+// affordance de "ainda não há nenhum X" a esperar, o botão de confirmação já
+// está sempre disponível, então basta reconhecê-lo pelo texto e clicar.
 
 import type { Page } from '@playwright/test';
 
@@ -105,6 +110,22 @@ export async function answerCurrentActivityGenerically(page: Page): Promise<void
 					response.url().includes('?/confirmDependencyMapping') && response.request().method() === 'POST'
 			),
 			confirmDependencyMappingButton.click()
+		]);
+		await page.waitForTimeout(200);
+		return;
+	}
+
+	// "Definir marcos" (S9 — explicit_confirmation contra Milestone, mas ZERO
+	// Milestone é resultado válido, D047): mesmo padrão de "Mapear
+	// dependências" acima — o botão de confirmação já está sempre disponível.
+	const confirmMilestoneReviewButton = page.getByRole('button', { name: 'Confirmar revisão dos marcos' });
+	if (await confirmMilestoneReviewButton.count()) {
+		await Promise.all([
+			page.waitForResponse(
+				(response) =>
+					response.url().includes('?/confirmMilestoneReview') && response.request().method() === 'POST'
+			),
+			confirmMilestoneReviewButton.click()
 		]);
 		await page.waitForTimeout(200);
 		return;

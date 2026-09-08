@@ -384,6 +384,8 @@ const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
 // mesmo motivo de DECOMPOR_TRABALHO_ACTIVITY_ID/PRIORIZAR_ENTREGAS_ACTIVITY_ID
 // acima: várias atividades explicit_confirmation coexistem no catálogo.
 const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
+// S9 (reconciliação de marcos legados) — mesmo motivo das constantes acima.
+const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
 
 // Confirma "Decompor o trabalho" quando existe ao menos um WorkItem real —
 // nunca cria, edita nem lê PlanningItem. Só altera ActivityProgress (e
@@ -456,6 +458,35 @@ export function confirmDependencyMapping(
 	occurredAt: string
 ): Result<ProjectState, DomainTransitionError> {
 	const activity = findActivityDefinition(catalog, MAPEAR_DEPENDENCIAS_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
+}
+
+// Confirma "Definir marcos" — nunca cria, edita, lê nem exige nenhum
+// Milestone: mesmo molde de confirmDependencyMapping acima, ZERO Milestone é
+// resultado legítimo (a confirmação é "revisei os marcos reais", não "existe
+// pelo menos um marco"). Só altera ActivityProgress (e resolve a pendência,
+// se estava pulada); nunca cria/edita/alcança/reabre/associa/agenda
+// Milestone.
+export function confirmMilestoneReview(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, DEFINIR_MARCOS_ACTIVITY_ID);
 	if (!activity || activity.completionMode !== 'explicit_confirmation') {
 		return { ok: false, error: { kind: 'activity_not_found' } };
 	}

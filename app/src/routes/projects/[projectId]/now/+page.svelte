@@ -41,6 +41,12 @@
 	// ProjectView.dependencies (nunca criada, D039: sem consumidor próprio).
 	let dependencyCount = $derived(view.workItems.reduce((total, item) => total + item.dependsOn.length, 0));
 
+	// S9 (reconciliação de marcos legados) — "Definir marcos" torna perceptível
+	// o estado canônico de Milestone sem projeção nova: `view.milestones` já
+	// existe (Trabalho). Contagem simples de marcos alcançados, nunca
+	// percentual/progresso (mesmo cuidado de MilestoneView.relatedConcluded).
+	let reachedMilestoneCount = $derived(view.milestones.filter((m) => m.status === 'alcancado').length);
+
 	// S9 — `partes_trabalho` é READ-LEGACY (§13.2): "Priorizar entregas" só
 	// apresenta o legado somente leitura agora, direto de `data.planningItems`
 	// (sem estado local nem reordenação — ver mainContent abaixo).
@@ -206,6 +212,40 @@
 
 			<form method="POST" action="?/confirmDependencyMapping" use:enhance>
 				<button type="submit">Confirmar revisão das dependências</button>
+			</form>
+
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
+			{/if}
+
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
+		</section>
+	{:else if data.activity?.id === 'definir_marcos'}
+		<section class="next-action">
+			<p class="eyebrow">Planejamento</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				Os marcos reais são geridos em <a href="/projects/{view.projectId}/work">Trabalho</a>, como marcos
+				declarados da entrega.
+			</p>
+			{#if data.marcosPrincipais}
+				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
+				<p class="legacy-dependencias-text">{data.marcosPrincipais}</p>
+			{/if}
+
+			<p>
+				{#if view.milestones.length === 0}
+					Não há nenhum marco declarado neste projeto.
+				{:else}
+					{view.milestones.length} {view.milestones.length === 1 ? 'marco declarado' : 'marcos declarados'} neste
+					projeto, {reachedMilestoneCount} {reachedMilestoneCount === 1 ? 'alcançado' : 'alcançados'}.
+				{/if}
+			</p>
+
+			<form method="POST" action="?/confirmMilestoneReview" use:enhance>
+				<button type="submit">Confirmar revisão dos marcos</button>
 			</form>
 
 			{#if form?.message}

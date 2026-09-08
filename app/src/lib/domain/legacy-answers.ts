@@ -56,7 +56,13 @@ export const DEPRECATED_ANSWER_FIELDS: readonly DeprecatedAnswerField[] = [
 	// `dependencias_trabalho` não é mais fonte de verdade (Dependency é, D039,
 	// domain/state-types.ts). Snapshots exportados antes dessa mudança ainda
 	// carregam essa Answer — ela continua legível, nunca reescrita.
-	{ activityDefinitionId: 'mapear_dependencias', fieldDefinitionId: 'dependencias_trabalho' }
+	{ activityDefinitionId: 'mapear_dependencias', fieldDefinitionId: 'dependencias_trabalho' },
+	// "Definir marcos" (S9, reconciliação de marcos legados) — a atividade
+	// `definir_marcos` deixou de ser required_fields; `marcos_principais` não é
+	// mais fonte de verdade (Milestone é, D040/D041, domain/state-types.ts).
+	// Snapshots exportados antes dessa mudança ainda carregam essa Answer — ela
+	// continua legível, nunca reescrita.
+	{ activityDefinitionId: 'definir_marcos', fieldDefinitionId: 'marcos_principais' }
 ];
 
 export function isDeprecatedAnswerField(activityDefinitionId: string, fieldDefinitionId: string): boolean {

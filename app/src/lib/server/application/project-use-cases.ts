@@ -29,6 +29,7 @@ import {
 	confirmCauseHypotheses as confirmCauseHypothesesInDomain,
 	confirmDecomposition as confirmDecompositionInDomain,
 	confirmDependencyMapping as confirmDependencyMappingInDomain,
+	confirmMilestoneReview as confirmMilestoneReviewInDomain,
 	confirmDesiredOutcomes as confirmDesiredOutcomesInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
@@ -114,6 +115,7 @@ import type {
 	ConfirmCauseHypothesesInput,
 	ConfirmDecompositionInput,
 	ConfirmDependencyMappingInput,
+	ConfirmMilestoneReviewInput,
 	ConfirmDesiredOutcomesInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
@@ -500,6 +502,17 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmDependencyMappingInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmMilestoneReview(input: ConfirmMilestoneReviewInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmMilestoneReviewInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

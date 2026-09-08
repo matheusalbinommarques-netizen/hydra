@@ -109,30 +109,28 @@ const estimarEsforcoCapacidade: ActivityDefinition = {
 	]
 };
 
+// S9 (reconciliação de marcos legados) — `marcos_principais` é READ-LEGACY
+// (§13.2): continua legível, mas nunca ganha nova escrita. A responsabilidade
+// operacional de marco real pertence a `Milestone` (D040/D041, Trabalho).
+// "Definir marcos" vira `explicit_confirmation` contra o estado canônico —
+// mesmo molde de "Mapear dependências" acima: ZERO Milestone é resultado
+// válido, confirmar significa "revisei os marcos reais e o estado atual está
+// correto", nunca "existe pelo menos um". `confirmMilestoneReview`
+// (domain/transitions.ts) nunca recusa por ausência de Milestone.
 const definirMarcos: ActivityDefinition = {
 	id: 'definir_marcos',
 	phaseId: 'planejamento',
 	order: 5,
 	title: 'Definir marcos',
 	mainQuestion: 'Quais marcos vão indicar progresso ao longo da entrega?',
-	why: 'Marcos dão pontos de checagem intermediários, em vez de só descobrir o progresso no final.',
-	example: 'Marco 1: tela de abertura de solicitação funcionando. Marco 2: fluxo de aprovação completo.',
-	completionCriteria: 'Principais marcos da entrega estão descritos.',
-	completionMode: 'required_fields',
+	why: 'Marcos dão pontos de checagem intermediários, em vez de só descobrir o progresso no final. Definir de verdade acontece em Trabalho, como Milestone — aqui você só confirma que revisou o estado atual, mesmo que ele seja "nenhum marco".',
+	example: 'Marco 1: tela de abertura de solicitação funcionando — declarado em Trabalho.',
+	completionCriteria:
+		'O usuário confirmou que revisou os marcos reais da entrega em Trabalho, mesmo que nenhum exista.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'Os marcos da entrega não foram definidos',
-	pendingItemDetail: 'Sem marcos, é difícil perceber atraso antes do prazo final.',
-	fields: [
-		{
-			id: 'marcos_principais',
-			activityId: 'definir_marcos',
-			label: 'Quais são os principais marcos?',
-			required: true,
-			placeholder: 'Ex.: tela de abertura funcionando; fluxo de aprovação completo',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'Os marcos da entrega não foram revisados aqui',
+	pendingItemDetail: 'Revise os marcos em Trabalho e volte para confirmar — ou pule esta etapa.'
 };
 
 const criteriosAceitacaoEntrega: ActivityDefinition = {

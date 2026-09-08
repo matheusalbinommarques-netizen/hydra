@@ -18,6 +18,7 @@ import {
 	confirmCauseHypotheses,
 	confirmDecomposition,
 	confirmDependencyMapping,
+	confirmMilestoneReview,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -189,6 +190,16 @@ export function confirmDependencyMappingMinimally(catalog: Catalog, state: Proje
 }
 
 /**
+ * Confirma "Definir marcos" (S9 — explicit_confirmation contra Milestone,
+ * mas ZERO é resultado válido) — mesmo raciocínio de
+ * {@link confirmDependencyMappingMinimally}: {@link confirmMilestoneReview}
+ * nunca exige nenhum Milestone, então não há "mínimo" a fabricar aqui.
+ */
+export function confirmMilestoneReviewMinimally(catalog: Catalog, state: ProjectState, occurredAt: string): ProjectState {
+	return unwrapResult(confirmMilestoneReview(catalog, state, occurredAt));
+}
+
+/**
  * Confirma "Resultado desejado" (`resultado`, Stage 4C do rework) com o
  * mínimo que satisfaz {@link getDesiredOutcomeConfirmationIssues}: um
  * DesiredOutcome com `change` preenchido — para quando o teste só precisa
@@ -211,7 +222,8 @@ export function confirmDesiredOutcomesMinimally(
  * via `confirmSummary` (Resumo), {@link confirmDecompositionMinimally}
  * (Decompor o trabalho, S9), {@link confirmPlanningPriorityMinimally}
  * (Priorizar entregas, S9), {@link confirmDependencyMappingMinimally}
- * (Mapear dependências, S9) ou {@link confirmAffectedGroupsMinimally} (Quem é
+ * (Mapear dependências, S9), {@link confirmMilestoneReviewMinimally}
+ * (Definir marcos, S9) ou {@link confirmAffectedGroupsMinimally} (Quem é
  * afetado, ETAPA 2), `scope_confirmation` via
  * {@link confirmScopeVersionMinimally}.
  */
@@ -231,6 +243,8 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				next = confirmPlanningPriorityMinimally(catalog, next, `${activity.id}-deliverable-1`, occurredAt);
 			} else if (activity.id === 'mapear_dependencias') {
 				next = confirmDependencyMappingMinimally(catalog, next, occurredAt);
+			} else if (activity.id === 'definir_marcos') {
+				next = confirmMilestoneReviewMinimally(catalog, next, occurredAt);
 			} else if (activity.id === 'publico') {
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else if (activity.id === 'estado_atual') {

@@ -24,6 +24,7 @@ import {
 	confirmCauseHypotheses,
 	confirmDecomposition,
 	confirmDependencyMapping,
+	confirmMilestoneReview,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -938,6 +939,83 @@ describe('confirmDependencyMapping (S9)', () => {
 			freshState(),
 			'mapear_dependencias',
 			{ dependencias_trabalho: 'Nova dependência via texto livre' },
+			T1
+		);
+		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });
+	});
+});
+
+// S9 (reconciliação de marcos legados) — mesmo molde de confirmDependencyMapping
+// acima: ZERO Milestone é resultado válido, confirmar significa "revisei o
+// estado real", nunca "existe pelo menos um fato". Falsificadores centrais:
+// confirma com zero, confirma com um Milestone real sem alterar lifecycle/
+// plannedDate/relações, nunca cria/altera Milestone, e o Answer legado nunca
+// ganha autoridade (nem impede, nem substitui a confirmação).
+describe('confirmMilestoneReview (S9)', () => {
+	it('conclui "Definir marcos" com ZERO Milestone — 0 é resultado válido, nunca recusado', () => {
+		const state = unwrap(confirmMilestoneReview(catalog, freshState(), T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'definir_marcos');
+		expect(progress?.status).toBe('concluída');
+		expect(state.milestones).toEqual([]);
+	});
+
+	it('conclui "Definir marcos" quando existe um Milestone real, sem alterar lifecycle/plannedDate/relações', () => {
+		const withMilestone = unwrap(addMilestone(catalog, freshState(), 'ms-1', 'Marco real', T1));
+		const state = unwrap(confirmMilestoneReview(catalog, withMilestone, T2));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'definir_marcos');
+		expect(progress?.status).toBe('concluída');
+		expect(state.milestones).toEqual(withMilestone.milestones);
+	});
+
+	it('Answer legado (marcos_principais) sozinho não impede nem é exigido para confirmar', () => {
+		const legacyState: ProjectState = {
+			...freshState(),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'definir_marcos',
+					fieldDefinitionId: 'marcos_principais',
+					value: 'Marco 1: tela de abertura funcionando',
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+		const state = unwrap(confirmMilestoneReview(catalog, legacyState, T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'definir_marcos');
+		expect(progress?.status).toBe('concluída');
+		expect(state.milestones).toEqual([]);
+	});
+
+	it('erro transition_not_allowed ao confirmar uma revisão já concluída', () => {
+		const state = unwrap(confirmMilestoneReview(catalog, freshState(), T1));
+		const result = confirmMilestoneReview(catalog, state, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('permite pular "Definir marcos" mesmo sendo explicit_confirmation (allowsSkip true)', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'definir_marcos', 'pend-1', T1));
+		const progress = skipped.activityProgress.find((p) => p.activityDefinitionId === 'definir_marcos');
+		expect(progress?.status).toBe('pulada');
+		expect(skipped.pendingItems).toEqual([
+			{ id: 'pend-1', projectId: 'proj-1', activityDefinitionId: 'definir_marcos', status: 'aberta', createdAt: T1 }
+		]);
+	});
+
+	it('skip → pending → retomar → confirmação resolve a pendência, mesmo com ZERO Milestone', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'definir_marcos', 'pend-1', T1));
+		const confirmed = unwrap(confirmMilestoneReview(catalog, skipped, T2));
+		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'definir_marcos');
+		expect(progress?.status).toBe('concluída');
+		expect(confirmed.pendingItems[0].status).toBe('resolvida');
+	});
+
+	it('answerActivity recusa "definir_marcos" com wrong_completion_mode — não é mais required_fields, nunca escreve Answer novo', () => {
+		const result = answerActivity(
+			catalog,
+			freshState(),
+			'definir_marcos',
+			{ marcos_principais: 'Novo marco via texto livre' },
 			T1
 		);
 		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });

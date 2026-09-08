@@ -481,6 +481,14 @@ export interface ConfirmDependencyMappingInput {
 	projectId: string;
 }
 
+// S9 (reconciliação de marcos legados) — confirmação de "Definir marcos"
+// (explicit_confirmation contra Milestone real, D040/D041). Não recebe
+// nenhum dado de Milestone: ZERO é resultado válido, então nenhum campo de
+// contagem/estado é necessário aqui — só marca a Activity concluída.
+export interface ConfirmMilestoneReviewInput {
+	projectId: string;
+}
+
 export interface RenameProjectInput {
 	projectId: string;
 	name: string;
@@ -905,6 +913,7 @@ export interface ProjectUseCases {
 	confirmDecomposition(input: ConfirmDecompositionInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmPlanningPriority(input: ConfirmPlanningPriorityInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmDependencyMapping(input: ConfirmDependencyMappingInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmMilestoneReview(input: ConfirmMilestoneReviewInput): Promise<UseCaseOutcome<ProjectView>>;
 	addScopeItem(input: AddScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setScopeItemText(input: SetScopeItemTextInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveScopeItem(input: MoveScopeItemInput): Promise<UseCaseOutcome<ProjectView>>;
