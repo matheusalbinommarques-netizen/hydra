@@ -4,6 +4,17 @@
 
 ### Adicionado
 
+- Rework, ETAPA 9 ("Estruturação e Planejamento reworkados") — `Deliverable`
+  passa a existir como objeto real de priorização/escopo (bucket, esforço e
+  ordem relativa), com promoção explícita de itens de escopo e vínculo
+  mutável com `WorkItem`; decomposição, priorização, dependências e marcos
+  antes capturados como texto livre passam a se apoiar nos objetos canônicos
+  já existentes (`WorkItem`, `Deliverable`, `Dependency`, `Milestone`), com
+  os registros antigos preservados só para leitura; o Quadro passa a
+  filtrar por entrega. Ver D043–D048
+  (`docs/07-management/decision-log.md`); D048 fecha a etapa e registra o
+  que permanece adiado.
+
 - Rework, ETAPA 8 ("Dependency + Milestone + Roadmap/Timeline") —
   `Dependency` e `Milestone` passam a estruturar precedência e
   checkpoints do trabalho: um item pode declarar que depende da conclusão

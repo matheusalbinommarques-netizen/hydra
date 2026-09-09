@@ -374,24 +374,26 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 8 do rework ("Dependency + Milestone + Roadmap/Timeline",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §38) está concluída. O resultado
-macro entregue — precedência entre itens de trabalho, impacto downstream
-de bloqueio, marcos declarados e a primeira Linha do tempo a partir de
-datas planejadas — está descrito em
-`docs/08-delivery/s8-dependency-milestone-timeline.md`.
+A ETAPA 9 do rework ("Estruturação e Planejamento reworkados",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §39) está concluída. O resultado
+macro entregue — `Deliverable` como objeto real com bucket/esforço/ordem,
+Entregas absorvendo o Roadmap mínimo/priorização, vínculo explícito
+`Deliverable ↔ WorkItem`, decomposição operacional pela própria Entrega, e
+decomposição/dependências/marcos legados reconciliados com os objetos
+canônicos — está registrado em D043–D048
+(`docs/07-management/decision-log.md`).
 
-D042 (`docs/07-management/decision-log.md`) fecha a etapa e registra os
-DEFERs reclassificados para fora dela — Roadmap, os dois sinais restantes
-do §38, a reconciliação `dependencia_externa` ↔ `Dependency`, a retirada
-da escrita legada e os event types —, cada um com a condição semântica
-que o reabre, sem congelar arquitetura ainda não decidida.
+D048 fecha a etapa e reclassifica, sem resolver, os residuais que
+permaneciam abertos — capacidade, critérios de aceitação, datas de
+entrega, responsabilidade, restrições/premissas/governança e a realocação
+de Marcos para Entregas —, cada um com a condição semântica que o reabre,
+sem congelar arquitetura ainda não decidida. `Risk` não é residual da S9;
+pertence à próxima etapa.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S9` (ETAPA 9, "Estruturação e Planejamento reworkados", §39) com status
-`in_progress`. O primeiro microcorte da S9 — `Deliverable` como objeto
-vivo e a superfície "Entregas", com promoção explícita de `ScopeItem`
-(CONFIRM-TO-CONVERT, D043) — foi entregue; a S9 permanece em andamento.
+`S10` (ETAPA 10, "Risk como objeto vivo", §40) com status `in_progress`.
+Nenhum trabalho de S10 foi iniciado — o ponteiro abre a etapa, não
+implementa nem planeja em detalhe nenhuma decisão de `Risk`.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
