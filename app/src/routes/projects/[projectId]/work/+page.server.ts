@@ -2,8 +2,7 @@ import { fail } from '@sveltejs/kit';
 import type { ImpedimentType, WorkItemStatus } from '$lib/domain';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
-import { buildWorkView } from './work-view';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 
 const WORK_ITEM_STATUSES: readonly WorkItemStatus[] = ['a_fazer', 'em_andamento', 'concluido'];
 const IMPEDIMENT_TYPES: readonly ImpedimentType[] = [
@@ -30,11 +29,6 @@ function readTipo(formData: FormData, key: string): ImpedimentType | null {
 	const value = readString(formData, key);
 	return value && (IMPEDIMENT_TYPES as readonly string[]).includes(value) ? (value as ImpedimentType) : null;
 }
-
-export const load: PageServerLoad = async ({ parent }) => {
-	const { view } = await parent();
-	return { board: buildWorkView(view.workItems) };
-};
 
 export const actions: Actions = {
 	create: async ({ request, params }) => {

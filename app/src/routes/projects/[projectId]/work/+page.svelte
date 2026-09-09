@@ -5,6 +5,7 @@
 	import type { DependencyPresentation } from './work-view';
 	import {
 		allMilestonesLinkedHint,
+		buildWorkView,
 		dependencyPresentation,
 		nextWorkItemStatus,
 		previousWorkItemStatus
@@ -12,7 +13,26 @@
 
 	let { data, form } = $props();
 	let projectId = $derived(data.view.projectId);
-	let board = $derived(data.board);
+
+	// Filtro por entrega (ETAPA 9 do rework, sexto microcorte, D043 DEFER) —
+	// projeção/UI pura sobre `deliverableId`, já existente (D044). Sem
+	// persistência, sem query param: estado só do cliente, mesmo padrão de
+	// `selectedItemId` abaixo. '' = todas, NO_DELIVERABLE_FILTER = sem entrega.
+	const NO_DELIVERABLE_FILTER = '__sem_entrega__';
+	let deliverableFilter = $state('');
+	let allWorkItems = $derived(data.view.workItems);
+	let filteredWorkItems = $derived.by(() => {
+		if (deliverableFilter === '') return allWorkItems;
+		if (deliverableFilter === NO_DELIVERABLE_FILTER) {
+			return allWorkItems.filter((item) => item.deliverable === null);
+		}
+		return allWorkItems.filter((item) => item.deliverable?.deliverableId === deliverableFilter);
+	});
+	// O Quadro reflete o filtro; candidatos a predecessor/marco continuam
+	// olhando o projeto inteiro (allItems abaixo) — filtrar a visão nunca
+	// restringe o que pode ser relacionado.
+	let board = $derived(buildWorkView(filteredWorkItems));
+	let isProjectEmpty = $derived(allWorkItems.length === 0);
 
 	const WORK_ITEM_STATUSES: WorkItemStatus[] = ['a_fazer', 'em_andamento', 'concluido'];
 	const statusLabel: Record<WorkItemStatus, string> = {
@@ -94,7 +114,7 @@
 		};
 	}
 
-	let allItems = $derived([...board.groups.a_fazer, ...board.groups.em_andamento, ...board.groups.concluido]);
+	let allItems = $derived(allWorkItems);
 	let selectedItem = $derived(selectedItemId ? (allItems.find((item) => item.id === selectedItemId) ?? null) : null);
 
 	function openDetail(itemId: string) {
@@ -178,7 +198,7 @@
 	<p role="alert">{form.message}</p>
 {/if}
 
-{#if board.isEmpty}
+{#if isProjectEmpty}
 	<section class="empty-state">
 		<p class="empty-title">Você ainda não tem itens de trabalho</p>
 		<p>Crie o primeiro item para começar a mover trabalho neste projeto.</p>
@@ -186,7 +206,21 @@
 	</section>
 {:else}
 	<div class="toolbar">
-		<button type="button" class="button-primary" onclick={openCreate}>+ Criar item de trabalho</button>
+		{#if data.view.deliverables.length > 0}
+			<label class="deliverable-filter">
+				<span>Entrega</span>
+				<select bind:value={deliverableFilter} aria-label="Filtrar por entrega">
+					<option value="">Todas</option>
+					{#each data.view.deliverables as deliverable (deliverable.id)}
+						<option value={deliverable.id}>{deliverable.title}</option>
+					{/each}
+					<option value={NO_DELIVERABLE_FILTER}>Sem entrega</option>
+				</select>
+			</label>
+		{/if}
+		<button type="button" class="button-primary toolbar-create" onclick={openCreate}>
+			+ Criar item de trabalho
+		</button>
 	</div>
 
 	<div class="columns">
@@ -625,8 +659,32 @@
 
 	.toolbar {
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--space-4);
+		flex-wrap: wrap;
 		margin-bottom: var(--space-5);
+	}
+
+	.deliverable-filter {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.deliverable-filter select {
+		border-radius: var(--hydra-radius);
+		border: 1px solid rgba(101, 104, 108, 0.3);
+		background: var(--hydra-surface);
+		color: var(--hydra-text);
+		padding: var(--space-2) var(--space-3);
+		font-size: var(--font-size-caption);
+	}
+
+	.toolbar-create {
+		margin-left: auto;
 	}
 
 	.button-primary {
