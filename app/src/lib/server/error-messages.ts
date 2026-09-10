@@ -95,6 +95,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Resultado desejado não encontrado.';
 		case 'desired_outcome_confirmation_invalid':
 			return 'Adicione ao menos uma mudança esperada antes de confirmar o resultado.';
+		case 'risk_not_found':
+			return 'Risco não encontrado.';
+		case 'risk_statement_required':
+			return 'Descreva o risco antes de salvar.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

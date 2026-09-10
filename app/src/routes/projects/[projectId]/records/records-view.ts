@@ -152,6 +152,22 @@ const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
 const MARCOS_PRINCIPAIS_FIELD_ID = 'marcos_principais';
 const MARCOS_PRINCIPAIS_FIELD_LABEL = 'Marcos principais';
 
+// S10 (D049, reconciliação de risco legado) — "Identificar riscos do
+// projeto"/"Atualizar riscos" seguem o mesmo padrão de DEFINIR_MARCOS acima:
+// viraram explicit_confirmation (confirmRiskIdentification/
+// confirmRiskUpdate, ver domain/transitions.ts), então o loop genérico não
+// as alcança mais. `riscos_identificados`/`resposta_inicial_riscos`/
+// `riscos_atualizados` são texto livre simples. Duas atividades distintas,
+// a primeira com dois campos (o segundo sempre foi opcional).
+const RISCOS_PROJETO_ACTIVITY_ID = 'riscos_projeto';
+const RISCOS_IDENTIFICADOS_FIELD_ID = 'riscos_identificados';
+const RISCOS_IDENTIFICADOS_FIELD_LABEL = 'Riscos identificados';
+const RESPOSTA_INICIAL_RISCOS_FIELD_ID = 'resposta_inicial_riscos';
+const RESPOSTA_INICIAL_RISCOS_FIELD_LABEL = 'Resposta inicial aos riscos';
+const ATUALIZAR_RISCOS_ACTIVITY_ID = 'atualizar_riscos';
+const RISCOS_ATUALIZADOS_FIELD_ID = 'riscos_atualizados';
+const RISCOS_ATUALIZADOS_FIELD_LABEL = 'Riscos atualizados';
+
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
 		const found = phase.activities.find((activity) => activity.id === activityDefinitionId);
@@ -317,6 +333,44 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 						id: MARCOS_PRINCIPAIS_FIELD_ID,
 						label: MARCOS_PRINCIPAIS_FIELD_LABEL,
 						value: input.answers[MARCOS_PRINCIPAIS_FIELD_ID]
+					}
+				],
+				editHref: null
+			});
+		}
+
+		const riscosProjeto = phase.activities.find((activity) => activity.id === RISCOS_PROJETO_ACTIVITY_ID);
+		if (riscosProjeto) {
+			const fields: RecordsAnswerFieldView[] = [];
+			if (input.answers[RISCOS_IDENTIFICADOS_FIELD_ID]) {
+				fields.push({
+					id: RISCOS_IDENTIFICADOS_FIELD_ID,
+					label: RISCOS_IDENTIFICADOS_FIELD_LABEL,
+					value: input.answers[RISCOS_IDENTIFICADOS_FIELD_ID]
+				});
+			}
+			if (input.answers[RESPOSTA_INICIAL_RISCOS_FIELD_ID]) {
+				fields.push({
+					id: RESPOSTA_INICIAL_RISCOS_FIELD_ID,
+					label: RESPOSTA_INICIAL_RISCOS_FIELD_LABEL,
+					value: input.answers[RESPOSTA_INICIAL_RISCOS_FIELD_ID]
+				});
+			}
+			if (fields.length > 0) {
+				activities.push({ activityId: RISCOS_PROJETO_ACTIVITY_ID, title: riscosProjeto.title, fields, editHref: null });
+			}
+		}
+
+		const atualizarRiscos = phase.activities.find((activity) => activity.id === ATUALIZAR_RISCOS_ACTIVITY_ID);
+		if (atualizarRiscos && input.answers[RISCOS_ATUALIZADOS_FIELD_ID]) {
+			activities.push({
+				activityId: ATUALIZAR_RISCOS_ACTIVITY_ID,
+				title: atualizarRiscos.title,
+				fields: [
+					{
+						id: RISCOS_ATUALIZADOS_FIELD_ID,
+						label: RISCOS_ATUALIZADOS_FIELD_LABEL,
+						value: input.answers[RISCOS_ATUALIZADOS_FIELD_ID]
 					}
 				],
 				editHref: null

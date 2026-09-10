@@ -143,39 +143,30 @@ const restricoesPremissas: ActivityDefinition = {
 	]
 };
 
+// S10 (D049, reconciliação de risco legado, ver
+// docs/core/HYDRA_PRODUCT_REWORK.md §40) — `riscos_identificados`/
+// `resposta_inicial_riscos` são READ-LEGACY (§13.2): continuam legíveis, mas
+// nunca ganham nova escrita. A responsabilidade operacional de risco real
+// pertence a `Risk` (Acompanhamento). "Identificar riscos do projeto" vira
+// `explicit_confirmation` contra o estado canônico — mesmo molde de "Definir
+// marcos": ZERO Risk é resultado válido, confirmar significa "revisei os
+// riscos reais e o estado atual está correto", nunca "existe pelo menos um".
+// `confirmRiskIdentification` (domain/transitions.ts) nunca recusa por
+// ausência de Risk.
 const riscosProjeto: ActivityDefinition = {
 	id: 'riscos_projeto',
 	phaseId: 'estruturacao',
 	order: 5,
 	title: 'Identificar riscos do projeto',
 	mainQuestion: 'Quais riscos podem afetar este projeto?',
-	why: 'Identificar riscos cedo permite reduzir a chance de que eles se tornem problemas reais mais tarde.',
-	example: 'Risco: baixa adesão da equipe ao novo sistema. Resposta inicial: envolver a equipe de atendimento desde os primeiros testes.',
-	completionCriteria: 'Riscos relevantes identificados, com uma resposta inicial quando possível.',
-	completionMode: 'required_fields',
+	why: 'Identificar riscos cedo permite reduzir a chance de que eles se tornem problemas reais mais tarde. Definir de verdade acontece em Acompanhamento, como Risk — aqui você só confirma que revisou o estado atual, mesmo que ele seja "nenhum risco".',
+	example: 'Risco: baixa adesão da equipe ao novo sistema — declarado em Acompanhamento.',
+	completionCriteria:
+		'O usuário confirmou que revisou os riscos reais do projeto em Acompanhamento, mesmo que nenhum exista.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'Riscos do projeto não foram identificados',
-	pendingItemDetail: 'Sem essa identificação, riscos podem só aparecer quando já causaram impacto.',
-	fields: [
-		{
-			id: 'riscos_identificados',
-			activityId: 'riscos_projeto',
-			label: 'Quais riscos você já identifica?',
-			required: true,
-			placeholder: 'Ex.: baixa adesão da equipe ao novo sistema',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		},
-		{
-			id: 'resposta_inicial_riscos',
-			activityId: 'riscos_projeto',
-			label: 'Qual seria uma resposta inicial a esses riscos?',
-			required: false,
-			placeholder: 'Ex.: envolver a equipe desde os primeiros testes',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'Os riscos do projeto não foram revisados aqui',
+	pendingItemDetail: 'Revise os riscos em Acompanhamento e volte para confirmar — ou pule esta etapa.'
 };
 
 const comunicacaoGovernanca: ActivityDefinition = {

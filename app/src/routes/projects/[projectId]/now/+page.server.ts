@@ -36,6 +36,17 @@ const DEPENDENCIAS_TRABALHO_FIELD_ID = 'dependencias_trabalho';
 const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
 const MARCOS_PRINCIPAIS_FIELD_ID = 'marcos_principais';
 
+// S10 (D049, reconciliação de risco legado) — mesmo raciocínio de
+// DEFINIR_MARCOS_ACTIVITY_ID/MARCOS_PRINCIPAIS_FIELD_ID acima:
+// `riscos_identificados`/`resposta_inicial_riscos`/`riscos_atualizados` são
+// READ-LEGACY, texto livre simples, repassados direto de `view.answers` para
+// o template. Duas atividades distintas.
+const RISCOS_PROJETO_ACTIVITY_ID = 'riscos_projeto';
+const RISCOS_IDENTIFICADOS_FIELD_ID = 'riscos_identificados';
+const RESPOSTA_INICIAL_RISCOS_FIELD_ID = 'resposta_inicial_riscos';
+const ATUALIZAR_RISCOS_ACTIVITY_ID = 'atualizar_riscos';
+const RISCOS_ATUALIZADOS_FIELD_ID = 'riscos_atualizados';
+
 // S4D — "Resumo da descoberta" agora é representada pela tela dedicada
 // /summary (Checkpoint da Descoberta), não mais por uma superfície própria
 // dentro de /now. `resumo` nunca é allowsSkip, então nunca chega aqui via
@@ -302,6 +313,15 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const marcosPrincipais =
 		activity?.id === DEFINIR_MARCOS_ACTIVITY_ID ? (view.answers[MARCOS_PRINCIPAIS_FIELD_ID] ?? null) : undefined;
 
+	const riscosIdentificados =
+		activity?.id === RISCOS_PROJETO_ACTIVITY_ID ? (view.answers[RISCOS_IDENTIFICADOS_FIELD_ID] ?? null) : undefined;
+
+	const respostaInicialRiscos =
+		activity?.id === RISCOS_PROJETO_ACTIVITY_ID ? (view.answers[RESPOSTA_INICIAL_RISCOS_FIELD_ID] ?? null) : undefined;
+
+	const riscosAtualizados =
+		activity?.id === ATUALIZAR_RISCOS_ACTIVITY_ID ? (view.answers[RISCOS_ATUALIZADOS_FIELD_ID] ?? null) : undefined;
+
 	return {
 		activity,
 		isResuming: Boolean(resumingPendingItem),
@@ -312,7 +332,10 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		phaseProgress,
 		planningItems,
 		dependenciasTrabalho,
-		marcosPrincipais
+		marcosPrincipais,
+		riscosIdentificados,
+		respostaInicialRiscos,
+		riscosAtualizados
 	};
 };
 
@@ -499,6 +522,30 @@ export const actions: Actions = {
 	// mesmo molde de confirmDependencyMapping acima.
 	confirmMilestoneReview: async ({ params }) => {
 		const result = await getProjectUseCases().confirmMilestoneReview({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// S10 (D049, reconciliação de risco legado) — confirma "Identificar riscos
+	// do projeto"/"Atualizar riscos". Não recebem nenhum dado de Risk: ZERO é
+	// resultado válido, mesmo molde de confirmDependencyMapping/
+	// confirmMilestoneReview acima.
+	confirmRiskIdentification: async ({ params }) => {
+		const result = await getProjectUseCases().confirmRiskIdentification({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	confirmRiskUpdate: async ({ params }) => {
+		const result = await getProjectUseCases().confirmRiskUpdate({ projectId: params.projectId });
 
 		if (!result.ok) {
 			return fail(400, { message: mapUseCaseError(result.error) });

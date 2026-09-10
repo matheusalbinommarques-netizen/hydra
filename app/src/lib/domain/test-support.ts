@@ -19,6 +19,8 @@ import {
 	confirmDecomposition,
 	confirmDependencyMapping,
 	confirmMilestoneReview,
+	confirmRiskIdentification,
+	confirmRiskUpdate,
 	confirmDesiredOutcomes,
 	confirmPlanningPriority,
 	confirmScopeVersion,
@@ -200,6 +202,20 @@ export function confirmMilestoneReviewMinimally(catalog: Catalog, state: Project
 }
 
 /**
+ * Confirma "Identificar riscos do projeto"/"Atualizar riscos" (S10 —
+ * explicit_confirmation contra Risk, mas ZERO é resultado válido, D049) —
+ * mesmo raciocínio de {@link confirmDependencyMappingMinimally}: nenhuma das
+ * duas exige nenhum Risk, então não há "mínimo" a fabricar aqui.
+ */
+export function confirmRiskIdentificationMinimally(catalog: Catalog, state: ProjectState, occurredAt: string): ProjectState {
+	return unwrapResult(confirmRiskIdentification(catalog, state, occurredAt));
+}
+
+export function confirmRiskUpdateMinimally(catalog: Catalog, state: ProjectState, occurredAt: string): ProjectState {
+	return unwrapResult(confirmRiskUpdate(catalog, state, occurredAt));
+}
+
+/**
  * Confirma "Resultado desejado" (`resultado`, Stage 4C do rework) com o
  * mínimo que satisfaz {@link getDesiredOutcomeConfirmationIssues}: um
  * DesiredOutcome com `change` preenchido — para quando o teste só precisa
@@ -223,8 +239,9 @@ export function confirmDesiredOutcomesMinimally(
  * (Decompor o trabalho, S9), {@link confirmPlanningPriorityMinimally}
  * (Priorizar entregas, S9), {@link confirmDependencyMappingMinimally}
  * (Mapear dependências, S9), {@link confirmMilestoneReviewMinimally}
- * (Definir marcos, S9) ou {@link confirmAffectedGroupsMinimally} (Quem é
- * afetado, ETAPA 2), `scope_confirmation` via
+ * (Definir marcos, S9), {@link confirmRiskIdentificationMinimally}/
+ * {@link confirmRiskUpdateMinimally} (Riscos, S10) ou
+ * {@link confirmAffectedGroupsMinimally} (Quem é afetado, ETAPA 2), `scope_confirmation` via
  * {@link confirmScopeVersionMinimally}.
  */
 export function completePhase(catalog: Catalog, state: ProjectState, phaseId: string, occurredAt: string): ProjectState {
@@ -245,6 +262,10 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				next = confirmDependencyMappingMinimally(catalog, next, occurredAt);
 			} else if (activity.id === 'definir_marcos') {
 				next = confirmMilestoneReviewMinimally(catalog, next, occurredAt);
+			} else if (activity.id === 'riscos_projeto') {
+				next = confirmRiskIdentificationMinimally(catalog, next, occurredAt);
+			} else if (activity.id === 'atualizar_riscos') {
+				next = confirmRiskUpdateMinimally(catalog, next, occurredAt);
 			} else if (activity.id === 'publico') {
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else if (activity.id === 'estado_atual') {

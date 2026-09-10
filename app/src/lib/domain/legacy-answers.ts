@@ -62,7 +62,19 @@ export const DEPRECATED_ANSWER_FIELDS: readonly DeprecatedAnswerField[] = [
 	// mais fonte de verdade (Milestone é, D040/D041, domain/state-types.ts).
 	// Snapshots exportados antes dessa mudança ainda carregam essa Answer — ela
 	// continua legível, nunca reescrita.
-	{ activityDefinitionId: 'definir_marcos', fieldDefinitionId: 'marcos_principais' }
+	{ activityDefinitionId: 'definir_marcos', fieldDefinitionId: 'marcos_principais' },
+	// "Riscos do projeto"/"Atualizar riscos" (S10, D049 — reconciliação de
+	// risco legado, ver docs/core/HYDRA_PRODUCT_REWORK.md §40) — as atividades
+	// `riscos_projeto` e `atualizar_riscos` deixaram de ser required_fields;
+	// `riscos_identificados`/`resposta_inicial_riscos`/`riscos_atualizados` não
+	// são mais fonte de verdade (Risk é, ver domain/state-types.ts). Duas
+	// atividades distintas, mesma coleção canônica — nenhum dos três campos
+	// tem equivalente individual em Risk (sem parsing/conversão automática).
+	// Snapshots exportados antes dessa mudança ainda carregam essas Answers —
+	// continuam legíveis, nunca reescritas.
+	{ activityDefinitionId: 'riscos_projeto', fieldDefinitionId: 'riscos_identificados' },
+	{ activityDefinitionId: 'riscos_projeto', fieldDefinitionId: 'resposta_inicial_riscos' },
+	{ activityDefinitionId: 'atualizar_riscos', fieldDefinitionId: 'riscos_atualizados' }
 ];
 
 export function isDeprecatedAnswerField(activityDefinitionId: string, fieldDefinitionId: string): boolean {

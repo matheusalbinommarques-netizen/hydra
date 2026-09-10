@@ -24,6 +24,7 @@ import type {
 	ImpedimentType,
 	PendingItem,
 	ProjectState,
+	Risk,
 	ScopeBucket,
 	ScopeEffort,
 	ScopeExecutionStatus,
@@ -92,7 +93,9 @@ export type DomainTransitionError =
 	| { kind: 'cause_exploration_has_hypotheses' }
 	| { kind: 'evidence_not_found' }
 	| { kind: 'desired_outcome_not_found' }
-	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] };
+	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] }
+	| { kind: 'risk_not_found' }
+	| { kind: 'risk_statement_required' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -386,6 +389,11 @@ const PRIORIZAR_ENTREGAS_ACTIVITY_ID = 'priorizar_entregas';
 const MAPEAR_DEPENDENCIAS_ACTIVITY_ID = 'mapear_dependencias';
 // S9 (reconciliação de marcos legados) — mesmo motivo das constantes acima.
 const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
+// S10 (D049, reconciliação de risco legado) — mesmo motivo das constantes
+// acima. Duas atividades legadas distintas (Estruturação e Execução) passam
+// a confirmar contra a mesma coleção canônica de Risk.
+const RISCOS_PROJETO_ACTIVITY_ID = 'riscos_projeto';
+const ATUALIZAR_RISCOS_ACTIVITY_ID = 'atualizar_riscos';
 
 // Confirma "Decompor o trabalho" quando existe ao menos um WorkItem real —
 // nunca cria, edita nem lê PlanningItem. Só altera ActivityProgress (e
@@ -487,6 +495,60 @@ export function confirmMilestoneReview(
 	occurredAt: string
 ): Result<ProjectState, DomainTransitionError> {
 	const activity = findActivityDefinition(catalog, DEFINIR_MARCOS_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
+}
+
+// Confirma "Riscos do projeto" (Estruturação) — nunca cria, edita, lê nem
+// exige nenhum Risk: mesmo molde de confirmDependencyMapping/
+// confirmMilestoneReview acima, ZERO Risk é resultado legítimo. Só altera
+// ActivityProgress (e resolve a pendência, se estava pulada); nunca
+// cria/edita/encerra/reabre Risk.
+export function confirmRiskIdentification(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, RISCOS_PROJETO_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
+}
+
+// Confirma "Atualizar riscos" (Execução) — mesmo molde de
+// confirmRiskIdentification acima, mesma coleção canônica de Risk, mesma
+// atividade sem exigir contagem mínima.
+export function confirmRiskUpdate(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, ATUALIZAR_RISCOS_ACTIVITY_ID);
 	if (!activity || activity.completionMode !== 'explicit_confirmation') {
 		return { ok: false, error: { kind: 'activity_not_found' } };
 	}
@@ -1577,6 +1639,112 @@ export function unlinkWorkItemFromMilestone(
 		value: {
 			...state,
 			milestoneWorkItems: state.milestoneWorkItems.filter((link) => link.id !== milestoneWorkItemId)
+		}
+	};
+}
+
+// --- Risk (ETAPA 10 do rework, primeiro microcorte, D049) -----------------
+//
+// Objeto em nível de projeto, sem vínculo obrigatório com WorkItem,
+// Deliverable, Milestone, Impediment, Issue ou pessoa/responsável nesta
+// primeira fatia. `status` é declarado, nunca inferido — nenhuma função
+// aqui deriva `encerrado`/`aberto` de nenhum outro objeto.
+
+function findRisk(state: ProjectState, riskId: string): Risk | undefined {
+	return state.risks.find((risk) => risk.id === riskId);
+}
+
+export function addRisk(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	statement: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (statement.trim().length === 0) {
+		return { ok: false, error: { kind: 'risk_statement_required' } };
+	}
+
+	const risk: Risk = {
+		id: riskId,
+		projectId: state.project.id,
+		statement,
+		status: 'aberto',
+		closedAt: null,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, risks: [...state.risks, risk] } };
+}
+
+// Editar a declaração nunca altera o lifecycle (status/closedAt) — mesmo
+// molde de setImpedimentNextAction/setMilestonePlannedDate: é o mesmo fato
+// sendo escrito, não uma transição.
+export function editRiskStatement(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	statement: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const risk = findRisk(state, riskId);
+	if (!risk) return { ok: false, error: { kind: 'risk_not_found' } };
+	if (statement.trim().length === 0) {
+		return { ok: false, error: { kind: 'risk_statement_required' } };
+	}
+	if (risk.statement === statement) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			risks: state.risks.map((item) => (item.id === riskId ? { ...item, statement, updatedAt: occurredAt } : item))
+		}
+	};
+}
+
+// Idempotente (mesmo espírito de resolveImpediment/reachMilestone): encerrar
+// um risco já encerrado é no-op, nunca erro — e nunca reescreve o closedAt
+// original. `status` e `closedAt` mudam sempre juntos.
+export function closeRisk(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const risk = findRisk(state, riskId);
+	if (!risk) return { ok: false, error: { kind: 'risk_not_found' } };
+	if (risk.status === 'encerrado') return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			risks: state.risks.map((item) =>
+				item.id === riskId ? { ...item, status: 'encerrado', closedAt: occurredAt, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+export function reopenRisk(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const risk = findRisk(state, riskId);
+	if (!risk) return { ok: false, error: { kind: 'risk_not_found' } };
+	if (risk.status === 'aberto') return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			risks: state.risks.map((item) =>
+				item.id === riskId ? { ...item, status: 'aberto', closedAt: null, updatedAt: occurredAt } : item
+			)
 		}
 	};
 }

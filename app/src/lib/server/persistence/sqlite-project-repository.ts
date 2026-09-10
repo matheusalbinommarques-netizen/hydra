@@ -26,6 +26,7 @@ import {
 	mapDependencyRow,
 	mapMilestoneRow,
 	mapMilestoneWorkItemRow,
+	mapRiskRow,
 	mapWorkItemRow,
 	type ActivityProgressRow,
 	type AffectedGroupRow,
@@ -47,6 +48,7 @@ import {
 	type DependencyRow,
 	type MilestoneRow,
 	type MilestoneWorkItemRow,
+	type RiskRow,
 	type WorkItemRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
@@ -391,6 +393,16 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertMilestoneWorkItem.run(link);
 		}
 
+		// risk é independente (sem FK além de project) — pode ser inserido em
+		// qualquer ponto depois do project row.
+		const insertRisk = db.prepare(
+			`INSERT INTO risk (id, project_id, statement, status, closed_at, created_at, updated_at)
+			 VALUES (@id, @projectId, @statement, @status, @closedAt, @createdAt, @updatedAt)`
+		);
+		for (const risk of state.risks) {
+			insertRisk.run(risk);
+		}
+
 		const insertAffectedGroup = db.prepare(
 			`INSERT INTO affected_group (id, project_id, label, impact, frequency, created_at, updated_at)
 			 VALUES (@id, @projectId, @label, @impact, @frequency, @createdAt, @updatedAt)`
@@ -525,6 +537,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// milestone_work_item antes de milestone e de work_item (FKs para ambos).
 		db.prepare('DELETE FROM milestone_work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM milestone WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM risk WHERE project_id = ?').run(state.project.id);
 		// work_item antes de deliverable (ETAPA 9, segundo microcorte):
 		// work_item.deliverable_id referencia deliverable.id.
 		db.prepare('DELETE FROM work_item WHERE project_id = ?').run(state.project.id);
@@ -633,6 +646,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as MilestoneWorkItemRow[];
 
+			const riskRows = db
+				.prepare(
+					`SELECT id, project_id, statement, status, closed_at, created_at, updated_at
+					 FROM risk WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as RiskRow[];
+
 			const affectedGroupRows = db
 				.prepare(
 					`SELECT id, project_id, label, impact, frequency, created_at, updated_at
@@ -702,6 +722,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				dependencies: dependencyRows.map(mapDependencyRow),
 				milestones: milestoneRows.map(mapMilestoneRow),
 				milestoneWorkItems: milestoneWorkItemRows.map(mapMilestoneWorkItemRow),
+				risks: riskRows.map(mapRiskRow),
 				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
 				externalActions: externalActionRows.map(mapExternalActionRow),
 				evidences: evidenceRows.map(mapEvidenceRow),

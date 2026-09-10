@@ -125,30 +125,28 @@ const decisoesMudancas: ActivityDefinition = {
 	]
 };
 
+// S10 (D049, reconciliação de risco legado, ver
+// docs/core/HYDRA_PRODUCT_REWORK.md §40) — `riscos_atualizados` é
+// READ-LEGACY (§13.2): continua legível, mas nunca ganha nova escrita.
+// Mesma coleção canônica de `riscos_projeto` (Estruturação) — `Risk` é
+// operado em Acompanhamento, não por fase. "Atualizar riscos" vira
+// `explicit_confirmation`, mesmo molde de "Identificar riscos do projeto":
+// ZERO Risk é resultado válido. `confirmRiskUpdate` (domain/transitions.ts)
+// nunca recusa por ausência de Risk.
 const atualizarRiscos: ActivityDefinition = {
 	id: 'atualizar_riscos',
 	phaseId: 'execucao',
 	order: 5,
 	title: 'Atualizar riscos',
 	mainQuestion: 'Como estão os riscos deste projeto agora?',
-	why: 'Riscos mudam ao longo da execução — revisar periodicamente evita agir com base em uma avaliação desatualizada.',
-	example: 'O risco de baixa adesão da equipe diminuiu depois dos primeiros testes positivos.',
-	completionCriteria: 'Situação atual dos riscos descrita (novos, alterados ou encerrados).',
-	completionMode: 'required_fields',
+	why: 'Riscos mudam ao longo da execução — revisar periodicamente evita agir com base em uma avaliação desatualizada. Atualizar de verdade acontece em Acompanhamento, como Risk — aqui você só confirma que revisou o estado atual, mesmo que ele seja "nenhum risco".',
+	example: 'O risco de baixa adesão da equipe foi encerrado em Acompanhamento depois dos primeiros testes positivos.',
+	completionCriteria:
+		'O usuário confirmou que revisou os riscos reais do projeto em Acompanhamento, mesmo que nenhum exista.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'Os riscos não foram atualizados',
-	pendingItemDetail: 'Sem essa atualização, decisões podem se basear numa avaliação de risco desatualizada.',
-	fields: [
-		{
-			id: 'riscos_atualizados',
-			activityId: 'atualizar_riscos',
-			label: 'Como estão os riscos agora (novos, alterados, encerrados)?',
-			required: true,
-			placeholder: 'Ex.: risco de baixa adesão diminuiu após testes positivos',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'Os riscos não foram revisados aqui',
+	pendingItemDetail: 'Revise os riscos em Acompanhamento e volte para confirmar — ou pule esta etapa.'
 };
 
 const proximaAcaoAcompanhamento: ActivityDefinition = {

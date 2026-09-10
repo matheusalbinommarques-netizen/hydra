@@ -30,6 +30,8 @@ import type {
 	PendingItem,
 	Project,
 	ProjectEvent,
+	Risk,
+	RiskStatus,
 	ScopeBucket,
 	ScopeEffort,
 	ScopeExecutionStatus,
@@ -266,6 +268,28 @@ export function mapMilestoneWorkItemRow(row: MilestoneWorkItemRow): MilestoneWor
 		milestoneId: row.milestone_id,
 		workItemId: row.work_item_id,
 		createdAt: row.created_at
+	};
+}
+
+export interface RiskRow {
+	id: string;
+	project_id: string;
+	statement: string;
+	status: RiskStatus;
+	closed_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapRiskRow(row: RiskRow): Risk {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		statement: row.statement,
+		status: row.status,
+		closedAt: row.closed_at,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
 	};
 }
 

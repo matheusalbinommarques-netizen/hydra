@@ -10,6 +10,7 @@ import {
 	addCauseHypothesis as addCauseHypothesisInDomain,
 	addDesiredOutcome as addDesiredOutcomeInDomain,
 	addImpediment as addImpedimentInDomain,
+	addRisk as addRiskInDomain,
 	addScopeItem as addScopeItemInDomain,
 	addTreatmentStep as addTreatmentStepInDomain,
 	addDeliverable as addDeliverableInDomain,
@@ -30,14 +31,18 @@ import {
 	confirmDecomposition as confirmDecompositionInDomain,
 	confirmDependencyMapping as confirmDependencyMappingInDomain,
 	confirmMilestoneReview as confirmMilestoneReviewInDomain,
+	confirmRiskIdentification as confirmRiskIdentificationInDomain,
+	confirmRiskUpdate as confirmRiskUpdateInDomain,
 	confirmDesiredOutcomes as confirmDesiredOutcomesInDomain,
 	confirmPlanningPriority as confirmPlanningPriorityInDomain,
 	confirmScopeVersion as confirmScopeVersionInDomain,
 	confirmSummary as confirmSummaryInDomain,
 	confirmTreatment as confirmTreatmentInDomain,
 	createInitialProjectState,
+	closeRisk as closeRiskInDomain,
 	deserializeProjectEvents,
 	deserializeProjectState,
+	editRiskStatement as editRiskStatementInDomain,
 	markCauseExplorationUnknown as markCauseExplorationUnknownInDomain,
 	moveDesiredOutcome as moveDesiredOutcomeInDomain,
 	moveScopeItem as moveScopeItemInDomain,
@@ -57,6 +62,7 @@ import {
 	removeTreatmentStep as removeTreatmentStepInDomain,
 	renameProject as renameProjectInDomain,
 	reopenImpediment as reopenImpedimentInDomain,
+	reopenRisk as reopenRiskInDomain,
 	reorderAgoraItems as reorderAgoraItemsInDomain,
 	resolveImpediment as resolveImpedimentInDomain,
 	serializeProjectState,
@@ -91,6 +97,7 @@ import type {
 	AddCauseHypothesisInput,
 	AddDesiredOutcomeInput,
 	AddImpedimentInput,
+	AddRiskInput,
 	AddScopeItemInput,
 	AddTreatmentStepInput,
 	AddDeliverableInput,
@@ -110,18 +117,22 @@ import type {
 	AddWorkItemInput,
 	SetWorkItemDeliverableInput,
 	AnswerActivityInput,
+	CloseRiskInput,
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmCauseHypothesesInput,
 	ConfirmDecompositionInput,
 	ConfirmDependencyMappingInput,
 	ConfirmMilestoneReviewInput,
+	ConfirmRiskIdentificationInput,
+	ConfirmRiskUpdateInput,
 	ConfirmDesiredOutcomesInput,
 	ConfirmPlanningPriorityInput,
 	ConfirmScopeVersionInput,
 	ConfirmSummaryInput,
 	ConfirmTreatmentInput,
 	CreateConfiguredProjectInput,
+	EditRiskStatementInput,
 	MarkCauseExplorationUnknownInput,
 	MoveDesiredOutcomeInput,
 	MoveScopeItemInput,
@@ -138,6 +149,7 @@ import type {
 	RemoveTreatmentStepInput,
 	RenameProjectInput,
 	ReopenImpedimentInput,
+	ReopenRiskInput,
 	ReorderAgoraItemsInput,
 	ResolveImpedimentInput,
 	SetAffectedGroupFrequencyInput,
@@ -513,6 +525,28 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmMilestoneReviewInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmRiskIdentification(input: ConfirmRiskIdentificationInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmRiskIdentificationInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async confirmRiskUpdate(input: ConfirmRiskUpdateInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmRiskUpdateInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);
@@ -1056,6 +1090,55 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = unlinkWorkItemFromMilestoneInDomain(catalog, state, input.milestoneWorkItemId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Risk (ETAPA 10 do rework, primeiro microcorte, D049) — sem evento no
+		// histórico nesta rodada, mesma razão de Milestone acima: a taxonomia de
+		// ProjectEvent é fechada e só cobre o loop WorkItem/Impediment (D037).
+		async addRisk(input: AddRiskInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addRiskInDomain(catalog, state, idGenerator.generate(), input.statement, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async editRiskStatement(input: EditRiskStatementInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = editRiskStatementInDomain(catalog, state, input.riskId, input.statement, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Encerrar é sempre ação humana explícita: nenhum outro caso de uso
+		// chama isto.
+		async closeRisk(input: CloseRiskInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = closeRiskInDomain(catalog, state, input.riskId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async reopenRisk(input: ReopenRiskInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reopenRiskInDomain(catalog, state, input.riskId, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

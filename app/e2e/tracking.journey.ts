@@ -27,9 +27,13 @@ test('Acompanhamento: adicionar, classificar tipo, definir próxima ação, reso
 	});
 
 	await test.step('adicionar um impedimento com tipo', async () => {
-		await page.getByLabel('Descrição').fill('Falta acesso ao ambiente de testes');
-		await page.getByLabel('Tipo').selectOption('falta_de_recurso');
-		await page.getByRole('button', { name: 'Adicionar' }).click();
+		// S10 (D049) — a seção "Riscos" introduziu um segundo formulário com
+		// botão "Adicionar" na mesma página; escopar pela seção evita
+		// ambiguidade (strict mode violation) sem depender de texto novo.
+		const impedimentSection = page.getByLabel('Gestão de impedimentos');
+		await impedimentSection.getByLabel('Descrição').fill('Falta acesso ao ambiente de testes');
+		await impedimentSection.getByLabel('Tipo').selectOption('falta_de_recurso');
+		await impedimentSection.getByRole('button', { name: 'Adicionar' }).click();
 
 		await expect(
 			page.locator('.impediment-row', { hasText: 'Falta acesso ao ambiente de testes' })

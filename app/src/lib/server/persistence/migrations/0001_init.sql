@@ -247,6 +247,29 @@ CREATE TABLE IF NOT EXISTS milestone_work_item (
 	CONSTRAINT milestone_work_item_unique_pair UNIQUE (milestone_id, work_item_id)
 );
 
+-- Risk (ETAPA 10 do rework, primeiro microcorte, D049) — ver
+-- app/src/lib/domain/state-types.ts. Objeto em nível de projeto, sem FK
+-- para work_item/deliverable/milestone/impediment nesta primeira fatia.
+-- `status` é a única autoridade sobre aberto/encerrado, nunca derivado.
+--
+-- As duas CHECK abaixo são NOMEADAS, mesma regra de milestone acima: a
+-- primeira cobre o conjunto fechado de status do lifecycle, a segunda o par
+-- (status, closed_at), que closeRisk/reopenRisk sempre alteram atomicamente
+-- — aberto => closed_at IS NULL; encerrado => closed_at IS NOT NULL.
+CREATE TABLE IF NOT EXISTS risk (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	statement TEXT NOT NULL,
+	status TEXT NOT NULL,
+	closed_at TEXT,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	CONSTRAINT risk_status_values CHECK (status IN ('aberto', 'encerrado')),
+	CONSTRAINT risk_closed_at_matches_status CHECK (
+		(status = 'aberto' AND closed_at IS NULL) OR (status = 'encerrado' AND closed_at IS NOT NULL)
+	)
+);
+
 -- Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — ver
 -- app/src/lib/domain/state-types.ts. Ligado à atividade `publico` do
 -- catálogo (completion deriva do estado destes grupos, ver
@@ -444,6 +467,7 @@ CREATE INDEX IF NOT EXISTS idx_work_item_project_id ON work_item (project_id);
 CREATE INDEX IF NOT EXISTS idx_dependency_project_id ON dependency (project_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_project_id ON milestone (project_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_work_item_project_id ON milestone_work_item (project_id);
+CREATE INDEX IF NOT EXISTS idx_risk_project_id ON risk (project_id);
 CREATE INDEX IF NOT EXISTS idx_affected_group_project_id ON affected_group (project_id);
 CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);

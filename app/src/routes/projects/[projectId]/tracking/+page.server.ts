@@ -40,6 +40,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		workItems: view.workItems,
 		milestones: view.milestones,
 		impediments: view.impediments,
+		risks: view.risks,
 		openPendingItems: view.openPendingItems
 	});
 
@@ -106,6 +107,47 @@ export const actions: Actions = {
 		if (!impedimentId) return fail(400, { message: 'Impedimento inválido.' });
 
 		const result = await getProjectUseCases().reopenImpediment({ projectId: params.projectId, impedimentId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	addRisk: async ({ request, params }) => {
+		const formData = await request.formData();
+		const statement = readString(formData, 'statement');
+		if (!statement) return fail(400, { message: 'Descreva o risco.' });
+
+		const result = await getProjectUseCases().addRisk({ projectId: params.projectId, statement });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	editRiskStatement: async ({ request, params }) => {
+		const formData = await request.formData();
+		const riskId = readString(formData, 'riskId');
+		const statement = readString(formData, 'statement');
+		if (!riskId || !statement) return fail(400, { message: 'Risco ou declaração inválida.' });
+
+		const result = await getProjectUseCases().editRiskStatement({ projectId: params.projectId, riskId, statement });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	closeRisk: async ({ request, params }) => {
+		const formData = await request.formData();
+		const riskId = readString(formData, 'riskId');
+		if (!riskId) return fail(400, { message: 'Risco inválido.' });
+
+		const result = await getProjectUseCases().closeRisk({ projectId: params.projectId, riskId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	reopenRisk: async ({ request, params }) => {
+		const formData = await request.formData();
+		const riskId = readString(formData, 'riskId');
+		if (!riskId) return fail(400, { message: 'Risco inválido.' });
+
+		const result = await getProjectUseCases().reopenRisk({ projectId: params.projectId, riskId });
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
 	}

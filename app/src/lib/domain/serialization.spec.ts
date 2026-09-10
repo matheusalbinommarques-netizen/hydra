@@ -10,6 +10,11 @@ import {
 	setMilestonePlannedDate,
 	linkWorkItemToMilestone,
 	reachMilestone,
+	addRisk,
+	editRiskStatement,
+	closeRisk,
+	reopenRisk,
+	confirmRiskIdentification,
 	addCauseHypothesis,
 	addDesiredOutcome,
 	addImpediment,
@@ -1882,6 +1887,143 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 		expect(result.value.answers.find((answer) => answer.fieldDefinitionId === 'marcos_principais')?.value).toBe(
 			'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo'
 		);
+	});
+});
+
+describe('Risk (ETAPA 10 do rework, primeiro microcorte, D049)', () => {
+	it('preserva riscos no round-trip completo', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addRisk(catalog, state, 'risk-1', 'Baixa adesão da equipe', T1));
+		state = unwrap(addRisk(catalog, state, 'risk-2', 'Prazo apertado', T1));
+		state = unwrap(editRiskStatement(catalog, state, 'risk-2', 'Prazo muito apertado', T2));
+		state = unwrap(closeRisk(catalog, state, 'risk-1', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('criar Risk nasce aberto, sem closedAt', () => {
+		const state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco novo', T1)
+		);
+		expect(state.risks[0]).toMatchObject({ status: 'aberto', closedAt: null });
+	});
+
+	it('encerrar/reabrir preserva a invariante do timestamp (idempotente)', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(closeRisk(catalog, state, 'risk-1', T2));
+		expect(state.risks[0].status).toBe('encerrado');
+		expect(state.risks[0].closedAt).toBe(T2);
+
+		// Idempotente: encerrar de novo não reescreve closedAt.
+		const closedAgain = unwrap(closeRisk(catalog, state, 'risk-1', '2026-03-01T00:00:00.000Z'));
+		expect(closedAgain.risks[0].closedAt).toBe(T2);
+
+		state = unwrap(reopenRisk(catalog, state, 'risk-1', T2));
+		expect(state.risks[0].status).toBe('aberto');
+		expect(state.risks[0].closedAt).toBeNull();
+	});
+
+	it('editar a declaração nunca altera status/closedAt', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(closeRisk(catalog, state, 'risk-1', T2));
+		state = unwrap(editRiskStatement(catalog, state, 'risk-1', 'Risco reformulado', '2026-03-01T00:00:00.000Z'));
+		expect(state.risks[0]).toMatchObject({
+			statement: 'Risco reformulado',
+			status: 'encerrado',
+			closedAt: T2
+		});
+	});
+
+	it('zero Risk é estado legítimo — confirmRiskIdentification nunca exige nenhum', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		expect(state.risks).toEqual([]);
+		const result = confirmRiskIdentification(catalog, state, T1);
+		expect(result.ok).toBe(true);
+	});
+
+	it('snapshot anterior a este corte (sem a chave risks) importa como coleção vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.risks;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.risks).toEqual([]);
+	});
+
+	it('recusa risco encerrado sem closedAt e risco aberto com closedAt', () => {
+		const base = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+
+		base.state.risks = [
+			{ id: 'risk-1', projectId: 'proj-1', statement: 'R', status: 'encerrado', closedAt: null, createdAt: T1, updatedAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+
+		base.state.risks = [
+			{ id: 'risk-1', projectId: 'proj-1', statement: 'R', status: 'aberto', closedAt: T2, createdAt: T1, updatedAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('não converte os Answers legados de riscos em nenhum Risk (riscos_projeto e atualizar_riscos)', () => {
+		// S10 (D049) — `riscos_projeto`/`atualizar_riscos` não são mais
+		// required_fields (viraram explicit_confirmation, ver
+		// domain/transitions.ts), então answerActivity recusa escrita nova aqui
+		// com wrong_completion_mode. Simula um projeto antigo: três Answers
+		// legadas gravadas diretamente no estado, mesmo padrão do teste de
+		// marcos_principais acima.
+		const state: ProjectState = {
+			...createInitialProjectState(catalog, 'proj-1', T1),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'riscos_projeto',
+					fieldDefinitionId: 'riscos_identificados',
+					value: 'Baixa adesão da equipe',
+					createdAt: T1,
+					updatedAt: T1
+				},
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'riscos_projeto',
+					fieldDefinitionId: 'resposta_inicial_riscos',
+					value: 'Envolver a equipe cedo',
+					createdAt: T1,
+					updatedAt: T1
+				},
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'atualizar_riscos',
+					fieldDefinitionId: 'riscos_atualizados',
+					value: 'Risco de adesão diminuiu',
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.risks).toEqual([]);
+		expect(
+			result.value.answers.find((answer) => answer.fieldDefinitionId === 'riscos_identificados')?.value
+		).toBe('Baixa adesão da equipe');
+		expect(
+			result.value.answers.find((answer) => answer.fieldDefinitionId === 'resposta_inicial_riscos')?.value
+		).toBe('Envolver a equipe cedo');
+		expect(
+			result.value.answers.find((answer) => answer.fieldDefinitionId === 'riscos_atualizados')?.value
+		).toBe('Risco de adesão diminuiu');
 	});
 });
 

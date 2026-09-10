@@ -31,6 +31,7 @@ function baseInput(overrides: Partial<TrackingViewInput> = {}): TrackingViewInpu
 		workItems: [],
 		milestones: [],
 		impediments: [],
+		risks: [],
 		openPendingItems: [],
 		...overrides
 	};

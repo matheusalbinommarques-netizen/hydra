@@ -131,6 +131,22 @@ export async function answerCurrentActivityGenerically(page: Page): Promise<void
 		return;
 	}
 
+	// "Identificar riscos do projeto"/"Atualizar riscos" (S10 — explicit_
+	// confirmation contra Risk, mas ZERO Risk é resultado válido, D049): mesmo
+	// padrão de "Mapear dependências"/"Definir marcos" acima.
+	const confirmRiskIdentificationButton = page.getByRole('button', { name: 'Confirmar revisão dos riscos' });
+	if (await confirmRiskIdentificationButton.count()) {
+		const action = (await page.getByRole('heading', { level: 2 }).textContent()) === 'Atualizar riscos'
+			? '?/confirmRiskUpdate'
+			: '?/confirmRiskIdentification';
+		await Promise.all([
+			page.waitForResponse((response) => response.url().includes(action) && response.request().method() === 'POST'),
+			confirmRiskIdentificationButton.click()
+		]);
+		await page.waitForTimeout(200);
+		return;
+	}
+
 	const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Salvar e continuar' }) });
 
 	const textInputs = form.locator('input[type="text"][required]');

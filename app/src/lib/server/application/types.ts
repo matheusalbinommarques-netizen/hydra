@@ -17,6 +17,7 @@ import type {
 	ProjectEvent,
 	ProjectStateParseError,
 	Result,
+	RiskStatus,
 	ScopeBucket,
 	ScopeConfirmationIssue,
 	ScopeEffort,
@@ -165,6 +166,17 @@ export interface ImpedimentView {
 	workItemId: string | null;
 	createdAt: string;
 	resolvedAt: string | null;
+}
+
+// Acompanhamento ("Riscos", ETAPA 10 do rework, primeiro microcorte, D049) —
+// view leve de Risk, sem projectId/updatedAt, que a interface não precisa.
+// `status` é o estado DECLARADO e a única autoridade sobre aberto/encerrado.
+export interface RiskView {
+	id: string;
+	statement: string;
+	status: RiskStatus;
+	createdAt: string;
+	closedAt: string | null;
 }
 
 // Trabalho (ETAPA 6 do rework, "Primeiro loop operacional") — view leve de
@@ -395,6 +407,13 @@ export interface ProjectView {
 	// projeção existente onde eles caibam.
 	deliverables: DeliverableView[];
 	milestones: MilestoneView[];
+	// Riscos do projeto (ETAPA 10 do rework, primeiro microcorte, D049) —
+	// todos os Risks (abertos e encerrados); Acompanhamento filtra por status
+	// diretamente, mesmo padrão de impediments acima. Deliberadamente NÃO
+	// entra em "Precisa de você" nem em "Atenções" nesta fatia — sem
+	// avaliação/urgência estruturada, isso fingiria acionabilidade que o
+	// modelo ainda não conhece.
+	risks: RiskView[];
 	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — todos os grupos
 	// afetados do projeto; a interface (MapaDeImpacto.svelte) agrupa em faixas
 	// por `impact` (derivado, nunca persistido, ver
@@ -486,6 +505,19 @@ export interface ConfirmDependencyMappingInput {
 // nenhum dado de Milestone: ZERO é resultado válido, então nenhum campo de
 // contagem/estado é necessário aqui — só marca a Activity concluída.
 export interface ConfirmMilestoneReviewInput {
+	projectId: string;
+}
+
+// S10 (D049, reconciliação de risco legado) — confirmação de "Identificar
+// riscos do projeto"/"Atualizar riscos" (explicit_confirmation contra Risk
+// real). Não recebe nenhum dado de Risk: ZERO é resultado válido, então
+// nenhum campo de contagem/estado é necessário aqui — só marca a Activity
+// concluída. Duas atividades distintas, mesmo contrato de input.
+export interface ConfirmRiskIdentificationInput {
+	projectId: string;
+}
+
+export interface ConfirmRiskUpdateInput {
 	projectId: string;
 }
 
@@ -719,6 +751,30 @@ export interface UnlinkWorkItemFromMilestoneInput {
 	milestoneWorkItemId: string;
 }
 
+// Risk (ETAPA 10 do rework, primeiro microcorte, D049) — mesmo padrão dos
+// inputs de Milestone acima: id gerado pelo caso de uso (idGenerator), nunca
+// recebido do cliente.
+export interface AddRiskInput {
+	projectId: string;
+	statement: string;
+}
+
+export interface EditRiskStatementInput {
+	projectId: string;
+	riskId: string;
+	statement: string;
+}
+
+export interface CloseRiskInput {
+	projectId: string;
+	riskId: string;
+}
+
+export interface ReopenRiskInput {
+	projectId: string;
+	riskId: string;
+}
+
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
 // inputs de ScopeItem/Impediment: id gerado pelo caso de uso
 // (idGenerator), nunca recebido do cliente.
@@ -948,6 +1004,12 @@ export interface ProjectUseCases {
 	setMilestonePlannedDate(input: SetMilestonePlannedDateInput): Promise<UseCaseOutcome<ProjectView>>;
 	linkWorkItemToMilestone(input: LinkWorkItemToMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
 	unlinkWorkItemFromMilestone(input: UnlinkWorkItemFromMilestoneInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmRiskIdentification(input: ConfirmRiskIdentificationInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmRiskUpdate(input: ConfirmRiskUpdateInput): Promise<UseCaseOutcome<ProjectView>>;
+	addRisk(input: AddRiskInput): Promise<UseCaseOutcome<ProjectView>>;
+	editRiskStatement(input: EditRiskStatementInput): Promise<UseCaseOutcome<ProjectView>>;
+	closeRisk(input: CloseRiskInput): Promise<UseCaseOutcome<ProjectView>>;
+	reopenRisk(input: ReopenRiskInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

@@ -40,6 +40,24 @@
 		editingImpedimentId = editingImpedimentId === id ? null : id;
 	}
 
+	let newRiskStatement = $state('');
+	// Mesmo padrão de editingImpedimentId: só um risco em edição por vez.
+	let editingRiskId = $state<string | null>(null);
+	let showClosedRisks = $state(false);
+
+	function handleAddRiskSubmit() {
+		return async ({ result, update }: { result: ActionResult; update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			if (result.type === 'success') {
+				newRiskStatement = '';
+			}
+			await update({ reset: false });
+		};
+	}
+
+	function toggleEditRisk(id: string) {
+		editingRiskId = editingRiskId === id ? null : id;
+	}
+
 	// reachedAt é INSTANTE (timestamp gravado pelo Clock), então aqui Date/Intl
 	// é o tratamento correto — ao contrário de plannedDate, que é dia civil e
 	// chega da projeção já formatado como string, sem nunca virar Date.
@@ -418,6 +436,92 @@
 							{/if}
 							<form method="POST" action="?/reopen" use:enhance class="reopen-form">
 								<input type="hidden" name="impedimentId" value={impediment.id} />
+								<button type="submit" class="button-secondary">Reabrir</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+	{/if}
+</section>
+
+<section class="card risk-management" aria-labelledby="risk-management-heading">
+	<h2 id="risk-management-heading">Riscos</h2>
+	<p class="subtitle-inline">Registre, edite e acompanhe os riscos do projeto até encerrá-los.</p>
+
+	<form method="POST" action="?/addRisk" use:enhance={handleAddRiskSubmit} class="add-risk-form">
+		<label class="visually-hidden" for="risk-statement">Declaração do risco</label>
+		<input
+			id="risk-statement"
+			type="text"
+			name="statement"
+			placeholder="Descreva o risco..."
+			required
+			bind:value={newRiskStatement}
+		/>
+		<button type="submit">Adicionar</button>
+	</form>
+
+	{#if tracking.risks.open.length === 0}
+		<p class="empty">Nenhum risco aberto.</p>
+	{:else}
+		<ul class="risk-list">
+			{#each tracking.risks.open as risk (risk.id)}
+				{#if editingRiskId === risk.id}
+					<li class="risk-row editing">
+						<form method="POST" action="?/editRiskStatement" use:enhance class="risk-statement-form">
+							<input type="hidden" name="riskId" value={risk.id} />
+							<label class="visually-hidden" for="statement-{risk.id}">Declaração do risco</label>
+							<input id="statement-{risk.id}" type="text" name="statement" value={risk.statement} required />
+							<button type="submit" class="button-secondary">Salvar</button>
+						</form>
+						<div class="risk-actions">
+							<button type="button" class="button-secondary" onclick={() => toggleEditRisk(risk.id)}>
+								Concluir edição
+							</button>
+							<form method="POST" action="?/closeRisk" use:enhance class="close-risk-form">
+								<input type="hidden" name="riskId" value={risk.id} />
+								<button type="submit" class="button-secondary">Encerrar</button>
+							</form>
+						</div>
+					</li>
+				{:else}
+					<li class="risk-row">
+						<p class="risk-text">{risk.statement}</p>
+						<div class="risk-actions">
+							<button type="button" class="link-button" onclick={() => toggleEditRisk(risk.id)}>Editar</button>
+							<form method="POST" action="?/closeRisk" use:enhance class="close-risk-form">
+								<input type="hidden" name="riskId" value={risk.id} />
+								<button type="submit" class="button-secondary">Encerrar</button>
+							</form>
+						</div>
+					</li>
+				{/if}
+			{/each}
+		</ul>
+	{/if}
+
+	<button
+		type="button"
+		class="resolved-toggle"
+		aria-expanded={showClosedRisks}
+		aria-controls="closed-risks-list"
+		onclick={() => (showClosedRisks = !showClosedRisks)}
+	>
+		Encerrados ({tracking.risks.closed.length})
+	</button>
+	{#if showClosedRisks}
+		<div id="closed-risks-list">
+			{#if tracking.risks.closed.length === 0}
+				<p class="empty">Nenhum risco encerrado ainda.</p>
+			{:else}
+				<ul class="risk-list">
+					{#each tracking.risks.closed as risk (risk.id)}
+						<li class="risk-row resolved">
+							<p class="risk-text">{risk.statement}</p>
+							<form method="POST" action="?/reopenRisk" use:enhance class="reopen-risk-form">
+								<input type="hidden" name="riskId" value={risk.id} />
 								<button type="submit" class="button-secondary">Reabrir</button>
 							</form>
 						</li>
@@ -819,6 +923,78 @@
 		margin-top: var(--space-3);
 	}
 
+	.add-risk-form {
+		display: flex;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		align-items: center;
+		margin-bottom: var(--space-4);
+	}
+
+	.add-risk-form input[type='text'] {
+		flex: 1;
+		min-width: 14rem;
+	}
+
+	.risk-list {
+		list-style: none;
+		margin: 0 0 var(--space-4);
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+
+	.risk-row {
+		border: 1px solid rgba(101, 104, 108, 0.22);
+		border-radius: var(--hydra-radius);
+		padding: var(--space-4);
+		background: var(--hydra-surface);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.risk-row.editing {
+		flex-direction: column;
+		align-items: stretch;
+		background: var(--hydra-surface);
+		border-color: rgba(101, 104, 108, 0.4);
+	}
+
+	.risk-row.resolved {
+		opacity: 0.85;
+	}
+
+	.risk-text {
+		font-weight: 600;
+		flex: 1;
+		min-width: 12rem;
+		margin: 0;
+	}
+
+	.risk-actions {
+		display: flex;
+		gap: var(--space-2);
+		align-items: center;
+		margin-left: auto;
+	}
+
+	.risk-statement-form {
+		display: flex;
+		gap: var(--space-3);
+		align-items: center;
+	}
+
+	.risk-statement-form input {
+		flex: 1;
+	}
+
+	#closed-risks-list {
+		margin-top: var(--space-3);
+	}
+
 	/* Continuidade — ponte discreta de volta a Agora; não deve competir
 	   visualmente com o CTA de próxima ação que já vive lá. */
 	.continuity {
@@ -1018,6 +1194,17 @@
 
 		.impediment-actions button,
 		.impediment-actions .resolve-form button {
+			min-height: 2.75rem;
+			flex: 1;
+		}
+
+		.risk-actions {
+			width: 100%;
+			margin-left: 0;
+		}
+
+		.risk-actions button,
+		.risk-actions .close-risk-form button {
 			min-height: 2.75rem;
 			flex: 1;
 		}

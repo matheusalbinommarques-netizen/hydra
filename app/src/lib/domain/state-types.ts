@@ -294,6 +294,43 @@ export interface MilestoneWorkItem {
 	createdAt: string;
 }
 
+// Risk — ETAPA 10 do rework ("Risk como objeto vivo",
+// docs/core/HYDRA_PRODUCT_REWORK.md §40), primeiro microcorte (D049).
+// Objeto em nível de projeto, sem vínculo obrigatório com WorkItem,
+// Deliverable, Milestone, Impediment, Issue ou pessoa/responsável — essa
+// associação fica deliberadamente para uma fatia futura.
+//
+// Substitui, como fonte de escrita, os três campos de texto livre
+// legados (`riscos_identificados`, `resposta_inicial_riscos` em
+// `riscos_projeto`; `riscos_atualizados` em `atualizar_riscos`), que
+// passam a READ-LEGACY (ver domain/legacy-answers.ts).
+//
+// `status` é declarado, nunca inferido: nenhum caminho do domínio deriva
+// `encerrado` de nenhum outro objeto. `encerrado` significa apenas "não
+// está mais sendo acompanhado como risco ativo" — não significa que o
+// risco ocorreu, foi mitigado, foi aceito ou virou impedimento.
+//
+// Invariante fechada do lifecycle, garantida por closeRisk/reopenRisk
+// (que alteram o par atomicamente) e reforçada na desserialização:
+//   aberto    => closedAt === null
+//   encerrado => closedAt !== null
+//
+// Sem probabilidade, impacto, severidade, score, resposta estruturada,
+// owner, histórico de revisão ou delete nesta primeira fatia — editar a
+// declaração e encerrar/reabrir cobrem a necessidade inicial.
+export type RiskStatus = 'aberto' | 'encerrado';
+
+export interface Risk {
+	id: string;
+	projectId: string;
+	// Declaração textual obrigatória do risco.
+	statement: string;
+	status: RiskStatus;
+	closedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
 // Mapa de Impacto — Descoberta, "Quem é afetado" (ETAPA 2 do rework, ver
 // docs/core/HYDRA_PRODUCT_REWORK.md §32). Objeto vivo real: substitui o
 // texto livre antes capturado em `publico_detail` (Answer da atividade
@@ -563,6 +600,7 @@ export interface ProjectState {
 	dependencies: Dependency[];
 	milestones: Milestone[];
 	milestoneWorkItems: MilestoneWorkItem[];
+	risks: Risk[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];

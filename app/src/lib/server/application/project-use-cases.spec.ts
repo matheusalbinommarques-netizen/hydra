@@ -1320,7 +1320,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 33 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 34 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1349,6 +1349,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'impediments',
 				'workItems',
 				'milestones',
+				'risks',
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',

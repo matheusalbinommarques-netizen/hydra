@@ -33,6 +33,7 @@ import type {
 	DeliverableView,
 	MilestoneView,
 	MilestoneWorkItemView,
+	RiskView,
 	WorkItemDependencyView,
 	WorkItemView
 } from './types';
@@ -125,6 +126,16 @@ function buildImpedimentView(impediment: ProjectState['impediments'][number]): I
 		workItemId: impediment.workItemId,
 		createdAt: impediment.createdAt,
 		resolvedAt: impediment.resolvedAt
+	};
+}
+
+function buildRiskView(risk: ProjectState['risks'][number]): RiskView {
+	return {
+		id: risk.id,
+		statement: risk.statement,
+		status: risk.status,
+		createdAt: risk.createdAt,
+		closedAt: risk.closedAt
 	};
 }
 
@@ -312,6 +323,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		impediments: state.impediments.map(buildImpedimentView),
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),
+		risks: state.risks.map(buildRiskView),
 		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
 		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups),
 		externalActions: state.externalActions.map(buildExternalActionView),

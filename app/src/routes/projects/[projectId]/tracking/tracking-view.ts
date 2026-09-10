@@ -8,7 +8,7 @@
 // e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
 import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
-import type { ImpedimentView, MilestoneView, WorkItemView } from '$lib/server/application/types';
+import type { ImpedimentView, MilestoneView, RiskView, WorkItemView } from '$lib/server/application/types';
 import type { NextActivityResult, PendingItemView } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
@@ -40,6 +40,15 @@ export interface TrackingAttentionPendingItem {
 export interface TrackingImpedimentsView {
 	open: ImpedimentView[];
 	resolved: ImpedimentView[];
+}
+
+// Riscos (ETAPA 10 do rework, primeiro microcorte, D049) — mesmo molde de
+// TrackingImpedimentsView: abertos/encerrados separados, sem promoção
+// automática a "Precisa de você" nem a "Atenções" — sem avaliação/urgência
+// estruturada, isso fingiria acionabilidade que o modelo ainda não conhece.
+export interface TrackingRisksView {
+	open: RiskView[];
+	closed: RiskView[];
 }
 
 // Bloqueios (ETAPA 6 do rework) — sinal estreito, derivado, explicável e
@@ -124,6 +133,7 @@ export interface TrackingView {
 	blockedWorkItems: TrackingBlockedWorkItem[];
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
+	risks: TrackingRisksView;
 	continuity: TrackingContinuityView;
 }
 
@@ -134,6 +144,7 @@ export interface TrackingViewInput {
 	workItems: WorkItemView[];
 	milestones: MilestoneView[];
 	impediments: ImpedimentView[];
+	risks: RiskView[];
 	openPendingItems: PendingItemView[];
 }
 
@@ -319,6 +330,13 @@ function buildImpediments(impediments: ImpedimentView[]): TrackingImpedimentsVie
 	};
 }
 
+function buildRisks(risks: RiskView[]): TrackingRisksView {
+	return {
+		open: risks.filter((risk) => risk.status === 'aberto'),
+		closed: risks.filter((risk) => risk.status === 'encerrado')
+	};
+}
+
 function buildContinuity(
 	nextActivity: NextActivityResult,
 	situation: TrackingSituationView | undefined
@@ -339,6 +357,7 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		blockedWorkItems: buildBlockedWorkItems(input.workItems),
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
 		impediments: buildImpediments(input.impediments),
+		risks: buildRisks(input.risks),
 		continuity: buildContinuity(input.nextActivity, situation)
 	};
 }

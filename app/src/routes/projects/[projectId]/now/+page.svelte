@@ -47,6 +47,10 @@
 	// percentual/progresso (mesmo cuidado de MilestoneView.relatedConcluded).
 	let reachedMilestoneCount = $derived(view.milestones.filter((m) => m.status === 'alcancado').length);
 
+	// S10 (D049, reconciliação de risco legado) — mesmo cuidado de
+	// reachedMilestoneCount acima: contagem simples, nunca percentual/progresso.
+	let openRiskCount = $derived(view.risks.filter((r) => r.status === 'aberto').length);
+
 	// S9 — `partes_trabalho` é READ-LEGACY (§13.2): "Priorizar entregas" só
 	// apresenta o legado somente leitura agora, direto de `data.planningItems`
 	// (sem estado local nem reordenação — ver mainContent abaixo).
@@ -246,6 +250,75 @@
 
 			<form method="POST" action="?/confirmMilestoneReview" use:enhance>
 				<button type="submit">Confirmar revisão dos marcos</button>
+			</form>
+
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
+			{/if}
+
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
+		</section>
+	{:else if data.activity?.id === 'riscos_projeto'}
+		<section class="next-action">
+			<p class="eyebrow">Estruturação</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				Os riscos reais são geridos em <a href="/projects/{view.projectId}/tracking">Acompanhamento</a>, como
+				riscos do projeto.
+			</p>
+			{#if data.riscosIdentificados}
+				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
+				<p class="legacy-dependencias-text">{data.riscosIdentificados}</p>
+			{/if}
+			{#if data.respostaInicialRiscos}
+				<p class="legacy-dependencias-text">{data.respostaInicialRiscos}</p>
+			{/if}
+
+			<p>
+				{#if openRiskCount === 0}
+					Não há nenhum risco aberto neste projeto.
+				{:else}
+					{openRiskCount} {openRiskCount === 1 ? 'risco aberto' : 'riscos abertos'} neste projeto.
+				{/if}
+			</p>
+
+			<form method="POST" action="?/confirmRiskIdentification" use:enhance>
+				<button type="submit">Confirmar revisão dos riscos</button>
+			</form>
+
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
+			{/if}
+
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
+		</section>
+	{:else if data.activity?.id === 'atualizar_riscos'}
+		<section class="next-action">
+			<p class="eyebrow">Execução</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				Os riscos reais são geridos em <a href="/projects/{view.projectId}/tracking">Acompanhamento</a>, como
+				riscos do projeto.
+			</p>
+			{#if data.riscosAtualizados}
+				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
+				<p class="legacy-dependencias-text">{data.riscosAtualizados}</p>
+			{/if}
+
+			<p>
+				{#if openRiskCount === 0}
+					Não há nenhum risco aberto neste projeto.
+				{:else}
+					{openRiskCount} {openRiskCount === 1 ? 'risco aberto' : 'riscos abertos'} neste projeto.
+				{/if}
+			</p>
+
+			<form method="POST" action="?/confirmRiskUpdate" use:enhance>
+				<button type="submit">Confirmar revisão dos riscos</button>
 			</form>
 
 			{#if form?.message}

@@ -33,6 +33,7 @@ export function createInitialProjectState(
 		dependencies: [],
 		milestones: [],
 		milestoneWorkItems: [],
+		risks: [],
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],

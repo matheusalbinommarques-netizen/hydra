@@ -40,6 +40,8 @@ import type {
 	Milestone,
 	MilestoneStatus,
 	MilestoneWorkItem,
+	Risk,
+	RiskStatus,
 	WorkItem,
 	WorkItemStatus
 } from './state-types';
@@ -126,6 +128,11 @@ function isImpedimentStatus(value: unknown): value is 'aberto' | 'resolvido' {
 const MILESTONE_STATUSES: readonly string[] = ['aberto', 'alcancado'];
 function isMilestoneStatus(value: unknown): value is MilestoneStatus {
 	return typeof value === 'string' && MILESTONE_STATUSES.includes(value);
+}
+
+const RISK_STATUSES: readonly string[] = ['aberto', 'encerrado'];
+function isRiskStatus(value: unknown): value is RiskStatus {
+	return typeof value === 'string' && RISK_STATUSES.includes(value);
 }
 
 const WORK_ITEM_STATUSES: readonly string[] = ['a_fazer', 'em_andamento', 'concluido'];
@@ -563,6 +570,39 @@ function parseMilestoneWorkItemList(value: unknown): Result<MilestoneWorkItem[],
 	return { ok: true, value: result };
 }
 
+// Risk (ETAPA 10 do rework, primeiro microcorte, D049) — ausente em
+// snapshots exportados antes deste corte: tratado como coleção vazia, mesmo
+// espírito de parseMilestoneList acima. Nunca inferido do texto livre legado
+// `riscos_identificados`/`resposta_inicial_riscos`/`riscos_atualizados`
+// (READ-LEGACY, sem auto-conversão — regra §13.2).
+function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('risks deve ser um array');
+	const result: Risk[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Risk deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Risk.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Risk.projectId deve ser uma string');
+		if (!isString(item.statement)) return shapeError('Risk.statement deve ser uma string');
+		if (!isRiskStatus(item.status)) return shapeError('Risk.status deve ser um dos literais aprovados');
+		if (item.closedAt !== null && !isIsoDateString(item.closedAt)) {
+			return shapeError('Risk.closedAt deve ser uma data ISO 8601 válida ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Risk.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('Risk.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			statement: item.statement,
+			status: item.status,
+			closedAt: item.closedAt,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 const AFFECTED_GROUP_IMPACTS: readonly string[] = ['alto', 'medio', 'baixo', 'desconhecido'];
 function isAffectedGroupImpactOrNull(value: unknown): value is AffectedGroupImpact | null {
 	return value === null || (typeof value === 'string' && AFFECTED_GROUP_IMPACTS.includes(value));
@@ -882,6 +922,7 @@ interface AssembleProjectStateInput {
 	dependencies: Dependency[];
 	milestones: Milestone[];
 	milestoneWorkItems: MilestoneWorkItem[];
+	risks: Risk[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];
@@ -906,6 +947,7 @@ function assembleProjectState({
 	dependencies,
 	milestones,
 	milestoneWorkItems,
+	risks,
 	affectedGroups,
 	externalActions,
 	evidences,
@@ -1360,6 +1402,26 @@ function assembleProjectState({
 		seenMilestoneWorkItemPairs.add(pair);
 	}
 
+	// invariantes: Risk (ETAPA 10 do rework, primeiro microcorte, D049) — sem
+	// referência a nenhum outro objeto nesta primeira fatia. Mesma invariante
+	// fechada de Milestone, com status/closedAt no lugar de status/reachedAt.
+	const seenRiskIds = new Set<string>();
+	for (const risk of risks) {
+		if (risk.projectId !== project.id) {
+			return invariantError(`Risk "${risk.id}" usa projectId diferente do Project`);
+		}
+		if (seenRiskIds.has(risk.id)) {
+			return invariantError(`Risk.id duplicado: "${risk.id}"`);
+		}
+		seenRiskIds.add(risk.id);
+		if (risk.status === 'encerrado' && risk.closedAt === null) {
+			return invariantError(`Risk "${risk.id}" está encerrado mas não possui closedAt`);
+		}
+		if (risk.status === 'aberto' && risk.closedAt !== null) {
+			return invariantError(`Risk "${risk.id}" está aberto mas possui closedAt`);
+		}
+	}
+
 	// referências + invariantes: AffectedGroup — ligado à atividade `publico`
 	// do catálogo (ao contrário de Impediment), mas sem activityDefinitionId
 	// próprio: a ligação é fixa (AFFECTED_GROUPS_ACTIVITY_ID em transitions.ts),
@@ -1621,6 +1683,7 @@ function assembleProjectState({
 			dependencies,
 			milestones,
 			milestoneWorkItems,
+			risks,
 			affectedGroups,
 			externalActions,
 			evidences,
@@ -1701,6 +1764,9 @@ export function deserializeProjectState(
 	const milestoneWorkItemsResult = parseMilestoneWorkItemList(state.milestoneWorkItems);
 	if (!milestoneWorkItemsResult.ok) return milestoneWorkItemsResult;
 
+	const risksResult = parseRiskList(state.risks);
+	if (!risksResult.ok) return risksResult;
+
 	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
 	if (!affectedGroupsResult.ok) return affectedGroupsResult;
 
@@ -1762,6 +1828,7 @@ export function deserializeProjectState(
 		dependencies: dependenciesResult.value,
 		milestones: milestonesResult.value,
 		milestoneWorkItems: milestoneWorkItemsResult.value,
+		risks: risksResult.value,
 		affectedGroups: affectedGroupsResult.value,
 		externalActions: externalActionsResult.value,
 		evidences: evidencesResult.value,
