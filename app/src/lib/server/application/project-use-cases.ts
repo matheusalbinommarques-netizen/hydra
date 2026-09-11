@@ -77,6 +77,8 @@ import {
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
+	setRiskAssessment as setRiskAssessmentInDomain,
+	setRiskResponse as setRiskResponseInDomain,
 	setRouteStartPhase as setRouteStartPhaseInDomain,
 	setScopeItemEffort as setScopeItemEffortInDomain,
 	setScopeItemExecutionStatus as setScopeItemExecutionStatusInDomain,
@@ -164,6 +166,8 @@ import type {
 	SetHypothesisInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
+	SetRiskAssessmentInput,
+	SetRiskResponseInput,
 	SetRouteStartPhaseInput,
 	SetScopeItemEffortInput,
 	SetScopeItemExecutionStatusInput,
@@ -1155,6 +1159,37 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = reviewRiskInDomain(catalog, state, input.riskId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// setRiskAssessment/setRiskResponse (ETAPA 10 do rework, terceiro
+		// microcorte) — mesmo padrão dos demais casos de uso de Risk acima.
+		async setRiskAssessment(input: SetRiskAssessmentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setRiskAssessmentInDomain(
+				catalog,
+				state,
+				input.riskId,
+				input.likelihood,
+				input.impact,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setRiskResponse(input: SetRiskResponseInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setRiskResponseInDomain(catalog, state, input.riskId, input.response, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

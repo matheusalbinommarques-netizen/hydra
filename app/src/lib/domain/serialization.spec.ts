@@ -15,6 +15,8 @@ import {
 	closeRisk,
 	reopenRisk,
 	reviewRisk,
+	setRiskAssessment,
+	setRiskResponse,
 	confirmRiskIdentification,
 	confirmRiskUpdate,
 	addCauseHypothesis,
@@ -2107,6 +2109,138 @@ describe('Risk (ETAPA 10 do rework, primeiro microcorte, D049; reviewedAt, segun
 		expect(
 			result.value.answers.find((answer) => answer.fieldDefinitionId === 'riscos_atualizados')?.value
 		).toBe('Risco de adesão diminuiu');
+	});
+});
+
+describe('Risk — avaliação qualitativa e resposta planejada (ETAPA 10 do rework, terceiro microcorte)', () => {
+	it('Risk novo nasce sem avaliação e sem resposta', () => {
+		const state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		expect(state.risks[0]).toMatchObject({ likelihood: null, impact: null, response: null });
+	});
+
+	it('avaliação só aceita o par completo — likelihood ou impact sozinho é recusado', () => {
+		const state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		expect(setRiskAssessment(catalog, state, 'risk-1', 'alta', null, T2)).toEqual({
+			ok: false,
+			error: { kind: 'risk_assessment_incomplete' }
+		});
+		expect(setRiskAssessment(catalog, state, 'risk-1', null, 'alto', T2)).toEqual({
+			ok: false,
+			error: { kind: 'risk_assessment_incomplete' }
+		});
+	});
+
+	it('definir, alterar e limpar a avaliação atualiza reviewedAt e updatedAt; no-op preserva ambos', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+
+		state = unwrap(setRiskAssessment(catalog, state, 'risk-1', 'baixa', 'alto', T2));
+		expect(state.risks[0]).toMatchObject({
+			likelihood: 'baixa',
+			impact: 'alto',
+			reviewedAt: T2,
+			updatedAt: T2
+		});
+
+		const noop = unwrap(setRiskAssessment(catalog, state, 'risk-1', 'baixa', 'alto', '2026-03-01T00:00:00.000Z'));
+		expect(noop).toBe(state);
+
+		state = unwrap(setRiskAssessment(catalog, state, 'risk-1', 'alta', 'baixo', '2026-03-02T00:00:00.000Z'));
+		expect(state.risks[0]).toMatchObject({
+			likelihood: 'alta',
+			impact: 'baixo',
+			reviewedAt: '2026-03-02T00:00:00.000Z'
+		});
+
+		const cleared = unwrap(setRiskAssessment(catalog, state, 'risk-1', null, null, '2026-03-03T00:00:00.000Z'));
+		expect(cleared.risks[0]).toMatchObject({
+			likelihood: null,
+			impact: null,
+			reviewedAt: '2026-03-03T00:00:00.000Z'
+		});
+	});
+
+	it('definir, alterar e limpar a resposta atualiza reviewedAt e updatedAt; no-op preserva ambos', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+
+		state = unwrap(setRiskResponse(catalog, state, 'risk-1', 'Envolver a equipe cedo', T2));
+		expect(state.risks[0]).toMatchObject({ response: 'Envolver a equipe cedo', reviewedAt: T2, updatedAt: T2 });
+
+		const noop = unwrap(
+			setRiskResponse(catalog, state, 'risk-1', 'Envolver a equipe cedo', '2026-03-01T00:00:00.000Z')
+		);
+		expect(noop).toBe(state);
+
+		const cleared = unwrap(setRiskResponse(catalog, state, 'risk-1', null, '2026-03-02T00:00:00.000Z'));
+		expect(cleared.risks[0]).toMatchObject({ response: null, reviewedAt: '2026-03-02T00:00:00.000Z' });
+	});
+
+	it('avaliação e resposta nunca alteram status/closedAt', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(closeRisk(catalog, state, 'risk-1', T2));
+		state = unwrap(setRiskAssessment(catalog, state, 'risk-1', 'media', 'medio', '2026-03-01T00:00:00.000Z'));
+		state = unwrap(setRiskResponse(catalog, state, 'risk-1', 'Plano de resposta', '2026-03-02T00:00:00.000Z'));
+		expect(state.risks[0]).toMatchObject({ status: 'encerrado', closedAt: T2 });
+	});
+
+	it('preserva avaliação e resposta no round-trip', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(setRiskAssessment(catalog, state, 'risk-1', 'alta', 'alto', T2));
+		state = unwrap(setRiskResponse(catalog, state, 'risk-1', 'Plano de resposta', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('snapshot anterior a este microcorte (Risk sem likelihood/impact/response) importa os três como null', () => {
+		const base = JSON.parse(
+			serializeProjectState(
+				unwrap(addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1))
+			)
+		) as { state: Record<string, unknown> };
+		const risks = base.state.risks as Array<Record<string, unknown>>;
+		delete risks[0].likelihood;
+		delete risks[0].impact;
+		delete risks[0].response;
+
+		const result = deserializeProjectState(JSON.stringify(base), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.risks[0]).toMatchObject({ likelihood: null, impact: null, response: null });
+	});
+
+	it('recusa avaliação parcial na desserialização (likelihood/impact devem ser ambos null ou ambos preenchidos)', () => {
+		const base = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+
+		base.state.risks = [
+			{
+				id: 'risk-1',
+				projectId: 'proj-1',
+				statement: 'R',
+				status: 'aberto',
+				closedAt: null,
+				reviewedAt: null,
+				likelihood: 'alta',
+				impact: null,
+				response: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
 	});
 });
 

@@ -136,7 +136,10 @@ function buildRiskView(risk: ProjectState['risks'][number]): RiskView {
 		status: risk.status,
 		createdAt: risk.createdAt,
 		closedAt: risk.closedAt,
-		reviewedAt: risk.reviewedAt
+		reviewedAt: risk.reviewedAt,
+		likelihood: risk.likelihood,
+		impact: risk.impact,
+		response: risk.response
 	};
 }
 

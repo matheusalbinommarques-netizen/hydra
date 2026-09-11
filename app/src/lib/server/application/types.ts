@@ -17,6 +17,8 @@ import type {
 	ProjectEvent,
 	ProjectStateParseError,
 	Result,
+	RiskImpact,
+	RiskLikelihood,
 	RiskStatus,
 	ScopeBucket,
 	ScopeConfirmationIssue,
@@ -169,9 +171,10 @@ export interface ImpedimentView {
 }
 
 // Acompanhamento ("Riscos", ETAPA 10 do rework, primeiro microcorte, D049;
-// reviewedAt no segundo microcorte) — view leve de Risk, sem
-// projectId/updatedAt, que a interface não precisa. `status` é o estado
-// DECLARADO e a única autoridade sobre aberto/encerrado.
+// reviewedAt no segundo microcorte; likelihood/impact/response no terceiro)
+// — view leve de Risk, sem projectId/updatedAt, que a interface não
+// precisa. `status` é o estado DECLARADO e a única autoridade sobre
+// aberto/encerrado.
 export interface RiskView {
 	id: string;
 	statement: string;
@@ -179,6 +182,9 @@ export interface RiskView {
 	createdAt: string;
 	closedAt: string | null;
 	reviewedAt: string | null;
+	likelihood: RiskLikelihood | null;
+	impact: RiskImpact | null;
+	response: string | null;
 }
 
 // Trabalho (ETAPA 6 do rework, "Primeiro loop operacional") — view leve de
@@ -784,6 +790,21 @@ export interface ReviewRiskInput {
 	riskId: string;
 }
 
+// setRiskAssessment/setRiskResponse (ETAPA 10 do rework, terceiro
+// microcorte) — mesmo padrão dos demais inputs de Risk acima.
+export interface SetRiskAssessmentInput {
+	projectId: string;
+	riskId: string;
+	likelihood: RiskLikelihood | null;
+	impact: RiskImpact | null;
+}
+
+export interface SetRiskResponseInput {
+	projectId: string;
+	riskId: string;
+	response: string | null;
+}
+
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
 // inputs de ScopeItem/Impediment: id gerado pelo caso de uso
 // (idGenerator), nunca recebido do cliente.
@@ -1020,6 +1041,8 @@ export interface ProjectUseCases {
 	closeRisk(input: CloseRiskInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenRisk(input: ReopenRiskInput): Promise<UseCaseOutcome<ProjectView>>;
 	reviewRisk(input: ReviewRiskInput): Promise<UseCaseOutcome<ProjectView>>;
+	setRiskAssessment(input: SetRiskAssessmentInput): Promise<UseCaseOutcome<ProjectView>>;
+	setRiskResponse(input: SetRiskResponseInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

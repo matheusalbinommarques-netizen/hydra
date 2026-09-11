@@ -38,6 +38,8 @@ import {
 	reopenImpediment,
 	resolveImpediment,
 	reviewRisk,
+	setRiskAssessment,
+	setRiskResponse,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
 	setCauseHypothesisExpectedIfTrue,
@@ -1376,5 +1378,133 @@ describe('createSqliteProjectRepository — Risk.reviewedAt (ETAPA 10 do rework,
 		const repo2 = createSqliteProjectRepository(filePath);
 		openRepos.push(repo2);
 		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
+	});
+});
+
+describe('createSqliteProjectRepository — Risk.likelihood/impact/response (ETAPA 10 do rework, terceiro microcorte)', () => {
+	it('round-trip preserva avaliação e resposta', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addRisk(catalog, state, 'risk-1', 'Risco', T1));
+		state = unwrap(setRiskAssessment(catalog, state, 'risk-1', 'alta', 'alto', T2));
+		state = unwrap(setRiskResponse(catalog, state, 'risk-1', 'Plano de resposta', T2));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('abre um banco pós-D050 sem as colunas likelihood/impact/response, adiciona-as de forma idempotente, e Risks existentes ficam sem avaliação/resposta', async () => {
+		const filePath = tempFilePath();
+
+		// Mesmo espírito do teste de reviewed_at acima: o projeto já tem um Risk
+		// com lifecycle e reviewedAt reais (não só os valores de nascimento), e
+		// as três colunas — introduzidas só neste corte — são removidas para
+		// simular o estado do segundo microcorte de Risk (D050).
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addRisk(catalog, state, 'risk-legacy', 'Risco pré-existente', T1));
+		state = unwrap(reviewRisk(catalog, state, 'risk-legacy', T2));
+		await seed.insert(state);
+		seed.close();
+
+		// DROP COLUMN direto falha aqui: likelihood/impact participam de CHECK
+		// constraints da tabela atual, e SQLite recusa remover uma coluna
+		// referenciada por CHECK. Reconstruir a tabela sem essas colunas (e sem
+		// as constraints, como a tabela real era antes deste corte) simula o
+		// schema pós-D050 fielmente.
+		const legacyDb = new Database(filePath);
+		legacyDb.exec(
+			`CREATE TABLE risk_legacy AS
+			   SELECT id, project_id, statement, status, closed_at, reviewed_at, created_at, updated_at FROM risk;
+			 DROP TABLE risk;
+			 ALTER TABLE risk_legacy RENAME TO risk;`
+		);
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const restored = await repo.findById('proj-1');
+		const legacyRisk = restored?.risks.find((risk) => risk.id === 'risk-legacy');
+		// Lifecycle/reviewedAt (fatos já existentes antes deste corte) chegam
+		// intactos; nenhuma Answer legada (riscos_identificados/
+		// resposta_inicial_riscos/riscos_atualizados) é lida nem interpretada
+		// para preencher os campos novos — eles nascem null, nunca sintetizados.
+		expect(legacyRisk).toEqual({
+			id: 'risk-legacy',
+			projectId: 'proj-1',
+			statement: 'Risco pré-existente',
+			status: 'aberto',
+			closedAt: null,
+			reviewedAt: T2,
+			likelihood: null,
+			impact: null,
+			response: null,
+			createdAt: T1,
+			updatedAt: T2
+		});
+
+		// Reabrir de novo não falha, não duplica as colunas, e não altera nada.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		const restoredAgain = await repo2.findById('proj-1');
+		expect(restoredAgain?.risks.find((risk) => risk.id === 'risk-legacy')).toEqual(legacyRisk);
+	});
+
+	// A CHECK nomeada risk_assessment_pair (0001_init.sql) só existe na tabela
+	// criada por CREATE TABLE IF NOT EXISTS — um banco pré-existente que já
+	// tinha a tabela `risk` (sem essa CHECK) recebe as três colunas novas só
+	// via ALTER TABLE ADD COLUMN (ensureRiskAssessmentAndResponseColumns), e
+	// SQLite não permite anexar uma CHECK a uma tabela existente por ALTER
+	// TABLE. Falsificação explícita: a invariante do par (likelihood/impact
+	// ambos null ou ambos preenchidos) NÃO é protegida pelo SQLite num banco
+	// upgradeado — só pelo domínio (setRiskAssessment) e pela desserialização
+	// (validateInvariants). Reconstruir a tabela inteira só para ganhar essa
+	// CHECK em bancos antigos seria migration machinery nova por simetria
+	// cosmética, não exigida pelo contrato deste corte.
+	it('a CHECK do par likelihood/impact não protege um banco upgradeado (só a criado do zero)', async () => {
+		const upgradedPath = tempFilePath();
+		const seed = createSqliteProjectRepository(upgradedPath);
+		let state = nonTrivialState();
+		state = unwrap(addRisk(catalog, state, 'risk-1', 'Risco', T1));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(upgradedPath);
+		legacyDb.exec(
+			`CREATE TABLE risk_legacy AS
+			   SELECT id, project_id, statement, status, closed_at, reviewed_at, created_at, updated_at FROM risk;
+			 DROP TABLE risk;
+			 ALTER TABLE risk_legacy RENAME TO risk;`
+		);
+		legacyDb.close();
+
+		// Abrir e fechar o repositório roda ensureRiskAssessmentAndResponseColumns
+		// na construção — as três colunas já existem depois disto, sem CHECK
+		// nenhuma sobre elas. Fechado antes de abrir uma conexão raw própria
+		// para evitar duas conexões concorrentes no mesmo arquivo.
+		const upgraded = createSqliteProjectRepository(upgradedPath);
+		upgraded.close();
+
+		const upgradedDb = new Database(upgradedPath);
+		expect(() =>
+			upgradedDb.prepare('UPDATE risk SET likelihood = ? WHERE id = ?').run('alta', 'risk-1')
+		).not.toThrow();
+		upgradedDb.close();
+
+		// No mesmo cenário, um banco criado do zero por este corte tem a CHECK
+		// e recusa a mesma escrita parcial.
+		const freshPath = tempFilePath();
+		const fresh = createSqliteProjectRepository(freshPath);
+		let freshState = nonTrivialState();
+		freshState = unwrap(addRisk(catalog, freshState, 'risk-1', 'Risco', T1));
+		await fresh.insert(freshState);
+		fresh.close();
+
+		const freshDb = new Database(freshPath);
+		expect(() =>
+			freshDb.prepare('UPDATE risk SET likelihood = ? WHERE id = ?').run('alta', 'risk-1')
+		).toThrow(/risk_assessment_pair/);
+		freshDb.close();
 	});
 });

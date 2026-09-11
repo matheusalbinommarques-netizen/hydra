@@ -73,6 +73,20 @@
 		return `Última revisão: ${timestampFormatter.format(new Date(reviewedAt))}`;
 	}
 
+	// Avaliação qualitativa (ETAPA 10 do rework, terceiro microcorte) — só
+	// probabilidade/impacto, nunca score/matriz/porcentagem.
+	const likelihoodLabel: Record<string, string> = { baixa: 'Baixa', media: 'Média', alta: 'Alta' };
+	const impactLabel: Record<string, string> = { baixo: 'Baixo', medio: 'Médio', alto: 'Alto' };
+
+	function riskAssessmentLabel(likelihood: string | null, impact: string | null): string {
+		if (!likelihood || !impact) return 'Sem avaliação registrada';
+		return `Avaliação: probabilidade ${likelihoodLabel[likelihood]} · impacto ${impactLabel[impact]}`;
+	}
+
+	function riskResponseLabel(response: string | null): string {
+		return response ? `Resposta planejada: ${response}` : 'Nenhuma resposta registrada';
+	}
+
 	let hasAttentions = $derived(tracking.attentionPendingItems.length > 0 || tracking.impediments.open.length > 0);
 	let hasBlocked = $derived(tracking.blockedWorkItems.length > 0);
 
@@ -486,6 +500,38 @@
 							<input id="statement-{risk.id}" type="text" name="statement" value={risk.statement} required />
 							<button type="submit" class="button-secondary">Salvar</button>
 						</form>
+
+						<form method="POST" action="?/setRiskAssessment" use:enhance class="risk-assessment-form">
+							<input type="hidden" name="riskId" value={risk.id} />
+							<label class="visually-hidden" for="likelihood-{risk.id}">Probabilidade</label>
+							<select id="likelihood-{risk.id}" name="likelihood">
+								<option value="" selected={risk.likelihood === null}>Sem avaliação</option>
+								<option value="baixa" selected={risk.likelihood === 'baixa'}>Probabilidade baixa</option>
+								<option value="media" selected={risk.likelihood === 'media'}>Probabilidade média</option>
+								<option value="alta" selected={risk.likelihood === 'alta'}>Probabilidade alta</option>
+							</select>
+							<label class="visually-hidden" for="impact-{risk.id}">Impacto</label>
+							<select id="impact-{risk.id}" name="impact">
+								<option value="" selected={risk.impact === null}>Sem avaliação</option>
+								<option value="baixo" selected={risk.impact === 'baixo'}>Impacto baixo</option>
+								<option value="medio" selected={risk.impact === 'medio'}>Impacto médio</option>
+								<option value="alto" selected={risk.impact === 'alto'}>Impacto alto</option>
+							</select>
+							<button type="submit" class="button-secondary">Salvar avaliação</button>
+						</form>
+
+						<form method="POST" action="?/setRiskResponse" use:enhance class="risk-response-form">
+							<input type="hidden" name="riskId" value={risk.id} />
+							<label class="visually-hidden" for="response-{risk.id}">Resposta planejada</label>
+							<textarea
+								id="response-{risk.id}"
+								name="response"
+								placeholder="Resposta planejada (opcional)"
+								value={risk.response ?? ''}
+							></textarea>
+							<button type="submit" class="button-secondary">Salvar resposta</button>
+						</form>
+
 						<p class="risk-review">{riskReviewLabel(risk.reviewedAt)}</p>
 						<div class="risk-actions">
 							<button type="button" class="button-secondary" onclick={() => toggleEditRisk(risk.id)}>
@@ -500,6 +546,8 @@
 				{:else}
 					<li class="risk-row">
 						<p class="risk-text">{risk.statement}</p>
+						<p class="risk-assessment">{riskAssessmentLabel(risk.likelihood, risk.impact)}</p>
+						<p class="risk-response">{riskResponseLabel(risk.response)}</p>
 						<p class="risk-review">{riskReviewLabel(risk.reviewedAt)}</p>
 						<div class="risk-actions">
 							<button type="button" class="link-button" onclick={() => toggleEditRisk(risk.id)}>Editar</button>
@@ -536,6 +584,8 @@
 					{#each tracking.risks.closed as risk (risk.id)}
 						<li class="risk-row resolved">
 							<p class="risk-text">{risk.statement}</p>
+							<p class="risk-assessment">{riskAssessmentLabel(risk.likelihood, risk.impact)}</p>
+							<p class="risk-response">{riskResponseLabel(risk.response)}</p>
 							<p class="risk-review">{riskReviewLabel(risk.reviewedAt)}</p>
 							<form method="POST" action="?/reopenRisk" use:enhance class="reopen-risk-form">
 								<input type="hidden" name="riskId" value={risk.id} />
@@ -1013,6 +1063,34 @@
 
 	.risk-statement-form input {
 		flex: 1;
+	}
+
+	.risk-assessment,
+	.risk-response {
+		flex-basis: 100%;
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--hydra-muted);
+	}
+
+	.risk-assessment-form {
+		flex-basis: 100%;
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-3);
+		align-items: center;
+	}
+
+	.risk-response-form {
+		flex-basis: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.risk-response-form textarea {
+		min-height: 4.5rem;
+		resize: vertical;
 	}
 
 	#closed-risks-list {

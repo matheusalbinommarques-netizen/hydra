@@ -329,6 +329,15 @@ export interface MilestoneWorkItem {
 // decide lifecycle nem promove o Risk a "Precisa de você"/Atenções.
 export type RiskStatus = 'aberto' | 'encerrado';
 
+// likelihood/impact (ETAPA 10 do rework, terceiro microcorte) — avaliação
+// qualitativa declarada pelo usuário, sem escala numérica, score, produto
+// probabilidade×impacto, prioridade, health, ranking, matriz ou porcentagem.
+// Invariante fechada, garantida por setRiskAssessment e reforçada na
+// desserialização: ambos `null` (sem avaliação) ou ambos preenchidos —
+// nunca um sozinho. Nunca inferido de nenhum outro dado do projeto.
+export type RiskLikelihood = 'baixa' | 'media' | 'alta';
+export type RiskImpact = 'baixo' | 'medio' | 'alto';
+
 export interface Risk {
 	id: string;
 	projectId: string;
@@ -337,6 +346,14 @@ export interface Risk {
 	status: RiskStatus;
 	closedAt: string | null;
 	reviewedAt: string | null;
+	likelihood: RiskLikelihood | null;
+	impact: RiskImpact | null;
+	// Resposta planejada (ETAPA 10 do rework, terceiro microcorte) — texto
+	// opcional pertencente ao Risk individual. `null` significa "nenhuma
+	// resposta registrada". Nunca cria WorkItem, Impediment ou Issue, e nunca
+	// altera status/closedAt — é o mesmo tipo de fato declarado que
+	// `statement`, não uma transição de lifecycle.
+	response: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

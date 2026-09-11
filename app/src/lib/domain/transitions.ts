@@ -25,6 +25,8 @@ import type {
 	PendingItem,
 	ProjectState,
 	Risk,
+	RiskImpact,
+	RiskLikelihood,
 	ScopeBucket,
 	ScopeEffort,
 	ScopeExecutionStatus,
@@ -95,7 +97,8 @@ export type DomainTransitionError =
 	| { kind: 'desired_outcome_not_found' }
 	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] }
 	| { kind: 'risk_not_found' }
-	| { kind: 'risk_statement_required' };
+	| { kind: 'risk_statement_required' }
+	| { kind: 'risk_assessment_incomplete' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -1672,6 +1675,9 @@ export function addRisk(
 		status: 'aberto',
 		closedAt: null,
 		reviewedAt: null,
+		likelihood: null,
+		impact: null,
+		response: null,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
@@ -1780,6 +1786,71 @@ export function reviewRisk(
 			...state,
 			risks: state.risks.map((item) =>
 				item.id === riskId ? { ...item, reviewedAt: occurredAt, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// setRiskAssessment (ETAPA 10 do rework, terceiro microcorte) — avaliação
+// qualitativa declarada pelo usuário, nunca calculada. `likelihood` e
+// `impact` são sempre lidos e escritos juntos: os dois `null` (limpar
+// avaliação) ou os dois preenchidos (definir/alterar avaliação) — nunca um
+// sozinho, mesmo par fechado de closeRisk/reopenRisk com status/closedAt.
+// Sem score, produto probabilidade×impacto, prioridade, health, ranking,
+// matriz ou porcentagem. Uma mudança material (par efetivamente diferente)
+// prova reconsideração do risco e conta como revisão; o no-op (mesmo par,
+// incluindo os dois `null`) preserva reviewedAt/updatedAt por referência,
+// mesmo molde de editRiskStatement.
+export function setRiskAssessment(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	likelihood: RiskLikelihood | null,
+	impact: RiskImpact | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const risk = findRisk(state, riskId);
+	if (!risk) return { ok: false, error: { kind: 'risk_not_found' } };
+	if ((likelihood === null) !== (impact === null)) {
+		return { ok: false, error: { kind: 'risk_assessment_incomplete' } };
+	}
+	if (risk.likelihood === likelihood && risk.impact === impact) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			risks: state.risks.map((item) =>
+				item.id === riskId ? { ...item, likelihood, impact, reviewedAt: occurredAt, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// setRiskResponse (ETAPA 10 do rework, terceiro microcorte) — resposta
+// planejada pertencente ao Risk individual, mesmo molde de
+// setImpedimentNextAction: o mesmo fato sendo escrito, não uma transição de
+// lifecycle. `null` significa "nenhuma resposta registrada". Nunca cria
+// WorkItem, Impediment ou Issue, e nunca altera status/closedAt. Uma
+// mudança material conta como revisão; o no-op (mesmo valor, incluindo os
+// dois `null`) preserva reviewedAt/updatedAt por referência.
+export function setRiskResponse(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	response: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const risk = findRisk(state, riskId);
+	if (!risk) return { ok: false, error: { kind: 'risk_not_found' } };
+	if (risk.response === response) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			risks: state.risks.map((item) =>
+				item.id === riskId ? { ...item, response, reviewedAt: occurredAt, updatedAt: occurredAt } : item
 			)
 		}
 	};

@@ -99,6 +99,8 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Risco não encontrado.';
 		case 'risk_statement_required':
 			return 'Descreva o risco antes de salvar.';
+			case 'risk_assessment_incomplete':
+			return 'Informe probabilidade e impacto juntos, ou deixe os dois em branco.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

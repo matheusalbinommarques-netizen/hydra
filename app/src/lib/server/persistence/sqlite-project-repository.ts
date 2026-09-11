@@ -288,6 +288,28 @@ function ensureRiskReviewedAtColumn(db: Database.Database): void {
 	}
 }
 
+// Décima evolução do schema desde 0001_init.sql (ETAPA 10 do rework,
+// terceiro microcorte) — mesmo caso de ensureRiskReviewedAtColumn: três
+// colunas novas na mesma tabela `risk`. SQLite não valida CHECK constraints
+// adicionadas depois via ALTER TABLE contra linhas já existentes, mas as
+// linhas existentes ficam com as três colunas NULL (par válido:
+// likelihood/impact ambos ausentes), então a invariante nunca é violada por
+// esta migração. Nenhuma avaliação ou resposta é sintetizada de nenhum
+// outro dado.
+function ensureRiskAssessmentAndResponseColumns(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(risk)').all() as TableInfoRow[];
+	const columnNames = new Set(columns.map((column) => column.name));
+	if (!columnNames.has('likelihood')) {
+		db.exec('ALTER TABLE risk ADD COLUMN likelihood TEXT');
+	}
+	if (!columnNames.has('impact')) {
+		db.exec('ALTER TABLE risk ADD COLUMN impact TEXT');
+	}
+	if (!columnNames.has('response')) {
+		db.exec('ALTER TABLE risk ADD COLUMN response TEXT');
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -300,6 +322,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureMilestonePlannedDateColumn(db);
 	ensureWorkItemDeliverableIdColumn(db);
 	ensureRiskReviewedAtColumn(db);
+	ensureRiskAssessmentAndResponseColumns(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -413,8 +436,10 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// risk é independente (sem FK além de project) — pode ser inserido em
 		// qualquer ponto depois do project row.
 		const insertRisk = db.prepare(
-			`INSERT INTO risk (id, project_id, statement, status, closed_at, reviewed_at, created_at, updated_at)
-			 VALUES (@id, @projectId, @statement, @status, @closedAt, @reviewedAt, @createdAt, @updatedAt)`
+			`INSERT INTO risk
+			   (id, project_id, statement, status, closed_at, reviewed_at, likelihood, impact, response, created_at, updated_at)
+			 VALUES
+			   (@id, @projectId, @statement, @status, @closedAt, @reviewedAt, @likelihood, @impact, @response, @createdAt, @updatedAt)`
 		);
 		for (const risk of state.risks) {
 			insertRisk.run(risk);
@@ -665,7 +690,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const riskRows = db
 				.prepare(
-					`SELECT id, project_id, statement, status, closed_at, reviewed_at, created_at, updated_at
+					`SELECT id, project_id, statement, status, closed_at, reviewed_at, likelihood, impact, response,
+					        created_at, updated_at
 					 FROM risk WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as RiskRow[];

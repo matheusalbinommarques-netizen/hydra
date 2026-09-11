@@ -41,6 +41,8 @@ import type {
 	MilestoneStatus,
 	MilestoneWorkItem,
 	Risk,
+	RiskImpact,
+	RiskLikelihood,
 	RiskStatus,
 	WorkItem,
 	WorkItemStatus
@@ -133,6 +135,16 @@ function isMilestoneStatus(value: unknown): value is MilestoneStatus {
 const RISK_STATUSES: readonly string[] = ['aberto', 'encerrado'];
 function isRiskStatus(value: unknown): value is RiskStatus {
 	return typeof value === 'string' && RISK_STATUSES.includes(value);
+}
+
+const RISK_LIKELIHOODS: readonly string[] = ['baixa', 'media', 'alta'];
+function isRiskLikelihoodOrNull(value: unknown): value is RiskLikelihood | null {
+	return value === null || (typeof value === 'string' && RISK_LIKELIHOODS.includes(value));
+}
+
+const RISK_IMPACTS: readonly string[] = ['baixo', 'medio', 'alto'];
+function isRiskImpactOrNull(value: unknown): value is RiskImpact | null {
+	return value === null || (typeof value === 'string' && RISK_IMPACTS.includes(value));
 }
 
 const WORK_ITEM_STATUSES: readonly string[] = ['a_fazer', 'em_andamento', 'concluido'];
@@ -571,13 +583,15 @@ function parseMilestoneWorkItemList(value: unknown): Result<MilestoneWorkItem[],
 }
 
 // Risk (ETAPA 10 do rework, primeiro microcorte, D049; reviewedAt no segundo
-// microcorte) — ausente em snapshots exportados antes deste corte: tratado
-// como coleção vazia, mesmo espírito de parseMilestoneList acima. Nunca
-// inferido do texto livre legado
-// `riscos_identificados`/`resposta_inicial_riscos`/`riscos_atualizados`
-// (READ-LEGACY, sem auto-conversão — regra §13.2). Snapshot anterior ao
-// segundo microcorte não tem `reviewedAt` — `undefined` importa como `null`
-// (nunca revisado), nunca sintetizado de createdAt/updatedAt/closedAt.
+// microcorte; likelihood/impact/response no terceiro) — ausente em
+// snapshots exportados antes deste corte: tratado como coleção vazia,
+// mesmo espírito de parseMilestoneList acima. Nunca inferido do texto livre
+// legado `riscos_identificados`/`resposta_inicial_riscos`/
+// `riscos_atualizados` (READ-LEGACY, sem auto-conversão — regra §13.2).
+// Snapshot anterior ao segundo/terceiro microcorte não tem
+// `reviewedAt`/`likelihood`/`impact`/`response` — `undefined` importa como
+// `null` (nunca revisado/avaliado, sem resposta), nunca sintetizado de
+// nenhum outro campo.
 function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 	if (value === undefined) return { ok: true, value: [] };
 	if (!Array.isArray(value)) return shapeError('risks deve ser um array');
@@ -594,6 +608,15 @@ function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 		if (item.reviewedAt !== undefined && item.reviewedAt !== null && !isIsoDateString(item.reviewedAt)) {
 			return shapeError('Risk.reviewedAt deve ser uma data ISO 8601 válida ou null');
 		}
+		if (item.likelihood !== undefined && !isRiskLikelihoodOrNull(item.likelihood)) {
+			return shapeError('Risk.likelihood deve ser um dos literais aprovados ou null');
+		}
+		if (item.impact !== undefined && !isRiskImpactOrNull(item.impact)) {
+			return shapeError('Risk.impact deve ser um dos literais aprovados ou null');
+		}
+		if (item.response !== undefined && item.response !== null && !isString(item.response)) {
+			return shapeError('Risk.response deve ser uma string ou null');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('Risk.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('Risk.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -603,6 +626,9 @@ function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 			status: item.status,
 			closedAt: item.closedAt,
 			reviewedAt: item.reviewedAt ?? null,
+			likelihood: item.likelihood ?? null,
+			impact: item.impact ?? null,
+			response: item.response ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});
@@ -1426,6 +1452,9 @@ function assembleProjectState({
 		}
 		if (risk.status === 'aberto' && risk.closedAt !== null) {
 			return invariantError(`Risk "${risk.id}" está aberto mas possui closedAt`);
+		}
+		if ((risk.likelihood === null) !== (risk.impact === null)) {
+			return invariantError(`Risk "${risk.id}" tem avaliação parcial (likelihood/impact devem ser ambos null ou ambos preenchidos)`);
 		}
 	}
 

@@ -262,6 +262,14 @@ CREATE TABLE IF NOT EXISTS milestone_work_item (
 --
 -- Bancos criados entre D049 e este corte recebem reviewed_at via ALTER TABLE
 -- idempotente em sqlite-project-repository.ts (ensureRiskReviewedAtColumn).
+--
+-- likelihood/impact/response (ETAPA 10 do rework, terceiro microcorte) —
+-- avaliação qualitativa e resposta planejada, ambas opcionais. A CHECK
+-- nomeada abaixo espelha risk_closed_at_matches_status: likelihood e
+-- impact são sempre ambos NULL (sem avaliação) ou ambos preenchidos —
+-- nunca um sozinho. Bancos criados entre este corte e o anterior recebem as
+-- três colunas via ALTER TABLE idempotente
+-- (ensureRiskAssessmentAndResponseColumns).
 CREATE TABLE IF NOT EXISTS risk (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
@@ -269,11 +277,19 @@ CREATE TABLE IF NOT EXISTS risk (
 	status TEXT NOT NULL,
 	closed_at TEXT,
 	reviewed_at TEXT,
+	likelihood TEXT,
+	impact TEXT,
+	response TEXT,
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	CONSTRAINT risk_status_values CHECK (status IN ('aberto', 'encerrado')),
 	CONSTRAINT risk_closed_at_matches_status CHECK (
 		(status = 'aberto' AND closed_at IS NULL) OR (status = 'encerrado' AND closed_at IS NOT NULL)
+	),
+	CONSTRAINT risk_likelihood_values CHECK (likelihood IS NULL OR likelihood IN ('baixa', 'media', 'alta')),
+	CONSTRAINT risk_impact_values CHECK (impact IS NULL OR impact IN ('baixo', 'medio', 'alto')),
+	CONSTRAINT risk_assessment_pair CHECK (
+		(likelihood IS NULL AND impact IS NULL) OR (likelihood IS NOT NULL AND impact IS NOT NULL)
 	)
 );
 

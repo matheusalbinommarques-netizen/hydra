@@ -31,6 +31,8 @@ import type {
 	Project,
 	ProjectEvent,
 	Risk,
+	RiskImpact,
+	RiskLikelihood,
 	RiskStatus,
 	ScopeBucket,
 	ScopeEffort,
@@ -278,6 +280,9 @@ export interface RiskRow {
 	status: RiskStatus;
 	closed_at: string | null;
 	reviewed_at: string | null;
+	likelihood: RiskLikelihood | null;
+	impact: RiskImpact | null;
+	response: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -290,6 +295,9 @@ export function mapRiskRow(row: RiskRow): Risk {
 		status: row.status,
 		closedAt: row.closed_at,
 		reviewedAt: row.reviewed_at,
+		likelihood: row.likelihood,
+		impact: row.impact,
+		response: row.response,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};
