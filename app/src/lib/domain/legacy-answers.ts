@@ -74,7 +74,16 @@ export const DEPRECATED_ANSWER_FIELDS: readonly DeprecatedAnswerField[] = [
 	// continuam legíveis, nunca reescritas.
 	{ activityDefinitionId: 'riscos_projeto', fieldDefinitionId: 'riscos_identificados' },
 	{ activityDefinitionId: 'riscos_projeto', fieldDefinitionId: 'resposta_inicial_riscos' },
-	{ activityDefinitionId: 'atualizar_riscos', fieldDefinitionId: 'riscos_atualizados' }
+	{ activityDefinitionId: 'atualizar_riscos', fieldDefinitionId: 'riscos_atualizados' },
+	// "Registrar decisões e mudanças" (S11, ETAPA 11 do rework — "Decision e
+	// Change", §41) — a atividade `decisoes_mudancas` deixou de ser
+	// required_fields; `decisoes_mudancas_recentes` não é mais fonte de
+	// verdade (Decision e Change são, ver domain/state-types.ts). Um único
+	// campo legado misturava os dois conceitos — nenhum tem equivalente
+	// individual nele (sem parsing/conversão automática, sem split). Snapshots
+	// exportados antes dessa mudança ainda carregam essa Answer — ela
+	// continua legível, nunca reescrita.
+	{ activityDefinitionId: 'decisoes_mudancas', fieldDefinitionId: 'decisoes_mudancas_recentes' }
 ];
 
 export function isDeprecatedAnswerField(activityDefinitionId: string, fieldDefinitionId: string): boolean {

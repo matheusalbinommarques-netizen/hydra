@@ -51,6 +51,11 @@
 	// reachedMilestoneCount acima: contagem simples, nunca percentual/progresso.
 	let openRiskCount = $derived(view.risks.filter((r) => r.status === 'aberto').length);
 
+	// S11 (ETAPA 11 do rework, "Decision e Change", §41) — mesmo cuidado de
+	// openRiskCount acima: contagem simples, nunca percentual/progresso.
+	let pendingDecisionCount = $derived(view.decisions.filter((d) => d.status === 'pendente').length);
+	let changeCount = $derived(view.changes.length);
+
 	// S9 — `partes_trabalho` é READ-LEGACY (§13.2): "Priorizar entregas" só
 	// apresenta o legado somente leitura agora, direto de `data.planningItems`
 	// (sem estado local nem reordenação — ver mainContent abaixo).
@@ -319,6 +324,47 @@
 
 			<form method="POST" action="?/confirmRiskUpdate" use:enhance>
 				<button type="submit">Confirmar revisão dos riscos</button>
+			</form>
+
+			{#if form?.message}
+				<p role="alert">{form.message}</p>
+			{/if}
+
+			{#if data.activity.allowsSkip}
+				<SkipActivityConfirm activity={data.activity} />
+			{/if}
+		</section>
+	{:else if data.activity?.id === 'decisoes_mudancas'}
+		<section class="next-action">
+			<p class="eyebrow">Execução</p>
+			<h2>{data.activity.title}</h2>
+			<p>
+				Decisões e mudanças reais são geridas em <a href="/projects/{view.projectId}/tracking">Acompanhamento</a
+				>, como Decisões e Mudanças.
+			</p>
+			{#if data.decisoesMudancasRecentes}
+				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
+				<p class="legacy-dependencias-text">{data.decisoesMudancasRecentes}</p>
+			{/if}
+
+			<p>
+				{#if pendingDecisionCount === 0}
+					Não há nenhuma decisão pendente neste projeto.
+				{:else}
+					{pendingDecisionCount} {pendingDecisionCount === 1 ? 'decisão pendente' : 'decisões pendentes'} neste
+					projeto.
+				{/if}
+			</p>
+			<p>
+				{#if changeCount === 0}
+					Não há nenhuma mudança registrada neste projeto.
+				{:else}
+					{changeCount} {changeCount === 1 ? 'mudança registrada' : 'mudanças registradas'} neste projeto.
+				{/if}
+			</p>
+
+			<form method="POST" action="?/confirmDecisionsAndChangesReview" use:enhance>
+				<button type="submit">Confirmar revisão de decisões e mudanças</button>
 			</form>
 
 			{#if form?.message}

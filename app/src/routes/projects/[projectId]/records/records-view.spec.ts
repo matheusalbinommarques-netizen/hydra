@@ -394,4 +394,48 @@ describe('buildRecordsView — filtro de entidade (Design Gate S7)', () => {
 		const result = buildRecordsView(catalog, { ...baseInput(), events: [], filterEntityIds: ['id-inexistente-xyz'] });
 		expect(result.recentActivity.filter).toEqual({ label: 'item selecionado' });
 	});
+
+	// S11 (ETAPA 11 do rework, "Decision e Change", §41) — "Registrar decisões
+	// e mudanças" virou explicit_confirmation (mesma reconciliação de S9/S10
+	// para decompor_trabalho/mapear_dependencias/definir_marcos/riscos_*): o
+	// loop genérico só olha completionMode === 'required_fields', então um
+	// projeto anterior a S11 com decisoes_mudancas_recentes preenchido ficaria
+	// invisível em Registros sem o bloco dedicado. Regressão para esse defeito.
+	it('projeto anterior a S11: Answer legada decisoes_mudancas_recentes continua visível, somente leitura', () => {
+		const result = buildRecordsView(catalog, {
+			projectId: PROJECT_ID,
+			answers: { decisoes_mudancas_recentes: 'Decisão: adiar a notificação por SMS para uma versão futura' },
+			pendingItemHistory: [],
+			activityStatuses: {}
+		});
+
+		const execucao = result.phases.find((phase) => phase.phaseId === 'execucao')!;
+		expect(execucao).toBeDefined();
+
+		const decisoesMudancas = execucao.activities.find((activity) => activity.activityId === 'decisoes_mudancas')!;
+		expect(decisoesMudancas).toBeDefined();
+		expect(decisoesMudancas.fields).toEqual([
+			{
+				id: 'decisoes_mudancas_recentes',
+				label: 'Decisões e mudanças recentes',
+				value: 'Decisão: adiar a notificação por SMS para uma versão futura'
+			}
+		]);
+		// Somente leitura: nunca ganha destino de edição, mesmo com a Activity
+		// marcada como concluída — mesmo contrato de decompor_trabalho/
+		// mapear_dependencias/definir_marcos/riscos_projeto/atualizar_riscos.
+		expect(decisoesMudancas.editHref).toBeNull();
+	});
+
+	it('atividade decisoes_mudancas sem Answer legada não aparece em Registros', () => {
+		const result = buildRecordsView(catalog, {
+			projectId: PROJECT_ID,
+			answers: {},
+			pendingItemHistory: [],
+			activityStatuses: {}
+		});
+
+		const execucao = result.phases.find((phase) => phase.phaseId === 'execucao');
+		expect(execucao?.activities.some((activity) => activity.activityId === 'decisoes_mudancas')).toBeFalsy();
+	});
 });

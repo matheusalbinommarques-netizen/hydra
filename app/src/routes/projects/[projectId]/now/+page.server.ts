@@ -47,6 +47,13 @@ const RESPOSTA_INICIAL_RISCOS_FIELD_ID = 'resposta_inicial_riscos';
 const ATUALIZAR_RISCOS_ACTIVITY_ID = 'atualizar_riscos';
 const RISCOS_ATUALIZADOS_FIELD_ID = 'riscos_atualizados';
 
+// S11 (ETAPA 11 do rework, "Decision e Change", §41) — mesmo raciocínio de
+// RISCOS_PROJETO_ACTIVITY_ID/RISCOS_IDENTIFICADOS_FIELD_ID acima:
+// `decisoes_mudancas_recentes` é READ-LEGACY, texto livre simples,
+// repassado direto de `view.answers` para o template.
+const DECISOES_MUDANCAS_ACTIVITY_ID = 'decisoes_mudancas';
+const DECISOES_MUDANCAS_RECENTES_FIELD_ID = 'decisoes_mudancas_recentes';
+
 // S4D — "Resumo da descoberta" agora é representada pela tela dedicada
 // /summary (Checkpoint da Descoberta), não mais por uma superfície própria
 // dentro de /now. `resumo` nunca é allowsSkip, então nunca chega aqui via
@@ -322,6 +329,11 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const riscosAtualizados =
 		activity?.id === ATUALIZAR_RISCOS_ACTIVITY_ID ? (view.answers[RISCOS_ATUALIZADOS_FIELD_ID] ?? null) : undefined;
 
+	const decisoesMudancasRecentes =
+		activity?.id === DECISOES_MUDANCAS_ACTIVITY_ID
+			? (view.answers[DECISOES_MUDANCAS_RECENTES_FIELD_ID] ?? null)
+			: undefined;
+
 	return {
 		activity,
 		isResuming: Boolean(resumingPendingItem),
@@ -335,7 +347,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		marcosPrincipais,
 		riscosIdentificados,
 		respostaInicialRiscos,
-		riscosAtualizados
+		riscosAtualizados,
+		decisoesMudancasRecentes
 	};
 };
 
@@ -546,6 +559,20 @@ export const actions: Actions = {
 
 	confirmRiskUpdate: async ({ params }) => {
 		const result = await getProjectUseCases().confirmRiskUpdate({ projectId: params.projectId });
+
+		if (!result.ok) {
+			return fail(400, { message: mapUseCaseError(result.error) });
+		}
+
+		redirect(303, `/projects/${params.projectId}/now`);
+	},
+
+	// S11 (ETAPA 11 do rework, "Decision e Change", §41) — confirma
+	// "Registrar decisões e mudanças". Não recebe nenhum dado de
+	// Decision/Change: ZERO de ambas é resultado válido, mesmo molde de
+	// confirmRiskIdentification/confirmRiskUpdate acima.
+	confirmDecisionsAndChangesReview: async ({ params }) => {
+		const result = await getProjectUseCases().confirmDecisionsAndChangesReview({ projectId: params.projectId });
 
 		if (!result.ok) {
 			return fail(400, { message: mapUseCaseError(result.error) });

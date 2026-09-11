@@ -168,6 +168,16 @@ const ATUALIZAR_RISCOS_ACTIVITY_ID = 'atualizar_riscos';
 const RISCOS_ATUALIZADOS_FIELD_ID = 'riscos_atualizados';
 const RISCOS_ATUALIZADOS_FIELD_LABEL = 'Riscos atualizados';
 
+// S11 (ETAPA 11 do rework, "Decision e Change", §41) — "Registrar decisões e
+// mudanças" segue o mesmo padrão de ATUALIZAR_RISCOS acima: virou
+// explicit_confirmation (confirmDecisionsAndChangesReview, ver
+// domain/transitions.ts), então o loop genérico não a alcança mais.
+// `decisoes_mudancas_recentes` é texto livre simples, mesmo molde de
+// RISCOS_ATUALIZADOS_FIELD_ID.
+const DECISOES_MUDANCAS_ACTIVITY_ID = 'decisoes_mudancas';
+const DECISOES_MUDANCAS_RECENTES_FIELD_ID = 'decisoes_mudancas_recentes';
+const DECISOES_MUDANCAS_RECENTES_FIELD_LABEL = 'Decisões e mudanças recentes';
+
 function findActivityDefinition(catalog: Catalog, activityDefinitionId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
 		const found = phase.activities.find((activity) => activity.id === activityDefinitionId);
@@ -371,6 +381,22 @@ export function buildRecordsView(catalog: Catalog, input: RecordsViewInput): Rec
 						id: RISCOS_ATUALIZADOS_FIELD_ID,
 						label: RISCOS_ATUALIZADOS_FIELD_LABEL,
 						value: input.answers[RISCOS_ATUALIZADOS_FIELD_ID]
+					}
+				],
+				editHref: null
+			});
+		}
+
+		const decisoesMudancas = phase.activities.find((activity) => activity.id === DECISOES_MUDANCAS_ACTIVITY_ID);
+		if (decisoesMudancas && input.answers[DECISOES_MUDANCAS_RECENTES_FIELD_ID]) {
+			activities.push({
+				activityId: DECISOES_MUDANCAS_ACTIVITY_ID,
+				title: decisoesMudancas.title,
+				fields: [
+					{
+						id: DECISOES_MUDANCAS_RECENTES_FIELD_ID,
+						label: DECISOES_MUDANCAS_RECENTES_FIELD_LABEL,
+						value: input.answers[DECISOES_MUDANCAS_RECENTES_FIELD_ID]
 					}
 				],
 				editHref: null

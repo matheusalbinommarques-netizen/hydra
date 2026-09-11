@@ -60,6 +60,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 		milestones: view.milestones,
 		impediments: view.impediments,
 		risks: view.risks,
+		decisions: view.decisions,
+		changes: view.changes,
 		openPendingItems: view.openPendingItems
 	});
 
@@ -207,6 +209,93 @@ export const actions: Actions = {
 		const response = readString(formData, 'response');
 
 		const result = await getProjectUseCases().setRiskResponse({ projectId: params.projectId, riskId, response });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	addDecision: async ({ request, params }) => {
+		const formData = await request.formData();
+		const subject = readString(formData, 'subject');
+		if (!subject) return fail(400, { message: 'Descreva o que precisa ser decidido.' });
+
+		const result = await getProjectUseCases().addDecision({ projectId: params.projectId, subject });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	editDecision: async ({ request, params }) => {
+		const formData = await request.formData();
+		const decisionId = readString(formData, 'decisionId');
+		const subject = readString(formData, 'subject');
+		if (!decisionId || !subject) return fail(400, { message: 'Decisão ou assunto inválido.' });
+		const options = readString(formData, 'options');
+		const dueDate = readString(formData, 'dueDate');
+
+		const result = await getProjectUseCases().editDecision({
+			projectId: params.projectId,
+			decisionId,
+			subject,
+			options,
+			dueDate
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	decideDecision: async ({ request, params }) => {
+		const formData = await request.formData();
+		const decisionId = readString(formData, 'decisionId');
+		const outcome = readString(formData, 'outcome');
+		if (!decisionId || !outcome) return fail(400, { message: 'Decisão ou resultado inválido.' });
+
+		const result = await getProjectUseCases().decideDecision({ projectId: params.projectId, decisionId, outcome });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	editDecisionOutcome: async ({ request, params }) => {
+		const formData = await request.formData();
+		const decisionId = readString(formData, 'decisionId');
+		const outcome = readString(formData, 'outcome');
+		if (!decisionId || !outcome) return fail(400, { message: 'Decisão ou resultado inválido.' });
+
+		const result = await getProjectUseCases().editDecisionOutcome({
+			projectId: params.projectId,
+			decisionId,
+			outcome
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	addChange: async ({ request, params }) => {
+		const formData = await request.formData();
+		const statement = readString(formData, 'statement');
+		if (!statement) return fail(400, { message: 'Descreva o que mudou.' });
+
+		const result = await getProjectUseCases().addChange({ projectId: params.projectId, statement });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	editChangeStatement: async ({ request, params }) => {
+		const formData = await request.formData();
+		const changeId = readString(formData, 'changeId');
+		const statement = readString(formData, 'statement');
+		if (!changeId || !statement) return fail(400, { message: 'Mudança ou declaração inválida.' });
+
+		const result = await getProjectUseCases().editChangeStatement({ projectId: params.projectId, changeId, statement });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	setChangeImpact: async ({ request, params }) => {
+		const formData = await request.formData();
+		const changeId = readString(formData, 'changeId');
+		if (!changeId) return fail(400, { message: 'Mudança inválida.' });
+		const impact = readString(formData, 'impact');
+
+		const result = await getProjectUseCases().setChangeImpact({ projectId: params.projectId, changeId, impact });
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
 	}

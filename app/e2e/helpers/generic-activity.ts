@@ -147,6 +147,25 @@ export async function answerCurrentActivityGenerically(page: Page): Promise<void
 		return;
 	}
 
+	// "Registrar decisões e mudanças" (S11 — explicit_confirmation contra
+	// Decision/Change, mas ZERO de ambas é resultado válido, ETAPA 11 do
+	// rework §41): mesmo padrão de "Mapear dependências"/"Definir marcos"/
+	// "Identificar riscos" acima.
+	const confirmDecisionsAndChangesButton = page.getByRole('button', {
+		name: 'Confirmar revisão de decisões e mudanças'
+	});
+	if (await confirmDecisionsAndChangesButton.count()) {
+		await Promise.all([
+			page.waitForResponse(
+				(response) =>
+					response.url().includes('?/confirmDecisionsAndChangesReview') && response.request().method() === 'POST'
+			),
+			confirmDecisionsAndChangesButton.click()
+		]);
+		await page.waitForTimeout(200);
+		return;
+	}
+
 	const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Salvar e continuar' }) });
 
 	const textInputs = form.locator('input[type="text"][required]');

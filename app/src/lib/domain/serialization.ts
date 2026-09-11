@@ -14,7 +14,10 @@ import type {
 	Answer,
 	CauseExploration,
 	CauseHypothesis,
+	Change,
 	CurrentTreatment,
+	Decision,
+	DecisionStatus,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -145,6 +148,11 @@ function isRiskLikelihoodOrNull(value: unknown): value is RiskLikelihood | null 
 const RISK_IMPACTS: readonly string[] = ['baixo', 'medio', 'alto'];
 function isRiskImpactOrNull(value: unknown): value is RiskImpact | null {
 	return value === null || (typeof value === 'string' && RISK_IMPACTS.includes(value));
+}
+
+const DECISION_STATUSES: readonly string[] = ['pendente', 'tomada'];
+function isDecisionStatus(value: unknown): value is DecisionStatus {
+	return typeof value === 'string' && DECISION_STATUSES.includes(value);
 }
 
 const WORK_ITEM_STATUSES: readonly string[] = ['a_fazer', 'em_andamento', 'concluido'];
@@ -636,6 +644,80 @@ function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 	return { ok: true, value: result };
 }
 
+// Decision (ETAPA 11 do rework, primeiro microcorte, §41) — ausente em
+// snapshots exportados antes deste corte: tratado como coleção vazia, mesmo
+// espírito de parseRiskList acima. Nunca inferido do texto livre legado
+// `decisoes_mudancas_recentes` (READ-LEGACY, sem auto-conversão — regra
+// §13.2).
+function parseDecisionList(value: unknown): Result<Decision[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('decisions deve ser um array');
+	const result: Decision[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Decision deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Decision.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Decision.projectId deve ser uma string');
+		if (!isString(item.subject)) return shapeError('Decision.subject deve ser uma string');
+		if (item.options !== null && !isString(item.options)) {
+			return shapeError('Decision.options deve ser uma string ou null');
+		}
+		if (item.dueDate !== null && !isCivilDate(item.dueDate)) {
+			return shapeError('Decision.dueDate deve ser uma data civil YYYY-MM-DD válida ou null');
+		}
+		if (!isDecisionStatus(item.status)) return shapeError('Decision.status deve ser um dos literais aprovados');
+		if (item.outcome !== null && !isString(item.outcome)) {
+			return shapeError('Decision.outcome deve ser uma string ou null');
+		}
+		if (item.decidedAt !== null && !isIsoDateString(item.decidedAt)) {
+			return shapeError('Decision.decidedAt deve ser uma data ISO 8601 válida ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Decision.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('Decision.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			subject: item.subject,
+			options: item.options,
+			dueDate: item.dueDate,
+			status: item.status,
+			outcome: item.outcome,
+			decidedAt: item.decidedAt,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+// Change (ETAPA 11 do rework, primeiro microcorte, §41) — ausente em
+// snapshots exportados antes deste corte: tratado como coleção vazia, mesmo
+// espírito de parseDecisionList acima.
+function parseChangeList(value: unknown): Result<Change[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('changes deve ser um array');
+	const result: Change[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada Change deve ser um objeto');
+		if (!isString(item.id)) return shapeError('Change.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('Change.projectId deve ser uma string');
+		if (!isString(item.statement)) return shapeError('Change.statement deve ser uma string');
+		if (item.impact !== null && !isString(item.impact)) {
+			return shapeError('Change.impact deve ser uma string ou null');
+		}
+		if (!isIsoDateString(item.createdAt)) return shapeError('Change.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('Change.updatedAt deve ser uma data ISO 8601 válida');
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			statement: item.statement,
+			impact: item.impact,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 const AFFECTED_GROUP_IMPACTS: readonly string[] = ['alto', 'medio', 'baixo', 'desconhecido'];
 function isAffectedGroupImpactOrNull(value: unknown): value is AffectedGroupImpact | null {
 	return value === null || (typeof value === 'string' && AFFECTED_GROUP_IMPACTS.includes(value));
@@ -956,6 +1038,8 @@ interface AssembleProjectStateInput {
 	milestones: Milestone[];
 	milestoneWorkItems: MilestoneWorkItem[];
 	risks: Risk[];
+	decisions: Decision[];
+	changes: Change[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];
@@ -981,6 +1065,8 @@ function assembleProjectState({
 	milestones,
 	milestoneWorkItems,
 	risks,
+	decisions,
+	changes,
 	affectedGroups,
 	externalActions,
 	evidences,
@@ -1458,6 +1544,41 @@ function assembleProjectState({
 		}
 	}
 
+	// invariantes: Decision (ETAPA 11 do rework, primeiro microcorte, §41) —
+	// sem referência a nenhum outro objeto nesta primeira fatia.
+	const seenDecisionIds = new Set<string>();
+	for (const decision of decisions) {
+		if (decision.projectId !== project.id) {
+			return invariantError(`Decision "${decision.id}" usa projectId diferente do Project`);
+		}
+		if (seenDecisionIds.has(decision.id)) {
+			return invariantError(`Decision.id duplicado: "${decision.id}"`);
+		}
+		seenDecisionIds.add(decision.id);
+		if (decision.status === 'pendente' && (decision.outcome !== null || decision.decidedAt !== null)) {
+			return invariantError(`Decision "${decision.id}" está pendente mas possui outcome/decidedAt`);
+		}
+		if (
+			decision.status === 'tomada' &&
+			(decision.outcome === null || decision.outcome.trim().length === 0 || decision.decidedAt === null)
+		) {
+			return invariantError(`Decision "${decision.id}" está tomada mas não possui outcome/decidedAt válidos`);
+		}
+	}
+
+	// invariantes: Change (ETAPA 11 do rework, primeiro microcorte, §41) — sem
+	// lifecycle, só identidade e projectId a checar.
+	const seenChangeIds = new Set<string>();
+	for (const change of changes) {
+		if (change.projectId !== project.id) {
+			return invariantError(`Change "${change.id}" usa projectId diferente do Project`);
+		}
+		if (seenChangeIds.has(change.id)) {
+			return invariantError(`Change.id duplicado: "${change.id}"`);
+		}
+		seenChangeIds.add(change.id);
+	}
+
 	// referências + invariantes: AffectedGroup — ligado à atividade `publico`
 	// do catálogo (ao contrário de Impediment), mas sem activityDefinitionId
 	// próprio: a ligação é fixa (AFFECTED_GROUPS_ACTIVITY_ID em transitions.ts),
@@ -1720,6 +1841,8 @@ function assembleProjectState({
 			milestones,
 			milestoneWorkItems,
 			risks,
+			decisions,
+			changes,
 			affectedGroups,
 			externalActions,
 			evidences,
@@ -1803,6 +1926,12 @@ export function deserializeProjectState(
 	const risksResult = parseRiskList(state.risks);
 	if (!risksResult.ok) return risksResult;
 
+	const decisionsResult = parseDecisionList(state.decisions);
+	if (!decisionsResult.ok) return decisionsResult;
+
+	const changesResult = parseChangeList(state.changes);
+	if (!changesResult.ok) return changesResult;
+
 	const affectedGroupsResult = parseAffectedGroupList(state.affectedGroups);
 	if (!affectedGroupsResult.ok) return affectedGroupsResult;
 
@@ -1865,6 +1994,8 @@ export function deserializeProjectState(
 		milestones: milestonesResult.value,
 		milestoneWorkItems: milestoneWorkItemsResult.value,
 		risks: risksResult.value,
+		decisions: decisionsResult.value,
+		changes: changesResult.value,
 		affectedGroups: affectedGroupsResult.value,
 		externalActions: externalActionsResult.value,
 		evidences: evidencesResult.value,

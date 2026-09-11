@@ -160,12 +160,13 @@ describe('catalog', () => {
 		expect(definir?.pendingItemDetail).toBeTruthy();
 	});
 
-	it('há exatamente onze atividades explicit_confirmation, com allowsSkip diferentes', () => {
+	it('há exatamente doze atividades explicit_confirmation, com allowsSkip diferentes', () => {
 		const explicitConfirmationActivities = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.completionMode === 'explicit_confirmation');
 		expect(explicitConfirmationActivities.map((activity) => activity.id).sort()).toEqual([
 			'atualizar_riscos',
+			'decisoes_mudancas',
 			'decompor_trabalho',
 			'definir_marcos',
 			'entender_causas',
@@ -185,6 +186,7 @@ describe('catalog', () => {
 		expect(byId.definir_marcos.allowsSkip).toBe(true);
 		expect(byId.riscos_projeto.allowsSkip).toBe(true);
 		expect(byId.atualizar_riscos.allowsSkip).toBe(true);
+		expect(byId.decisoes_mudancas.allowsSkip).toBe(true);
 		expect(byId.publico.allowsSkip).toBe(true);
 		expect(byId.estado_atual.allowsSkip).toBe(true);
 		expect(byId.entender_causas.allowsSkip).toBe(true);

@@ -1350,6 +1350,8 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'workItems',
 				'milestones',
 				'risks',
+				'decisions',
+				'changes',
 				'affectedGroups',
 				'affectedGroupConfirmationIssues',
 				'externalActions',

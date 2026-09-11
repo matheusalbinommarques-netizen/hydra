@@ -11,7 +11,10 @@ import type {
 	Answer,
 	CauseExploration,
 	CauseHypothesis,
+	Change,
 	CurrentTreatment,
+	Decision,
+	DecisionStatus,
 	Dependency,
 	Milestone,
 	Deliverable,
@@ -298,6 +301,54 @@ export function mapRiskRow(row: RiskRow): Risk {
 		likelihood: row.likelihood,
 		impact: row.impact,
 		response: row.response,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
+	};
+}
+
+export interface DecisionRow {
+	id: string;
+	project_id: string;
+	subject: string;
+	options: string | null;
+	due_date: string | null;
+	status: DecisionStatus;
+	outcome: string | null;
+	decided_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapDecisionRow(row: DecisionRow): Decision {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		subject: row.subject,
+		options: row.options,
+		dueDate: row.due_date,
+		status: row.status,
+		outcome: row.outcome,
+		decidedAt: row.decided_at,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at
+	};
+}
+
+export interface ChangeRow {
+	id: string;
+	project_id: string;
+	statement: string;
+	impact: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export function mapChangeRow(row: ChangeRow): Change {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		statement: row.statement,
+		impact: row.impact,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

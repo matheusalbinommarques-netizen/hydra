@@ -6,6 +6,7 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	CauseHypothesisConfirmationIssue,
+	DecisionStatus,
 	DesiredOutcomeConfirmationIssue,
 	DomainTransitionError,
 	EvidenceOutcome,
@@ -185,6 +186,29 @@ export interface RiskView {
 	likelihood: RiskLikelihood | null;
 	impact: RiskImpact | null;
 	response: string | null;
+}
+
+// Acompanhamento ("Decisões", ETAPA 11 do rework, §41) — view leve de
+// Decision, sem projectId/updatedAt, que a interface não precisa. `status` é
+// o estado DECLARADO e a única autoridade sobre pendente/tomada.
+export interface DecisionView {
+	id: string;
+	subject: string;
+	options: string | null;
+	dueDate: string | null;
+	status: DecisionStatus;
+	outcome: string | null;
+	decidedAt: string | null;
+	createdAt: string;
+}
+
+// Acompanhamento ("Mudanças", ETAPA 11 do rework, §41) — view leve de
+// Change, sem projectId/updatedAt.
+export interface ChangeView {
+	id: string;
+	statement: string;
+	impact: string | null;
+	createdAt: string;
 }
 
 // Trabalho (ETAPA 6 do rework, "Primeiro loop operacional") — view leve de
@@ -422,6 +446,13 @@ export interface ProjectView {
 	// avaliação/urgência estruturada, isso fingiria acionabilidade que o
 	// modelo ainda não conhece.
 	risks: RiskView[];
+	// Decisões/mudanças do projeto (ETAPA 11 do rework, primeiro microcorte,
+	// §41) — todas as Decisions/Changes; Acompanhamento filtra por status
+	// diretamente, mesmo padrão de risks acima. Deliberadamente NÃO entram em
+	// "Precisa de você" nem em "Atenções" nesta fatia — ter prazo não implica
+	// nenhuma regra de urgência automática.
+	decisions: DecisionView[];
+	changes: ChangeView[];
 	// Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — todos os grupos
 	// afetados do projeto; a interface (MapaDeImpacto.svelte) agrupa em faixas
 	// por `impact` (derivado, nunca persistido, ver
@@ -526,6 +557,15 @@ export interface ConfirmRiskIdentificationInput {
 }
 
 export interface ConfirmRiskUpdateInput {
+	projectId: string;
+}
+
+// S11 (ETAPA 11 do rework, "Decision e Change", §41) — confirmação de
+// "Registrar decisões e mudanças" (explicit_confirmation contra
+// Decision/Change reais). Não recebe nenhum dado de Decision/Change: ZERO de
+// ambas é resultado válido, então nenhum campo de contagem/estado é
+// necessário aqui — só marca a Activity concluída.
+export interface ConfirmDecisionsAndChangesReviewInput {
 	projectId: string;
 }
 
@@ -805,6 +845,56 @@ export interface SetRiskResponseInput {
 	response: string | null;
 }
 
+// Decision (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo padrão dos
+// inputs de Risk acima: id gerado pelo caso de uso (idGenerator), nunca
+// recebido do cliente.
+export interface AddDecisionInput {
+	projectId: string;
+	subject: string;
+}
+
+// subject/options/dueDate editados juntos (mesmo formulário) — nunca uma
+// transição de lifecycle.
+export interface EditDecisionInput {
+	projectId: string;
+	decisionId: string;
+	subject: string;
+	options: string | null;
+	dueDate: string | null;
+}
+
+export interface DecideDecisionInput {
+	projectId: string;
+	decisionId: string;
+	outcome: string;
+}
+
+// Corrige o outcome de uma decisão já tomada, sem mexer em status/decidedAt.
+export interface EditDecisionOutcomeInput {
+	projectId: string;
+	decisionId: string;
+	outcome: string;
+}
+
+// Change (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo padrão dos
+// inputs de Decision acima.
+export interface AddChangeInput {
+	projectId: string;
+	statement: string;
+}
+
+export interface EditChangeStatementInput {
+	projectId: string;
+	changeId: string;
+	statement: string;
+}
+
+export interface SetChangeImpactInput {
+	projectId: string;
+	changeId: string;
+	impact: string | null;
+}
+
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
 // inputs de ScopeItem/Impediment: id gerado pelo caso de uso
 // (idGenerator), nunca recebido do cliente.
@@ -1043,6 +1133,16 @@ export interface ProjectUseCases {
 	reviewRisk(input: ReviewRiskInput): Promise<UseCaseOutcome<ProjectView>>;
 	setRiskAssessment(input: SetRiskAssessmentInput): Promise<UseCaseOutcome<ProjectView>>;
 	setRiskResponse(input: SetRiskResponseInput): Promise<UseCaseOutcome<ProjectView>>;
+	confirmDecisionsAndChangesReview(
+		input: ConfirmDecisionsAndChangesReviewInput
+	): Promise<UseCaseOutcome<ProjectView>>;
+	addDecision(input: AddDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
+	editDecision(input: EditDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
+	decideDecision(input: DecideDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
+	editDecisionOutcome(input: EditDecisionOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
+	addChange(input: AddChangeInput): Promise<UseCaseOutcome<ProjectView>>;
+	editChangeStatement(input: EditChangeStatementInput): Promise<UseCaseOutcome<ProjectView>>;
+	setChangeImpact(input: SetChangeImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

@@ -8,6 +8,8 @@ import type { NextActivityResult } from '$lib/orientation-engine';
 import {
 	addAffectedGroup as addAffectedGroupInDomain,
 	addCauseHypothesis as addCauseHypothesisInDomain,
+	addChange as addChangeInDomain,
+	addDecision as addDecisionInDomain,
 	addDesiredOutcome as addDesiredOutcomeInDomain,
 	addImpediment as addImpedimentInDomain,
 	addRisk as addRiskInDomain,
@@ -28,6 +30,7 @@ import {
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmCauseHypotheses as confirmCauseHypothesesInDomain,
+	confirmDecisionsAndChangesReview as confirmDecisionsAndChangesReviewInDomain,
 	confirmDecomposition as confirmDecompositionInDomain,
 	confirmDependencyMapping as confirmDependencyMappingInDomain,
 	confirmMilestoneReview as confirmMilestoneReviewInDomain,
@@ -40,8 +43,12 @@ import {
 	confirmTreatment as confirmTreatmentInDomain,
 	createInitialProjectState,
 	closeRisk as closeRiskInDomain,
+	decideDecision as decideDecisionInDomain,
 	deserializeProjectEvents,
 	deserializeProjectState,
+	editChangeStatement as editChangeStatementInDomain,
+	editDecision as editDecisionInDomain,
+	editDecisionOutcome as editDecisionOutcomeInDomain,
 	editRiskStatement as editRiskStatementInDomain,
 	markCauseExplorationUnknown as markCauseExplorationUnknownInDomain,
 	moveDesiredOutcome as moveDesiredOutcomeInDomain,
@@ -77,6 +84,7 @@ import {
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
+	setChangeImpact as setChangeImpactInDomain,
 	setRiskAssessment as setRiskAssessmentInDomain,
 	setRiskResponse as setRiskResponseInDomain,
 	setRouteStartPhase as setRouteStartPhaseInDomain,
@@ -98,6 +106,8 @@ import { buildProjectView } from './project-view';
 import type {
 	AddAffectedGroupInput,
 	AddCauseHypothesisInput,
+	AddChangeInput,
+	AddDecisionInput,
 	AddDesiredOutcomeInput,
 	AddImpedimentInput,
 	AddRiskInput,
@@ -124,6 +134,7 @@ import type {
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmCauseHypothesesInput,
+	ConfirmDecisionsAndChangesReviewInput,
 	ConfirmDecompositionInput,
 	ConfirmDependencyMappingInput,
 	ConfirmMilestoneReviewInput,
@@ -135,6 +146,10 @@ import type {
 	ConfirmSummaryInput,
 	ConfirmTreatmentInput,
 	CreateConfiguredProjectInput,
+	DecideDecisionInput,
+	EditChangeStatementInput,
+	EditDecisionInput,
+	EditDecisionOutcomeInput,
 	EditRiskStatementInput,
 	MarkCauseExplorationUnknownInput,
 	MoveDesiredOutcomeInput,
@@ -164,6 +179,7 @@ import type {
 	SetDesiredOutcomeChangeInput,
 	SetDesiredOutcomeTargetInput,
 	SetHypothesisInput,
+	SetChangeImpactInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
 	SetRiskAssessmentInput,
@@ -553,6 +569,21 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = confirmRiskUpdateInDomain(catalog, state, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// S11 (ETAPA 11 do rework, "Decision e Change", §41) — confirma
+		// "Registrar decisões e mudanças". Não recebe nenhum dado de
+		// Decision/Change: ZERO de ambas é resultado válido, mesmo molde de
+		// confirmRiskIdentification/confirmRiskUpdate acima.
+		async confirmDecisionsAndChangesReview(input: ConfirmDecisionsAndChangesReviewInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = confirmDecisionsAndChangesReviewInDomain(catalog, state, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);
@@ -1190,6 +1221,96 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = setRiskResponseInDomain(catalog, state, input.riskId, input.response, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Decision (ETAPA 11 do rework, primeiro microcorte, §41) — sem evento no
+		// histórico nesta rodada, mesma razão de Risk acima: a taxonomia de
+		// ProjectEvent é fechada e só cobre o loop WorkItem/Impediment (D037).
+		async addDecision(input: AddDecisionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addDecisionInDomain(catalog, state, idGenerator.generate(), input.subject, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async editDecision(input: EditDecisionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = editDecisionInDomain(
+				catalog,
+				state,
+				input.decisionId,
+				input.subject,
+				input.options,
+				input.dueDate,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async decideDecision(input: DecideDecisionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = decideDecisionInDomain(catalog, state, input.decisionId, input.outcome, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async editDecisionOutcome(input: EditDecisionOutcomeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = editDecisionOutcomeInDomain(catalog, state, input.decisionId, input.outcome, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Change (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo padrão
+		// dos casos de uso de Decision acima. Change NÃO é ProjectEvent.
+		async addChange(input: AddChangeInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = addChangeInDomain(catalog, state, idGenerator.generate(), input.statement, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async editChangeStatement(input: EditChangeStatementInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = editChangeStatementInDomain(catalog, state, input.changeId, input.statement, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async setChangeImpact(input: SetChangeImpactInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setChangeImpactInDomain(catalog, state, input.changeId, input.impact, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

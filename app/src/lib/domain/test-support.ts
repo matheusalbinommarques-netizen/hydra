@@ -16,6 +16,7 @@ import {
 	answerActivity,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDecisionsAndChangesReview,
 	confirmDecomposition,
 	confirmDependencyMapping,
 	confirmMilestoneReview,
@@ -216,6 +217,20 @@ export function confirmRiskUpdateMinimally(catalog: Catalog, state: ProjectState
 }
 
 /**
+ * Confirma "Registrar decisões e mudanças" (S11 — explicit_confirmation
+ * contra Decision/Change, mas ZERO de ambas é resultado válido, ETAPA 11 do
+ * rework §41) — mesmo raciocínio de {@link confirmDependencyMappingMinimally}:
+ * nunca exige nenhuma Decision/Change, então não há "mínimo" a fabricar aqui.
+ */
+export function confirmDecisionsAndChangesReviewMinimally(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): ProjectState {
+	return unwrapResult(confirmDecisionsAndChangesReview(catalog, state, occurredAt));
+}
+
+/**
  * Confirma "Resultado desejado" (`resultado`, Stage 4C do rework) com o
  * mínimo que satisfaz {@link getDesiredOutcomeConfirmationIssues}: um
  * DesiredOutcome com `change` preenchido — para quando o teste só precisa
@@ -266,6 +281,8 @@ export function completePhase(catalog: Catalog, state: ProjectState, phaseId: st
 				next = confirmRiskIdentificationMinimally(catalog, next, occurredAt);
 			} else if (activity.id === 'atualizar_riscos') {
 				next = confirmRiskUpdateMinimally(catalog, next, occurredAt);
+			} else if (activity.id === 'decisoes_mudancas') {
+				next = confirmDecisionsAndChangesReviewMinimally(catalog, next, occurredAt);
 			} else if (activity.id === 'publico') {
 				next = confirmAffectedGroupsMinimally(catalog, next, `${activity.id}-affected-group-1`, occurredAt);
 			} else if (activity.id === 'estado_atual') {

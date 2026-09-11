@@ -9,7 +9,9 @@ import type {
 	AffectedGroupFrequency,
 	AffectedGroupImpact,
 	CauseHypothesis,
+	Change,
 	CurrentTreatment,
+	Decision,
 	Deliverable,
 	DeliverableBucket,
 	DeliverableEffort,
@@ -98,7 +100,15 @@ export type DomainTransitionError =
 	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] }
 	| { kind: 'risk_not_found' }
 	| { kind: 'risk_statement_required' }
-	| { kind: 'risk_assessment_incomplete' };
+	| { kind: 'risk_assessment_incomplete' }
+	| { kind: 'decision_not_found' }
+	| { kind: 'decision_subject_required' }
+	| { kind: 'decision_due_date_invalid' }
+	| { kind: 'decision_already_decided' }
+	| { kind: 'decision_not_decided' }
+	| { kind: 'decision_outcome_required' }
+	| { kind: 'change_not_found' }
+	| { kind: 'change_statement_required' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -397,6 +407,11 @@ const DEFINIR_MARCOS_ACTIVITY_ID = 'definir_marcos';
 // a confirmar contra a mesma coleção canônica de Risk.
 const RISCOS_PROJETO_ACTIVITY_ID = 'riscos_projeto';
 const ATUALIZAR_RISCOS_ACTIVITY_ID = 'atualizar_riscos';
+// S11 (ETAPA 11 do rework, "Decision e Change", §41) — mesmo motivo das
+// constantes acima. Uma única atividade legada (`decisoes_mudancas`, que
+// misturava os dois conceitos em texto livre) passa a confirmar contra as
+// duas coleções canônicas (Decision e Change) de uma vez.
+const DECISOES_MUDANCAS_ACTIVITY_ID = 'decisoes_mudancas';
 
 // Confirma "Decompor o trabalho" quando existe ao menos um WorkItem real —
 // nunca cria, edita nem lê PlanningItem. Só altera ActivityProgress (e
@@ -552,6 +567,36 @@ export function confirmRiskUpdate(
 	occurredAt: string
 ): Result<ProjectState, DomainTransitionError> {
 	const activity = findActivityDefinition(catalog, ATUALIZAR_RISCOS_ACTIVITY_ID);
+	if (!activity || activity.completionMode !== 'explicit_confirmation') {
+		return { ok: false, error: { kind: 'activity_not_found' } };
+	}
+
+	const progress = findActivityProgress(state, activity.id);
+	const currentStatus = progress?.status ?? 'não_iniciada';
+	if (currentStatus === 'concluída') {
+		return { ok: false, error: { kind: 'transition_not_allowed', from: currentStatus } };
+	}
+
+	let nextState = setActivityStatus(state, activity.id, 'concluída');
+	if (currentStatus === 'pulada') {
+		nextState = resolvePendingItem(nextState, activity.id, occurredAt);
+	}
+	return { ok: true, value: nextState };
+}
+
+// Confirma "Registrar decisões e mudanças" (Execução, S11) — nunca cria,
+// edita, lê nem exige nenhuma Decision/Change: mesmo molde de
+// confirmRiskIdentification/confirmRiskUpdate acima, ZERO de ambas é
+// resultado legítimo (a confirmação é "revisei o estado canônico atual de
+// decisões e mudanças do projeto", não "existe pelo menos uma"). Só altera
+// ActivityProgress (e resolve a pendência, se estava pulada); nunca
+// cria/edita/decide Decision nem Change.
+export function confirmDecisionsAndChangesReview(
+	catalog: Catalog,
+	state: ProjectState,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const activity = findActivityDefinition(catalog, DECISOES_MUDANCAS_ACTIVITY_ID);
 	if (!activity || activity.completionMode !== 'explicit_confirmation') {
 		return { ok: false, error: { kind: 'activity_not_found' } };
 	}
@@ -1852,6 +1897,230 @@ export function setRiskResponse(
 			risks: state.risks.map((item) =>
 				item.id === riskId ? { ...item, response, reviewedAt: occurredAt, updatedAt: occurredAt } : item
 			)
+		}
+	};
+}
+
+// --- Decision (ETAPA 11 do rework, primeiro microcorte, §41) --------------
+//
+// Objeto em nível de projeto, sem vínculo obrigatório com WorkItem,
+// Deliverable, Milestone, Risk, Impediment ou pessoa/responsável nesta
+// primeira fatia. `status` é declarado, nunca inferido.
+
+function findDecision(state: ProjectState, decisionId: string): Decision | undefined {
+	return state.decisions.find((decision) => decision.id === decisionId);
+}
+
+export function addDecision(
+	catalog: Catalog,
+	state: ProjectState,
+	decisionId: string,
+	subject: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (subject.trim().length === 0) {
+		return { ok: false, error: { kind: 'decision_subject_required' } };
+	}
+
+	const decision: Decision = {
+		id: decisionId,
+		projectId: state.project.id,
+		subject,
+		options: null,
+		dueDate: null,
+		status: 'pendente',
+		outcome: null,
+		decidedAt: null,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, decisions: [...state.decisions, decision] } };
+}
+
+// Edita subject/options/dueDate juntos (mesmo formulário, mesmo fato sendo
+// escrito) — nunca altera status/outcome/decidedAt, mesmo molde de
+// editRiskStatement: o mesmo fato sendo reescrito, não uma transição de
+// lifecycle. Só permitido enquanto 'pendente' — depois de tomada, o assunto,
+// as opções e o prazo ficam congelados (o registro passa a ser sobre a
+// decisão que foi tomada, não sobre a pergunta em aberto); a única correção
+// possível a partir daí é o outcome, via editDecisionOutcome abaixo.
+export function editDecision(
+	catalog: Catalog,
+	state: ProjectState,
+	decisionId: string,
+	subject: string,
+	options: string | null,
+	dueDate: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const decision = findDecision(state, decisionId);
+	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
+	if (decision.status === 'tomada') {
+		return { ok: false, error: { kind: 'decision_already_decided' } };
+	}
+	if (subject.trim().length === 0) {
+		return { ok: false, error: { kind: 'decision_subject_required' } };
+	}
+	if (dueDate !== null && !isCivilDate(dueDate)) {
+		return { ok: false, error: { kind: 'decision_due_date_invalid' } };
+	}
+	if (decision.subject === subject && decision.options === options && decision.dueDate === dueDate) {
+		return { ok: true, value: state };
+	}
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			decisions: state.decisions.map((item) =>
+				item.id === decisionId ? { ...item, subject, options, dueDate, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// Marca a decisão como tomada — só a partir de 'pendente' (ao contrário de
+// closeRisk/reachMilestone, não é idempotente: chamar de novo sobre uma
+// decisão já tomada reescreveria decidedAt silenciosamente, então é recusado
+// como erro; a correção de outcome depois de tomada usa editDecisionOutcome,
+// abaixo, que não mexe em status/decidedAt).
+export function decideDecision(
+	catalog: Catalog,
+	state: ProjectState,
+	decisionId: string,
+	outcome: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const decision = findDecision(state, decisionId);
+	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
+	if (decision.status === 'tomada') {
+		return { ok: false, error: { kind: 'decision_already_decided' } };
+	}
+	if (outcome.trim().length === 0) {
+		return { ok: false, error: { kind: 'decision_outcome_required' } };
+	}
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			decisions: state.decisions.map((item) =>
+				item.id === decisionId
+					? { ...item, status: 'tomada', outcome, decidedAt: occurredAt, updatedAt: occurredAt }
+					: item
+			)
+		}
+	};
+}
+
+// Corrige o outcome de uma decisão já tomada, sem criar lifecycle adicional
+// (sem reverter/reabrir) — status e decidedAt permanecem intactos, mesmo
+// espírito de editRiskStatement.
+export function editDecisionOutcome(
+	catalog: Catalog,
+	state: ProjectState,
+	decisionId: string,
+	outcome: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const decision = findDecision(state, decisionId);
+	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
+	if (decision.status !== 'tomada') {
+		return { ok: false, error: { kind: 'decision_not_decided' } };
+	}
+	if (outcome.trim().length === 0) {
+		return { ok: false, error: { kind: 'decision_outcome_required' } };
+	}
+	if (decision.outcome === outcome) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			decisions: state.decisions.map((item) =>
+				item.id === decisionId ? { ...item, outcome, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// --- Change (ETAPA 11 do rework, primeiro microcorte, §41) ----------------
+//
+// Objeto em nível de projeto, sem lifecycle e sem relação com nenhuma outra
+// entidade nesta primeira fatia. Change NÃO é ProjectEvent (ver
+// domain/events.ts) — nenhuma função aqui é chamada a partir de outra
+// transição, sempre ação humana explícita.
+
+function findChange(state: ProjectState, changeId: string): Change | undefined {
+	return state.changes.find((change) => change.id === changeId);
+}
+
+export function addChange(
+	catalog: Catalog,
+	state: ProjectState,
+	changeId: string,
+	statement: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (statement.trim().length === 0) {
+		return { ok: false, error: { kind: 'change_statement_required' } };
+	}
+
+	const change: Change = {
+		id: changeId,
+		projectId: state.project.id,
+		statement,
+		impact: null,
+		createdAt: occurredAt,
+		updatedAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, changes: [...state.changes, change] } };
+}
+
+export function editChangeStatement(
+	catalog: Catalog,
+	state: ProjectState,
+	changeId: string,
+	statement: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const change = findChange(state, changeId);
+	if (!change) return { ok: false, error: { kind: 'change_not_found' } };
+	if (statement.trim().length === 0) {
+		return { ok: false, error: { kind: 'change_statement_required' } };
+	}
+	if (change.statement === statement) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			changes: state.changes.map((item) =>
+				item.id === changeId ? { ...item, statement, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// null limpa o impacto — mesmo espírito de setRiskResponse.
+export function setChangeImpact(
+	catalog: Catalog,
+	state: ProjectState,
+	changeId: string,
+	impact: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const change = findChange(state, changeId);
+	if (!change) return { ok: false, error: { kind: 'change_not_found' } };
+	if (change.impact === impact) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			changes: state.changes.map((item) => (item.id === changeId ? { ...item, impact, updatedAt: occurredAt } : item))
 		}
 	};
 }

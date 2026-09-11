@@ -8,7 +8,14 @@
 // e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
 import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
-import type { ImpedimentView, MilestoneView, RiskView, WorkItemView } from '$lib/server/application/types';
+import type {
+	ChangeView,
+	DecisionView,
+	ImpedimentView,
+	MilestoneView,
+	RiskView,
+	WorkItemView
+} from '$lib/server/application/types';
 import type { NextActivityResult, PendingItemView } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
@@ -49,6 +56,15 @@ export interface TrackingImpedimentsView {
 export interface TrackingRisksView {
 	open: RiskView[];
 	closed: RiskView[];
+}
+
+// Decisões/mudanças (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo
+// molde de TrackingRisksView: pendentes/tomadas separadas, sem promoção
+// automática a "Precisa de você" nem a "Atenções" — ter prazo declarado não
+// implica nenhuma regra de urgência automática nesta fatia.
+export interface TrackingDecisionsView {
+	pending: DecisionView[];
+	decided: DecisionView[];
 }
 
 // Bloqueios (ETAPA 6 do rework) — sinal estreito, derivado, explicável e
@@ -134,6 +150,8 @@ export interface TrackingView {
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
 	risks: TrackingRisksView;
+	decisions: TrackingDecisionsView;
+	changes: ChangeView[];
 	continuity: TrackingContinuityView;
 }
 
@@ -145,6 +163,8 @@ export interface TrackingViewInput {
 	milestones: MilestoneView[];
 	impediments: ImpedimentView[];
 	risks: RiskView[];
+	decisions: DecisionView[];
+	changes: ChangeView[];
 	openPendingItems: PendingItemView[];
 }
 
@@ -337,6 +357,13 @@ function buildRisks(risks: RiskView[]): TrackingRisksView {
 	};
 }
 
+function buildDecisions(decisions: DecisionView[]): TrackingDecisionsView {
+	return {
+		pending: decisions.filter((decision) => decision.status === 'pendente'),
+		decided: decisions.filter((decision) => decision.status === 'tomada')
+	};
+}
+
 function buildContinuity(
 	nextActivity: NextActivityResult,
 	situation: TrackingSituationView | undefined
@@ -358,6 +385,8 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
 		impediments: buildImpediments(input.impediments),
 		risks: buildRisks(input.risks),
+		decisions: buildDecisions(input.decisions),
+		changes: input.changes,
 		continuity: buildContinuity(input.nextActivity, situation)
 	};
 }

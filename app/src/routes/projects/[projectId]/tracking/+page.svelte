@@ -127,6 +127,59 @@
 	function cancelConfirm() {
 		confirmingWorkItemId = null;
 	}
+
+	// Decisões (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo padrão
+	// de newRiskStatement/editingRiskId acima.
+	let newDecisionSubject = $state('');
+	let editingDecisionId = $state<string | null>(null);
+	let showDecidedDecisions = $state(false);
+
+	function handleAddDecisionSubmit() {
+		return async ({ result, update }: { result: ActionResult; update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			if (result.type === 'success') {
+				newDecisionSubject = '';
+			}
+			await update({ reset: false });
+		};
+	}
+
+	function toggleEditDecision(id: string) {
+		editingDecisionId = editingDecisionId === id ? null : id;
+	}
+
+	// Ter prazo declarado não implica nenhuma regra de urgência automática
+	// (§41) — o rótulo é sempre a data crua, nunca "atrasado"/"há N dias".
+	function decisionDueDateLabel(dueDate: string | null): string {
+		if (!dueDate) return 'Sem prazo declarado';
+		const [year, month, day] = dueDate.split('-');
+		return `Prazo: ${day}/${month}/${year}`;
+	}
+
+	function decisionOptionsLabel(options: string | null): string {
+		return options ? `Opções: ${options}` : 'Nenhuma opção registrada';
+	}
+
+	// Mudanças (ETAPA 11 do rework, primeiro microcorte, §41) — sem lifecycle,
+	// mesmo padrão de edição alternada das demais coleções desta tela.
+	let newChangeStatement = $state('');
+	let editingChangeId = $state<string | null>(null);
+
+	function handleAddChangeSubmit() {
+		return async ({ result, update }: { result: ActionResult; update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			if (result.type === 'success') {
+				newChangeStatement = '';
+			}
+			await update({ reset: false });
+		};
+	}
+
+	function toggleEditChange(id: string) {
+		editingChangeId = editingChangeId === id ? null : id;
+	}
+
+	function changeImpactLabel(impact: string | null): string {
+		return impact ? `Impacto: ${impact}` : 'Nenhum impacto registrado';
+	}
 </script>
 
 <svelte:head>
@@ -596,6 +649,182 @@
 				</ul>
 			{/if}
 		</div>
+	{/if}
+</section>
+
+<section class="card decision-management" aria-labelledby="decision-management-heading">
+	<h2 id="decision-management-heading">Decisões</h2>
+	<p class="subtitle-inline">Registre, edite e marque as decisões do projeto como tomadas.</p>
+
+	<form method="POST" action="?/addDecision" use:enhance={handleAddDecisionSubmit} class="add-risk-form">
+		<label class="visually-hidden" for="decision-subject">O que precisa ser decidido</label>
+		<input
+			id="decision-subject"
+			type="text"
+			name="subject"
+			placeholder="O que precisa ser decidido?"
+			required
+			bind:value={newDecisionSubject}
+		/>
+		<button type="submit">Adicionar</button>
+	</form>
+
+	{#if tracking.decisions.pending.length === 0}
+		<p class="empty">Nenhuma decisão pendente.</p>
+	{:else}
+		<ul class="risk-list">
+			{#each tracking.decisions.pending as decision (decision.id)}
+				{#if editingDecisionId === decision.id}
+					<li class="risk-row editing">
+						<form method="POST" action="?/editDecision" use:enhance class="risk-statement-form">
+							<input type="hidden" name="decisionId" value={decision.id} />
+							<label class="visually-hidden" for="subject-{decision.id}">Assunto</label>
+							<input id="subject-{decision.id}" type="text" name="subject" value={decision.subject} required />
+							<label class="visually-hidden" for="due-date-{decision.id}">Prazo</label>
+							<input id="due-date-{decision.id}" type="date" name="dueDate" value={decision.dueDate ?? ''} />
+							<label class="visually-hidden" for="options-{decision.id}">Opções consideradas</label>
+							<textarea
+								id="options-{decision.id}"
+								name="options"
+								placeholder="Opções consideradas (opcional)"
+								value={decision.options ?? ''}
+							></textarea>
+							<button type="submit" class="button-secondary">Salvar</button>
+						</form>
+						<form method="POST" action="?/decideDecision" use:enhance class="risk-response-form">
+							<input type="hidden" name="decisionId" value={decision.id} />
+							<label class="visually-hidden" for="outcome-{decision.id}">Resultado</label>
+							<textarea id="outcome-{decision.id}" name="outcome" placeholder="Resultado da decisão" required
+							></textarea>
+							<button type="submit" class="button-secondary">Marcar como tomada</button>
+						</form>
+						<div class="risk-actions">
+							<button type="button" class="button-secondary" onclick={() => toggleEditDecision(decision.id)}>
+								Concluir edição
+							</button>
+						</div>
+					</li>
+				{:else}
+					<li class="risk-row">
+						<p class="risk-text">{decision.subject}</p>
+						<p class="risk-assessment">{decisionOptionsLabel(decision.options)}</p>
+						<p class="risk-response">{decisionDueDateLabel(decision.dueDate)}</p>
+						<div class="risk-actions">
+							<button type="button" class="link-button" onclick={() => toggleEditDecision(decision.id)}>Editar</button>
+						</div>
+					</li>
+				{/if}
+			{/each}
+		</ul>
+	{/if}
+
+	<button
+		type="button"
+		class="resolved-toggle"
+		aria-expanded={showDecidedDecisions}
+		aria-controls="decided-decisions-list"
+		onclick={() => (showDecidedDecisions = !showDecidedDecisions)}
+	>
+		Tomadas ({tracking.decisions.decided.length})
+	</button>
+	{#if showDecidedDecisions}
+		<div id="decided-decisions-list">
+			{#if tracking.decisions.decided.length === 0}
+				<p class="empty">Nenhuma decisão tomada ainda.</p>
+			{:else}
+				<ul class="risk-list">
+					{#each tracking.decisions.decided as decision (decision.id)}
+						{#if editingDecisionId === decision.id}
+							<li class="risk-row editing">
+								<form method="POST" action="?/editDecisionOutcome" use:enhance class="risk-response-form">
+									<input type="hidden" name="decisionId" value={decision.id} />
+									<label class="visually-hidden" for="outcome-edit-{decision.id}">Resultado</label>
+									<textarea id="outcome-edit-{decision.id}" name="outcome" required>{decision.outcome}</textarea>
+									<button type="submit" class="button-secondary">Corrigir resultado</button>
+								</form>
+								<div class="risk-actions">
+									<button type="button" class="button-secondary" onclick={() => toggleEditDecision(decision.id)}>
+										Concluir edição
+									</button>
+								</div>
+							</li>
+						{:else}
+							<li class="risk-row resolved">
+								<p class="risk-text">{decision.subject}</p>
+								<p class="risk-assessment">Resultado: {decision.outcome}</p>
+								<p class="risk-response">{decisionDueDateLabel(decision.dueDate)}</p>
+								<div class="risk-actions">
+									<button type="button" class="link-button" onclick={() => toggleEditDecision(decision.id)}>
+										Corrigir resultado
+									</button>
+								</div>
+							</li>
+						{/if}
+					{/each}
+				</ul>
+			{/if}
+		</div>
+	{/if}
+</section>
+
+<section class="card change-management" aria-labelledby="change-management-heading">
+	<h2 id="change-management-heading">Mudanças</h2>
+	<p class="subtitle-inline">Registre e edite as mudanças relevantes deste projeto.</p>
+
+	<form method="POST" action="?/addChange" use:enhance={handleAddChangeSubmit} class="add-risk-form">
+		<label class="visually-hidden" for="change-statement">O que mudou</label>
+		<input
+			id="change-statement"
+			type="text"
+			name="statement"
+			placeholder="O que mudou?"
+			required
+			bind:value={newChangeStatement}
+		/>
+		<button type="submit">Adicionar</button>
+	</form>
+
+	{#if tracking.changes.length === 0}
+		<p class="empty">Nenhuma mudança registrada.</p>
+	{:else}
+		<ul class="risk-list">
+			{#each tracking.changes as change (change.id)}
+				{#if editingChangeId === change.id}
+					<li class="risk-row editing">
+						<form method="POST" action="?/editChangeStatement" use:enhance class="risk-statement-form">
+							<input type="hidden" name="changeId" value={change.id} />
+							<label class="visually-hidden" for="statement-{change.id}">O que mudou</label>
+							<input id="statement-{change.id}" type="text" name="statement" value={change.statement} required />
+							<button type="submit" class="button-secondary">Salvar</button>
+						</form>
+						<form method="POST" action="?/setChangeImpact" use:enhance class="risk-response-form">
+							<input type="hidden" name="changeId" value={change.id} />
+							<label class="visually-hidden" for="impact-{change.id}">Impacto</label>
+							<textarea
+								id="impact-{change.id}"
+								name="impact"
+								placeholder="Impacto conhecido (opcional)"
+								value={change.impact ?? ''}
+							></textarea>
+							<button type="submit" class="button-secondary">Salvar impacto</button>
+						</form>
+						<div class="risk-actions">
+							<button type="button" class="button-secondary" onclick={() => toggleEditChange(change.id)}>
+								Concluir edição
+							</button>
+						</div>
+					</li>
+				{:else}
+					<li class="risk-row">
+						<p class="risk-text">{change.statement}</p>
+						<p class="risk-assessment">{changeImpactLabel(change.impact)}</p>
+						<div class="risk-actions">
+							<button type="button" class="link-button" onclick={() => toggleEditChange(change.id)}>Editar</button>
+						</div>
+					</li>
+				{/if}
+			{/each}
+		</ul>
 	{/if}
 </section>
 

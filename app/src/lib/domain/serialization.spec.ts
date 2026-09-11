@@ -3,6 +3,8 @@ import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
 	addAffectedGroup,
+	addChange,
+	addDecision,
 	addDeliverable,
 	addDependency,
 	promoteScopeItemToDeliverable,
@@ -19,6 +21,12 @@ import {
 	setRiskResponse,
 	confirmRiskIdentification,
 	confirmRiskUpdate,
+	confirmDecisionsAndChangesReview,
+	decideDecision,
+	editChangeStatement,
+	editDecision,
+	editDecisionOutcome,
+	setChangeImpact,
 	addCauseHypothesis,
 	addDesiredOutcome,
 	addImpediment,
@@ -2241,6 +2249,153 @@ describe('Risk — avaliação qualitativa e resposta planejada (ETAPA 10 do rew
 			}
 		];
 		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+});
+
+describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
+	it('preserva decisões no round-trip completo', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		state = unwrap(editDecision(catalog, state, 'dec-1', 'Adiar o SMS?', 'A ou B', '2026-02-01', T2));
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Adiado', T2));
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('snapshot anterior a este corte (sem a chave decisions) importa como coleção vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.decisions;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.decisions).toEqual([]);
+	});
+
+	it('zero Decision é estado legítimo — confirmDecisionsAndChangesReview nunca exige nenhuma', () => {
+		const state = createInitialProjectState(catalog, 'proj-1', T1);
+		expect(state.decisions).toEqual([]);
+		const result = confirmDecisionsAndChangesReview(catalog, state, T1);
+		expect(result.ok).toBe(true);
+	});
+
+	it('recusa decisão pendente com outcome/decidedAt e decisão tomada sem outcome/decidedAt', () => {
+		const base = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+
+		base.state.decisions = [
+			{
+				id: 'dec-1',
+				projectId: 'proj-1',
+				subject: 'S',
+				options: null,
+				dueDate: null,
+				status: 'pendente',
+				outcome: 'Resultado indevido',
+				decidedAt: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+
+		base.state.decisions = [
+			{
+				id: 'dec-1',
+				projectId: 'proj-1',
+				subject: 'S',
+				options: null,
+				dueDate: null,
+				status: 'tomada',
+				outcome: null,
+				decidedAt: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('recusa dueDate que não é data civil estrita — timestamp ISO completo, mês/dia inexistentes', () => {
+		const base = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+
+		for (const dueDate of ['2026-09-01T12:00:00.000Z', '2026-13-01', '2026-02-30']) {
+			base.state.decisions = [
+				{
+					id: 'dec-1',
+					projectId: 'proj-1',
+					subject: 'S',
+					options: null,
+					dueDate,
+					status: 'pendente',
+					outcome: null,
+					decidedAt: null,
+					createdAt: T1,
+					updatedAt: T1
+				}
+			];
+			expectError(JSON.stringify(base), 'invalid_shape');
+		}
+	});
+
+	it('não converte o Answer legado (decisoes_mudancas_recentes) em nenhuma Decision/Change', () => {
+		// S11 (§41) — `decisoes_mudancas` não é mais required_fields (virou
+		// explicit_confirmation), então answerActivity recusa escrita nova aqui
+		// com wrong_completion_mode. Simula um projeto antigo: Answer legada
+		// gravada diretamente no estado, mesmo padrão do teste de riscos acima.
+		const state: ProjectState = {
+			...createInitialProjectState(catalog, 'proj-1', T1),
+			answers: [
+				{
+					projectId: 'proj-1',
+					activityDefinitionId: 'decisoes_mudancas',
+					fieldDefinitionId: 'decisoes_mudancas_recentes',
+					value: 'Decisão: adiar a notificação por SMS',
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.decisions).toEqual([]);
+		expect(result.value.changes).toEqual([]);
+		expect(
+			result.value.answers.find((answer) => answer.fieldDefinitionId === 'decisoes_mudancas_recentes')?.value
+		).toBe('Decisão: adiar a notificação por SMS');
+	});
+});
+
+describe('Change (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
+	it('preserva mudanças no round-trip completo', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addChange(catalog, state, 'chg-1', 'Trocou o fornecedor de e-mail', T1));
+		state = unwrap(setChangeImpact(catalog, state, 'chg-1', 'Atraso de 2 dias', T2));
+		state = unwrap(editChangeStatement(catalog, state, 'chg-1', 'Trocou o fornecedor de e-mail (v2)', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('snapshot anterior a este corte (sem a chave changes) importa como coleção vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(createInitialProjectState(catalog, 'proj-1', T1))) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.changes;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.changes).toEqual([]);
 	});
 });
 

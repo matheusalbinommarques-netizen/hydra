@@ -21,7 +21,9 @@ import type {
 	AffectedGroupView,
 	CauseExplorationView,
 	CauseHypothesisView,
+	ChangeView,
 	CurrentTreatmentView,
+	DecisionView,
 	DesiredOutcomeView,
 	EvidenceView,
 	ExternalActionView,
@@ -140,6 +142,28 @@ function buildRiskView(risk: ProjectState['risks'][number]): RiskView {
 		likelihood: risk.likelihood,
 		impact: risk.impact,
 		response: risk.response
+	};
+}
+
+function buildDecisionView(decision: ProjectState['decisions'][number]): DecisionView {
+	return {
+		id: decision.id,
+		subject: decision.subject,
+		options: decision.options,
+		dueDate: decision.dueDate,
+		status: decision.status,
+		outcome: decision.outcome,
+		decidedAt: decision.decidedAt,
+		createdAt: decision.createdAt
+	};
+}
+
+function buildChangeView(change: ProjectState['changes'][number]): ChangeView {
+	return {
+		id: change.id,
+		statement: change.statement,
+		impact: change.impact,
+		createdAt: change.createdAt
 	};
 }
 
@@ -328,6 +352,8 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),
 		risks: state.risks.map(buildRiskView),
+		decisions: state.decisions.map(buildDecisionView),
+		changes: state.changes.map(buildChangeView),
 		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
 		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups),
 		externalActions: state.externalActions.map(buildExternalActionView),

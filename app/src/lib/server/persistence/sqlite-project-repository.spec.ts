@@ -7,11 +7,16 @@ import { catalog } from '../../catalog';
 import {
 	addAffectedGroup,
 	addCauseHypothesis,
+	addChange,
+	addDecision,
 	addDeliverable,
 	addDesiredOutcome,
 	addImpediment,
 	addMilestone,
 	addRisk,
+	decideDecision,
+	editDecision,
+	setChangeImpact,
 	setMilestonePlannedDate,
 	linkWorkItemToMilestone,
 	addScopeItem,
@@ -1506,5 +1511,54 @@ describe('createSqliteProjectRepository — Risk.likelihood/impact/response (ETA
 			freshDb.prepare('UPDATE risk SET likelihood = ? WHERE id = ?').run('alta', 'risk-1')
 		).toThrow(/risk_assessment_pair/);
 		freshDb.close();
+	});
+});
+
+describe('createSqliteProjectRepository — Decision/Change (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
+	it('round-trip preserva Decision pendente e tomada, e Change com/sem impacto', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		state = unwrap(editDecision(catalog, state, 'dec-1', 'Adiar o SMS?', 'A ou B', '2026-02-01', T1));
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T1));
+		state = unwrap(decideDecision(catalog, state, 'dec-2', 'Mantido o atual', T2));
+		state = unwrap(addChange(catalog, state, 'chg-1', 'Trocou o fornecedor de e-mail', T1));
+		state = unwrap(setChangeImpact(catalog, state, 'chg-1', 'Atraso de 2 dias', T2));
+		state = unwrap(addChange(catalog, state, 'chg-2', 'Mudou o escopo do MVP', T1));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('a CHECK decision_outcome_matches_status recusa escrita direta que viole o par status/outcome/decidedAt', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		await repo.insert(state);
+
+		const rawDb = new Database(filePath);
+		expect(() =>
+			rawDb.prepare("UPDATE decision SET status = 'tomada' WHERE id = ?").run('dec-1')
+		).toThrow(/decision_outcome_matches_status/);
+		rawDb.close();
+	});
+
+	it('banco anterior a este corte (sem as tabelas decision/change) abre e importa como coleções vazias', async () => {
+		const filePath = tempFilePath();
+		const seed = createSqliteProjectRepository(filePath);
+		await seed.insert(createInitialProjectState(catalog, 'proj-1', T1));
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('DROP TABLE decision; DROP TABLE change;');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		const restored = await repo.findById('proj-1');
+		expect(restored?.decisions).toEqual([]);
+		expect(restored?.changes).toEqual([]);
 	});
 });

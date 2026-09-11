@@ -358,6 +358,72 @@ export interface Risk {
 	updatedAt: string;
 }
 
+// Decision — ETAPA 11 do rework ("Decision e Change",
+// docs/core/HYDRA_PRODUCT_REWORK.md §41), primeiro microcorte. Objeto em
+// nível de projeto, sem vínculo obrigatório com WorkItem, Deliverable,
+// Milestone, Risk, Impediment ou pessoa/responsável — mesmo adiamento
+// deliberado que Risk fez na ETAPA 10 (D049) para essas mesmas associações.
+//
+// Substitui, como fonte de escrita, o campo de texto livre legado
+// `decisoes_mudancas_recentes` (atividade `decisoes_mudancas`), que passa a
+// READ-LEGACY (ver domain/legacy-answers.ts) — a mesma Answer também cobria
+// "mudança", hoje reconciliada separadamente por Change (abaixo).
+//
+// `status` é declarado, nunca inferido. Invariante fechada, garantida por
+// addDecision/decideDecision/editDecisionOutcome e reforçada na
+// desserialização:
+//   pendente => outcome === null && decidedAt === null
+//   tomada    => outcome não vazio && decidedAt !== null
+//
+// Sem responsável/owner, entidades afetadas estruturadas, revertida,
+// cancelada, reopen, delete, score/prioridade ou alerta por prazo nesta
+// primeira fatia — nenhum objeto vivo hoje representa "responsável" (ver
+// §13 do rework), e recriar isso como texto livre reintroduziria a mesma
+// segunda fonte de verdade que a regra de promoção proíbe.
+export type DecisionStatus = 'pendente' | 'tomada';
+
+export interface Decision {
+	id: string;
+	projectId: string;
+	// O que precisa ser decidido.
+	subject: string;
+	// Opções consideradas, texto narrativo — sem estrutura de lista nesta
+	// primeira versão.
+	options: string | null;
+	// Data civil YYYY-MM-DD, ou null quando a decisão não tem prazo declarado
+	// (caso normal). Ter prazo não implica nenhuma regra de urgência
+	// automática nesta fatia.
+	dueDate: string | null;
+	status: DecisionStatus;
+	outcome: string | null;
+	decidedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+// Change — ETAPA 11 do rework ("Decision e Change", §41), primeiro
+// microcorte. Objeto em nível de projeto, sem lifecycle, sem relação com
+// nenhuma outra entidade e sem delete nesta primeira fatia.
+//
+// Substitui, junto com Decision, o campo legado `decisoes_mudancas_recentes`
+// (ver domain/legacy-answers.ts).
+//
+// Change NÃO é ProjectEvent: a taxonomia de eventos (domain/events.ts) é
+// fechada e cobre só o loop WorkItem/Impediment (D037) — Change não estende
+// essa taxonomia nem nasce de captura automática nesta fatia. Registro
+// sempre manual, inclusive para mudanças ocorridas fora do Hydra.
+export interface Change {
+	id: string;
+	projectId: string;
+	// O que mudou.
+	statement: string;
+	// Impacto conhecido/declarado, opcional. null significa "nenhum impacto
+	// registrado".
+	impact: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
 // Mapa de Impacto — Descoberta, "Quem é afetado" (ETAPA 2 do rework, ver
 // docs/core/HYDRA_PRODUCT_REWORK.md §32). Objeto vivo real: substitui o
 // texto livre antes capturado em `publico_detail` (Answer da atividade
@@ -628,6 +694,8 @@ export interface ProjectState {
 	milestones: Milestone[];
 	milestoneWorkItems: MilestoneWorkItem[];
 	risks: Risk[];
+	decisions: Decision[];
+	changes: Change[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
 	evidences: Evidence[];

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { catalog } from '../catalog';
 import { createInitialProjectState } from './factory';
 import {
+	addChange,
+	addDecision,
 	addDeliverable,
 	addDependency,
 	addMilestone,
@@ -22,6 +24,7 @@ import {
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
+	confirmDecisionsAndChangesReview,
 	confirmDecomposition,
 	confirmDependencyMapping,
 	confirmMilestoneReview,
@@ -30,6 +33,11 @@ import {
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
+	decideDecision,
+	editChangeStatement,
+	editDecision,
+	editDecisionOutcome,
+	setChangeImpact,
 	getAffectedGroupConfirmationIssues,
 	getCauseHypothesesConfirmationIssues,
 	getDesiredOutcomeConfirmationIssues,
@@ -1019,6 +1027,198 @@ describe('confirmMilestoneReview (S9)', () => {
 			T1
 		);
 		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });
+	});
+});
+
+describe('confirmDecisionsAndChangesReview (S11)', () => {
+	it('conclui "Registrar decisões e mudanças" com ZERO Decision/Change — 0 é resultado válido, nunca recusado', () => {
+		const state = unwrap(confirmDecisionsAndChangesReview(catalog, freshState(), T1));
+		const progress = state.activityProgress.find((p) => p.activityDefinitionId === 'decisoes_mudancas');
+		expect(progress?.status).toBe('concluída');
+		expect(state.decisions).toEqual([]);
+		expect(state.changes).toEqual([]);
+	});
+
+	it('erro transition_not_allowed ao confirmar uma revisão já concluída', () => {
+		const state = unwrap(confirmDecisionsAndChangesReview(catalog, freshState(), T1));
+		const result = confirmDecisionsAndChangesReview(catalog, state, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'transition_not_allowed', from: 'concluída' } });
+	});
+
+	it('permite pular "Registrar decisões e mudanças" mesmo sendo explicit_confirmation (allowsSkip true)', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'decisoes_mudancas', 'pend-1', T1));
+		const progress = skipped.activityProgress.find((p) => p.activityDefinitionId === 'decisoes_mudancas');
+		expect(progress?.status).toBe('pulada');
+	});
+
+	it('skip → pending → retomar → confirmação resolve a pendência, mesmo com ZERO Decision/Change', () => {
+		const skipped = unwrap(skipActivity(catalog, freshState(), 'decisoes_mudancas', 'pend-1', T1));
+		const confirmed = unwrap(confirmDecisionsAndChangesReview(catalog, skipped, T2));
+		expect(confirmed.pendingItems[0].status).toBe('resolvida');
+	});
+
+	it('answerActivity recusa "decisoes_mudancas" com wrong_completion_mode — não é mais required_fields, nunca escreve Answer novo', () => {
+		const result = answerActivity(
+			catalog,
+			freshState(),
+			'decisoes_mudancas',
+			{ decisoes_mudancas_recentes: 'Nova decisão via texto livre' },
+			T1
+		);
+		expect(result).toEqual({ ok: false, error: { kind: 'wrong_completion_mode' } });
+	});
+
+	it('aceita qualquer combinação de Decision/Change existentes e nunca cria/edita/remove nenhuma delas', () => {
+		let state = freshState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Adiado', T1));
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T1));
+		state = unwrap(addChange(catalog, state, 'chg-1', 'Trocou o fornecedor de e-mail', T1));
+
+		const decisionsBefore = state.decisions;
+		const changesBefore = state.changes;
+		const confirmed = unwrap(confirmDecisionsAndChangesReview(catalog, state, T2));
+
+		expect(confirmed.decisions).toBe(decisionsBefore);
+		expect(confirmed.changes).toBe(changesBefore);
+		const progress = confirmed.activityProgress.find((p) => p.activityDefinitionId === 'decisoes_mudancas');
+		expect(progress?.status).toBe('concluída');
+	});
+});
+
+describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
+	it('nasce pendente, sem outcome/decidedAt/options/dueDate', () => {
+		const state = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		expect(state.decisions).toEqual([
+			{
+				id: 'dec-1',
+				projectId: 'proj-1',
+				subject: 'Adiar o SMS?',
+				options: null,
+				dueDate: null,
+				status: 'pendente',
+				outcome: null,
+				decidedAt: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+	});
+
+	it('recusa subject vazio na criação', () => {
+		const result = addDecision(catalog, freshState(), 'dec-1', '   ', T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_subject_required' } });
+	});
+
+	it('editDecision atualiza subject/options/dueDate juntos, sem alterar status/outcome/decidedAt', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const edited = unwrap(editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', 'A: agora; B: depois', '2026-02-01', T2));
+		expect(edited.decisions[0]).toEqual({
+			id: 'dec-1',
+			projectId: 'proj-1',
+			subject: 'Adiar o SMS?',
+			options: 'A: agora; B: depois',
+			dueDate: '2026-02-01',
+			status: 'pendente',
+			outcome: null,
+			decidedAt: null,
+			createdAt: T1,
+			updatedAt: T2
+		});
+	});
+
+	it('editDecision recusa dueDate que não é data civil válida', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const result = editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', null, '2026-13-40', T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_due_date_invalid' } });
+	});
+
+	it('decideDecision exige outcome não vazio, grava status/outcome/decidedAt juntos', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		expect(decided.decisions[0]).toMatchObject({
+			status: 'tomada',
+			outcome: 'Adiado para v2',
+			decidedAt: T2
+		});
+
+		const missingOutcome = decideDecision(catalog, created, 'dec-1', '   ', T2);
+		expect(missingOutcome).toEqual({ ok: false, error: { kind: 'decision_outcome_required' } });
+	});
+
+	it('decideDecision recusa decidir de novo uma decisão já tomada', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		const result = decideDecision(catalog, decided, 'dec-1', 'Outro resultado', T3);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
+	});
+
+	it('editDecisionOutcome corrige o outcome de uma decisão tomada sem alterar status/decidedAt', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		const corrected = unwrap(editDecisionOutcome(catalog, decided, 'dec-1', 'Adiado para v3', T3));
+		expect(corrected.decisions[0]).toMatchObject({
+			status: 'tomada',
+			outcome: 'Adiado para v3',
+			decidedAt: T2,
+			createdAt: T1,
+			updatedAt: T3
+		});
+	});
+
+	it('editDecisionOutcome recusa decisão ainda pendente', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const result = editDecisionOutcome(catalog, created, 'dec-1', 'Resultado precoce', T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_not_decided' } });
+	});
+
+	it('editDecisionOutcome recusa outcome vazio', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		const result = editDecisionOutcome(catalog, decided, 'dec-1', '   ', T3);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_outcome_required' } });
+	});
+
+	it('editDecision recusa alterar subject/options/dueDate de uma decisão já tomada — outcome é a única correção possível', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		const result = editDecision(catalog, decided, 'dec-1', 'Novo assunto', 'Novas opções', '2026-03-01', T3);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
+		// Nenhum campo foi alterado pela tentativa recusada.
+		expect(decided.decisions[0]).toMatchObject({ subject: 'Adiar o SMS?', options: null, dueDate: null });
+	});
+});
+
+describe('Change (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
+	it('nasce sem impact', () => {
+		const state = unwrap(addChange(catalog, freshState(), 'chg-1', 'Trocou o fornecedor de e-mail', T1));
+		expect(state.changes).toEqual([
+			{
+				id: 'chg-1',
+				projectId: 'proj-1',
+				statement: 'Trocou o fornecedor de e-mail',
+				impact: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+	});
+
+	it('recusa statement vazio na criação', () => {
+		const result = addChange(catalog, freshState(), 'chg-1', '   ', T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'change_statement_required' } });
+	});
+
+	it('editChangeStatement e setChangeImpact editam independentemente, impact aceita limpar com null', () => {
+		const created = unwrap(addChange(catalog, freshState(), 'chg-1', 'Trocou o fornecedor de e-mail', T1));
+		const withImpact = unwrap(setChangeImpact(catalog, created, 'chg-1', 'Atraso de 2 dias na migração', T2));
+		expect(withImpact.changes[0].impact).toBe('Atraso de 2 dias na migração');
+
+		const restated = unwrap(editChangeStatement(catalog, withImpact, 'chg-1', 'Trocou o fornecedor de e-mail (v2)', T3));
+		expect(restated.changes[0]).toMatchObject({ statement: 'Trocou o fornecedor de e-mail (v2)', impact: 'Atraso de 2 dias na migração' });
+
+		const cleared = unwrap(setChangeImpact(catalog, restated, 'chg-1', null, T4));
+		expect(cleared.changes[0].impact).toBeNull();
 	});
 });
 

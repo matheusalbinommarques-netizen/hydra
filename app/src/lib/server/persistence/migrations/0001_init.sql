@@ -293,6 +293,45 @@ CREATE TABLE IF NOT EXISTS risk (
 	)
 );
 
+-- Decision (ETAPA 11 do rework, primeiro microcorte, §41) — ver
+-- app/src/lib/domain/state-types.ts. Objeto em nível de projeto, sem FK para
+-- work_item/deliverable/milestone/risk/impediment nesta primeira fatia.
+-- `status` é a única autoridade sobre pendente/tomada, nunca derivado.
+--
+-- A CHECK nomeada abaixo é o par fechado (status, outcome, decided_at),
+-- espelhando risk_closed_at_matches_status: pendente exige os dois NULL;
+-- tomada exige os dois preenchidos. Garantida atomicamente por
+-- decideDecision/editDecisionOutcome (domain/transitions.ts), reforçada aqui.
+CREATE TABLE IF NOT EXISTS decision (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	subject TEXT NOT NULL,
+	options TEXT,
+	due_date TEXT,
+	status TEXT NOT NULL,
+	outcome TEXT,
+	decided_at TEXT,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	CONSTRAINT decision_status_values CHECK (status IN ('pendente', 'tomada')),
+	CONSTRAINT decision_outcome_matches_status CHECK (
+		(status = 'pendente' AND outcome IS NULL AND decided_at IS NULL)
+		OR (status = 'tomada' AND outcome IS NOT NULL AND decided_at IS NOT NULL)
+	)
+);
+
+-- Change (ETAPA 11 do rework, primeiro microcorte, §41) — ver
+-- app/src/lib/domain/state-types.ts. Objeto em nível de projeto, sem
+-- lifecycle e sem relação com nenhuma outra entidade nesta primeira fatia.
+CREATE TABLE IF NOT EXISTS change (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	statement TEXT NOT NULL,
+	impact TEXT,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
 -- Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — ver
 -- app/src/lib/domain/state-types.ts. Ligado à atividade `publico` do
 -- catálogo (completion deriva do estado destes grupos, ver
@@ -491,6 +530,8 @@ CREATE INDEX IF NOT EXISTS idx_dependency_project_id ON dependency (project_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_project_id ON milestone (project_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_work_item_project_id ON milestone_work_item (project_id);
 CREATE INDEX IF NOT EXISTS idx_risk_project_id ON risk (project_id);
+CREATE INDEX IF NOT EXISTS idx_decision_project_id ON decision (project_id);
+CREATE INDEX IF NOT EXISTS idx_change_project_id ON change (project_id);
 CREATE INDEX IF NOT EXISTS idx_affected_group_project_id ON affected_group (project_id);
 CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);

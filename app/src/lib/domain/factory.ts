@@ -34,6 +34,8 @@ export function createInitialProjectState(
 		milestones: [],
 		milestoneWorkItems: [],
 		risks: [],
+		decisions: [],
+		changes: [],
 		affectedGroups: [],
 		externalActions: [],
 		evidences: [],

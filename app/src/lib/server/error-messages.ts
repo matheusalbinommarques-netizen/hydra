@@ -101,6 +101,22 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Descreva o risco antes de salvar.';
 			case 'risk_assessment_incomplete':
 			return 'Informe probabilidade e impacto juntos, ou deixe os dois em branco.';
+		case 'decision_not_found':
+			return 'Decisão não encontrada.';
+		case 'decision_subject_required':
+			return 'Descreva o que precisa ser decidido antes de salvar.';
+		case 'decision_due_date_invalid':
+			return 'Prazo inválido.';
+		case 'decision_already_decided':
+			return 'Esta decisão já foi tomada.';
+		case 'decision_not_decided':
+			return 'Esta decisão ainda não foi tomada.';
+		case 'decision_outcome_required':
+			return 'Descreva o resultado da decisão antes de salvar.';
+		case 'change_not_found':
+			return 'Mudança não encontrada.';
+		case 'change_statement_required':
+			return 'Descreva o que mudou antes de salvar.';
 		default:
 			return 'Não foi possível concluir a operação.';
 	}

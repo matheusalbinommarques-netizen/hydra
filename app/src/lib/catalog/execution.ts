@@ -98,31 +98,26 @@ const impedimentosExecucao: ActivityDefinition = {
 	]
 };
 
+// S11 (ETAPA 11 do rework, "Decision e Change", §41) — igual a
+// riscos_projeto/atualizar_riscos (S10, D049): a atividade deixa de
+// required_fields (texto livre misturando decisão e mudança) e vira
+// explicit_confirmation contra as coleções canônicas Decision/Change. O
+// campo legado `decisoes_mudancas_recentes` passa a READ-LEGACY (ver
+// domain/legacy-answers.ts) — nunca recebe nova escrita.
 const decisoesMudancas: ActivityDefinition = {
 	id: 'decisoes_mudancas',
 	phaseId: 'execucao',
 	order: 4,
 	title: 'Registrar decisões e mudanças',
 	mainQuestion: 'Quais decisões ou mudanças relevantes ocorreram?',
-	why: 'Registrar decisões e mudanças evita que elas se percam ou sejam esquecidas mais tarde.',
-	example: 'Decisão: adiar a notificação por SMS para uma versão futura, mantendo só e-mail por enquanto.',
-	completionCriteria: 'Decisões ou mudanças relevantes recentes estão descritas.',
-	completionMode: 'required_fields',
+	why: 'Registrar decisões e mudanças evita que elas se percam ou sejam esquecidas mais tarde. Registrar de verdade acontece em Acompanhamento, como Decision e Change — aqui você só confirma que revisou o estado atual, mesmo que ele seja "nenhuma decisão ou mudança".',
+	example: 'Decisão: adiar a notificação por SMS para uma versão futura, mantendo só e-mail por enquanto — declarada em Acompanhamento.',
+	completionCriteria:
+		'O usuário confirmou que revisou o estado real de decisões e mudanças do projeto em Acompanhamento, mesmo que nenhuma exista.',
+	completionMode: 'explicit_confirmation',
 	allowsSkip: true,
-	pendingItemLabel: 'Decisões e mudanças não foram registradas',
-	pendingItemDetail: 'Sem esse registro, decisões importantes podem ser esquecidas ou questionadas depois sem contexto.',
-	fields: [
-		{
-			id: 'decisoes_mudancas_recentes',
-			activityId: 'decisoes_mudancas',
-			label: 'Quais decisões ou mudanças relevantes ocorreram?',
-			required: true,
-			help: 'Se nada relevante mudou desde a última atualização, registre isso.',
-			placeholder: 'Ex.: adiada a notificação por SMS para uma versão futura',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
+	pendingItemLabel: 'Decisões e mudanças não foram revisadas aqui',
+	pendingItemDetail: 'Revise decisões e mudanças em Acompanhamento e volte para confirmar — ou pule esta etapa.'
 };
 
 // S10 (D049, reconciliação de risco legado, ver
