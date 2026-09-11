@@ -374,26 +374,27 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 9 do rework ("Estruturação e Planejamento reworkados",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §39) está concluída. O resultado
-macro entregue — `Deliverable` como objeto real com bucket/esforço/ordem,
-Entregas absorvendo o Roadmap mínimo/priorização, vínculo explícito
-`Deliverable ↔ WorkItem`, decomposição operacional pela própria Entrega, e
-decomposição/dependências/marcos legados reconciliados com os objetos
-canônicos — está registrado em D043–D048
-(`docs/07-management/decision-log.md`).
+A ETAPA 10 do rework ("Risk como objeto vivo",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §40) está concluída. O resultado
+macro entregue — a primeira versão de `Risk` permite identificar, avaliar
+qualitativamente, registrar resposta planejada e monitorar/revisar
+continuamente, com lifecycle próprio e fonte canônica única, sem
+transformar risco em formulário fixo de fase — está registrado em
+D049–D052 (`docs/07-management/decision-log.md`).
 
-D048 fecha a etapa e reclassifica, sem resolver, os residuais que
-permaneciam abertos — capacidade, critérios de aceitação, datas de
-entrega, responsabilidade, restrições/premissas/governança e a realocação
-de Marcos para Entregas —, cada um com a condição semântica que o reabre,
-sem congelar arquitetura ainda não decidida. `Risk` não é residual da S9;
-pertence à próxima etapa.
+D052 fecha a etapa e reclassifica, sem resolver, os residuais que
+permaneciam abertos — owner/`Responsible`, materialização em `Issue`,
+`Risk → Impediment`, relações com outros objetos, histórico/event types,
+cadence/SLA/atenção automática, score/matriz, razão de encerramento,
+premortem/sugestões e IA —, cada um com a condição semântica que o
+reabre, sem congelar arquitetura ainda não decidida.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S10` (ETAPA 10, "Risk como objeto vivo", §40) com status `in_progress`.
-Nenhum trabalho de S10 foi iniciado — o ponteiro abre a etapa, não
-implementa nem planeja em detalhe nenhuma decisão de `Risk`.
+`S11` (ETAPA 11, "Decision e Change", §41) com status `in_progress`.
+Nenhuma decisão de S11 foi tomada ainda — o ponteiro abre a etapa porque o
+repo já possui objetos estruturados suficientes para calcular impacto,
+mas não decide modelo de `Decision`, modelo de `Change`, relações, schema
+ou superfície.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

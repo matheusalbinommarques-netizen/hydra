@@ -4,6 +4,14 @@
 
 ### Adicionado
 
+- Rework, ETAPA 10 ("Risk como objeto vivo") — `Risk` passa a existir como
+  objeto canônico de nível de projeto: identificar, avaliar (probabilidade/
+  impacto qualitativos), registrar resposta planejada e monitorar/revisar
+  continuamente, com lifecycle próprio (aberto/encerrado) e as três
+  capturas legadas de texto livre reconciliadas para leitura apenas. Ver
+  D049–D052 (`docs/07-management/decision-log.md`); D052 fecha a etapa e
+  registra o que permanece adiado.
+
 - Rework, ETAPA 9 ("Estruturação e Planejamento reworkados") — `Deliverable`
   passa a existir como objeto real de priorização/escopo (bucket, esforço e
   ordem relativa), com promoção explícita de itens de escopo e vínculo
