@@ -1671,6 +1671,7 @@ export function addRisk(
 		statement,
 		status: 'aberto',
 		closedAt: null,
+		reviewedAt: null,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
@@ -1680,7 +1681,9 @@ export function addRisk(
 
 // Editar a declaração nunca altera o lifecycle (status/closedAt) — mesmo
 // molde de setImpedimentNextAction/setMilestonePlannedDate: é o mesmo fato
-// sendo escrito, não uma transição.
+// sendo escrito, não uma transição. Uma edição real prova reconsideração do
+// risco, então também conta como revisão (reviewedAt = occurredAt); o no-op
+// (mesma declaração) não é edição nenhuma e não toca reviewedAt.
 export function editRiskStatement(
 	catalog: Catalog,
 	state: ProjectState,
@@ -1699,14 +1702,18 @@ export function editRiskStatement(
 		ok: true,
 		value: {
 			...state,
-			risks: state.risks.map((item) => (item.id === riskId ? { ...item, statement, updatedAt: occurredAt } : item))
+			risks: state.risks.map((item) =>
+				item.id === riskId ? { ...item, statement, reviewedAt: occurredAt, updatedAt: occurredAt } : item
+			)
 		}
 	};
 }
 
 // Idempotente (mesmo espírito de resolveImpediment/reachMilestone): encerrar
 // um risco já encerrado é no-op, nunca erro — e nunca reescreve o closedAt
-// original. `status` e `closedAt` mudam sempre juntos.
+// original (nem reviewedAt, pelo mesmo motivo). `status` e `closedAt` mudam
+// sempre juntos. Uma transição real prova reconsideração e também conta como
+// revisão.
 export function closeRisk(
 	catalog: Catalog,
 	state: ProjectState,
@@ -1722,7 +1729,9 @@ export function closeRisk(
 		value: {
 			...state,
 			risks: state.risks.map((item) =>
-				item.id === riskId ? { ...item, status: 'encerrado', closedAt: occurredAt, updatedAt: occurredAt } : item
+				item.id === riskId
+					? { ...item, status: 'encerrado', closedAt: occurredAt, reviewedAt: occurredAt, updatedAt: occurredAt }
+					: item
 			)
 		}
 	};
@@ -1743,7 +1752,34 @@ export function reopenRisk(
 		value: {
 			...state,
 			risks: state.risks.map((item) =>
-				item.id === riskId ? { ...item, status: 'aberto', closedAt: null, updatedAt: occurredAt } : item
+				item.id === riskId
+					? { ...item, status: 'aberto', closedAt: null, reviewedAt: occurredAt, updatedAt: occurredAt }
+					: item
+			)
+		}
+	};
+}
+
+// reviewRisk (ETAPA 10 do rework, segundo microcorte) — confirma que alguém
+// revisou o Risk sem que mais nada precise mudar (o caso comum: "revisei, e
+// continua igual"). Não altera statement/status/closedAt. Sempre aceita se o
+// Risk existe — não é idempotência de estado (cada chamada real avança
+// reviewedAt), é apenas ausência de recusa por status.
+export function reviewRisk(
+	catalog: Catalog,
+	state: ProjectState,
+	riskId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const risk = findRisk(state, riskId);
+	if (!risk) return { ok: false, error: { kind: 'risk_not_found' } };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			risks: state.risks.map((item) =>
+				item.id === riskId ? { ...item, reviewedAt: occurredAt, updatedAt: occurredAt } : item
 			)
 		}
 	};

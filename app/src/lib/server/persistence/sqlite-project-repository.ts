@@ -272,6 +272,22 @@ function ensureWorkItemDeliverableIdColumn(db: Database.Database): void {
 	db.exec('CREATE INDEX IF NOT EXISTS idx_work_item_deliverable_id ON work_item (deliverable_id)');
 }
 
+// Nona evolução do schema desde 0001_init.sql (ETAPA 10 do rework, segundo
+// microcorte) — mesmo caso de ensureImpedimentWorkItemIdColumn/
+// ensureWorkItemDeliverableIdColumn: reviewed_at é uma COLUNA nova numa
+// tabela existente (risk, criada em D049), então `CREATE TABLE IF NOT
+// EXISTS risk` é no-op num banco criado antes deste corte — inclusive os
+// criados entre D049 e este. Idempotente, isolado da inicialização, mesmo
+// padrão. Risks já persistidos ficam com reviewed_at NULL — nenhuma revisão
+// é sintetizada de created_at/updated_at/closed_at.
+function ensureRiskReviewedAtColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(risk)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'reviewed_at');
+	if (!hasColumn) {
+		db.exec('ALTER TABLE risk ADD COLUMN reviewed_at TEXT');
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -283,6 +299,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureImpedimentWorkItemIdColumn(db);
 	ensureMilestonePlannedDateColumn(db);
 	ensureWorkItemDeliverableIdColumn(db);
+	ensureRiskReviewedAtColumn(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -396,8 +413,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// risk é independente (sem FK além de project) — pode ser inserido em
 		// qualquer ponto depois do project row.
 		const insertRisk = db.prepare(
-			`INSERT INTO risk (id, project_id, statement, status, closed_at, created_at, updated_at)
-			 VALUES (@id, @projectId, @statement, @status, @closedAt, @createdAt, @updatedAt)`
+			`INSERT INTO risk (id, project_id, statement, status, closed_at, reviewed_at, created_at, updated_at)
+			 VALUES (@id, @projectId, @statement, @status, @closedAt, @reviewedAt, @createdAt, @updatedAt)`
 		);
 		for (const risk of state.risks) {
 			insertRisk.run(risk);
@@ -648,7 +665,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const riskRows = db
 				.prepare(
-					`SELECT id, project_id, statement, status, closed_at, created_at, updated_at
+					`SELECT id, project_id, statement, status, closed_at, reviewed_at, created_at, updated_at
 					 FROM risk WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as RiskRow[];

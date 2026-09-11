@@ -11,6 +11,7 @@ import {
 	addDesiredOutcome,
 	addImpediment,
 	addMilestone,
+	addRisk,
 	setMilestonePlannedDate,
 	linkWorkItemToMilestone,
 	addScopeItem,
@@ -36,6 +37,7 @@ import {
 	renameProject,
 	reopenImpediment,
 	resolveImpediment,
+	reviewRisk,
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
 	setCauseHypothesisExpectedIfTrue,
@@ -1331,5 +1333,48 @@ describe('createSqliteProjectRepository — WorkItem.deliverableId (ETAPA 9, seg
 		await repo.save(state);
 		restored = await repo.findById('proj-1');
 		expect(restored?.workItems.find((item) => item.id === 'wi-new')?.deliverableId).toBeNull();
+	});
+});
+
+describe('createSqliteProjectRepository — Risk.reviewedAt (ETAPA 10 do rework, segundo microcorte)', () => {
+	it('round-trip preserva reviewedAt', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addRisk(catalog, state, 'risk-1', 'Risco', T1));
+		state = unwrap(reviewRisk(catalog, state, 'risk-1', T2));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('abre um banco pós-D049 sem a coluna reviewed_at, adiciona-a de forma idempotente, e Risks existentes ficam com reviewedAt null', async () => {
+		const filePath = tempFilePath();
+
+		// Fixture construída rebaixando um banco válido (mesmo espírito do teste
+		// de WorkItem.deliverableId acima): o projeto já tem um Risk, e a coluna
+		// reviewed_at — introduzida só neste corte — é removida para simular o
+		// estado do primeiro microcorte de Risk (D049), quando a tabela ainda
+		// não tinha nenhuma noção de revisão.
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addRisk(catalog, state, 'risk-legacy', 'Risco pré-existente', T1));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('ALTER TABLE risk DROP COLUMN reviewed_at');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const restored = await repo.findById('proj-1');
+		const legacyRisk = restored?.risks.find((risk) => risk.id === 'risk-legacy');
+		expect(legacyRisk).toMatchObject({ statement: 'Risco pré-existente', status: 'aberto', reviewedAt: null });
+
+		// Reabrir de novo não falha nem duplica a coluna.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
 	});
 });

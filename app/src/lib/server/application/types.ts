@@ -168,15 +168,17 @@ export interface ImpedimentView {
 	resolvedAt: string | null;
 }
 
-// Acompanhamento ("Riscos", ETAPA 10 do rework, primeiro microcorte, D049) —
-// view leve de Risk, sem projectId/updatedAt, que a interface não precisa.
-// `status` é o estado DECLARADO e a única autoridade sobre aberto/encerrado.
+// Acompanhamento ("Riscos", ETAPA 10 do rework, primeiro microcorte, D049;
+// reviewedAt no segundo microcorte) — view leve de Risk, sem
+// projectId/updatedAt, que a interface não precisa. `status` é o estado
+// DECLARADO e a única autoridade sobre aberto/encerrado.
 export interface RiskView {
 	id: string;
 	statement: string;
 	status: RiskStatus;
 	createdAt: string;
 	closedAt: string | null;
+	reviewedAt: string | null;
 }
 
 // Trabalho (ETAPA 6 do rework, "Primeiro loop operacional") — view leve de
@@ -775,6 +777,13 @@ export interface ReopenRiskInput {
 	riskId: string;
 }
 
+// reviewRisk (ETAPA 10 do rework, segundo microcorte) — confirma revisão sem
+// mudar mais nada, mesmo padrão dos demais inputs de Risk acima.
+export interface ReviewRiskInput {
+	projectId: string;
+	riskId: string;
+}
+
 // Mapa de Impacto ("Quem é afetado", ETAPA 2 do rework) — mesmo padrão dos
 // inputs de ScopeItem/Impediment: id gerado pelo caso de uso
 // (idGenerator), nunca recebido do cliente.
@@ -1010,6 +1019,7 @@ export interface ProjectUseCases {
 	editRiskStatement(input: EditRiskStatementInput): Promise<UseCaseOutcome<ProjectView>>;
 	closeRisk(input: CloseRiskInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenRisk(input: ReopenRiskInput): Promise<UseCaseOutcome<ProjectView>>;
+	reviewRisk(input: ReviewRiskInput): Promise<UseCaseOutcome<ProjectView>>;
 	addAffectedGroup(input: AddAffectedGroupInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupImpact(input: SetAffectedGroupImpactInput): Promise<UseCaseOutcome<ProjectView>>;
 	setAffectedGroupFrequency(input: SetAffectedGroupFrequencyInput): Promise<UseCaseOutcome<ProjectView>>;

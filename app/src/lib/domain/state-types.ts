@@ -316,8 +316,17 @@ export interface MilestoneWorkItem {
 //   encerrado => closedAt !== null
 //
 // Sem probabilidade, impacto, severidade, score, resposta estruturada,
-// owner, histórico de revisão ou delete nesta primeira fatia — editar a
-// declaração e encerrar/reabrir cobrem a necessidade inicial.
+// owner ou delete nesta primeira fatia — editar a declaração e
+// encerrar/reabrir cobrem a necessidade inicial.
+//
+// reviewedAt (ETAPA 10 do rework, segundo microcorte) — instante da última
+// revisão confirmada, `null` até a primeira. Fato individual do Risk, sem
+// histórico, sem contagem, sem nota, sem usuário/responsável da revisão, e
+// sem qualquer noção de periodicidade/prazo/atraso: é só "quando alguém
+// olhou para este risco por último". editRiskStatement, closeRisk e
+// reopenRisk já provam reconsideração real e também o atualizam — reviewRisk
+// (abaixo) existe para o caso em que a revisão não muda mais nada. Nunca
+// decide lifecycle nem promove o Risk a "Precisa de você"/Atenções.
 export type RiskStatus = 'aberto' | 'encerrado';
 
 export interface Risk {
@@ -327,6 +336,7 @@ export interface Risk {
 	statement: string;
 	status: RiskStatus;
 	closedAt: string | null;
+	reviewedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

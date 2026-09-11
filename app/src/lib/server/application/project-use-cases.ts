@@ -65,6 +65,7 @@ import {
 	reopenRisk as reopenRiskInDomain,
 	reorderAgoraItems as reorderAgoraItemsInDomain,
 	resolveImpediment as resolveImpedimentInDomain,
+	reviewRisk as reviewRiskInDomain,
 	serializeProjectState,
 	setAffectedGroupFrequency as setAffectedGroupFrequencyInDomain,
 	setAffectedGroupImpact as setAffectedGroupImpactInDomain,
@@ -152,6 +153,7 @@ import type {
 	ReopenRiskInput,
 	ReorderAgoraItemsInput,
 	ResolveImpedimentInput,
+	ReviewRiskInput,
 	SetAffectedGroupFrequencyInput,
 	SetAffectedGroupImpactInput,
 	SetCauseHypothesisExpectedIfTrueInput,
@@ -1139,6 +1141,20 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = reopenRiskInDomain(catalog, state, input.riskId, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// reviewRisk (ETAPA 10 do rework, segundo microcorte) — confirma revisão
+		// sem exigir mais nenhuma mudança, mesmo padrão dos demais casos de uso
+		// de Risk acima.
+		async reviewRisk(input: ReviewRiskInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reviewRiskInDomain(catalog, state, input.riskId, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

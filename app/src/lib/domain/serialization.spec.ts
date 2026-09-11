@@ -14,7 +14,9 @@ import {
 	editRiskStatement,
 	closeRisk,
 	reopenRisk,
+	reviewRisk,
 	confirmRiskIdentification,
+	confirmRiskUpdate,
 	addCauseHypothesis,
 	addDesiredOutcome,
 	addImpediment,
@@ -1890,7 +1892,7 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 	});
 });
 
-describe('Risk (ETAPA 10 do rework, primeiro microcorte, D049)', () => {
+describe('Risk (ETAPA 10 do rework, primeiro microcorte, D049; reviewedAt, segundo microcorte)', () => {
 	it('preserva riscos no round-trip completo', () => {
 		let state = createInitialProjectState(catalog, 'proj-1', T1);
 		state = unwrap(addRisk(catalog, state, 'risk-1', 'Baixa adesão da equipe', T1));
@@ -1902,11 +1904,11 @@ describe('Risk (ETAPA 10 do rework, primeiro microcorte, D049)', () => {
 		expect(result).toEqual({ ok: true, value: state });
 	});
 
-	it('criar Risk nasce aberto, sem closedAt', () => {
+	it('criar Risk nasce aberto, sem closedAt e sem revisão', () => {
 		const state = unwrap(
 			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco novo', T1)
 		);
-		expect(state.risks[0]).toMatchObject({ status: 'aberto', closedAt: null });
+		expect(state.risks[0]).toMatchObject({ status: 'aberto', closedAt: null, reviewedAt: null });
 	});
 
 	it('encerrar/reabrir preserva a invariante do timestamp (idempotente)', () => {
@@ -1937,6 +1939,87 @@ describe('Risk (ETAPA 10 do rework, primeiro microcorte, D049)', () => {
 			status: 'encerrado',
 			closedAt: T2
 		});
+	});
+
+	it('reviewRisk define reviewedAt sem alterar statement/status/closedAt', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(reviewRisk(catalog, state, 'risk-1', T2));
+		expect(state.risks[0]).toMatchObject({
+			statement: 'Risco',
+			status: 'aberto',
+			closedAt: null,
+			reviewedAt: T2
+		});
+	});
+
+	it('editar a declaração de verdade também conta como revisão; o no-op (mesma declaração) não', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(editRiskStatement(catalog, state, 'risk-1', 'Risco reformulado', T2));
+		expect(state.risks[0].reviewedAt).toBe(T2);
+
+		const noop = unwrap(editRiskStatement(catalog, state, 'risk-1', 'Risco reformulado', '2026-03-01T00:00:00.000Z'));
+		expect(noop.risks[0].reviewedAt).toBe(T2);
+		expect(noop).toBe(state);
+	});
+
+	it('encerrar/reabrir uma transição real também conta como revisão', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		expect(state.risks[0].reviewedAt).toBeNull();
+
+		state = unwrap(closeRisk(catalog, state, 'risk-1', T2));
+		expect(state.risks[0]).toMatchObject({ status: 'encerrado', closedAt: T2, reviewedAt: T2 });
+
+		state = unwrap(reopenRisk(catalog, state, 'risk-1', '2026-03-01T00:00:00.000Z'));
+		expect(state.risks[0]).toMatchObject({
+			status: 'aberto',
+			closedAt: null,
+			reviewedAt: '2026-03-01T00:00:00.000Z'
+		});
+	});
+
+	it('encerrar/reabrir já encerrado/já aberto é no-op e não reescreve reviewedAt', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		state = unwrap(closeRisk(catalog, state, 'risk-1', T2));
+
+		const closedAgain = unwrap(closeRisk(catalog, state, 'risk-1', '2026-03-01T00:00:00.000Z'));
+		expect(closedAgain).toBe(state);
+		expect(closedAgain.risks[0].reviewedAt).toBe(T2);
+	});
+
+	it('checkpoints (confirmRiskIdentification/confirmRiskUpdate) nunca alteram reviewedAt de nenhum Risk', () => {
+		let state = unwrap(
+			addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1)
+		);
+		expect(state.risks[0].reviewedAt).toBeNull();
+
+		state = unwrap(confirmRiskIdentification(catalog, state, T2));
+		expect(state.risks[0].reviewedAt).toBeNull();
+
+		state = unwrap(confirmRiskUpdate(catalog, state, '2026-03-01T00:00:00.000Z'));
+		expect(state.risks[0].reviewedAt).toBeNull();
+	});
+
+	it('snapshot anterior a este microcorte (Risk sem reviewedAt) importa reviewedAt como null', () => {
+		const base = JSON.parse(
+			serializeProjectState(
+				unwrap(addRisk(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'risk-1', 'Risco', T1))
+			)
+		) as { state: Record<string, unknown> };
+		const risks = base.state.risks as Array<Record<string, unknown>>;
+		delete risks[0].reviewedAt;
+
+		const result = deserializeProjectState(JSON.stringify(base), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.risks[0].reviewedAt).toBeNull();
 	});
 
 	it('zero Risk é estado legítimo — confirmRiskIdentification nunca exige nenhum', () => {

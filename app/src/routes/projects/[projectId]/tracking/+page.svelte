@@ -58,10 +58,20 @@
 		editingRiskId = editingRiskId === id ? null : id;
 	}
 
-	// reachedAt é INSTANTE (timestamp gravado pelo Clock), então aqui Date/Intl
-	// é o tratamento correto — ao contrário de plannedDate, que é dia civil e
-	// chega da projeção já formatado como string, sem nunca virar Date.
+	// reachedAt/reviewedAt são INSTANTE (timestamp gravado pelo Clock), então
+	// aqui Date/Intl é o tratamento correto — ao contrário de plannedDate, que
+	// é dia civil e chega da projeção já formatado como string, sem nunca
+	// virar Date.
 	const timestampFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+
+	// reviewedAt é fato factual ("quando alguém olhou por último"), nunca
+	// urgência — por isso o rótulo é sempre uma data absoluta ou "sem revisão
+	// registrada", nunca "há N dias"/atrasado (ETAPA 10 do rework, segundo
+	// microcorte).
+	function riskReviewLabel(reviewedAt: string | null): string {
+		if (!reviewedAt) return 'Sem revisão registrada';
+		return `Última revisão: ${timestampFormatter.format(new Date(reviewedAt))}`;
+	}
 
 	let hasAttentions = $derived(tracking.attentionPendingItems.length > 0 || tracking.impediments.open.length > 0);
 	let hasBlocked = $derived(tracking.blockedWorkItems.length > 0);
@@ -476,6 +486,7 @@
 							<input id="statement-{risk.id}" type="text" name="statement" value={risk.statement} required />
 							<button type="submit" class="button-secondary">Salvar</button>
 						</form>
+						<p class="risk-review">{riskReviewLabel(risk.reviewedAt)}</p>
 						<div class="risk-actions">
 							<button type="button" class="button-secondary" onclick={() => toggleEditRisk(risk.id)}>
 								Concluir edição
@@ -489,8 +500,13 @@
 				{:else}
 					<li class="risk-row">
 						<p class="risk-text">{risk.statement}</p>
+						<p class="risk-review">{riskReviewLabel(risk.reviewedAt)}</p>
 						<div class="risk-actions">
 							<button type="button" class="link-button" onclick={() => toggleEditRisk(risk.id)}>Editar</button>
+							<form method="POST" action="?/reviewRisk" use:enhance class="review-risk-form">
+								<input type="hidden" name="riskId" value={risk.id} />
+								<button type="submit" class="button-secondary">Revisar</button>
+							</form>
 							<form method="POST" action="?/closeRisk" use:enhance class="close-risk-form">
 								<input type="hidden" name="riskId" value={risk.id} />
 								<button type="submit" class="button-secondary">Encerrar</button>
@@ -520,6 +536,7 @@
 					{#each tracking.risks.closed as risk (risk.id)}
 						<li class="risk-row resolved">
 							<p class="risk-text">{risk.statement}</p>
+							<p class="risk-review">{riskReviewLabel(risk.reviewedAt)}</p>
 							<form method="POST" action="?/reopenRisk" use:enhance class="reopen-risk-form">
 								<input type="hidden" name="riskId" value={risk.id} />
 								<button type="submit" class="button-secondary">Reabrir</button>
@@ -972,6 +989,13 @@
 		flex: 1;
 		min-width: 12rem;
 		margin: 0;
+	}
+
+	.risk-review {
+		flex-basis: 100%;
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--hydra-muted);
 	}
 
 	.risk-actions {

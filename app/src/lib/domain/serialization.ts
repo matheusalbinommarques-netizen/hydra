@@ -570,11 +570,14 @@ function parseMilestoneWorkItemList(value: unknown): Result<MilestoneWorkItem[],
 	return { ok: true, value: result };
 }
 
-// Risk (ETAPA 10 do rework, primeiro microcorte, D049) — ausente em
-// snapshots exportados antes deste corte: tratado como coleção vazia, mesmo
-// espírito de parseMilestoneList acima. Nunca inferido do texto livre legado
+// Risk (ETAPA 10 do rework, primeiro microcorte, D049; reviewedAt no segundo
+// microcorte) — ausente em snapshots exportados antes deste corte: tratado
+// como coleção vazia, mesmo espírito de parseMilestoneList acima. Nunca
+// inferido do texto livre legado
 // `riscos_identificados`/`resposta_inicial_riscos`/`riscos_atualizados`
-// (READ-LEGACY, sem auto-conversão — regra §13.2).
+// (READ-LEGACY, sem auto-conversão — regra §13.2). Snapshot anterior ao
+// segundo microcorte não tem `reviewedAt` — `undefined` importa como `null`
+// (nunca revisado), nunca sintetizado de createdAt/updatedAt/closedAt.
 function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 	if (value === undefined) return { ok: true, value: [] };
 	if (!Array.isArray(value)) return shapeError('risks deve ser um array');
@@ -588,6 +591,9 @@ function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 		if (item.closedAt !== null && !isIsoDateString(item.closedAt)) {
 			return shapeError('Risk.closedAt deve ser uma data ISO 8601 válida ou null');
 		}
+		if (item.reviewedAt !== undefined && item.reviewedAt !== null && !isIsoDateString(item.reviewedAt)) {
+			return shapeError('Risk.reviewedAt deve ser uma data ISO 8601 válida ou null');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('Risk.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('Risk.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -596,6 +602,7 @@ function parseRiskList(value: unknown): Result<Risk[], ProjectStateParseError> {
 			statement: item.statement,
 			status: item.status,
 			closedAt: item.closedAt,
+			reviewedAt: item.reviewedAt ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});

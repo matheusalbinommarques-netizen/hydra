@@ -150,5 +150,15 @@ export const actions: Actions = {
 		const result = await getProjectUseCases().reopenRisk({ projectId: params.projectId, riskId });
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
+	},
+
+	reviewRisk: async ({ request, params }) => {
+		const formData = await request.formData();
+		const riskId = readString(formData, 'riskId');
+		if (!riskId) return fail(400, { message: 'Risco inválido.' });
+
+		const result = await getProjectUseCases().reviewRisk({ projectId: params.projectId, riskId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
 	}
 };
