@@ -66,6 +66,7 @@ import {
 	setDesiredOutcomeChange,
 	setDesiredOutcomeTarget,
 	setHypothesis,
+	setImpedimentDecision,
 	setImpedimentNextAction,
 	setImpedimentType,
 	setRouteStartPhase,
@@ -1703,6 +1704,7 @@ describe('addImpediment', () => {
 				nextAction: null,
 				status: 'aberto',
 				workItemId: null,
+				decisionId: null,
 				createdAt: T1,
 				updatedAt: T1,
 				resolvedAt: null
@@ -1741,6 +1743,134 @@ describe('setImpedimentType', () => {
 	it('erro impediment_not_found para id inexistente', () => {
 		const result = setImpedimentType(catalog, freshState(), 'nao-existe', 'outro', T1);
 		expect(result).toEqual({ ok: false, error: { kind: 'impediment_not_found' } });
+	});
+
+	// ETAPA 11 do rework, segundo microcorte (§41/§13.4) — mudar tipo enquanto
+	// decisionId estiver preenchido é recusado, nunca limpa a relação
+	// silenciosamente.
+	it('recusa mudar tipo enquanto decisionId estiver preenchido', () => {
+		let state = unwrap(
+			addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'decisao_pendente', T1)
+		);
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Decidir algo', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+
+		const before = state.impediments[0];
+		const decisionBefore = state.decisions[0];
+		const result = setImpedimentType(catalog, state, 'imp-1', 'outro', T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'impediment_type_change_blocked_by_decision' } });
+		// A recusa preserva integralmente tipo, decisionId e a Decision — nunca
+		// uma mutação parcial nem limpeza silenciosa da relação.
+		expect(state.impediments[0]).toEqual(before);
+		expect(state.impediments[0].tipo).toBe('decisao_pendente');
+		expect(state.impediments[0].decisionId).toBe('dec-1');
+		expect(state.decisions[0]).toEqual(decisionBefore);
+	});
+
+	it('permite mudar tipo depois de desassociar a Decision', () => {
+		let state = unwrap(
+			addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'decisao_pendente', T1)
+		);
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Decidir algo', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', null, T1));
+
+		state = unwrap(setImpedimentType(catalog, state, 'imp-1', 'outro', T2));
+		expect(state.impediments[0].tipo).toBe('outro');
+	});
+});
+
+describe('setImpedimentDecision', () => {
+	function pendingImpedimentWithDecision() {
+		let state = unwrap(
+			addImpediment(catalog, freshState(), 'imp-1', 'Aguardando decisão', 'decisao_pendente', T1)
+		);
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T1));
+		return state;
+	}
+
+	it('Impediment nasce com decisionId: null', () => {
+		const state = unwrap(
+			addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'decisao_pendente', T1)
+		);
+		expect(state.impediments[0].decisionId).toBeNull();
+	});
+
+	it('associa uma Decision existente', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T2));
+		expect(state.impediments[0].decisionId).toBe('dec-1');
+		expect(state.impediments[0].updatedAt).toBe(T2);
+	});
+
+	it('troca a associação para outra Decision', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Outro fornecedor?', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-2', T2));
+		expect(state.impediments[0].decisionId).toBe('dec-2');
+	});
+
+	it('desassocia (decisionId: null)', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', null, T2));
+		expect(state.impediments[0].decisionId).toBeNull();
+		expect(state.impediments[0].updatedAt).toBe(T2);
+	});
+
+	it('reassociar ao mesmo valor é no-op', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		const result = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T2));
+		expect(result.impediments[0].updatedAt).toBe(T1);
+	});
+
+	it('erro decision_not_found para Decision inexistente', () => {
+		const state = pendingImpedimentWithDecision();
+		const result = setImpedimentDecision(catalog, state, 'imp-1', 'nao-existe', T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_not_found' } });
+	});
+
+	it('erro impediment_decision_requires_pending_type quando tipo não é decisao_pendente', () => {
+		let state = unwrap(addImpediment(catalog, freshState(), 'imp-1', 'Texto', 'outro', T1));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T1));
+		const result = setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'impediment_decision_requires_pending_type' } });
+	});
+
+	it('erro impediment_not_found para Impediment inexistente', () => {
+		const result = setImpedimentDecision(catalog, freshState(), 'nao-existe', null, T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'impediment_not_found' } });
+	});
+
+	it('permite relacionar uma Decision já tomada', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Fornecedor A', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T2));
+		expect(state.impediments[0].decisionId).toBe('dec-1');
+		expect(state.decisions[0].status).toBe('tomada');
+	});
+
+	it('decidir/corrigir a Decision não altera o Impediment', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		const before = state.impediments[0];
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Fornecedor A', T2));
+		state = unwrap(editDecisionOutcome(catalog, state, 'dec-1', 'Fornecedor B', '2026-01-03T00:00:00.000Z'));
+		expect(state.impediments[0]).toEqual(before);
+	});
+
+	it('resolver/reabrir o Impediment preserva decisionId e não altera a Decision', () => {
+		let state = pendingImpedimentWithDecision();
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		const decisionBefore = state.decisions[0];
+		state = unwrap(resolveImpediment(catalog, state, 'imp-1', T2));
+		expect(state.impediments[0].decisionId).toBe('dec-1');
+		expect(state.decisions[0]).toEqual(decisionBefore);
+		state = unwrap(reopenImpediment(catalog, state, 'imp-1', '2026-01-03T00:00:00.000Z'));
+		expect(state.impediments[0].decisionId).toBe('dec-1');
+		expect(state.decisions[0]).toEqual(decisionBefore);
 	});
 });
 

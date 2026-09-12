@@ -150,6 +150,14 @@ CREATE TABLE IF NOT EXISTS work_item (
 -- sempre pôde existir no nível do projeto, sem relação com nenhum item de
 -- trabalho). Bancos criados antes desta etapa recebem esta coluna via ALTER
 -- TABLE idempotente em sqlite-project-repository.ts, não aqui.
+-- decision_id (ETAPA 11 do rework, segundo microcorte, §41/§13.4): vínculo
+-- opcional com a Decision que responde "qual decisão está pendente neste
+-- impedimento?" — NULL é o caso normal; só é válido junto com
+-- `tipo = 'decisao_pendente'` (garantido por setImpedimentDecision/
+-- setImpedimentType em domain/transitions.ts, reforçado na desserialização,
+-- não por CHECK aqui — a mesma razão de work_item_id não ter CHECK contra
+-- status). Bancos criados antes deste corte recebem esta coluna via ALTER
+-- TABLE idempotente (ensureImpedimentDecisionIdColumn), mesmo padrão.
 CREATE TABLE IF NOT EXISTS impediment (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
@@ -160,6 +168,7 @@ CREATE TABLE IF NOT EXISTS impediment (
 	next_action TEXT,
 	status TEXT NOT NULL CHECK (status IN ('aberto', 'resolvido')),
 	work_item_id TEXT REFERENCES work_item (id),
+	decision_id TEXT REFERENCES decision (id),
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	resolved_at TEXT,

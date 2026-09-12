@@ -148,6 +148,7 @@ export interface ImpedimentRow {
 	next_action: string | null;
 	status: 'aberto' | 'resolvido';
 	work_item_id: string | null;
+	decision_id: string | null;
 	created_at: string;
 	updated_at: string;
 	resolved_at: string | null;
@@ -162,6 +163,7 @@ export function mapImpedimentRow(row: ImpedimentRow): Impediment {
 		nextAction: row.next_action,
 		status: row.status,
 		workItemId: row.work_item_id,
+		decisionId: row.decision_id,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 		resolvedAt: row.resolved_at

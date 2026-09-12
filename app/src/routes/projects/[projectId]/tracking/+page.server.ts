@@ -97,6 +97,24 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// setDecision (ETAPA 11 do rework, segundo microcorte, §41/§13.4) — associa,
+	// troca ou desassocia (select vazio) a Decision relacionada a um Impediment
+	// `decisao_pendente`. Mesmo padrão de setType acima.
+	setDecision: async ({ request, params }) => {
+		const formData = await request.formData();
+		const impedimentId = readString(formData, 'impedimentId');
+		if (!impedimentId) return fail(400, { message: 'Impedimento inválido.' });
+		const decisionId = readString(formData, 'decisionId');
+
+		const result = await getProjectUseCases().setImpedimentDecision({
+			projectId: params.projectId,
+			impedimentId,
+			decisionId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	setNextAction: async ({ request, params }) => {
 		const formData = await request.formData();
 		const impedimentId = readString(formData, 'impedimentId');

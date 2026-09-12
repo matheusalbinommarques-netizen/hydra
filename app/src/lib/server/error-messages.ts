@@ -41,6 +41,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Impedimento não encontrado.';
 		case 'impediment_id_already_exists':
 			return 'Já existe um impedimento com este identificador.';
+		case 'impediment_decision_requires_pending_type':
+			return 'Só é possível relacionar uma decisão a um impedimento do tipo "Decisão pendente".';
+		case 'impediment_type_change_blocked_by_decision':
+			return 'Remova a decisão relacionada antes de mudar o tipo deste impedimento.';
 		case 'work_item_not_found':
 			return 'Item de trabalho não encontrado.';
 		case 'work_item_blocked':

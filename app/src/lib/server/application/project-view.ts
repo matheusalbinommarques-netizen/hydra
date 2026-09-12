@@ -118,7 +118,19 @@ function buildDeliverableView(deliverable: ProjectState['deliverables'][number])
 	};
 }
 
-function buildImpedimentView(impediment: ProjectState['impediments'][number]): ImpedimentView {
+// decisionSubject (ETAPA 11 do rework, segundo microcorte, §41/§13.4) —
+// denormalizado aqui, mesmo espírito de blockedBy em buildWorkItemView
+// abaixo: a interface exibe a Decision relacionada pelo subject sem round-
+// trip adicional. Nunca persistido — sempre derivado de state.decisions no
+// momento da leitura.
+function buildImpedimentView(
+	state: ProjectState,
+	impediment: ProjectState['impediments'][number]
+): ImpedimentView {
+	const decision =
+		impediment.decisionId !== null
+			? state.decisions.find((candidate) => candidate.id === impediment.decisionId)
+			: undefined;
 	return {
 		id: impediment.id,
 		text: impediment.text,
@@ -126,6 +138,8 @@ function buildImpedimentView(impediment: ProjectState['impediments'][number]): I
 		nextAction: impediment.nextAction,
 		status: impediment.status,
 		workItemId: impediment.workItemId,
+		decisionId: impediment.decisionId,
+		decisionSubject: decision?.subject ?? null,
 		createdAt: impediment.createdAt,
 		resolvedAt: impediment.resolvedAt
 	};
@@ -348,7 +362,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		fieldSuggestions: computeFieldSuggestions(catalog, state.answers),
 		criteriaScopeConflict: computeCriteriaScopeConflict(state.answers, state.scopeItems),
 		deliverables: state.deliverables.map(buildDeliverableView),
-		impediments: state.impediments.map(buildImpedimentView),
+		impediments: state.impediments.map((impediment) => buildImpedimentView(state, impediment)),
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),
 		risks: state.risks.map(buildRiskView),

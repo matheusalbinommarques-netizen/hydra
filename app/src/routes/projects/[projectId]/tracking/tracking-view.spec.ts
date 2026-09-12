@@ -332,6 +332,8 @@ describe('buildTrackingView — impedimentos', () => {
 				nextAction: 'Solicitar à TI',
 				status: 'aberto',
 				workItemId: null,
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: null
 			},
@@ -342,6 +344,8 @@ describe('buildTrackingView — impedimentos', () => {
 				nextAction: null,
 				status: 'resolvido',
 				workItemId: null,
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: '2026-01-02T00:00:00.000Z'
 			}
@@ -360,6 +364,8 @@ describe('buildTrackingView — impedimentos', () => {
 				nextAction: null,
 				status: 'aberto',
 				workItemId: null,
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: null
 			},
@@ -370,6 +376,8 @@ describe('buildTrackingView — impedimentos', () => {
 				nextAction: null,
 				status: 'aberto',
 				workItemId: 'wi-1',
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: null
 			},
@@ -380,6 +388,8 @@ describe('buildTrackingView — impedimentos', () => {
 				nextAction: null,
 				status: 'resolvido',
 				workItemId: 'wi-1',
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: '2026-01-02T00:00:00.000Z'
 			}

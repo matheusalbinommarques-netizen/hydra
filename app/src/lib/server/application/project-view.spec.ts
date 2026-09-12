@@ -282,6 +282,7 @@ describe('buildProjectView — impediments', () => {
 					nextAction: null,
 					status: 'aberto',
 					workItemId: null,
+					decisionId: null,
 					createdAt: '2026-01-02T00:00:00.000Z',
 					updatedAt: '2026-01-02T00:00:00.000Z',
 					resolvedAt: null
@@ -298,6 +299,8 @@ describe('buildProjectView — impediments', () => {
 				nextAction: null,
 				status: 'aberto',
 				workItemId: null,
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-02T00:00:00.000Z',
 				resolvedAt: null
 			}
@@ -315,6 +318,7 @@ describe('buildProjectView — impediments', () => {
 					nextAction: 'Aguardar reunião',
 					status: 'resolvido',
 					workItemId: null,
+					decisionId: null,
 					createdAt: '2026-01-02T00:00:00.000Z',
 					updatedAt: '2026-01-03T00:00:00.000Z',
 					resolvedAt: '2026-01-03T00:00:00.000Z'
@@ -330,8 +334,62 @@ describe('buildProjectView — impediments', () => {
 			nextAction: 'Aguardar reunião',
 			status: 'resolvido',
 			workItemId: null,
+			decisionId: null,
+			decisionSubject: null,
 			createdAt: '2026-01-02T00:00:00.000Z',
 			resolvedAt: '2026-01-03T00:00:00.000Z'
+		});
+	});
+
+	it('projeta decisionSubject denormalizado quando decisionId aponta para uma Decision existente', () => {
+		const state = baseState({
+			impediments: [
+				{
+					id: 'imp-3',
+					projectId: 'p1',
+					text: 'Aguardando decisão sobre fornecedor',
+					tipo: 'decisao_pendente',
+					nextAction: null,
+					status: 'aberto',
+					workItemId: null,
+					decisionId: 'dec-1',
+					createdAt: '2026-01-02T00:00:00.000Z',
+					updatedAt: '2026-01-02T00:00:00.000Z',
+					resolvedAt: null
+				}
+			],
+			decisions: [
+				{
+					id: 'dec-1',
+					projectId: 'p1',
+					subject: 'Qual fornecedor escolher?',
+					options: null,
+					dueDate: null,
+					status: 'pendente',
+					outcome: null,
+					decidedAt: null,
+					createdAt: '2026-01-01T00:00:00.000Z',
+					updatedAt: '2026-01-01T00:00:00.000Z'
+				}
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		// toEqual com a forma exata de ImpedimentView — prova que a projeção
+		// nunca vaza projectId/updatedAt nem qualquer outro campo de
+		// ProjectState bruto, só o necessário (decisionId/decisionSubject
+		// incluídos).
+		expect(view.impediments[0]).toEqual({
+			id: 'imp-3',
+			text: 'Aguardando decisão sobre fornecedor',
+			tipo: 'decisao_pendente',
+			nextAction: null,
+			status: 'aberto',
+			workItemId: null,
+			decisionId: 'dec-1',
+			decisionSubject: 'Qual fornecedor escolher?',
+			createdAt: '2026-01-02T00:00:00.000Z',
+			resolvedAt: null
 		});
 	});
 });

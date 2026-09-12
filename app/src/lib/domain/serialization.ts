@@ -391,6 +391,13 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 		if (item.workItemId !== undefined && item.workItemId !== null && !isString(item.workItemId)) {
 			return shapeError('Impediment.workItemId deve ser string, null ou ausente');
 		}
+		// decisionId (ETAPA 11 do rework, segundo microcorte, §41/§13.4) —
+		// ausente em snapshots exportados antes deste corte; mesmo tratamento de
+		// workItemId acima, nunca inferido de tipo === 'decisao_pendente' nem do
+		// texto do impedimento.
+		if (item.decisionId !== undefined && item.decisionId !== null && !isString(item.decisionId)) {
+			return shapeError('Impediment.decisionId deve ser string, null ou ausente');
+		}
 		result.push({
 			id: item.id,
 			projectId: item.projectId,
@@ -399,6 +406,7 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 			nextAction: (item.nextAction as string | null) ?? null,
 			status: item.status,
 			workItemId: (item.workItemId as string | null | undefined) ?? null,
+			decisionId: (item.decisionId as string | null | undefined) ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt,
 			resolvedAt: (item.resolvedAt as string | null) ?? null
@@ -1390,6 +1398,27 @@ function assembleProjectState({
 		if (impediment.status === 'aberto' && target.status === 'concluido') {
 			return invariantError(
 				`WorkItem "${target.id}" está "concluido" mas tem o Impediment "${impediment.id}" aberto apontando para ele`
+			);
+		}
+	}
+
+	// referência + invariante: Impediment.decisionId (ETAPA 11 do rework,
+	// segundo microcorte, §41/§13.4) — mesmo padrão do bloco de workItemId
+	// acima: quando presente, precisa apontar para uma Decision real do mesmo
+	// projeto, e só é válido quando `tipo === 'decisao_pendente'` (o mesmo
+	// contrato que setImpedimentDecision/setImpedimentType aplicam em tempo de
+	// execução, reforçado aqui contra estado desserializado).
+	const decisionIds = new Set(decisions.map((decision) => decision.id));
+	for (const impediment of impediments) {
+		if (impediment.decisionId === null) continue;
+		if (!decisionIds.has(impediment.decisionId)) {
+			return referenceError(
+				`Impediment "${impediment.id}" referencia decisionId "${impediment.decisionId}", que não existe`
+			);
+		}
+		if (impediment.tipo !== 'decisao_pendente') {
+			return invariantError(
+				`Impediment "${impediment.id}" tem decisionId preenchido mas tipo diferente de "decisao_pendente"`
 			);
 		}
 	}

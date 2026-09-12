@@ -82,6 +82,7 @@ import {
 	setDesiredOutcomeChange as setDesiredOutcomeChangeInDomain,
 	setDesiredOutcomeTarget as setDesiredOutcomeTargetInDomain,
 	setHypothesis as setHypothesisInDomain,
+	setImpedimentDecision as setImpedimentDecisionInDomain,
 	setImpedimentNextAction as setImpedimentNextActionInDomain,
 	setImpedimentType as setImpedimentTypeInDomain,
 	setChangeImpact as setChangeImpactInDomain,
@@ -180,6 +181,7 @@ import type {
 	SetDesiredOutcomeTargetInput,
 	SetHypothesisInput,
 	SetChangeImpactInput,
+	SetImpedimentDecisionInput,
 	SetImpedimentNextActionInput,
 	SetImpedimentTypeInput,
 	SetRiskAssessmentInput,
@@ -809,6 +811,28 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				};
 				await repository.save(result.value, [event]);
 			}
+			return viewOf(result.value);
+		},
+
+		// setImpedimentDecision (ETAPA 11 do rework, segundo microcorte,
+		// §41/§13.4) — associa, troca ou desassocia (decisionId: null) a Decision
+		// relacionada a um Impediment `decisao_pendente`. Sem evento de
+		// histórico, mesma razão de setWorkItemDeliverable acima: a taxonomia de
+		// ProjectEvent é fechada e cobre só o loop WorkItem/Impediment (D037).
+		async setImpedimentDecision(input: SetImpedimentDecisionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setImpedimentDecisionInDomain(
+				catalog,
+				state,
+				input.impedimentId,
+				input.decisionId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

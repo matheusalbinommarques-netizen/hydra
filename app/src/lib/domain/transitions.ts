@@ -71,6 +71,8 @@ export type DomainTransitionError =
 	| { kind: 'deliverable_already_promoted' }
 	| { kind: 'impediment_not_found' }
 	| { kind: 'impediment_id_already_exists' }
+	| { kind: 'impediment_decision_requires_pending_type' }
+	| { kind: 'impediment_type_change_blocked_by_decision' }
 	| { kind: 'work_item_not_found' }
 	| { kind: 'work_item_blocked' }
 	| { kind: 'dependency_not_found' }
@@ -1231,6 +1233,7 @@ export function addImpediment(
 		nextAction: null,
 		status: 'aberto',
 		workItemId,
+		decisionId: null,
 		createdAt: occurredAt,
 		updatedAt: occurredAt,
 		resolvedAt: null
@@ -1239,6 +1242,11 @@ export function addImpediment(
 	return { ok: true, value: { ...state, impediments: [...state.impediments, impediment] } };
 }
 
+// Recusa mudar `tipo` enquanto `decisionId` estiver preenchido (ETAPA 11 do
+// rework, segundo microcorte, §41/§13.4) — desassociar a Decision
+// (setImpedimentDecision abaixo) é sempre o primeiro passo; nunca limpa
+// decisionId silenciosamente aqui, para não perder a relação sem o usuário
+// perceber.
 export function setImpedimentType(
 	catalog: Catalog,
 	state: ProjectState,
@@ -1249,6 +1257,9 @@ export function setImpedimentType(
 	const impediment = findImpediment(state, impedimentId);
 	if (!impediment) return { ok: false, error: { kind: 'impediment_not_found' } };
 	if (impediment.tipo === tipo) return { ok: true, value: state };
+	if (impediment.decisionId !== null) {
+		return { ok: false, error: { kind: 'impediment_type_change_blocked_by_decision' } };
+	}
 
 	return {
 		ok: true,
@@ -1256,6 +1267,44 @@ export function setImpedimentType(
 			...state,
 			impediments: state.impediments.map((item) =>
 				item.id === impedimentId ? { ...item, tipo, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// Associa, troca ou desassocia (decisionId === null) a Decision relacionada a
+// um Impediment `decisao_pendente` (ETAPA 11 do rework, segundo microcorte,
+// §41/§13.4) — mesmo molde de setWorkItemDeliverable: ação explícita e
+// mutável, nunca inferida. Só altera este campo (e updatedAt do próprio
+// Impediment) — nunca a Decision, e nunca o status/resolvedAt do Impediment.
+// Permitido associar uma Decision já `tomada`: o vínculo é factual ("qual
+// decisão está pendente aqui"), não uma condição de decisão ainda em aberto.
+// Idempotente: reassociar ao mesmo valor é no-op.
+export function setImpedimentDecision(
+	catalog: Catalog,
+	state: ProjectState,
+	impedimentId: string,
+	decisionId: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const impediment = findImpediment(state, impedimentId);
+	if (!impediment) return { ok: false, error: { kind: 'impediment_not_found' } };
+	if (decisionId !== null) {
+		if (!findDecision(state, decisionId)) {
+			return { ok: false, error: { kind: 'decision_not_found' } };
+		}
+		if (impediment.tipo !== 'decisao_pendente') {
+			return { ok: false, error: { kind: 'impediment_decision_requires_pending_type' } };
+		}
+	}
+	if (impediment.decisionId === decisionId) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			impediments: state.impediments.map((item) =>
+				item.id === impedimentId ? { ...item, decisionId, updatedAt: occurredAt } : item
 			)
 		}
 	};

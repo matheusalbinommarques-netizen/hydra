@@ -45,6 +45,7 @@ import {
 	setAffectedGroupFrequency,
 	setAffectedGroupImpact,
 	setHypothesis,
+	setImpedimentDecision,
 	setImpedimentNextAction,
 	setRouteStartPhase,
 	setScopeItemEffort,
@@ -634,6 +635,64 @@ describe('deserializeProjectState — Impediment', () => {
 		};
 		envelope.state.impediments[0].resolvedAt = null;
 		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+});
+
+// Impediment.decisionId — ETAPA 11 do rework, segundo microcorte (§41/§13.4).
+describe('deserializeProjectState — Impediment.decisionId', () => {
+	function impedimentWithDecisionState(): ProjectState {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addImpediment(catalog, state, 'imp-1', 'Aguardando decisão', 'decisao_pendente', T1));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T1));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-1', 'dec-1', T1));
+		return state;
+	}
+
+	function impedimentWithoutDecisionState(): ProjectState {
+		return unwrap(
+			addImpediment(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'imp-1', 'Texto', 'outro', T1)
+		);
+	}
+
+	it('trata decisionId ausente como null (compatibilidade com snapshot anterior a este corte)', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentWithoutDecisionState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		delete envelope.state.impediments[0].decisionId;
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.impediments[0].decisionId).toBeNull();
+	});
+
+	it('round-trip preserva decisionId', () => {
+		const original = impedimentWithDecisionState();
+		const json = serializeProjectState(original);
+		const result = deserializeProjectState(json, catalog);
+		expect(result).toEqual({ ok: true, value: original });
+	});
+
+	it('rejeita decisionId apontando para Decision inexistente', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentWithDecisionState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].decisionId = 'nao-existe';
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('rejeita decisionId preenchido em Impediment de tipo diferente de decisao_pendente', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentWithDecisionState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].tipo = 'outro';
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('rejeita decisionId que não é string, null ou ausente', () => {
+		const envelope = JSON.parse(serializeProjectState(impedimentWithDecisionState())) as {
+			state: { impediments: Array<Record<string, unknown>> };
+		};
+		envelope.state.impediments[0].decisionId = 42;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
 	});
 });
 

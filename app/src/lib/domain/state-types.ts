@@ -115,6 +115,22 @@ export type ImpedimentType =
 // é 1 Impediment → no máximo 1 WorkItem — o inverso (múltiplos impedimentos
 // bloqueando o mesmo WorkItem) é permitido pelo schema, mesmo que a interface
 // desta rodada só crie um de cada vez.
+// decisionId (ETAPA 11 do rework, segundo microcorte, §41/§13.4) — vínculo
+// opcional com a Decision que responde "qual decisão está pendente neste
+// impedimento?". Mesmo molde de workItemId acima: null é o caso normal e
+// permanece totalmente válido, associação é explícita e mutável
+// (setImpedimentDecision em transitions.ts), nunca inferida de
+// `tipo === 'decisao_pendente'` nem do texto do impedimento. Cardinalidade é
+// 1 Impediment → no máximo 1 Decision; o inverso (uma Decision relacionada a
+// vários Impediment) é permitido pelo schema. Só pode ser não-nulo quando
+// `tipo === 'decisao_pendente'` — trocar `tipo` enquanto `decisionId` estiver
+// preenchido é recusado pelo domínio (setImpedimentType), para não perder a
+// relação silenciosamente. É puramente factual: associar/desassociar nunca
+// altera a Decision, e o lifecycle dos dois objetos é independente —
+// resolver/reabrir o Impediment não toca a Decision, decidir/corrigir a
+// Decision não toca o Impediment. Uma Decision já `tomada` pode continuar
+// (ou passar a ser) relacionada: o vínculo é sobre "qual decisão", não sobre
+// "decisão ainda em aberto".
 export interface Impediment {
 	id: string;
 	projectId: string;
@@ -123,6 +139,7 @@ export interface Impediment {
 	nextAction: string | null;
 	status: 'aberto' | 'resolvido';
 	workItemId: string | null;
+	decisionId: string | null;
 	createdAt: string;
 	updatedAt: string;
 	resolvedAt: string | null;

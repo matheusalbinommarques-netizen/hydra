@@ -314,6 +314,27 @@ function ensureRiskAssessmentAndResponseColumns(db: Database.Database): void {
 	}
 }
 
+// Décima primeira evolução do schema desde 0001_init.sql (ETAPA 11 do
+// rework, segundo microcorte, §41/§13.4) — mesmo caso de
+// ensureImpedimentWorkItemIdColumn/ensureWorkItemDeliverableIdColumn:
+// decision_id é uma COLUNA nova numa tabela existente (impediment), então
+// `CREATE TABLE IF NOT EXISTS decision` sozinho (tabela nova desde D053, já
+// existente nos bancos deste corte) não afeta a tabela impediment já criada
+// num banco anterior a este microcorte. Idempotente, isolado da
+// inicialização, mesmo padrão. Todo Impediment já persistido fica com
+// decision_id NULL — nenhum vínculo é inferido de tipo === 'decisao_pendente'
+// nem de nenhum outro dado.
+function ensureImpedimentDecisionIdColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(impediment)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'decision_id');
+	if (!hasColumn) {
+		db.exec('ALTER TABLE impediment ADD COLUMN decision_id TEXT REFERENCES decision (id)');
+	}
+	// Precisa rodar depois de garantir a coluna acima — 0001_init.sql não
+	// indexa decision_id (mesma razão de idx_impediment_work_item_id).
+	db.exec('CREATE INDEX IF NOT EXISTS idx_impediment_decision_id ON impediment (decision_id)');
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -327,6 +348,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureWorkItemDeliverableIdColumn(db);
 	ensureRiskReviewedAtColumn(db);
 	ensureRiskAssessmentAndResponseColumns(db);
+	ensureImpedimentDecisionIdColumn(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -388,6 +410,22 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertDeliverable.run(deliverable);
 		}
 
+		// decision precisa ser inserida antes de impediment (movida para cá,
+		// ETAPA 11 do rework, segundo microcorte, §41/§13.4):
+		// impediment.decision_id passou a referenciar decision.id (FK checada
+		// imediatamente, foreign_keys = ON). decision em si não depende de
+		// nenhuma outra tabela além de project, então pode nascer aqui sem
+		// problema — mesmo raciocínio de risk abaixo.
+		const insertDecision = db.prepare(
+			`INSERT INTO decision
+			   (id, project_id, subject, options, due_date, status, outcome, decided_at, created_at, updated_at)
+			 VALUES
+			   (@id, @projectId, @subject, @options, @dueDate, @status, @outcome, @decidedAt, @createdAt, @updatedAt)`
+		);
+		for (const decision of state.decisions) {
+			insertDecision.run(decision);
+		}
+
 		// work_item precisa ser inserido depois de deliverable (deliverable_id
 		// referencia deliverable.id) e antes de impediment: impediment.work_item_id
 		// referencia work_item.id (FK checada imediatamente, foreign_keys = ON).
@@ -399,10 +437,14 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertWorkItem.run(item);
 		}
 
+		// impediment também depende de decision (decision_id, ETAPA 11 do rework,
+		// segundo microcorte) além de work_item — por isso vem depois dos dois
+		// blocos de insert acima.
 		const insertImpediment = db.prepare(
 			`INSERT INTO impediment
-			   (id, project_id, text, tipo, next_action, status, work_item_id, created_at, updated_at, resolved_at)
-			 VALUES (@id, @projectId, @text, @tipo, @nextAction, @status, @workItemId, @createdAt, @updatedAt, @resolvedAt)`
+			   (id, project_id, text, tipo, next_action, status, work_item_id, decision_id, created_at, updated_at, resolved_at)
+			 VALUES
+			   (@id, @projectId, @text, @tipo, @nextAction, @status, @workItemId, @decisionId, @createdAt, @updatedAt, @resolvedAt)`
 		);
 		for (const impediment of state.impediments) {
 			insertImpediment.run(impediment);
@@ -449,18 +491,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertRisk.run(risk);
 		}
 
-		// decision/change são independentes (sem FK além de project) — mesmo
-		// raciocínio de risk acima.
-		const insertDecision = db.prepare(
-			`INSERT INTO decision
-			   (id, project_id, subject, options, due_date, status, outcome, decided_at, created_at, updated_at)
-			 VALUES
-			   (@id, @projectId, @subject, @options, @dueDate, @status, @outcome, @decidedAt, @createdAt, @updatedAt)`
-		);
-		for (const decision of state.decisions) {
-			insertDecision.run(decision);
-		}
-
+		// change é independente (sem FK além de project) — mesmo raciocínio de
+		// risk acima. decision (também independente) foi movida para antes de
+		// work_item/impediment — ver comentário lá.
 		const insertChange = db.prepare(
 			`INSERT INTO change (id, project_id, statement, impact, created_at, updated_at)
 			 VALUES (@id, @projectId, @statement, @impact, @createdAt, @updatedAt)`
@@ -681,7 +714,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const impedimentRows = db
 				.prepare(
-					`SELECT id, project_id, text, tipo, next_action, status, work_item_id, created_at, updated_at, resolved_at
+					`SELECT id, project_id, text, tipo, next_action, status, work_item_id, decision_id, created_at, updated_at, resolved_at
 					 FROM impediment WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as ImpedimentRow[];

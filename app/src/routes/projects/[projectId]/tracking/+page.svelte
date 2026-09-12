@@ -19,6 +19,12 @@
 		em_andamento: 'Em andamento',
 		concluido: 'Concluído'
 	};
+	// Decisões disponíveis para relacionar a um Impediment `decisao_pendente`
+	// (ETAPA 11 do rework, segundo microcorte, §41/§13.4) — pendentes e tomadas
+	// juntas: relacionar uma Decision já tomada é um estado válido (o vínculo é
+	// factual, não uma condição de decisão em aberto).
+	let allDecisions = $derived([...tracking.decisions.pending, ...tracking.decisions.decided]);
+
 	let newText = $state('');
 	let newTipo = $state('');
 	// Só um impedimento em edição por vez — evita deixar todos os formulários
@@ -458,6 +464,23 @@
 									}}
 								/>
 							</form>
+							{#if impediment.tipo === 'decisao_pendente'}
+								<form method="POST" action="?/setDecision" use:enhance class="decision-form">
+									<input type="hidden" name="impedimentId" value={impediment.id} />
+									<label for="decision-{impediment.id}">Decisão relacionada</label>
+									<select
+										id="decision-{impediment.id}"
+										name="decisionId"
+										value={impediment.decisionId ?? ''}
+										onchange={(event) => event.currentTarget.form?.requestSubmit()}
+									>
+										<option value="">Nenhuma</option>
+										{#each allDecisions as decision (decision.id)}
+											<option value={decision.id}>{decision.subject}</option>
+										{/each}
+									</select>
+								</form>
+							{/if}
 						</div>
 						<div class="impediment-actions">
 							<button type="button" class="button-secondary" onclick={() => toggleEdit(impediment.id)}>
@@ -475,6 +498,9 @@
 						<span class="impediment-tipo">{tipoLabel[impediment.tipo]}</span>
 						{#if impediment.nextAction}
 							<span class="impediment-next-action">Próxima ação: {impediment.nextAction}</span>
+						{/if}
+						{#if impediment.decisionSubject}
+							<span class="impediment-decision">Decisão relacionada: {impediment.decisionSubject}</span>
 						{/if}
 						<div class="impediment-actions">
 							<button type="button" class="link-button" onclick={() => toggleEdit(impediment.id)}>Editar</button>
@@ -510,6 +536,9 @@
 							<span class="impediment-tipo">{tipoLabel[impediment.tipo]}</span>
 							{#if impediment.nextAction}
 								<span class="impediment-next-action">Próxima ação registrada: {impediment.nextAction}</span>
+							{/if}
+							{#if impediment.decisionSubject}
+								<span class="impediment-decision">Decisão relacionada: {impediment.decisionSubject}</span>
 							{/if}
 							<form method="POST" action="?/reopen" use:enhance class="reopen-form">
 								<input type="hidden" name="impedimentId" value={impediment.id} />
@@ -1158,7 +1187,8 @@
 		border-radius: var(--hydra-radius-pill);
 	}
 
-	.impediment-next-action {
+	.impediment-next-action,
+	.impediment-decision {
 		font-size: var(--font-size-caption);
 		color: var(--hydra-muted);
 	}
@@ -1202,6 +1232,15 @@
 	}
 
 	.next-action-form input {
+		width: 100%;
+	}
+
+	.decision-form {
+		flex: 1;
+		min-width: 14rem;
+	}
+
+	.decision-form select {
 		width: 100%;
 	}
 

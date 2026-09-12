@@ -1394,6 +1394,8 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 				nextAction: null,
 				status: 'aberto',
 				workItemId: null,
+				decisionId: null,
+				decisionSubject: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				resolvedAt: null
 			}
@@ -1462,6 +1464,8 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 			nextAction: null,
 			status: 'resolvido',
 			workItemId: null,
+			decisionId: null,
+			decisionSubject: null,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			resolvedAt: '2026-01-02T00:00:00.000Z'
 		});
@@ -1471,6 +1475,98 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 		expect(reopened.ok).toBe(true);
 		if (!reopened.ok) return;
 		expect(reopened.value.impediments[0]).toMatchObject({ status: 'aberto', resolvedAt: null });
+	});
+
+	// setImpedimentDecision (ETAPA 11 do rework, segundo microcorte, §41/§13.4)
+	it('setImpedimentDecision associa, troca e desassocia a Decision relacionada, e reflete decisionSubject', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Aguardando decisão', tipo: 'decisao_pendente' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		const decisionA = await useCases.addDecision({ projectId, subject: 'Qual fornecedor?' });
+		if (!decisionA.ok) throw new Error('esperado ok');
+		const decisionAId = decisionA.value.decisions[0].id;
+		const decisionB = await useCases.addDecision({ projectId, subject: 'Qual data?' });
+		if (!decisionB.ok) throw new Error('esperado ok');
+		const decisionBId = decisionB.value.decisions.find((decision) => decision.id !== decisionAId)!.id;
+
+		const associated = await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId: decisionAId });
+		expect(associated.ok).toBe(true);
+		if (!associated.ok) return;
+		expect(associated.value.impediments[0].decisionId).toBe(decisionAId);
+		expect(associated.value.impediments[0].decisionSubject).toBe('Qual fornecedor?');
+
+		const swapped = await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId: decisionBId });
+		expect(swapped.ok).toBe(true);
+		if (!swapped.ok) return;
+		expect(swapped.value.impediments[0].decisionId).toBe(decisionBId);
+
+		const unlinked = await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId: null });
+		expect(unlinked.ok).toBe(true);
+		if (!unlinked.ok) return;
+		expect(unlinked.value.impediments[0].decisionId).toBeNull();
+		expect(unlinked.value.impediments[0].decisionSubject).toBeNull();
+	});
+
+	it('setImpedimentDecision recusa decision_not_found e impediment_decision_requires_pending_type', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Item', tipo: 'outro' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		expect(await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'decision_not_found' }
+		});
+
+		const decision = await useCases.addDecision({ projectId, subject: 'Qual fornecedor?' });
+		if (!decision.ok) throw new Error('esperado ok');
+		const decisionId = decision.value.decisions[0].id;
+
+		expect(await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId })).toEqual({
+			ok: false,
+			error: { kind: 'impediment_decision_requires_pending_type' }
+		});
+	});
+
+	it('setImpedimentType recusa mudar tipo enquanto decisionId estiver preenchido', async () => {
+		const { useCases } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+
+		const added = await useCases.addImpediment({ projectId, text: 'Aguardando decisão', tipo: 'decisao_pendente' });
+		if (!added.ok) throw new Error('esperado ok');
+		const impedimentId = added.value.impediments[0].id;
+
+		const decision = await useCases.addDecision({ projectId, subject: 'Qual fornecedor?' });
+		if (!decision.ok) throw new Error('esperado ok');
+		const decisionId = decision.value.decisions[0].id;
+
+		const associated = await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId });
+		if (!associated.ok) throw new Error('esperado ok');
+
+		expect(await useCases.setImpedimentType({ projectId, impedimentId, tipo: 'outro' })).toEqual({
+			ok: false,
+			error: { kind: 'impediment_type_change_blocked_by_decision' }
+		});
+
+		const unlinked = await useCases.setImpedimentDecision({ projectId, impedimentId, decisionId: null });
+		if (!unlinked.ok) throw new Error('esperado ok');
+
+		const retyped = await useCases.setImpedimentType({ projectId, impedimentId, tipo: 'outro' });
+		expect(retyped.ok).toBe(true);
+		if (!retyped.ok) return;
+		expect(retyped.value.impediments[0].tipo).toBe('outro');
 	});
 
 	it('impediment_not_found para id inexistente em cada operação', async () => {
@@ -1494,6 +1590,9 @@ describe('createProjectUseCases — impedimentos (Acompanhamento)', () => {
 			ok: false,
 			error: { kind: 'impediment_not_found' }
 		});
+		expect(
+			await useCases.setImpedimentDecision({ projectId, impedimentId: 'nao-existe', decisionId: null })
+		).toEqual({ ok: false, error: { kind: 'impediment_not_found' } });
 	});
 
 	it('project_not_found quando o projeto não existe', async () => {

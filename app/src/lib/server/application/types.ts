@@ -167,6 +167,14 @@ export interface ImpedimentView {
 	// caso normal e continua totalmente válido: Impediment sempre pôde
 	// existir no nível do projeto, sem relação com nenhum item de trabalho.
 	workItemId: string | null;
+	// Decision relacionada (ETAPA 11 do rework, segundo microcorte, §41/§13.4)
+	// — null é o caso normal, mesmo espírito de workItemId acima. Só é
+	// preenchido quando tipo === 'decisao_pendente'.
+	decisionId: string | null;
+	// subject da Decision relacionada, denormalizado para a interface exibir
+	// sem round-trip adicional (mesmo espírito de blocking em WorkItemView) —
+	// null quando decisionId é null.
+	decisionSubject: string | null;
 	createdAt: string;
 	resolvedAt: string | null;
 }
@@ -681,6 +689,15 @@ export interface ReopenImpedimentInput {
 	impedimentId: string;
 }
 
+// Associa, troca ou desassocia (decisionId: null) a Decision relacionada a um
+// Impediment `decisao_pendente` (ETAPA 11 do rework, segundo microcorte,
+// §41/§13.4) — mesmo padrão de SetWorkItemDeliverableInput.
+export interface SetImpedimentDecisionInput {
+	projectId: string;
+	impedimentId: string;
+	decisionId: string | null;
+}
+
 // Trabalho (ETAPA 6 do rework) — mesmo padrão dos inputs de ScopeItem/
 // Impediment: id gerado pelo caso de uso (idGenerator), nunca recebido do
 // cliente.
@@ -1104,6 +1121,7 @@ export interface ProjectUseCases {
 	setImpedimentNextAction(input: SetImpedimentNextActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	resolveImpediment(input: ResolveImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
 	reopenImpediment(input: ReopenImpedimentInput): Promise<UseCaseOutcome<ProjectView>>;
+	setImpedimentDecision(input: SetImpedimentDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
 	addWorkItem(input: AddWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setWorkItemDeliverable(input: SetWorkItemDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;

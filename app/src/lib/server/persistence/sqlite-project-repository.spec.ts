@@ -52,6 +52,7 @@ import {
 	setDeliverableEffort,
 	setDesiredOutcomeTarget,
 	setHypothesis,
+	setImpedimentDecision,
 	setImpedimentNextAction,
 	setRouteStartPhase,
 	setScopeItemEffort,
@@ -1560,5 +1561,95 @@ describe('createSqliteProjectRepository — Decision/Change (ETAPA 11 do rework,
 		const restored = await repo.findById('proj-1');
 		expect(restored?.decisions).toEqual([]);
 		expect(restored?.changes).toEqual([]);
+	});
+});
+
+describe('createSqliteProjectRepository — Impediment.decisionId (ETAPA 11 do rework, segundo microcorte, §41/§13.4)', () => {
+	it('round-trip preserva a associação Impediment → Decision', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addImpediment(catalog, state, 'imp-new', 'Aguardando decisão', 'decisao_pendente', T2));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-new', 'dec-1', T2));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('associar/trocar/desassociar via setImpedimentDecision persiste corretamente', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addImpediment(catalog, state, 'imp-new', 'Aguardando decisão', 'decisao_pendente', T2));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Qual data?', T2));
+		await repo.insert(state);
+
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-new', 'dec-1', T2));
+		await repo.save(state);
+		let restored = await repo.findById('proj-1');
+		expect(restored?.impediments.find((item) => item.id === 'imp-new')?.decisionId).toBe('dec-1');
+
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-new', 'dec-2', T2));
+		await repo.save(state);
+		restored = await repo.findById('proj-1');
+		expect(restored?.impediments.find((item) => item.id === 'imp-new')?.decisionId).toBe('dec-2');
+
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-new', null, T2));
+		await repo.save(state);
+		restored = await repo.findById('proj-1');
+		expect(restored?.impediments.find((item) => item.id === 'imp-new')?.decisionId).toBeNull();
+	});
+
+	it('resolver/reabrir o Impediment preserva decisionId, e a Decision permanece intocada', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addImpediment(catalog, state, 'imp-new', 'Aguardando decisão', 'decisao_pendente', T2));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		state = unwrap(setImpedimentDecision(catalog, state, 'imp-new', 'dec-1', T2));
+		await repo.insert(state);
+
+		state = unwrap(resolveImpediment(catalog, state, 'imp-new', T2));
+		await repo.save(state);
+		let restored = await repo.findById('proj-1');
+		expect(restored?.impediments.find((item) => item.id === 'imp-new')?.decisionId).toBe('dec-1');
+		expect(restored?.decisions.find((decision) => decision.id === 'dec-1')?.status).toBe('pendente');
+
+		state = unwrap(reopenImpediment(catalog, state, 'imp-new', T2));
+		await repo.save(state);
+		restored = await repo.findById('proj-1');
+		expect(restored?.impediments.find((item) => item.id === 'imp-new')?.decisionId).toBe('dec-1');
+	});
+
+	it('abre um banco anterior a este corte (sem a coluna decision_id), adiciona-a de forma idempotente, e Impediments existentes ficam com decisionId null', async () => {
+		const filePath = tempFilePath();
+
+		// Fixture construída rebaixando um banco válido (mesmo espírito do teste
+		// de WorkItem.deliverableId acima): o projeto já tem um Impediment
+		// `decisao_pendente`, e a coluna decision_id — introduzida só neste
+		// corte — é removida para simular o estado anterior a ele.
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addImpediment(catalog, state, 'imp-legacy', 'Aguardando decisão antiga', 'decisao_pendente', T1));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		// O índice criado por ensureImpedimentDecisionIdColumn referencia a
+		// coluna — precisa ser removido antes, senão DROP COLUMN falha.
+		legacyDb.exec('DROP INDEX idx_impediment_decision_id');
+		legacyDb.exec('ALTER TABLE impediment DROP COLUMN decision_id');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const restored = await repo.findById('proj-1');
+		const legacyImpediment = restored?.impediments.find((item) => item.id === 'imp-legacy');
+		expect(legacyImpediment?.decisionId).toBeNull();
+
+		// Reabrir de novo não falha nem duplica a coluna/índice.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
 	});
 });
