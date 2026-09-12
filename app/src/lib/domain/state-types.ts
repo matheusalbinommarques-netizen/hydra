@@ -178,12 +178,36 @@ export type WorkItemStatus = 'a_fazer' | 'em_andamento' | 'concluido';
 // sobrevive desassociado. Associar/desassociar/trocar nunca altera
 // status, Dependency, Impediment, Milestone ou timestamps de outros
 // objetos — só este campo (e updatedAt do próprio WorkItem) muda.
+// plannedStart/durationDays (ETAPA 12 do rework, "Scheduling e Gantt",
+// docs/core/HYDRA_PRODUCT_REWORK.md §42, primeiro microcorte fundacional) —
+// fato temporal MANUAL e declarado, sem precedência, propagação, folga,
+// caminho crítico ou baseline: essas capacidades são os próximos itens da
+// lista incremental de §42, ainda não implementados. `plannedStart` é data
+// civil `YYYY-MM-DD` (mesmo isCivilDate de Milestone.plannedDate, nunca
+// timestamp/Date). `durationDays` é dias corridos, inteiro >= 1, contagem
+// INCLUSIVA — o fim semântico é `plannedStart + (durationDays - 1)` dias
+// (não persistido nesta rodada, sem consumidor real ainda). Par fechado,
+// garantido por setWorkItemSchedule (domain/transitions.ts) e reforçado na
+// desserialização: ambos `null` (sem schedule, caso normal e permanentemente
+// válido) ou ambos preenchidos — nunca um sozinho, mesmo molde do par
+// likelihood/impact de Risk.
+//
+// Unidade canônica de scheduling nesta etapa: só WorkItem. Deliverable não
+// ganha nenhum campo de data neste corte — nem data-alvo declarada nem
+// forecast derivado dos WorkItems são decididos aqui.
+//
+// Dependency continua com a semântica atual (precedência declarada, nunca
+// bloqueio): nada aqui altera moveWorkItem, e nenhuma Dependency recalcula
+// ou é recalculada por causa deste campo. Milestone.plannedDate permanece
+// fato independente, não redefinido nem derivado de WorkItem.
 export interface WorkItem {
 	id: string;
 	projectId: string;
 	title: string;
 	status: WorkItemStatus;
 	deliverableId: string | null;
+	plannedStart: string | null;
+	durationDays: number | null;
 	createdAt: string;
 	updatedAt: string;
 }

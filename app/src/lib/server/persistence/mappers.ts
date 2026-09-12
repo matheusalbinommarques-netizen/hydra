@@ -177,6 +177,8 @@ export interface WorkItemRow {
 	title: string;
 	status: WorkItemStatus;
 	deliverable_id: string | null;
+	planned_start: string | null;
+	duration_days: number | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -188,6 +190,8 @@ export function mapWorkItemRow(row: WorkItemRow): WorkItem {
 		title: row.title,
 		status: row.status,
 		deliverableId: row.deliverable_id,
+		plannedStart: row.planned_start,
+		durationDays: row.duration_days,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};

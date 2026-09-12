@@ -49,6 +49,12 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Item de trabalho não encontrado.';
 		case 'work_item_blocked':
 			return 'Marque o impedimento como resolvido antes de concluir este item.';
+		case 'work_item_schedule_incomplete':
+			return 'Informe início e duração juntos, ou deixe os dois em branco.';
+		case 'work_item_planned_start_invalid':
+			return 'Informe uma data de início válida (dia, mês e ano).';
+		case 'work_item_duration_invalid':
+			return 'A duração deve ser um número inteiro de dias, maior ou igual a 1.';
 		case 'dependency_not_found':
 			return 'Dependência não encontrada.';
 		case 'dependency_self_reference':

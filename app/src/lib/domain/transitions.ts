@@ -76,6 +76,9 @@ export type DomainTransitionError =
 	| { kind: 'impediment_type_change_blocked_by_decision' }
 	| { kind: 'work_item_not_found' }
 	| { kind: 'work_item_blocked' }
+	| { kind: 'work_item_schedule_incomplete' }
+	| { kind: 'work_item_planned_start_invalid' }
+	| { kind: 'work_item_duration_invalid' }
 	| { kind: 'dependency_not_found' }
 	| { kind: 'dependency_self_reference' }
 	| { kind: 'dependency_already_exists' }
@@ -1410,6 +1413,8 @@ export function addWorkItem(
 		title,
 		status: 'a_fazer',
 		deliverableId,
+		plannedStart: null,
+		durationDays: null,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
@@ -1472,6 +1477,56 @@ export function moveWorkItem(
 		value: {
 			...state,
 			workItems: state.workItems.map((i) => (i.id === workItemId ? { ...i, status, updatedAt: occurredAt } : i))
+		}
+	};
+}
+
+// setWorkItemSchedule — ETAPA 12 do rework ("Scheduling e Gantt", §42),
+// primeiro microcorte fundacional. Uma única operação cobre definir,
+// reagendar e limpar (os dois `null`), mesmo molde de setMilestonePlannedDate/
+// setRiskAssessment: plannedStart/durationDays são um único fato atômico,
+// nunca dois campos independentes — os dois `null` juntos ou os dois
+// preenchidos juntos.
+//
+// Fato MANUAL e declarado, sem cálculo: nenhuma precedência, propagação,
+// folga, caminho crítico ou baseline acontece aqui — isso é trabalho dos
+// próximos itens da lista incremental de §42. durationDays é dias corridos,
+// contagem INCLUSIVA (fim semântico = plannedStart + (durationDays - 1)
+// dias, não calculado nem persistido nesta rodada, sem consumidor real
+// ainda). Não altera status, Dependency, Impediment, Deliverable nem
+// Milestone — só este par (e updatedAt do próprio WorkItem). Dependency
+// continua sem recalcular nem bloquear nada por causa deste campo.
+//
+// Idempotência real: gravar exatamente o mesmo par preserva o objeto
+// inteiro, inclusive updatedAt — mesmo espírito de setMilestonePlannedDate.
+export function setWorkItemSchedule(
+	catalog: Catalog,
+	state: ProjectState,
+	workItemId: string,
+	plannedStart: string | null,
+	durationDays: number | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const item = findWorkItem(state, workItemId);
+	if (!item) return { ok: false, error: { kind: 'work_item_not_found' } };
+	if ((plannedStart === null) !== (durationDays === null)) {
+		return { ok: false, error: { kind: 'work_item_schedule_incomplete' } };
+	}
+	if (plannedStart !== null && !isCivilDate(plannedStart)) {
+		return { ok: false, error: { kind: 'work_item_planned_start_invalid' } };
+	}
+	if (durationDays !== null && (!Number.isInteger(durationDays) || durationDays < 1)) {
+		return { ok: false, error: { kind: 'work_item_duration_invalid' } };
+	}
+	if (item.plannedStart === plannedStart && item.durationDays === durationDays) return { ok: true, value: state };
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			workItems: state.workItems.map((i) =>
+				i.id === workItemId ? { ...i, plannedStart, durationDays, updatedAt: occurredAt } : i
+			)
 		}
 	};
 }

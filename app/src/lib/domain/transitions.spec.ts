@@ -10,6 +10,7 @@ import {
 	setMilestonePlannedDate,
 	addWorkItem,
 	moveWorkItem,
+	setWorkItemSchedule,
 	linkWorkItemToDecision,
 	linkWorkItemToMilestone,
 	reachMilestone,
@@ -1227,6 +1228,98 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
 		// Nenhum campo foi alterado pela tentativa recusada.
 		expect(decided.decisions[0]).toMatchObject({ subject: 'Adiar o SMS?', options: null, dueDate: null, responsible: null });
+	});
+});
+
+// setWorkItemSchedule (ETAPA 12 do rework, "Scheduling e Gantt", §42,
+// primeiro microcorte fundacional) — fato temporal MANUAL, sem precedência
+// nem propagação. Falsificadores centrais: par sempre fechado (nunca
+// estado parcial), formato/duração validados, no-op idempotente, e nenhum
+// efeito colateral sobre status/Dependency/Deliverable/Impediment.
+describe('setWorkItemSchedule (ETAPA 12 do rework, §42, primeiro microcorte fundacional)', () => {
+	it('WorkItem nasce sem schedule (plannedStart/durationDays null)', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		expect(state.workItems[0]).toMatchObject({ plannedStart: null, durationDays: null });
+	});
+
+	it('define um schedule válido', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-1', '2026-09-12', 3, T2));
+		expect(state.workItems[0]).toMatchObject({
+			plannedStart: '2026-09-12',
+			durationDays: 3,
+			updatedAt: T2
+		});
+	});
+
+	it('recusa work_item_not_found para WorkItem inexistente', () => {
+		const result = setWorkItemSchedule(catalog, freshState(), 'nao-existe', '2026-09-12', 3, T1);
+		expect(result).toEqual({ ok: false, error: { kind: 'work_item_not_found' } });
+	});
+
+	it('recusa estado parcial: plannedStart preenchido com durationDays null', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		const result = setWorkItemSchedule(catalog, state, 'wi-1', '2026-09-12', null, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'work_item_schedule_incomplete' } });
+	});
+
+	it('recusa estado parcial: durationDays preenchido com plannedStart null', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		const result = setWorkItemSchedule(catalog, state, 'wi-1', null, 3, T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'work_item_schedule_incomplete' } });
+	});
+
+	it('recusa data inválida (timestamp completo, formato local, dia inexistente)', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		for (const invalid of ['2026-09-01T00:00:00.000Z', '01/09/2026', '2026-02-30']) {
+			expect(setWorkItemSchedule(catalog, state, 'wi-1', invalid, 1, T2)).toEqual({
+				ok: false,
+				error: { kind: 'work_item_planned_start_invalid' }
+			});
+		}
+	});
+
+	it('recusa duração zero, negativa, fracionária ou não numérica', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		for (const invalid of [0, -1, 1.5, NaN]) {
+			expect(setWorkItemSchedule(catalog, state, 'wi-1', '2026-09-12', invalid, T2)).toEqual({
+				ok: false,
+				error: { kind: 'work_item_duration_invalid' }
+			});
+		}
+	});
+
+	it('limpa o schedule atomicamente (os dois voltam a null juntos)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-1', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-1', null, null, T3));
+		expect(state.workItems[0]).toMatchObject({ plannedStart: null, durationDays: null, updatedAt: T3 });
+	});
+
+	it('idempotência real: gravar o mesmo par preserva o objeto por referência, inclusive updatedAt', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-1', 'Item', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-1', '2026-09-12', 3, T2));
+		const before = state.workItems[0];
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-1', '2026-09-12', 3, T3));
+		expect(state.workItems[0]).toBe(before);
+	});
+
+	it('alterar o schedule não muda status, deliverableId nem as Dependency/Impediment do item', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(addImpediment(catalog, state, 'imp-1', 'Bloqueado', 'bloqueio_tecnico', T1, 'wi-a'));
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+
+		expect(state.workItems[0]).toMatchObject({ status: 'a_fazer', deliverableId: null });
+		expect(state.dependencies).toHaveLength(1);
+		expect(state.impediments[0]).toMatchObject({ status: 'aberto', workItemId: 'wi-a' });
+		// moveWorkItem continua recusado pelo Impediment aberto, nunca por schedule.
+		expect(moveWorkItem(catalog, state, 'wi-a', 'concluido', T3)).toEqual({
+			ok: false,
+			error: { kind: 'work_item_blocked' }
+		});
 	});
 });
 

@@ -257,6 +257,12 @@ export interface WorkItemView {
 	// denormalizado aqui só para leitura (Trabalho tornar perceptível a
 	// origem sem cruzar listas na interface) — nunca sincronizado de volta.
 	deliverable: { deliverableId: string; title: string } | null;
+	// plannedStart/durationDays (ETAPA 12 do rework, §42, primeiro microcorte
+	// fundacional) — schedule MANUAL declarado, sem precedência/propagação.
+	// null/null é o caso normal (a maioria dos WorkItems não tem schedule
+	// ainda). Par sempre coerente: ver WorkItem em domain/state-types.ts.
+	plannedStart: string | null;
+	durationDays: number | null;
 }
 
 // Uma aresta de precedência vista a partir do item que depende. `title`/
@@ -740,6 +746,17 @@ export interface SetWorkItemDeliverableInput {
 	deliverableId: string | null;
 }
 
+// Fato temporal MANUAL e atômico — ETAPA 12 do rework ("Scheduling e
+// Gantt", §42), primeiro microcorte fundacional. Uma única entrada cobre
+// definir, alterar e limpar (os dois null) — mesmo molde de
+// SetMilestonePlannedDateInput/SetRiskAssessmentInput.
+export interface SetWorkItemScheduleInput {
+	projectId: string;
+	workItemId: string;
+	plannedStart: string | null;
+	durationDays: number | null;
+}
+
 // Dependency (ETAPA 8 do rework) — mesmo padrão: id gerado pelo caso de uso
 // (idGenerator), nunca recebido do cliente.
 export interface AddDependencyInput {
@@ -1156,6 +1173,7 @@ export interface ProjectUseCases {
 	addWorkItem(input: AddWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveWorkItem(input: MoveWorkItemInput): Promise<UseCaseOutcome<ProjectView>>;
 	setWorkItemDeliverable(input: SetWorkItemDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
+	setWorkItemSchedule(input: SetWorkItemScheduleInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDependency(input: AddDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDependency(input: RemoveDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDeliverable(input: AddDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;

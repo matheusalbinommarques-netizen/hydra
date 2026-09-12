@@ -34,6 +34,7 @@ import {
 	addScopeItem,
 	addTreatmentStep,
 	addWorkItem,
+	setWorkItemSchedule,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
@@ -1673,6 +1674,69 @@ describe('Decompor o trabalho (S9, D045 — correção de compatibilidade de par
 // Dependency (ETAPA 8 do rework) — compatibilidade de leitura e invariantes
 // reforçadas contra estado desserializado, mesmo padrão já aplicado a
 // WorkItem/Impediment neste arquivo.
+// WorkItem.plannedStart/durationDays (ETAPA 12 do rework, "Scheduling e
+// Gantt", §42, primeiro microcorte fundacional) — mesmo molde de
+// Risk.likelihood/impact: par fechado, ausência em snapshot antigo importa
+// como null/null, nunca sintetizado de nenhum outro dado.
+describe('WorkItem.plannedStart/durationDays (ETAPA 12 do rework, §42)', () => {
+	function stateWithScheduledWorkItem(): ProjectState {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		return state;
+	}
+
+	it('preserva o schedule no round-trip completo', () => {
+		const state = stateWithScheduledWorkItem();
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('snapshot anterior a este corte (sem plannedStart/durationDays) importa como null/null', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		const envelope = JSON.parse(serializeProjectState(state)) as { state: { workItems: Record<string, unknown>[] } };
+		delete envelope.state.workItems[0].plannedStart;
+		delete envelope.state.workItems[0].durationDays;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.value.workItems[0]).toMatchObject({ plannedStart: null, durationDays: null });
+	});
+
+	it('recusa schedule parcial vindo de estado persistido (plannedStart sem durationDays)', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithScheduledWorkItem())) as {
+			state: { workItems: Record<string, unknown>[] };
+		};
+		envelope.state.workItems[0].durationDays = null;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('recusa schedule parcial vindo de estado persistido (durationDays sem plannedStart)', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithScheduledWorkItem())) as {
+			state: { workItems: Record<string, unknown>[] };
+		};
+		envelope.state.workItems[0].plannedStart = null;
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('recusa plannedStart com formato inválido (timestamp completo, dia inexistente)', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithScheduledWorkItem())) as {
+			state: { workItems: Record<string, unknown>[] };
+		};
+		envelope.state.workItems[0].plannedStart = '2026-09-01T00:00:00.000Z';
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+
+	it('recusa durationDays não inteiro ou menor que 1', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithScheduledWorkItem())) as {
+			state: { workItems: Record<string, unknown>[] };
+		};
+		envelope.state.workItems[0].durationDays = 0;
+		expectError(JSON.stringify(envelope), 'invalid_shape');
+	});
+});
+
 describe('Dependency (ETAPA 8 do rework)', () => {
 	function stateWithWorkItems(): ProjectState {
 		let state = createInitialProjectState(catalog, 'proj-1', T1);

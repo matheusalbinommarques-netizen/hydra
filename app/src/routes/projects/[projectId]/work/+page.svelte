@@ -146,6 +146,15 @@
 		};
 	}
 
+	// Schedule (ETAPA 12 do rework, "Scheduling e Gantt", §42, primeiro
+	// microcorte fundacional) — mesmo espírito de handleDependencySubmit: os
+	// campos refletem selectedItem depois do reload, sem estado local próprio.
+	function handleScheduleSubmit() {
+		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			await update({ reset: false });
+		};
+	}
+
 	// Marcos (ETAPA 8 do rework, segundo microcorte). O estado exibido é o
 	// DECLARADO: nada aqui deriva "alcançado" do trabalho relacionado, e a
 	// contagem abaixo é contexto, nunca percentual/progresso do marco.
@@ -609,6 +618,49 @@
 					<button type="submit" class="button-secondary" disabled={!newMilestoneTargetId}>
 						Relacionar a um marco
 					</button>
+				</form>
+			{/if}
+		</div>
+
+		<!-- Schedule (ETAPA 12 do rework, "Scheduling e Gantt", §42, primeiro
+		     microcorte fundacional) — fato temporal MANUAL, sem precedência nem
+		     propagação: Trabalho continua sendo o único lugar onde o WorkItem se
+		     edita, mesmo espírito da data planejada do marco acima. Início e
+		     duração são um único fato atômico — os dois campos são sempre
+		     submetidos juntos, e "Limpar" também limpa os dois de uma vez. -->
+		<div class="panel-section">
+			<p class="panel-label">Cronograma</p>
+			<p class="panel-hint">
+				Quando este trabalho começa e por quantos dias corridos ocupa — um fato manual, sem cálculo de
+				precedência ou propagação ainda.
+			</p>
+			<form method="POST" action="?/setWorkItemSchedule" use:enhance={handleScheduleSubmit}>
+				<input type="hidden" name="workItemId" value={selectedItem.id} />
+				<label class="visually-hidden" for="schedule-start-{selectedItem.id}">Início planejado</label>
+				<input
+					id="schedule-start-{selectedItem.id}"
+					type="date"
+					name="plannedStart"
+					value={selectedItem.plannedStart ?? ''}
+				/>
+				<label class="visually-hidden" for="schedule-duration-{selectedItem.id}">Duração em dias corridos</label>
+				<input
+					id="schedule-duration-{selectedItem.id}"
+					type="number"
+					name="durationDays"
+					min="1"
+					step="1"
+					placeholder="dias"
+					value={selectedItem.durationDays ?? ''}
+				/>
+				<button type="submit" class="button-secondary">Salvar cronograma</button>
+			</form>
+			{#if selectedItem.plannedStart !== null}
+				<form method="POST" action="?/setWorkItemSchedule" use:enhance={handleScheduleSubmit}>
+					<input type="hidden" name="workItemId" value={selectedItem.id} />
+					<input type="hidden" name="plannedStart" value="" />
+					<input type="hidden" name="durationDays" value="" />
+					<button type="submit" class="link-button">Limpar cronograma</button>
 				</form>
 			{/if}
 		</div>

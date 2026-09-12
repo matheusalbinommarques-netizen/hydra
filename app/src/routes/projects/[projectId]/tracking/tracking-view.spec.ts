@@ -60,7 +60,9 @@ function makeWorkItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'
 		createdAt: overrides.createdAt ?? '2026-01-01T00:00:00.000Z',
 		blockedBy: overrides.blockedBy ?? null,
 		dependsOn: overrides.dependsOn ?? [],
-		deliverable: overrides.deliverable ?? null
+		deliverable: overrides.deliverable ?? null,
+		plannedStart: overrides.plannedStart ?? null,
+		durationDays: overrides.durationDays ?? null
 	};
 }
 
@@ -412,7 +414,7 @@ describe('buildTrackingView — Linha do tempo', () => {
 			makeMilestone({ id: 'm2', plannedDate: null })
 		];
 		const result = buildTrackingView(baseInput({ milestones }));
-		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['m1']);
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['m1']);
 	});
 
 	it('ordena por data civil ascendente, independente da ordem de criação', () => {
@@ -422,7 +424,7 @@ describe('buildTrackingView — Linha do tempo', () => {
 			makeMilestone({ id: 'm3', plannedDate: '2026-09-30' })
 		];
 		const result = buildTrackingView(baseInput({ milestones }));
-		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['m2', 'm3', 'm1']);
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['m2', 'm3', 'm1']);
 	});
 
 	// Desempate por FATO, não por acaso: a ordem em que a projeção recebe os
@@ -436,7 +438,7 @@ describe('buildTrackingView — Linha do tempo', () => {
 			makeMilestone({ id: 'anterior', plannedDate: '2026-08-31', createdAt: '2026-12-01T00:00:00.000Z' })
 		];
 		const result = buildTrackingView(baseInput({ milestones }));
-		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['anterior', 'aa', 'mm', 'zz']);
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['anterior', 'aa', 'mm', 'zz']);
 	});
 
 	// Caso extremo restante: mesma data planejada E mesmo instante de criação.
@@ -450,7 +452,7 @@ describe('buildTrackingView — Linha do tempo', () => {
 			makeMilestone({ id: 'ms-b', plannedDate: '2026-09-01', createdAt })
 		];
 		const result = buildTrackingView(baseInput({ milestones }));
-		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['ms-a', 'ms-b', 'ms-c']);
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['ms-a', 'ms-b', 'ms-c']);
 	});
 
 	it('um único marco datado já produz Linha do tempo', () => {
@@ -490,11 +492,11 @@ describe('buildTrackingView — Linha do tempo', () => {
 			})
 		];
 		const result = buildTrackingView(baseInput({ milestones }));
-		expect(result.timeline.map((entry) => entry.milestoneId)).toEqual(['atrasado', 'adiantado']);
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['atrasado', 'adiantado']);
 		for (const entry of result.timeline) {
 			expect(entry.statusLabel).toBe('Alcançado');
 			expect(Object.keys(entry).sort()).toEqual(
-				['createdAt', 'milestoneId', 'plannedDate', 'plannedDateLabel', 'reachedAt', 'status', 'statusLabel', 'title'].sort()
+				['createdAt', 'id', 'kind', 'plannedDate', 'plannedDateLabel', 'reachedAt', 'status', 'statusLabel', 'title'].sort()
 			);
 		}
 	});
@@ -504,7 +506,59 @@ describe('buildTrackingView — Linha do tempo', () => {
 		const [entry] = buildTrackingView(baseInput({ milestones })).timeline;
 		expect(entry.status).toBe('aberto');
 		expect(entry.statusLabel).toBe('Em aberto');
+		expect(entry.kind).toBe('milestone');
+		if (entry.kind !== 'milestone') throw new Error('esperado marco');
 		expect(entry.reachedAt).toBeNull();
+	});
+
+	// WorkItem com schedule (ETAPA 12 do rework, §42, primeiro microcorte
+	// fundacional) — segunda variante da mesma Linha do tempo, mesmos
+	// falsificadores: nenhuma barra, nenhum plannedEnd, nenhuma propagação.
+	it('inclui WorkItem com schedule completo e exclui WorkItem sem schedule', () => {
+		const workItems = [
+			makeWorkItem({ id: 'w1', title: 'Com schedule', plannedStart: '2026-09-12', durationDays: 3 }),
+			makeWorkItem({ id: 'w2', title: 'Sem schedule' })
+		];
+		const result = buildTrackingView(baseInput({ workItems }));
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['w1']);
+		expect(result.timeline[0].kind).toBe('workItem');
+	});
+
+	it('WorkItem no schedule expõe exatamente os campos do contrato, sem plannedEnd', () => {
+		const workItems = [makeWorkItem({ id: 'w1', title: 'Migração', plannedStart: '2026-09-12', durationDays: 3 })];
+		const [entry] = buildTrackingView(baseInput({ workItems })).timeline;
+		expect(entry).toMatchObject({
+			kind: 'workItem',
+			id: 'w1',
+			title: 'Migração',
+			plannedDate: '2026-09-12',
+			plannedDateLabel: '12/09/2026',
+			durationDays: 3,
+			durationLabel: '3 dias'
+		});
+		expect(Object.keys(entry).sort()).toEqual(
+			['createdAt', 'durationDays', 'durationLabel', 'id', 'kind', 'plannedDate', 'plannedDateLabel', 'status', 'statusLabel', 'title'].sort()
+		);
+		expect('plannedEnd' in entry).toBe(false);
+	});
+
+	it('duração de 1 dia usa singular no rótulo', () => {
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-12', durationDays: 1 })];
+		const [entry] = buildTrackingView(baseInput({ workItems })).timeline;
+		expect(entry.kind === 'workItem' && entry.durationLabel).toBe('1 dia');
+	});
+
+	it('marcos e WorkItems com schedule aparecem juntos, ordenados por data civil', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-20' })];
+		const workItems = [
+			makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 }),
+			makeWorkItem({ id: 'w2', title: 'Sem schedule' })
+		];
+		const result = buildTrackingView(baseInput({ milestones, workItems }));
+		expect(result.timeline.map((entry) => ({ id: entry.id, kind: entry.kind }))).toEqual([
+			{ id: 'w1', kind: 'workItem' },
+			{ id: 'm1', kind: 'milestone' }
+		]);
 	});
 });
 

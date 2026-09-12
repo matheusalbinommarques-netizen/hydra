@@ -222,7 +222,9 @@ function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][
 		// removeDeliverable, ou inconsistência de estado) é tratada como
 		// ausência de origem, mesmo espírito de buildWorkItemDependencyViews —
 		// nunca quebra a tela.
-		deliverable: deliverable ? { deliverableId: deliverable.id, title: deliverable.title } : null
+		deliverable: deliverable ? { deliverableId: deliverable.id, title: deliverable.title } : null,
+		plannedStart: item.plannedStart,
+		durationDays: item.durationDays
 	};
 }
 

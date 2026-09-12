@@ -52,6 +52,29 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// setWorkItemSchedule (ETAPA 12 do rework, "Scheduling e Gantt", §42,
+	// primeiro microcorte fundacional) — schedule MANUAL e atômico: campo vazio
+	// em ambos significa LIMPAR (null/null), não erro. Estado parcial (só um
+	// preenchido) é recusado pelo domínio, não aqui — esta action só distingue
+	// "veio vazio" de "veio algo", mesmo espírito de setMilestonePlannedDate.
+	setWorkItemSchedule: async ({ request, params }) => {
+		const formData = await request.formData();
+		const workItemId = readString(formData, 'workItemId');
+		if (!workItemId) return fail(400, { message: 'Item de trabalho inválido.' });
+		const plannedStart = readString(formData, 'plannedStart');
+		const durationDaysRaw = readString(formData, 'durationDays');
+		const durationDays = durationDaysRaw === null ? null : Number(durationDaysRaw);
+
+		const result = await getProjectUseCases().setWorkItemSchedule({
+			projectId: params.projectId,
+			workItemId,
+			plannedStart,
+			durationDays
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	// Dependency (ETAPA 8 do rework) — precedência planejada, nunca bloqueio:
 	// nada aqui interfere na action `move` acima.
 	addDependency: async ({ request, params }) => {

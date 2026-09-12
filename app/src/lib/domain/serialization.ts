@@ -427,6 +427,12 @@ function parseImpedimentList(value: unknown): Result<Impediment[], ProjectStateP
 // D037/D043). A integridade referencial (a Deliverable referenciada existe
 // no mesmo snapshot) é checada depois, junto às demais invariantes
 // cruzadas — ver validateCrossReferences.
+//
+// plannedStart/durationDays (ETAPA 12 do rework, §42, primeiro microcorte
+// fundacional) — ausentes/undefined em snapshots exportados antes deste
+// corte: tratados como `null`/`null`, mesmo espírito de deliverableId acima.
+// O par fechado (ambos null ou ambos preenchidos) é reforçado depois, junto
+// às demais invariantes — ver validateInvariants.
 function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParseError> {
 	if (value === undefined) return { ok: true, value: [] };
 	if (!Array.isArray(value)) return shapeError('workItems deve ser um array');
@@ -440,6 +446,16 @@ function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParse
 		if (item.deliverableId !== undefined && item.deliverableId !== null && !isString(item.deliverableId)) {
 			return shapeError('WorkItem.deliverableId deve ser uma string ou null');
 		}
+		if (item.plannedStart !== undefined && item.plannedStart !== null && !isCivilDate(item.plannedStart)) {
+			return shapeError('WorkItem.plannedStart deve ser uma data civil YYYY-MM-DD válida ou null');
+		}
+		if (
+			item.durationDays !== undefined &&
+			item.durationDays !== null &&
+			(typeof item.durationDays !== 'number' || !Number.isInteger(item.durationDays) || item.durationDays < 1)
+		) {
+			return shapeError('WorkItem.durationDays deve ser um número inteiro maior ou igual a 1, ou null');
+		}
 		if (!isIsoDateString(item.createdAt)) return shapeError('WorkItem.createdAt deve ser uma data ISO 8601 válida');
 		if (!isIsoDateString(item.updatedAt)) return shapeError('WorkItem.updatedAt deve ser uma data ISO 8601 válida');
 		result.push({
@@ -448,6 +464,8 @@ function parseWorkItemList(value: unknown): Result<WorkItem[], ProjectStateParse
 			title: item.title,
 			status: item.status,
 			deliverableId: (item.deliverableId as string | null | undefined) ?? null,
+			plannedStart: (item.plannedStart as string | null | undefined) ?? null,
+			durationDays: (item.durationDays as number | null | undefined) ?? null,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});
@@ -1401,6 +1419,11 @@ function assembleProjectState({
 		}
 		seenWorkItemIds.add(item.id);
 		workItemById.set(item.id, item);
+		if ((item.plannedStart === null) !== (item.durationDays === null)) {
+			return invariantError(
+				`WorkItem "${item.id}" tem schedule parcial (plannedStart/durationDays devem ser ambos null ou ambos preenchidos)`
+			);
+		}
 	}
 
 	// referência: WorkItem.deliverableId (ETAPA 9 do rework, segundo

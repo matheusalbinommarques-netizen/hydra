@@ -132,14 +132,39 @@ CREATE TABLE IF NOT EXISTS deliverable (
 -- deste corte recebem esta coluna via ALTER TABLE idempotente em
 -- sqlite-project-repository.ts, não aqui (mesmo padrão de
 -- ensureImpedimentWorkItemIdColumn/ETAPA 6).
+--
+-- planned_start/duration_days (ETAPA 12 do rework, "Scheduling e Gantt",
+-- §42, primeiro microcorte fundacional) — fato temporal MANUAL e declarado,
+-- sem precedência, propagação, folga, caminho crítico ou baseline (próximos
+-- itens da lista incremental de §42, ainda não implementados). planned_start
+-- é data CIVIL YYYY-MM-DD (mesmo formato/CHECK de milestone.planned_date);
+-- duration_days é dias corridos, inteiro >= 1. NULL/NULL é o caso normal e
+-- permanentemente válido. A invariante do par fechado é garantida SEMPRE
+-- pelo domínio (setWorkItemSchedule) e pela desserialização, e pela CHECK
+-- cruzada `work_item_schedule_pair` abaixo APENAS em bancos criados do zero
+-- por este corte — mesmo padrão de `risk_assessment_pair` (D051): SQLite não
+-- permite anexar CHECK a uma tabela já existente via ALTER TABLE, então um
+-- banco criado antes deste corte recebe as duas colunas via ALTER TABLE
+-- idempotente (ensureWorkItemScheduleColumns), sem CHECK cruzada nenhuma
+-- sobre elas — a proteção de banco nesse caso é só de FORMATO/POSITIVIDADE
+-- por coluna, nunca do par.
 CREATE TABLE IF NOT EXISTS work_item (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
 	title TEXT NOT NULL,
 	status TEXT NOT NULL CHECK (status IN ('a_fazer', 'em_andamento', 'concluido')),
 	deliverable_id TEXT REFERENCES deliverable (id),
+	planned_start TEXT,
+	duration_days INTEGER,
 	created_at TEXT NOT NULL,
-	updated_at TEXT NOT NULL
+	updated_at TEXT NOT NULL,
+	CONSTRAINT work_item_planned_start_format CHECK (
+		planned_start IS NULL OR planned_start GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+	),
+	CONSTRAINT work_item_duration_days_positive CHECK (duration_days IS NULL OR duration_days >= 1),
+	CONSTRAINT work_item_schedule_pair CHECK (
+		(planned_start IS NULL AND duration_days IS NULL) OR (planned_start IS NOT NULL AND duration_days IS NOT NULL)
+	)
 );
 
 -- Cockpit, vertical 2, fatia "Impedimentos" — ver app/src/lib/domain/state-types.ts.

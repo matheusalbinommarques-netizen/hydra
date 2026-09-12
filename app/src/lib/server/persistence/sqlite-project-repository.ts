@@ -351,6 +351,41 @@ function ensureDecisionResponsibleColumn(db: Database.Database): void {
 	}
 }
 
+// Décima terceira evolução do schema desde 0001_init.sql (ETAPA 12 do
+// rework, "Scheduling e Gantt", §42, primeiro microcorte fundacional) —
+// mesmo caso de ensureRiskAssessmentAndResponseColumns: duas colunas novas na
+// mesma tabela `work_item`, já existente desde a ETAPA 6. Cada ALTER TABLE
+// ADD COLUMN abaixo só pode carregar uma CHECK que referencie a própria
+// coluna nova (restrição do SQLite) — por isso a CHECK cruzada do par
+// (`work_item_schedule_pair`, ver 0001_init.sql) só existe numa tabela criada
+// do zero por este corte, mesmo caso de `risk_assessment_pair` (D051): um
+// banco upgradeado ganha as duas colunas com formato/positividade validados
+// por coluna, mas SEM proteção de banco sobre o par — só o domínio
+// (setWorkItemSchedule) e a desserialização protegem o par nesse caso,
+// falsificado explicitamente em teste dedicado. Linhas já existentes ficam
+// com as duas colunas NULL (par válido: sem schedule), então a invariante
+// nunca é violada por esta migração em si. Nenhum schedule é sintetizado de
+// nenhum outro dado (effort, capacity, data_alvo_entrega ou qualquer Answer
+// legado).
+function ensureWorkItemScheduleColumns(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(work_item)').all() as TableInfoRow[];
+	const columnNames = new Set(columns.map((column) => column.name));
+	if (!columnNames.has('planned_start')) {
+		db.exec(
+			`ALTER TABLE work_item ADD COLUMN planned_start TEXT
+			 CONSTRAINT work_item_planned_start_format
+			 CHECK (planned_start IS NULL OR planned_start GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')`
+		);
+	}
+	if (!columnNames.has('duration_days')) {
+		db.exec(
+			`ALTER TABLE work_item ADD COLUMN duration_days INTEGER
+			 CONSTRAINT work_item_duration_days_positive
+			 CHECK (duration_days IS NULL OR duration_days >= 1)`
+		);
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -366,6 +401,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureRiskAssessmentAndResponseColumns(db);
 	ensureImpedimentDecisionIdColumn(db);
 	ensureDecisionResponsibleColumn(db);
+	ensureWorkItemScheduleColumns(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -447,8 +483,10 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// referencia deliverable.id) e antes de impediment: impediment.work_item_id
 		// referencia work_item.id (FK checada imediatamente, foreign_keys = ON).
 		const insertWorkItem = db.prepare(
-			`INSERT INTO work_item (id, project_id, title, status, deliverable_id, created_at, updated_at)
-			 VALUES (@id, @projectId, @title, @status, @deliverableId, @createdAt, @updatedAt)`
+			`INSERT INTO work_item
+			   (id, project_id, title, status, deliverable_id, planned_start, duration_days, created_at, updated_at)
+			 VALUES
+			   (@id, @projectId, @title, @status, @deliverableId, @plannedStart, @durationDays, @createdAt, @updatedAt)`
 		);
 		for (const item of state.workItems) {
 			insertWorkItem.run(item);
@@ -753,7 +791,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const workItemRows = db
 				.prepare(
-					`SELECT id, project_id, title, status, deliverable_id, created_at, updated_at
+					`SELECT id, project_id, title, status, deliverable_id, planned_start, duration_days, created_at, updated_at
 					 FROM work_item WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as WorkItemRow[];

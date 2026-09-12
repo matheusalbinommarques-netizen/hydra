@@ -24,6 +24,7 @@ import {
 	addScopeItem,
 	addTreatmentStep,
 	addWorkItem,
+	setWorkItemSchedule,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
@@ -1343,6 +1344,162 @@ describe('createSqliteProjectRepository — WorkItem.deliverableId (ETAPA 9, seg
 		await repo.save(state);
 		restored = await repo.findById('proj-1');
 		expect(restored?.workItems.find((item) => item.id === 'wi-new')?.deliverableId).toBeNull();
+	});
+});
+
+// WorkItem.plannedStart/durationDays (ETAPA 12 do rework, "Scheduling e
+// Gantt", §42, primeiro microcorte fundacional) — mesmo molde de
+// Risk.reviewedAt/likelihood/impact: colunas novas na mesma tabela,
+// já existente desde a ETAPA 6.
+describe('createSqliteProjectRepository — WorkItem.plannedStart/durationDays (ETAPA 12 do rework, §42)', () => {
+	it('round-trip preserva o schedule definido, alterado e limpo', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addWorkItem(catalog, state, 'wi-new', 'Tarefa', T2));
+		await repo.insert(state);
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-new', '2026-09-12', 3, T2));
+		await repo.save(state);
+		let restored = await repo.findById('proj-1');
+		expect(restored?.workItems.find((item) => item.id === 'wi-new')).toMatchObject({
+			plannedStart: '2026-09-12',
+			durationDays: 3
+		});
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-new', null, null, T2));
+		await repo.save(state);
+		restored = await repo.findById('proj-1');
+		expect(restored?.workItems.find((item) => item.id === 'wi-new')).toMatchObject({
+			plannedStart: null,
+			durationDays: null
+		});
+	});
+
+	// planned_start/duration_days participam de CHECK — DROP COLUMN não serve
+	// aqui (mesma razão do teste de milestone.planned_date acima): recria
+	// work_item na forma anterior a este corte e grava um WorkItem "antigo"
+	// direto no SQL, isolado (sem dependency/impediment/milestone_work_item
+	// apontando para ele, então recriar a tabela é seguro).
+	it('abre um banco cuja tabela work_item não tem planned_start/duration_days, sem sintetizar schedule, e volta a aceitar escrita', async () => {
+		const filePath = tempFilePath();
+
+		const seed = createSqliteProjectRepository(filePath);
+		await seed.insert(createInitialProjectState(catalog, 'proj-1', T1));
+		seed.close();
+
+		const raw = new Database(filePath);
+		raw.exec('DROP TABLE work_item;');
+		raw.exec(
+			`CREATE TABLE work_item (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+				title TEXT NOT NULL,
+				status TEXT NOT NULL CHECK (status IN ('a_fazer', 'em_andamento', 'concluido')),
+				deliverable_id TEXT REFERENCES deliverable (id),
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			);`
+		);
+		raw
+			.prepare(
+				`INSERT INTO work_item (id, project_id, title, status, deliverable_id, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			)
+			.run('wi-legacy', 'proj-1', 'Item pré-existente', 'a_fazer', null, T1, T1);
+		raw.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		// O WorkItem pré-coluna continua válido e simplesmente não tem schedule:
+		// nada é sintetizado de created_at nem de nenhum outro dado.
+		const loaded = await repo.findById('proj-1');
+		expect(loaded?.workItems).toEqual([
+			{
+				id: 'wi-legacy',
+				projectId: 'proj-1',
+				title: 'Item pré-existente',
+				status: 'a_fazer',
+				deliverableId: null,
+				plannedStart: null,
+				durationDays: null,
+				createdAt: T1,
+				updatedAt: T1
+			}
+		]);
+
+		if (!loaded) throw new Error('esperado estado');
+		const next = unwrap(setWorkItemSchedule(catalog, loaded, 'wi-legacy', '2026-09-12', 3, T2));
+		await repo.save(next);
+		await expect(repo.findById('proj-1')).resolves.toEqual(next);
+
+		// Reabrir de novo não falha nem duplica as colunas.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
+	});
+
+	// A CHECK nomeada work_item_schedule_pair (0001_init.sql) só existe na
+	// tabela criada por CREATE TABLE IF NOT EXISTS — mesmo caso de
+	// risk_assessment_pair (D051): um banco pré-existente que já tinha a
+	// tabela `work_item` (sem essa CHECK) recebe as duas colunas novas só via
+	// ALTER TABLE ADD COLUMN (ensureWorkItemScheduleColumns), e cada ALTER só
+	// pode carregar uma CHECK referenciando a própria coluna nova — nunca uma
+	// CHECK cruzando as duas. Falsificação explícita: a invariante do par
+	// (plannedStart/durationDays ambos null ou ambos preenchidos) NÃO é
+	// protegida pelo SQLite num banco upgradeado — só pelo domínio
+	// (setWorkItemSchedule) e pela desserialização (validateInvariants).
+	// Reconstruir a tabela inteira só para ganhar essa CHECK em bancos antigos
+	// seria migration machinery nova por simetria cosmética, não exigida pelo
+	// contrato deste corte.
+	it('a CHECK do par plannedStart/durationDays não protege um banco upgradeado (só o criado do zero)', async () => {
+		const upgradedPath = tempFilePath();
+		const seed = createSqliteProjectRepository(upgradedPath);
+		// Estado isolado (sem dependency/impediment/milestone_work_item
+		// apontando para o WorkItem): DROP TABLE work_item abaixo falharia por
+		// violação de FK (foreign_keys = ON) se algum outro registro
+		// referenciasse esta linha.
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-sched-1', 'Tarefa', T1));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(upgradedPath);
+		legacyDb.exec(
+			`CREATE TABLE work_item_legacy AS
+			   SELECT id, project_id, title, status, deliverable_id, created_at, updated_at FROM work_item;
+			 DROP TABLE work_item;
+			 ALTER TABLE work_item_legacy RENAME TO work_item;`
+		);
+		legacyDb.close();
+
+		// Abrir e fechar o repositório roda ensureWorkItemScheduleColumns na
+		// construção — as duas colunas já existem depois disto, sem CHECK
+		// cruzada nenhuma sobre elas. Fechado antes de abrir uma conexão raw
+		// própria para evitar duas conexões concorrentes no mesmo arquivo.
+		const upgraded = createSqliteProjectRepository(upgradedPath);
+		upgraded.close();
+
+		const upgradedDb = new Database(upgradedPath);
+		expect(() =>
+			upgradedDb.prepare('UPDATE work_item SET planned_start = ? WHERE id = ?').run('2026-09-12', 'wi-sched-1')
+		).not.toThrow();
+		upgradedDb.close();
+
+		// No mesmo cenário, um banco criado do zero por este corte tem a CHECK
+		// e recusa a mesma escrita parcial.
+		const freshPath = tempFilePath();
+		const fresh = createSqliteProjectRepository(freshPath);
+		let freshState = nonTrivialState();
+		freshState = unwrap(addWorkItem(catalog, freshState, 'wi-sched-1', 'Tarefa', T1));
+		await fresh.insert(freshState);
+		fresh.close();
+
+		const freshDb = new Database(freshPath);
+		expect(() =>
+			freshDb.prepare('UPDATE work_item SET planned_start = ? WHERE id = ?').run('2026-09-12', 'wi-sched-1')
+		).toThrow(/work_item_schedule_pair/);
+		freshDb.close();
 	});
 });
 

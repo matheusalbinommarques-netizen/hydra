@@ -26,6 +26,7 @@ import {
 	addMilestone as addMilestoneInDomain,
 	addWorkItem as addWorkItemInDomain,
 	setWorkItemDeliverable as setWorkItemDeliverableInDomain,
+	setWorkItemSchedule as setWorkItemScheduleInDomain,
 	answerActivity as answerActivityInDomain,
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
@@ -132,6 +133,7 @@ import type {
 	UnlinkWorkItemFromMilestoneInput,
 	AddWorkItemInput,
 	SetWorkItemDeliverableInput,
+	SetWorkItemScheduleInput,
 	AnswerActivityInput,
 	CloseRiskInput,
 	CompleteExternalActionInput,
@@ -915,6 +917,29 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				state,
 				input.workItemId,
 				input.deliverableId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// setWorkItemSchedule (ETAPA 12 do rework, "Scheduling e Gantt", §42,
+		// primeiro microcorte fundacional) — define, altera ou limpa (os dois
+		// null) o fato temporal manual do WorkItem. Sem evento de histórico, mesma
+		// razão do bloco de Deliverable/Milestone: a taxonomia de ProjectEvent é
+		// fechada e cobre só o loop WorkItem/Impediment (D037).
+		async setWorkItemSchedule(input: SetWorkItemScheduleInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setWorkItemScheduleInDomain(
+				catalog,
+				state,
+				input.workItemId,
+				input.plannedStart,
+				input.durationDays,
 				clock.now()
 			);
 			if (!result.ok) return { ok: false, error: result.error };

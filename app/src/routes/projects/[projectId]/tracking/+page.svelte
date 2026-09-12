@@ -387,23 +387,31 @@
 	<section class="card timeline" aria-labelledby="timeline-heading">
 		<h2 id="timeline-heading">Linha do tempo</h2>
 		<p class="subtitle-inline">
-			Marcos com data planejada, do mais próximo ao mais distante. A data é o que você planejou; o estado é o
-			que você declarou.
+			Marcos e trabalhos com schedule declarado, do mais próximo ao mais distante. A data é o que você
+			planejou; o estado é o que você declarou — sem cálculo de precedência ou propagação ainda.
 		</p>
 
 		<ul class="timeline-list">
-			{#each tracking.timeline as entry (entry.milestoneId)}
-				<li class="timeline-row" class:reached={entry.status === 'alcancado'}>
+			{#each tracking.timeline as entry (entry.id)}
+				<li
+					class="timeline-row"
+					class:reached={entry.kind === 'milestone' && entry.status === 'alcancado'}
+				>
 					<span class="timeline-date">{entry.plannedDateLabel}</span>
+					<span class="timeline-kind">{entry.kind === 'milestone' ? 'Marco' : 'Trabalho'}</span>
 					<span class="timeline-title">{entry.title}</span>
-					<!-- O estado declarado aparece uma vez só: quando o marco foi
-					     alcançado, a própria frase com a data já É o estado. -->
-					{#if entry.reachedAt === null}
-						<span class="timeline-state">{entry.statusLabel}</span>
+					{#if entry.kind === 'milestone'}
+						<!-- O estado declarado aparece uma vez só: quando o marco foi
+						     alcançado, a própria frase com a data já É o estado. -->
+						{#if entry.reachedAt === null}
+							<span class="timeline-state">{entry.statusLabel}</span>
+						{:else}
+							<span class="timeline-state">
+								{entry.statusLabel} em {timestampFormatter.format(new Date(entry.reachedAt))}
+							</span>
+						{/if}
 					{:else}
-						<span class="timeline-state">
-							{entry.statusLabel} em {timestampFormatter.format(new Date(entry.reachedAt))}
-						</span>
+						<span class="timeline-state">{entry.statusLabel} · {entry.durationLabel}</span>
 					{/if}
 				</li>
 			{/each}
@@ -1095,6 +1103,19 @@
 		flex: none;
 		font-variant-numeric: tabular-nums;
 		font-weight: 700;
+	}
+
+	/* Distingue WorkItem de Milestone sem depender só da palavra em
+	   .timeline-title — mesmo espírito de .deliverable-badge em Trabalho. */
+	.timeline-kind {
+		flex: none;
+		font-size: var(--font-size-caption);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--hydra-muted);
+		border: 1px solid rgba(101, 104, 108, 0.3);
+		border-radius: var(--hydra-radius-pill);
+		padding: 0 var(--space-2);
 	}
 
 	.timeline-title {

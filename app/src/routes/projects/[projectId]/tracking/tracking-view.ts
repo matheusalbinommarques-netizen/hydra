@@ -107,15 +107,18 @@ export interface TrackingBlockedWaitingWorkItem {
 
 // Linha do tempo (ETAPA 8 do rework, microcorte de Timeline;
 // HYDRA_PRODUCT_REWORK.md §16 "Linha do tempo" e §17, prontidão "datas/marcos").
-// LISTA cronológica declarada, nunca gráfico de scheduling: sem duração, sem
-// barra, sem escala espacial, sem "hoje", sem atraso, sem folga e sem
-// comparação entre plannedDate e reachedAt — variação é §42.
+// LISTA cronológica declarada, nunca gráfico de scheduling: sem barra, sem
+// escala espacial, sem "hoje", sem atraso, sem folga e sem comparação entre
+// plannedDate e reachedAt — variação é §42.
 //
 // `status` é o estado DECLARADO do marco e continua sendo a única autoridade
 // (D040): a Timeline não corrige nem interpreta um marco alcançado com data
 // futura ou passada, só mostra os dois fatos.
-export interface TrackingTimelineEntry {
-	milestoneId: string;
+export interface TrackingMilestoneTimelineEntry {
+	kind: 'milestone';
+	// Comum às duas variantes (ver TrackingWorkItemTimelineEntry) — chave de
+	// lista e desempate de ordenação (ver compareTimelineEntries).
+	id: string;
 	title: string;
 	// Data civil crua (YYYY-MM-DD), preservada para ordenação/teste.
 	plannedDate: string;
@@ -133,6 +136,30 @@ export interface TrackingTimelineEntry {
 	// cadastrado.
 	createdAt: string;
 }
+
+// WorkItem com schedule (ETAPA 12 do rework, "Scheduling e Gantt", §42,
+// primeiro microcorte fundacional) — segunda variante da Linha do tempo,
+// primeiro leitor real do fato temporal manual introduzido em
+// WorkItem.plannedStart/durationDays. Só entram aqui WorkItems com schedule
+// COMPLETO (ver buildWorkItemTimelineEntries) — sem schedule, o WorkItem
+// continua existindo normalmente em Trabalho, fora desta lista. Sem
+// plannedEnd exposto (não calculado nem persistido nesta rodada) e sem
+// nenhuma promessa de precedência/propagação: `durationLabel` é só o dado
+// declarado, formatado.
+export interface TrackingWorkItemTimelineEntry {
+	kind: 'workItem';
+	id: string;
+	title: string;
+	plannedDate: string;
+	plannedDateLabel: string;
+	durationDays: number;
+	durationLabel: string;
+	status: WorkItemStatus;
+	statusLabel: string;
+	createdAt: string;
+}
+
+export type TrackingTimelineEntry = TrackingMilestoneTimelineEntry | TrackingWorkItemTimelineEntry;
 
 export interface TrackingContinuityView {
 	completed: boolean;
@@ -303,28 +330,31 @@ function formatCivilDate(plannedDate: string): string {
 }
 
 // Só marcos COM data planejada: um marco sem data não tem fato temporal e
-// continua existindo normalmente em Trabalho.
+// continua existindo normalmente em Trabalho. Mesma regra para WorkItem: só
+// entram aqui os com schedule COMPLETO (ver buildWorkItemTimelineEntries).
 //
 // Ordenação totalmente determinística, sem depender da estabilidade do `sort`
-// nem da ordem incidental em que a projeção recebeu os marcos:
+// nem da ordem incidental em que a projeção recebeu marcos/WorkItems:
 //   1. plannedDate ASC — comparação lexicográfica de YYYY-MM-DD é exatamente a
 //      ordem cronológica, sem construir Date;
 //   2. createdAt ASC — mesma data planejada mantém a ordem de criação;
 //   3. id ASC — resolve o caso extremo restante (mesma data e mesmo instante
 //      de criação), para a lista nunca depender de acaso.
 // Nenhum dos três é ordenação de PRODUTO: não existe campo `order` em
-// Milestone, e prioridade/recorte continuam pertencendo a Roadmap (§38).
+// Milestone nem em WorkItem, e prioridade/recorte continuam pertencendo a
+// Roadmap (§38)/Entregas.
 function compareTimelineEntries(a: TrackingTimelineEntry, b: TrackingTimelineEntry): number {
 	if (a.plannedDate !== b.plannedDate) return a.plannedDate < b.plannedDate ? -1 : 1;
 	if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
-	return a.milestoneId < b.milestoneId ? -1 : a.milestoneId > b.milestoneId ? 1 : 0;
+	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-function buildTimeline(milestones: MilestoneView[]): TrackingTimelineEntry[] {
+function buildMilestoneTimelineEntries(milestones: MilestoneView[]): TrackingMilestoneTimelineEntry[] {
 	return milestones
 		.filter((milestone) => milestone.plannedDate !== null)
 		.map((milestone) => ({
-			milestoneId: milestone.id,
+			kind: 'milestone',
+			id: milestone.id,
 			// filter acima já garante plannedDate !== null.
 			plannedDate: milestone.plannedDate!,
 			plannedDateLabel: formatCivilDate(milestone.plannedDate!),
@@ -333,8 +363,41 @@ function buildTimeline(milestones: MilestoneView[]): TrackingTimelineEntry[] {
 			statusLabel: MILESTONE_STATUS_LABEL[milestone.status],
 			reachedAt: milestone.reachedAt,
 			createdAt: milestone.createdAt
-		}))
-		.sort(compareTimelineEntries);
+		}));
+}
+
+function durationLabel(durationDays: number): string {
+	return durationDays === 1 ? '1 dia' : `${durationDays} dias`;
+}
+
+// Só WorkItems com schedule COMPLETO (plannedStart e durationDays não-null —
+// a invariante do domínio já garante que os dois vêm juntos, ver WorkItem em
+// domain/state-types.ts). Sem plannedEnd: não é calculado nem persistido
+// nesta rodada, e não há consumidor real ainda (ver HYDRA_PRODUCT_REWORK.md
+// §42).
+function buildWorkItemTimelineEntries(workItems: WorkItemView[]): TrackingWorkItemTimelineEntry[] {
+	return workItems
+		.filter((item): item is WorkItemView & { plannedStart: string; durationDays: number } =>
+			item.plannedStart !== null && item.durationDays !== null
+		)
+		.map((item) => ({
+			kind: 'workItem',
+			id: item.id,
+			plannedDate: item.plannedStart,
+			plannedDateLabel: formatCivilDate(item.plannedStart),
+			durationDays: item.durationDays,
+			durationLabel: durationLabel(item.durationDays),
+			title: item.title,
+			status: item.status,
+			statusLabel: WORK_STATUS_LABEL[item.status],
+			createdAt: item.createdAt
+		}));
+}
+
+function buildTimeline(milestones: MilestoneView[], workItems: WorkItemView[]): TrackingTimelineEntry[] {
+	return [...buildMilestoneTimelineEntries(milestones), ...buildWorkItemTimelineEntries(workItems)].sort(
+		compareTimelineEntries
+	);
 }
 
 function buildAttentionPendingItems(openPendingItems: PendingItemView[]): TrackingAttentionPendingItem[] {
@@ -397,7 +460,7 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 	return {
 		situation,
 		work: buildWork(input.workItems),
-		timeline: buildTimeline(input.milestones),
+		timeline: buildTimeline(input.milestones, input.workItems),
 		blockedWorkItems: buildBlockedWorkItems(input.workItems),
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
 		impediments: buildImpediments(input.impediments),
