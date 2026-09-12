@@ -58,11 +58,13 @@ import {
 	prepareExternalAction as prepareExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeCauseHypothesis as removeCauseHypothesisInDomain,
+	linkWorkItemToDecision as linkWorkItemToDecisionInDomain,
 	linkWorkItemToMilestone as linkWorkItemToMilestoneInDomain,
 	reachMilestone as reachMilestoneInDomain,
 	removeDependency as removeDependencyInDomain,
 	reopenMilestone as reopenMilestoneInDomain,
 	setMilestonePlannedDate as setMilestonePlannedDateInDomain,
+	unlinkWorkItemFromDecision as unlinkWorkItemFromDecisionInDomain,
 	unlinkWorkItemFromMilestone as unlinkWorkItemFromMilestoneInDomain,
 	removeDesiredOutcome as removeDesiredOutcomeInDomain,
 	removeScopeItem as removeScopeItemInDomain,
@@ -152,6 +154,8 @@ import type {
 	EditDecisionInput,
 	EditDecisionOutcomeInput,
 	EditRiskStatementInput,
+	LinkWorkItemToDecisionInput,
+	UnlinkWorkItemFromDecisionInput,
 	MarkCauseExplorationUnknownInput,
 	MoveDesiredOutcomeInput,
 	MoveScopeItemInput,
@@ -1300,6 +1304,39 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = editDecisionOutcomeInDomain(catalog, state, input.decisionId, input.outcome, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// linkWorkItemToDecision/unlinkWorkItemFromDecision (ETAPA 11 do rework,
+		// terceiro microcorte, §41) — mesmo padrão de linkWorkItemToMilestone/
+		// unlinkWorkItemFromMilestone acima; sem evento no histórico, mesma razão
+		// de Milestone/Risk/Decision (taxonomia de ProjectEvent fechada, D037).
+		async linkWorkItemToDecision(input: LinkWorkItemToDecisionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = linkWorkItemToDecisionInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.decisionId,
+				input.workItemId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		async unlinkWorkItemFromDecision(input: UnlinkWorkItemFromDecisionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = unlinkWorkItemFromDecisionInDomain(catalog, state, input.decisionAffectedWorkItemId);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

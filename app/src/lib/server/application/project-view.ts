@@ -23,6 +23,7 @@ import type {
 	CauseHypothesisView,
 	ChangeView,
 	CurrentTreatmentView,
+	DecisionAffectedWorkItemView,
 	DecisionView,
 	DesiredOutcomeView,
 	EvidenceView,
@@ -159,7 +160,22 @@ function buildRiskView(risk: ProjectState['risks'][number]): RiskView {
 	};
 }
 
-function buildDecisionView(decision: ProjectState['decisions'][number]): DecisionView {
+// affectedWorkItems (ETAPA 11 do rework, terceiro microcorte, §41) — mesmo
+// tratamento de vínculo órfão de buildMilestoneView: um WorkItem ausente só
+// poderia vir de estado corrompido (FK + invariante na desserialização),
+// filtrado em vez de quebrar a tela.
+function buildDecisionView(state: ProjectState, decision: ProjectState['decisions'][number]): DecisionView {
+	const affectedWorkItems: DecisionAffectedWorkItemView[] = [];
+	for (const link of state.decisionAffectedWorkItems) {
+		if (link.decisionId !== decision.id) continue;
+		const workItem = state.workItems.find((item) => item.id === link.workItemId);
+		if (!workItem) continue;
+		affectedWorkItems.push({
+			decisionAffectedWorkItemId: link.id,
+			workItemId: workItem.id,
+			title: workItem.title
+		});
+	}
 	return {
 		id: decision.id,
 		subject: decision.subject,
@@ -168,7 +184,8 @@ function buildDecisionView(decision: ProjectState['decisions'][number]): Decisio
 		status: decision.status,
 		outcome: decision.outcome,
 		decidedAt: decision.decidedAt,
-		createdAt: decision.createdAt
+		createdAt: decision.createdAt,
+		affectedWorkItems
 	};
 }
 
@@ -366,7 +383,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),
 		risks: state.risks.map(buildRiskView),
-		decisions: state.decisions.map(buildDecisionView),
+		decisions: state.decisions.map((decision) => buildDecisionView(state, decision)),
 		changes: state.changes.map(buildChangeView),
 		affectedGroups: state.affectedGroups.map(buildAffectedGroupView),
 		affectedGroupConfirmationIssues: getAffectedGroupConfirmationIssues(state.affectedGroups),

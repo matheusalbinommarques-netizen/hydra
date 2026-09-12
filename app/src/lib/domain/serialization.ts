@@ -17,6 +17,7 @@ import type {
 	Change,
 	CurrentTreatment,
 	Decision,
+	DecisionAffectedWorkItem,
 	DecisionStatus,
 	DesiredOutcome,
 	Evidence,
@@ -697,6 +698,35 @@ function parseDecisionList(value: unknown): Result<Decision[], ProjectStateParse
 	return { ok: true, value: result };
 }
 
+// DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41) —
+// ausente em snapshots exportados antes deste corte: tratado como coleção
+// vazia, mesmo espírito de parseMilestoneWorkItemList acima.
+function parseDecisionAffectedWorkItemList(
+	value: unknown
+): Result<DecisionAffectedWorkItem[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('decisionAffectedWorkItems deve ser um array');
+	const result: DecisionAffectedWorkItem[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada DecisionAffectedWorkItem deve ser um objeto');
+		if (!isString(item.id)) return shapeError('DecisionAffectedWorkItem.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('DecisionAffectedWorkItem.projectId deve ser uma string');
+		if (!isString(item.decisionId)) return shapeError('DecisionAffectedWorkItem.decisionId deve ser uma string');
+		if (!isString(item.workItemId)) return shapeError('DecisionAffectedWorkItem.workItemId deve ser uma string');
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('DecisionAffectedWorkItem.createdAt deve ser uma data ISO 8601 válida');
+		}
+		result.push({
+			id: item.id,
+			projectId: item.projectId,
+			decisionId: item.decisionId,
+			workItemId: item.workItemId,
+			createdAt: item.createdAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
 // Change (ETAPA 11 do rework, primeiro microcorte, §41) — ausente em
 // snapshots exportados antes deste corte: tratado como coleção vazia, mesmo
 // espírito de parseDecisionList acima.
@@ -1047,6 +1077,7 @@ interface AssembleProjectStateInput {
 	milestoneWorkItems: MilestoneWorkItem[];
 	risks: Risk[];
 	decisions: Decision[];
+	decisionAffectedWorkItems: DecisionAffectedWorkItem[];
 	changes: Change[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];
@@ -1074,6 +1105,7 @@ function assembleProjectState({
 	milestoneWorkItems,
 	risks,
 	decisions,
+	decisionAffectedWorkItems,
 	changes,
 	affectedGroups,
 	externalActions,
@@ -1595,6 +1627,40 @@ function assembleProjectState({
 		}
 	}
 
+	// referências + invariantes: DecisionAffectedWorkItem (ETAPA 11 do rework,
+	// terceiro microcorte, §41) — ambos os lados existem no projeto e o par
+	// (decisão, item) não se repete, mesmo padrão do bloco de MilestoneWorkItem
+	// acima. A relação é factual e independente do lifecycle da Decision: nada
+	// aqui exige status === 'pendente' nem 'tomada'.
+	const seenDecisionAffectedWorkItemIds = new Set<string>();
+	const seenDecisionAffectedWorkItemPairs = new Set<string>();
+	for (const link of decisionAffectedWorkItems) {
+		if (link.projectId !== project.id) {
+			return invariantError(`DecisionAffectedWorkItem "${link.id}" usa projectId diferente do Project`);
+		}
+		if (seenDecisionAffectedWorkItemIds.has(link.id)) {
+			return invariantError(`DecisionAffectedWorkItem.id duplicado: "${link.id}"`);
+		}
+		seenDecisionAffectedWorkItemIds.add(link.id);
+		if (!seenDecisionIds.has(link.decisionId)) {
+			return referenceError(
+				`DecisionAffectedWorkItem "${link.id}" referencia decisionId "${link.decisionId}", que não existe`
+			);
+		}
+		if (!workItemById.has(link.workItemId)) {
+			return referenceError(
+				`DecisionAffectedWorkItem "${link.id}" referencia workItemId "${link.workItemId}", que não existe`
+			);
+		}
+		const pair = `${link.decisionId} -> ${link.workItemId}`;
+		if (seenDecisionAffectedWorkItemPairs.has(pair)) {
+			return invariantError(
+				`Trabalho "${link.workItemId}" associado mais de uma vez à decisão "${link.decisionId}"`
+			);
+		}
+		seenDecisionAffectedWorkItemPairs.add(pair);
+	}
+
 	// invariantes: Change (ETAPA 11 do rework, primeiro microcorte, §41) — sem
 	// lifecycle, só identidade e projectId a checar.
 	const seenChangeIds = new Set<string>();
@@ -1871,6 +1937,7 @@ function assembleProjectState({
 			milestoneWorkItems,
 			risks,
 			decisions,
+			decisionAffectedWorkItems,
 			changes,
 			affectedGroups,
 			externalActions,
@@ -1958,6 +2025,9 @@ export function deserializeProjectState(
 	const decisionsResult = parseDecisionList(state.decisions);
 	if (!decisionsResult.ok) return decisionsResult;
 
+	const decisionAffectedWorkItemsResult = parseDecisionAffectedWorkItemList(state.decisionAffectedWorkItems);
+	if (!decisionAffectedWorkItemsResult.ok) return decisionAffectedWorkItemsResult;
+
 	const changesResult = parseChangeList(state.changes);
 	if (!changesResult.ok) return changesResult;
 
@@ -2024,6 +2094,7 @@ export function deserializeProjectState(
 		milestoneWorkItems: milestoneWorkItemsResult.value,
 		risks: risksResult.value,
 		decisions: decisionsResult.value,
+		decisionAffectedWorkItems: decisionAffectedWorkItemsResult.value,
 		changes: changesResult.value,
 		affectedGroups: affectedGroupsResult.value,
 		externalActions: externalActionsResult.value,

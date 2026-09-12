@@ -117,6 +117,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Esta decisão ainda não foi tomada.';
 		case 'decision_outcome_required':
 			return 'Descreva o resultado da decisão antes de salvar.';
+		case 'decision_work_item_not_found':
+			return 'Trabalho afetado não encontrado.';
+		case 'decision_work_item_already_linked':
+			return 'Este trabalho já está relacionado a esta decisão.';
 		case 'change_not_found':
 			return 'Mudança não encontrada.';
 		case 'change_statement_required':

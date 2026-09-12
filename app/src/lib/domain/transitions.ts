@@ -12,6 +12,7 @@ import type {
 	Change,
 	CurrentTreatment,
 	Decision,
+	DecisionAffectedWorkItem,
 	Deliverable,
 	DeliverableBucket,
 	DeliverableEffort,
@@ -109,6 +110,8 @@ export type DomainTransitionError =
 	| { kind: 'decision_already_decided' }
 	| { kind: 'decision_not_decided' }
 	| { kind: 'decision_outcome_required' }
+	| { kind: 'decision_work_item_not_found' }
+	| { kind: 'decision_work_item_already_linked' }
 	| { kind: 'change_not_found' }
 	| { kind: 'change_statement_required' };
 
@@ -2089,6 +2092,61 @@ export function editDecisionOutcome(
 			...state,
 			decisions: state.decisions.map((item) =>
 				item.id === decisionId ? { ...item, outcome, updatedAt: occurredAt } : item
+			)
+		}
+	};
+}
+
+// Associa um WorkItem já existente a uma Decision como "afetado por ela"
+// (ETAPA 11 do rework, terceiro microcorte, §41) — mesmo molde de
+// linkWorkItemToMilestone: nunca muda status/outcome/decidedAt/dueDate da
+// Decision, nunca move ou muda o status do WorkItem, nunca cria Impediment,
+// Change ou Signal. Permitido com a Decision pendente OU tomada — a
+// associação é factual e corrigível a qualquer momento, o mesmo espírito de
+// Impediment.decisionId/WorkItem.deliverableId (nenhuma das duas pontas
+// congela por causa do lifecycle da outra).
+export function linkWorkItemToDecision(
+	catalog: Catalog,
+	state: ProjectState,
+	decisionAffectedWorkItemId: string,
+	decisionId: string,
+	workItemId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!findDecision(state, decisionId)) return { ok: false, error: { kind: 'decision_not_found' } };
+	if (!findWorkItem(state, workItemId)) return { ok: false, error: { kind: 'work_item_not_found' } };
+
+	const duplicate = state.decisionAffectedWorkItems.some(
+		(link) => link.decisionId === decisionId && link.workItemId === workItemId
+	);
+	if (duplicate) return { ok: false, error: { kind: 'decision_work_item_already_linked' } };
+
+	const link: DecisionAffectedWorkItem = {
+		id: decisionAffectedWorkItemId,
+		projectId: state.project.id,
+		decisionId,
+		workItemId,
+		createdAt: occurredAt
+	};
+
+	return { ok: true, value: { ...state, decisionAffectedWorkItems: [...state.decisionAffectedWorkItems, link] } };
+}
+
+export function unlinkWorkItemFromDecision(
+	catalog: Catalog,
+	state: ProjectState,
+	decisionAffectedWorkItemId: string
+): Result<ProjectState, DomainTransitionError> {
+	if (!state.decisionAffectedWorkItems.some((link) => link.id === decisionAffectedWorkItemId)) {
+		return { ok: false, error: { kind: 'decision_work_item_not_found' } };
+	}
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			decisionAffectedWorkItems: state.decisionAffectedWorkItems.filter(
+				(link) => link.id !== decisionAffectedWorkItemId
 			)
 		}
 	};

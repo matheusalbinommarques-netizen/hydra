@@ -10,6 +10,7 @@ import {
 	promoteScopeItemToDeliverable,
 	addMilestone,
 	setMilestonePlannedDate,
+	linkWorkItemToDecision,
 	linkWorkItemToMilestone,
 	reachMilestone,
 	addRisk,
@@ -2431,6 +2432,59 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(
 			result.value.answers.find((answer) => answer.fieldDefinitionId === 'decisoes_mudancas_recentes')?.value
 		).toBe('Decisão: adiar a notificação por SMS');
+	});
+});
+
+describe('DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41)', () => {
+	function stateWithDecisionAndWorkItem(): ProjectState {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		return state;
+	}
+
+	it('preserva relações no round-trip completo', () => {
+		let state = stateWithDecisionAndWorkItem();
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-1', 'wi-b', T2));
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('snapshot anterior a este corte (sem a chave decisionAffectedWorkItems) importa como coleção vazia', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithDecisionAndWorkItem())) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.decisionAffectedWorkItems;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.decisionAffectedWorkItems).toEqual([]);
+	});
+
+	it('recusa referência inválida e par (decisão, trabalho) duplicado vindos de estado persistido', () => {
+		const base = JSON.parse(serializeProjectState(stateWithDecisionAndWorkItem())) as {
+			state: Record<string, unknown>;
+		};
+
+		base.state.decisionAffectedWorkItems = [
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'nao-existe', workItemId: 'wi-a', createdAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invalid_reference');
+
+		base.state.decisionAffectedWorkItems = [
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'nao-existe', createdAt: T1 }
+		];
+		expectError(JSON.stringify(base), 'invalid_reference');
+
+		base.state.decisionAffectedWorkItems = [
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'wi-a', createdAt: T1 },
+			{ id: 'dwi-2', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'wi-a', createdAt: T2 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
 	});
 });
 

@@ -286,6 +286,37 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// linkWorkItemToDecision/unlinkWorkItemFromDecision (ETAPA 11 do rework,
+	// terceiro microcorte, §41) — "Trabalhos afetados" dentro da própria
+	// Decision. Mesmo padrão de setDecision acima.
+	linkWorkItem: async ({ request, params }) => {
+		const formData = await request.formData();
+		const decisionId = readString(formData, 'decisionId');
+		const workItemId = readString(formData, 'workItemId');
+		if (!decisionId || !workItemId) return fail(400, { message: 'Decisão ou trabalho inválido.' });
+
+		const result = await getProjectUseCases().linkWorkItemToDecision({
+			projectId: params.projectId,
+			decisionId,
+			workItemId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	unlinkWorkItem: async ({ request, params }) => {
+		const formData = await request.formData();
+		const decisionAffectedWorkItemId = readString(formData, 'decisionAffectedWorkItemId');
+		if (!decisionAffectedWorkItemId) return fail(400, { message: 'Relação inválida.' });
+
+		const result = await getProjectUseCases().unlinkWorkItemFromDecision({
+			projectId: params.projectId,
+			decisionAffectedWorkItemId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	addChange: async ({ request, params }) => {
 		const formData = await request.formData();
 		const statement = readString(formData, 'statement');

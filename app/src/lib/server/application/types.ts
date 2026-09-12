@@ -208,6 +208,18 @@ export interface DecisionView {
 	outcome: string | null;
 	decidedAt: string | null;
 	createdAt: string;
+	// WorkItems afetados (ETAPA 11 do rework, terceiro microcorte, §41) —
+	// título vem do WorkItem relacionado, mesmo espírito de
+	// MilestoneWorkItemView: a interface não precisa cruzar workItems para
+	// exibir a linha.
+	affectedWorkItems: DecisionAffectedWorkItemView[];
+}
+
+// Título é do WorkItem relacionado — mesmo padrão de MilestoneWorkItemView.
+export interface DecisionAffectedWorkItemView {
+	decisionAffectedWorkItemId: string;
+	workItemId: string;
+	title: string;
 }
 
 // Acompanhamento ("Mudanças", ETAPA 11 do rework, §41) — view leve de
@@ -893,6 +905,21 @@ export interface EditDecisionOutcomeInput {
 	outcome: string;
 }
 
+// linkWorkItemToDecision/unlinkWorkItemFromDecision (ETAPA 11 do rework,
+// terceiro microcorte, §41) — mesmo padrão de LinkWorkItemToMilestoneInput/
+// UnlinkWorkItemFromMilestoneInput: id da relação gerado pelo caso de uso,
+// nunca recebido do cliente.
+export interface LinkWorkItemToDecisionInput {
+	projectId: string;
+	decisionId: string;
+	workItemId: string;
+}
+
+export interface UnlinkWorkItemFromDecisionInput {
+	projectId: string;
+	decisionAffectedWorkItemId: string;
+}
+
 // Change (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo padrão dos
 // inputs de Decision acima.
 export interface AddChangeInput {
@@ -1158,6 +1185,8 @@ export interface ProjectUseCases {
 	editDecision(input: EditDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
 	decideDecision(input: DecideDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
 	editDecisionOutcome(input: EditDecisionOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
+	linkWorkItemToDecision(input: LinkWorkItemToDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
+	unlinkWorkItemFromDecision(input: UnlinkWorkItemFromDecisionInput): Promise<UseCaseOutcome<ProjectView>>;
 	addChange(input: AddChangeInput): Promise<UseCaseOutcome<ProjectView>>;
 	editChangeStatement(input: EditChangeStatementInput): Promise<UseCaseOutcome<ProjectView>>;
 	setChangeImpact(input: SetChangeImpactInput): Promise<UseCaseOutcome<ProjectView>>;

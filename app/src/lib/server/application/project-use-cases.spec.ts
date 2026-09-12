@@ -2501,3 +2501,120 @@ describe('createProjectUseCases — Milestone (ETAPA 8 do rework)', () => {
 		expect(second).toEqual({ ok: false, error: { kind: 'milestone_work_item_already_linked' } });
 	});
 });
+
+// DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41) —
+// exercitado pela mesma porta que a interface usa. Mesmo espírito da
+// suíte de Milestone acima: a associação é factual, nunca deriva nem altera
+// lifecycle de nenhum dos dois lados.
+describe('createProjectUseCases — DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41)', () => {
+	async function projectWithWorkItems(titles: string[]) {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const ids: string[] = [];
+		for (const title of titles) {
+			const added = await useCases.addWorkItem({ projectId, title });
+			if (!added.ok) throw new Error('esperado ok');
+			ids.push(added.value.workItems[added.value.workItems.length - 1].id);
+		}
+		return { useCases, repo, projectId, ids };
+	}
+
+	it('linkWorkItemToDecision projeta o trabalho afetado dentro da própria Decision', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const created = await useCases.addDecision({ projectId, subject: 'Adiar o SMS?' });
+		if (!created.ok) throw new Error('esperado ok');
+		const decisionId = created.value.decisions[0].id;
+
+		const linked = await useCases.linkWorkItemToDecision({ projectId, decisionId, workItemId: ids[0] });
+		if (!linked.ok) throw new Error('esperado ok');
+		expect(linked.value.decisions[0].affectedWorkItems).toEqual([
+			{ decisionAffectedWorkItemId: expect.any(String), workItemId: ids[0], title: 'Formulário' }
+		]);
+	});
+
+	it('associa vários WorkItems à mesma Decision e o mesmo WorkItem a várias Decisions', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário', 'Listagem']);
+		const [formulario, listagem] = ids;
+		const decisionA = await useCases.addDecision({ projectId, subject: 'Adiar o SMS?' });
+		if (!decisionA.ok) throw new Error('esperado ok');
+		const decisionB = await useCases.addDecision({ projectId, subject: 'Trocar de fornecedor?' });
+		if (!decisionB.ok) throw new Error('esperado ok');
+		const decisionAId = decisionA.value.decisions.find((d) => d.subject === 'Adiar o SMS?')!.id;
+		const decisionBId = decisionB.value.decisions.find((d) => d.subject === 'Trocar de fornecedor?')!.id;
+
+		await useCases.linkWorkItemToDecision({ projectId, decisionId: decisionAId, workItemId: formulario });
+		await useCases.linkWorkItemToDecision({ projectId, decisionId: decisionAId, workItemId: listagem });
+		const result = await useCases.linkWorkItemToDecision({ projectId, decisionId: decisionBId, workItemId: formulario });
+		if (!result.ok) throw new Error('esperado ok');
+
+		const affectedByA = result.value.decisions.find((d) => d.id === decisionAId)?.affectedWorkItems;
+		const affectedByB = result.value.decisions.find((d) => d.id === decisionBId)?.affectedWorkItems;
+		expect(affectedByA).toHaveLength(2);
+		expect(affectedByB).toHaveLength(1);
+	});
+
+	it('associar/desassociar nunca altera status/outcome/decidedAt da Decision nem o status do WorkItem', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const created = await useCases.addDecision({ projectId, subject: 'Adiar o SMS?' });
+		if (!created.ok) throw new Error('esperado ok');
+		const decisionId = created.value.decisions[0].id;
+
+		const linked = await useCases.linkWorkItemToDecision({ projectId, decisionId, workItemId: ids[0] });
+		if (!linked.ok) throw new Error('esperado ok');
+		const linkId = linked.value.decisions[0].affectedWorkItems[0].decisionAffectedWorkItemId;
+
+		const decided = await useCases.decideDecision({ projectId, decisionId, outcome: 'Adiado para v2' });
+		if (!decided.ok) throw new Error('esperado ok');
+		// A Decision tomada continua permitindo associar/corrigir trabalhos afetados.
+		expect(decided.value.decisions[0].affectedWorkItems).toHaveLength(1);
+
+		const unlinked = await useCases.unlinkWorkItemFromDecision({ projectId, decisionAffectedWorkItemId: linkId });
+		if (!unlinked.ok) throw new Error('esperado ok');
+		expect(unlinked.value.decisions[0]).toMatchObject({
+			status: 'tomada',
+			outcome: 'Adiado para v2',
+			affectedWorkItems: []
+		});
+		expect(unlinked.value.workItems.find((item) => item.id === ids[0])?.status).toBe('a_fazer');
+	});
+
+	it('recusa vínculo entre projetos diferentes', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const other = await useCases.createProject();
+		if (!other.ok) throw new Error('esperado ok');
+		const otherDecision = await useCases.addDecision({ projectId: other.value.projectId, subject: 'Decisão alheia' });
+		if (!otherDecision.ok) throw new Error('esperado ok');
+		const otherDecisionId = otherDecision.value.decisions[0].id;
+
+		const linked = await useCases.linkWorkItemToDecision({
+			projectId,
+			decisionId: otherDecisionId,
+			workItemId: ids[0]
+		});
+		expect(linked).toEqual({ ok: false, error: { kind: 'decision_not_found' } });
+
+		const createdHere = await useCases.addDecision({ projectId, subject: 'Decisão daqui' });
+		if (!createdHere.ok) throw new Error('esperado ok');
+		const crossed = await useCases.linkWorkItemToDecision({
+			projectId: other.value.projectId,
+			decisionId: otherDecisionId,
+			workItemId: ids[0]
+		});
+		expect(crossed).toEqual({ ok: false, error: { kind: 'work_item_not_found' } });
+	});
+
+	it('recusa vínculo duplicado pela mesma porta que a interface usa', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['Formulário']);
+		const created = await useCases.addDecision({ projectId, subject: 'Adiar o SMS?' });
+		if (!created.ok) throw new Error('esperado ok');
+		const decisionId = created.value.decisions[0].id;
+
+		const first = await useCases.linkWorkItemToDecision({ projectId, decisionId, workItemId: ids[0] });
+		expect(first.ok).toBe(true);
+
+		const second = await useCases.linkWorkItemToDecision({ projectId, decisionId, workItemId: ids[0] });
+		expect(second).toEqual({ ok: false, error: { kind: 'decision_work_item_already_linked' } });
+	});
+});

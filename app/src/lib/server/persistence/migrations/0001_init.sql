@@ -329,6 +329,22 @@ CREATE TABLE IF NOT EXISTS decision (
 	)
 );
 
+-- DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41) —
+-- "este WorkItem foi afetado por esta Decision", N:N tipada e explícita,
+-- mesmo molde de milestone_work_item acima (par único, sem updated_at, só
+-- nasce e é removida). Deliberadamente NÃO é uma relação polimórfica
+-- (entity_type/entity_id) — ver scout READ-ONLY anterior a este corte.
+-- Nem decision nem work_item têm remoção hoje, então nenhuma política de
+-- cascade/guard é decidida aqui.
+CREATE TABLE IF NOT EXISTS decision_affected_work_item (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	decision_id TEXT NOT NULL REFERENCES decision (id),
+	work_item_id TEXT NOT NULL REFERENCES work_item (id),
+	created_at TEXT NOT NULL,
+	CONSTRAINT decision_affected_work_item_unique_pair UNIQUE (decision_id, work_item_id)
+);
+
 -- Change (ETAPA 11 do rework, primeiro microcorte, §41) — ver
 -- app/src/lib/domain/state-types.ts. Objeto em nível de projeto, sem
 -- lifecycle e sem relação com nenhuma outra entidade nesta primeira fatia.

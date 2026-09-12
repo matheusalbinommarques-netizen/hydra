@@ -14,6 +14,7 @@ import type {
 	Change,
 	CurrentTreatment,
 	Decision,
+	DecisionAffectedWorkItem,
 	DecisionStatus,
 	Dependency,
 	Milestone,
@@ -333,6 +334,24 @@ export function mapDecisionRow(row: DecisionRow): Decision {
 		decidedAt: row.decided_at,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
+	};
+}
+
+export interface DecisionAffectedWorkItemRow {
+	id: string;
+	project_id: string;
+	decision_id: string;
+	work_item_id: string;
+	created_at: string;
+}
+
+export function mapDecisionAffectedWorkItemRow(row: DecisionAffectedWorkItemRow): DecisionAffectedWorkItem {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		decisionId: row.decision_id,
+		workItemId: row.work_item_id,
+		createdAt: row.created_at
 	};
 }
 

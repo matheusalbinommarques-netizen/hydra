@@ -10,9 +10,11 @@ import {
 	setMilestonePlannedDate,
 	addWorkItem,
 	moveWorkItem,
+	linkWorkItemToDecision,
 	linkWorkItemToMilestone,
 	reachMilestone,
 	reopenMilestone,
+	unlinkWorkItemFromDecision,
 	unlinkWorkItemFromMilestone,
 	addAffectedGroup,
 	addCauseHypothesis,
@@ -1187,6 +1189,121 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
 		// Nenhum campo foi alterado pela tentativa recusada.
 		expect(decided.decisions[0]).toMatchObject({ subject: 'Adiar o SMS?', options: null, dueDate: null });
+	});
+});
+
+describe('DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41)', () => {
+	function stateWithDecisionAndWorkItems(): ProjectState {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'Trabalho A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'Trabalho B', T1));
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		return state;
+	}
+
+	it('zero relações é estado normal', () => {
+		expect(stateWithDecisionAndWorkItems().decisionAffectedWorkItems).toEqual([]);
+	});
+
+	it('associa um WorkItem existente a uma Decision', () => {
+		const state = unwrap(
+			linkWorkItemToDecision(catalog, stateWithDecisionAndWorkItems(), 'dwi-1', 'dec-1', 'wi-a', T2)
+		);
+		expect(state.decisionAffectedWorkItems).toEqual([
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'wi-a', createdAt: T2 }
+		]);
+	});
+
+	it('associa vários WorkItems à mesma Decision (0..N)', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-1', 'wi-b', T1));
+		expect(state.decisionAffectedWorkItems).toHaveLength(2);
+	});
+
+	it('o mesmo WorkItem pode estar associado a várias Decisions (0..N)', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T1));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-2', 'wi-a', T1));
+		expect(state.decisionAffectedWorkItems).toHaveLength(2);
+	});
+
+	it('recusa par duplicado, Decision inexistente e WorkItem inexistente', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+
+		expect(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-1', 'wi-a', T2)).toEqual({
+			ok: false,
+			error: { kind: 'decision_work_item_already_linked' }
+		});
+		expect(linkWorkItemToDecision(catalog, state, 'dwi-2', 'nao-existe', 'wi-a', T2)).toEqual({
+			ok: false,
+			error: { kind: 'decision_not_found' }
+		});
+		expect(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-1', 'nao-existe', T2)).toEqual({
+			ok: false,
+			error: { kind: 'work_item_not_found' }
+		});
+	});
+
+	it('remove a associação; remover relação inexistente é recusado', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+
+		state = unwrap(unlinkWorkItemFromDecision(catalog, state, 'dwi-1'));
+		expect(state.decisionAffectedWorkItems).toEqual([]);
+
+		expect(unlinkWorkItemFromDecision(catalog, state, 'nao-existe')).toEqual({
+			ok: false,
+			error: { kind: 'decision_work_item_not_found' }
+		});
+	});
+
+	it('Decision pendente e Decision tomada aceitam igualmente a associação', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+		expect(state.decisions[0].status).toBe('pendente');
+
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Adiado para v2', T2));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-1', 'wi-b', T3));
+		expect(state.decisionAffectedWorkItems).toHaveLength(2);
+	});
+
+	it('decidir/corrigir a Decision preserva as relações existentes', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Adiado para v2', T2));
+		expect(state.decisionAffectedWorkItems).toEqual([
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'wi-a', createdAt: T1 }
+		]);
+
+		state = unwrap(editDecisionOutcome(catalog, state, 'dec-1', 'Adiado para v3', T3));
+		expect(state.decisionAffectedWorkItems).toEqual([
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'wi-a', createdAt: T1 }
+		]);
+	});
+
+	it('mover o WorkItem preserva as relações e não altera a Decision', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T1));
+
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'concluido', T2));
+		expect(state.decisionAffectedWorkItems).toEqual([
+			{ id: 'dwi-1', projectId: 'proj-1', decisionId: 'dec-1', workItemId: 'wi-a', createdAt: T1 }
+		]);
+		expect(state.decisions[0]).toMatchObject({ status: 'pendente', outcome: null, decidedAt: null });
+	});
+
+	it('associar/desassociar nunca muda status/outcome/decidedAt da Decision nem status do WorkItem', () => {
+		let state = stateWithDecisionAndWorkItems();
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-a', T2));
+		expect(state.decisions[0]).toMatchObject({ status: 'pendente', outcome: null, decidedAt: null });
+		expect(state.workItems.find((item) => item.id === 'wi-a')?.status).toBe('a_fazer');
+
+		state = unwrap(unlinkWorkItemFromDecision(catalog, state, 'dwi-1'));
+		expect(state.decisions[0]).toMatchObject({ status: 'pendente', outcome: null, decidedAt: null });
+		expect(state.workItems.find((item) => item.id === 'wi-a')?.status).toBe('a_fazer');
 	});
 });
 

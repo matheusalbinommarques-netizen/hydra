@@ -18,7 +18,9 @@ import {
 	editDecision,
 	setChangeImpact,
 	setMilestonePlannedDate,
+	linkWorkItemToDecision,
 	linkWorkItemToMilestone,
+	unlinkWorkItemFromDecision,
 	addScopeItem,
 	addTreatmentStep,
 	addWorkItem,
@@ -1651,5 +1653,87 @@ describe('createSqliteProjectRepository — Impediment.decisionId (ETAPA 11 do r
 		const repo2 = createSqliteProjectRepository(filePath);
 		openRepos.push(repo2);
 		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
+	});
+});
+
+// DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41) —
+// tabela nova, mesmo molde de milestone_work_item: o risco concreto aqui é
+// de UPGRADE (banco anterior a este corte não tem a tabela), coberto por
+// CREATE TABLE IF NOT EXISTS, sem coluna nova em tabela existente.
+describe('createSqliteProjectRepository — DecisionAffectedWorkItem (ETAPA 11 do rework, terceiro microcorte, §41)', () => {
+	it('round-trip preserva a associação N:N em ambos os sentidos', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Adiar o SMS?', T2));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-1', T2));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-2', 'dec-1', 'wi-2', T2));
+		// mesmo WorkItem afetado por mais de uma Decision (N:N do outro lado).
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-3', 'dec-2', 'wi-1', T2));
+
+		await repo.insert(state);
+		await expect(repo.findById('proj-1')).resolves.toEqual(state);
+	});
+
+	it('a UNIQUE nomeada recusa o par (decision_id, work_item_id) duplicado em escrita direta', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-1', T2));
+		await repo.insert(state);
+
+		const rawDb = new Database(filePath);
+		expect(() =>
+			rawDb
+				.prepare(
+					`INSERT INTO decision_affected_work_item (id, project_id, decision_id, work_item_id, created_at)
+					 VALUES (?, ?, ?, ?, ?)`
+				)
+				.run('dwi-2', 'proj-1', 'dec-1', 'wi-1', T2)
+		).toThrow(/UNIQUE constraint failed: decision_affected_work_item/);
+		rawDb.close();
+	});
+
+	it('remover a associação persiste corretamente, sem afetar Decision nem WorkItem', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		state = unwrap(linkWorkItemToDecision(catalog, state, 'dwi-1', 'dec-1', 'wi-1', T2));
+		await repo.insert(state);
+
+		state = unwrap(unlinkWorkItemFromDecision(catalog, state, 'dwi-1'));
+		await repo.save(state);
+
+		const restored = await repo.findById('proj-1');
+		expect(restored?.decisionAffectedWorkItems).toEqual([]);
+		expect(restored?.decisions.find((decision) => decision.id === 'dec-1')?.status).toBe('pendente');
+		// wi-1 em nonTrivialState() já está 'em_andamento' — a associação/
+		// desassociação com a Decision não pode ter mexido nisso.
+		expect(restored?.workItems.find((item) => item.id === 'wi-1')?.status).toBe('em_andamento');
+	});
+
+	it('banco anterior a este corte (sem a tabela decision_affected_work_item) abre e importa como coleção vazia, e volta a aceitar escrita', async () => {
+		const filePath = tempFilePath();
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Qual fornecedor?', T2));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('DROP TABLE decision_affected_work_item');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		const restored = await repo.findById('proj-1');
+		expect(restored?.decisionAffectedWorkItems).toEqual([]);
+
+		if (!restored) throw new Error('esperado estado');
+		const next = unwrap(linkWorkItemToDecision(catalog, restored, 'dwi-1', 'dec-1', 'wi-1', T2));
+		await repo.save(next);
+		await expect(repo.findById('proj-1')).resolves.toEqual(next);
 	});
 });

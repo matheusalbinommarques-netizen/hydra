@@ -14,6 +14,7 @@ import {
 	mapChangeRow,
 	mapCurrentTreatmentRow,
 	mapDecisionRow,
+	mapDecisionAffectedWorkItemRow,
 	mapDesiredOutcomeRow,
 	mapEvidenceRow,
 	mapExternalActionRow,
@@ -38,6 +39,7 @@ import {
 	type ChangeRow,
 	type CurrentTreatmentRow,
 	type DecisionRow,
+	type DecisionAffectedWorkItemRow,
 	type DesiredOutcomeRow,
 	type EvidenceRow,
 	type ExternalActionRow,
@@ -479,6 +481,17 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertMilestoneWorkItem.run(link);
 		}
 
+		// decision_affected_work_item (ETAPA 11 do rework, terceiro microcorte,
+		// §41) depende de decision e de work_item (duas FKs) — ambos já foram
+		// inseridos acima, mesma razão de milestone_work_item.
+		const insertDecisionAffectedWorkItem = db.prepare(
+			`INSERT INTO decision_affected_work_item (id, project_id, decision_id, work_item_id, created_at)
+			 VALUES (@id, @projectId, @decisionId, @workItemId, @createdAt)`
+		);
+		for (const link of state.decisionAffectedWorkItems) {
+			insertDecisionAffectedWorkItem.run(link);
+		}
+
 		// risk é independente (sem FK além de project) — pode ser inserido em
 		// qualquer ponto depois do project row.
 		const insertRisk = db.prepare(
@@ -637,6 +650,10 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM milestone_work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM milestone WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM risk WHERE project_id = ?').run(state.project.id);
+		// decision_affected_work_item antes de decision e de work_item (FKs para
+		// ambos, ETAPA 11 do rework, terceiro microcorte, §41) — mesmo raciocínio
+		// de milestone_work_item acima.
+		db.prepare('DELETE FROM decision_affected_work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM decision WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM change WHERE project_id = ?').run(state.project.id);
 		// work_item antes de deliverable (ETAPA 9, segundo microcorte):
@@ -762,6 +779,13 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				)
 				.all(projectId) as DecisionRow[];
 
+			const decisionAffectedWorkItemRows = db
+				.prepare(
+					`SELECT id, project_id, decision_id, work_item_id, created_at
+					 FROM decision_affected_work_item WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as DecisionAffectedWorkItemRow[];
+
 			const changeRows = db
 				.prepare(
 					`SELECT id, project_id, statement, impact, created_at, updated_at
@@ -840,6 +864,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				milestoneWorkItems: milestoneWorkItemRows.map(mapMilestoneWorkItemRow),
 				risks: riskRows.map(mapRiskRow),
 				decisions: decisionRows.map(mapDecisionRow),
+				decisionAffectedWorkItems: decisionAffectedWorkItemRows.map(mapDecisionAffectedWorkItemRow),
 				changes: changeRows.map(mapChangeRow),
 				affectedGroups: affectedGroupRows.map(mapAffectedGroupRow),
 				externalActions: externalActionRows.map(mapExternalActionRow),

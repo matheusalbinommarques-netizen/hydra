@@ -507,3 +507,22 @@ describe('buildTrackingView — Linha do tempo', () => {
 		expect(entry.reachedAt).toBeNull();
 	});
 });
+
+// workItemOptions (ETAPA 11 do rework, terceiro microcorte, §41) — opções
+// para o seletor "Trabalhos afetados" dentro de cada Decision.
+describe('workItemOptions', () => {
+	it('vazio quando o projeto não tem nenhum WorkItem', () => {
+		expect(buildTrackingView(baseInput({ workItems: [] })).workItemOptions).toEqual([]);
+	});
+
+	it('lista id/title de todos os WorkItems, independente de status', () => {
+		const workItems = [
+			makeWorkItem({ id: '1', title: 'Formulário', status: 'a_fazer' }),
+			makeWorkItem({ id: '2', title: 'Listagem', status: 'concluido' })
+		];
+		expect(buildTrackingView(baseInput({ workItems })).workItemOptions).toEqual([
+			{ id: '1', title: 'Formulário' },
+			{ id: '2', title: 'Listagem' }
+		]);
+	});
+});

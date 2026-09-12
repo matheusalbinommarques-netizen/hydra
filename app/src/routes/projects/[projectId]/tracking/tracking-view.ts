@@ -139,6 +139,16 @@ export interface TrackingContinuityView {
 	label: string;
 }
 
+// Opção enxuta para o seletor "Trabalhos afetados" de uma Decision (ETAPA 11
+// do rework, terceiro microcorte, §41) — mesmo espírito de allDecisions em
+// +page.svelte (todos os WorkItems do projeto, sem filtrar por status: um
+// WorkItem concluído continua podendo ser marcado como afetado por uma
+// decisão registrada depois).
+export interface TrackingWorkItemOption {
+	id: string;
+	title: string;
+}
+
 export interface TrackingView {
 	situation: TrackingSituationView | undefined;
 	work: TrackingWorkView;
@@ -151,6 +161,9 @@ export interface TrackingView {
 	impediments: TrackingImpedimentsView;
 	risks: TrackingRisksView;
 	decisions: TrackingDecisionsView;
+	// Opções para o seletor "Trabalhos afetados" dentro de cada Decision —
+	// todos os WorkItems do projeto (ver TrackingWorkItemOption acima).
+	workItemOptions: TrackingWorkItemOption[];
 	changes: ChangeView[];
 	continuity: TrackingContinuityView;
 }
@@ -374,6 +387,10 @@ function buildContinuity(
 	return { completed: false, label: `Próxima atividade: ${situation?.activityLabel ?? '—'}` };
 }
 
+function buildWorkItemOptions(workItems: WorkItemView[]): TrackingWorkItemOption[] {
+	return workItems.map((item) => ({ id: item.id, title: item.title }));
+}
+
 export function buildTrackingView(input: TrackingViewInput): TrackingView {
 	const situation = buildSituation(input.journeyContext, input.phaseProgress);
 
@@ -386,6 +403,7 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		impediments: buildImpediments(input.impediments),
 		risks: buildRisks(input.risks),
 		decisions: buildDecisions(input.decisions),
+		workItemOptions: buildWorkItemOptions(input.workItems),
 		changes: input.changes,
 		continuity: buildContinuity(input.nextActivity, situation)
 	};

@@ -418,6 +418,42 @@ export interface Decision {
 	updatedAt: string;
 }
 
+// DecisionAffectedWorkItem — ETAPA 11 do rework ("Decision e Change", §41),
+// terceiro microcorte. Relação N:N explícita e tipada entre Decision e
+// WorkItem, provando a primeira semântica concreta de "entidades afetadas"
+// com um único tipo canônico (WorkItem) — não uma relação polimórfica nem um
+// primeiro passo para uma entidade genérica (ver scout READ-ONLY anterior,
+// §12 do rework). Mesmo molde de MilestoneWorkItem (id próprio, projectId,
+// as duas FKs, createdAt, sem updatedAt): imutável depois de criada, só
+// existe associar e desassociar. Par duplicado é inválido.
+//
+// Significa especificamente "este WorkItem foi afetado por esta Decision" —
+// nunca "trabalho necessário para decidir", "trabalho que implementa a
+// decisão" nem "evidência da decisão". Uma Decision pode afetar 0..N
+// WorkItem, um WorkItem pode ser afetado por 0..N Decision.
+//
+// Puramente factual e corrigível a qualquer momento, independente do
+// lifecycle da Decision (pendente/tomada) — mesmo espírito de
+// Impediment.decisionId/WorkItem.deliverableId: nenhuma das duas pontas
+// congela por causa da outra. Associar/desassociar nunca decide a Decision,
+// nunca muda outcome/decidedAt/dueDate/status, nunca move o WorkItem nem
+// cria Impediment/Change/Signal.
+//
+// Deliberadamente NÃO inclui Impediment como alvo desta mesma relação: já
+// existe Impediment.decisionId ("qual decisão está pendente aqui"), e um
+// segundo relacionamento entre o mesmo par Decision↔Impediment duplicaria
+// semântica sem caso de produto observável (§13.4). Nem Decision nem
+// WorkItem têm função de remoção hoje — nenhuma política de cascade/guard é
+// decidida aqui; um corte futuro que introduza remoção de qualquer um dos
+// dois lados decide o destino desta relação explicitamente.
+export interface DecisionAffectedWorkItem {
+	id: string;
+	projectId: string;
+	decisionId: string;
+	workItemId: string;
+	createdAt: string;
+}
+
 // Change — ETAPA 11 do rework ("Decision e Change", §41), primeiro
 // microcorte. Objeto em nível de projeto, sem lifecycle, sem relação com
 // nenhuma outra entidade e sem delete nesta primeira fatia.
@@ -712,6 +748,7 @@ export interface ProjectState {
 	milestoneWorkItems: MilestoneWorkItem[];
 	risks: Risk[];
 	decisions: Decision[];
+	decisionAffectedWorkItems: DecisionAffectedWorkItem[];
 	changes: Change[];
 	affectedGroups: AffectedGroup[];
 	externalActions: ExternalAction[];

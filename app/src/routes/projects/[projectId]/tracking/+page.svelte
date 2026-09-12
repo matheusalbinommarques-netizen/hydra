@@ -165,6 +165,15 @@
 		return options ? `Opções: ${options}` : 'Nenhuma opção registrada';
 	}
 
+	// "Trabalhos afetados" (ETAPA 11 do rework, terceiro microcorte, §41) —
+	// opções do seletor excluem WorkItems já associados a esta Decision, para
+	// não oferecer uma duplicata que o domínio recusaria (mesmo espírito de
+	// filtros de disponibilidade já usados nesta tela).
+	function availableWorkItemsFor(decision: { affectedWorkItems: { workItemId: string }[] }) {
+		const linkedIds = new Set(decision.affectedWorkItems.map((link) => link.workItemId));
+		return tracking.workItemOptions.filter((option) => !linkedIds.has(option.id));
+	}
+
 	// Mudanças (ETAPA 11 do rework, primeiro microcorte, §41) — sem lifecycle,
 	// mesmo padrão de edição alternada das demais coleções desta tela.
 	let newChangeStatement = $state('');
@@ -738,6 +747,41 @@
 						<p class="risk-text">{decision.subject}</p>
 						<p class="risk-assessment">{decisionOptionsLabel(decision.options)}</p>
 						<p class="risk-response">{decisionDueDateLabel(decision.dueDate)}</p>
+						<div class="affected-work-items">
+							<p class="affected-work-items-label">Trabalhos afetados</p>
+							{#if decision.affectedWorkItems.length === 0}
+								<p class="empty">Nenhum trabalho relacionado.</p>
+							{:else}
+								<ul class="affected-work-items-list">
+									{#each decision.affectedWorkItems as link (link.decisionAffectedWorkItemId)}
+										<li>
+											<span>{link.title}</span>
+											<form method="POST" action="?/unlinkWorkItem" use:enhance>
+												<input
+													type="hidden"
+													name="decisionAffectedWorkItemId"
+													value={link.decisionAffectedWorkItemId}
+												/>
+												<button type="submit" class="link-button">Remover</button>
+											</form>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if availableWorkItemsFor(decision).length > 0}
+								<form method="POST" action="?/linkWorkItem" use:enhance class="affected-work-items-form">
+									<input type="hidden" name="decisionId" value={decision.id} />
+									<label class="visually-hidden" for="affected-work-item-{decision.id}">Adicionar trabalho afetado</label>
+									<select id="affected-work-item-{decision.id}" name="workItemId" required>
+										<option value="">Adicionar trabalho afetado…</option>
+										{#each availableWorkItemsFor(decision) as option (option.id)}
+											<option value={option.id}>{option.title}</option>
+										{/each}
+									</select>
+									<button type="submit" class="button-secondary">Associar</button>
+								</form>
+							{/if}
+						</div>
 						<div class="risk-actions">
 							<button type="button" class="link-button" onclick={() => toggleEditDecision(decision.id)}>Editar</button>
 						</div>
@@ -782,6 +826,43 @@
 								<p class="risk-text">{decision.subject}</p>
 								<p class="risk-assessment">Resultado: {decision.outcome}</p>
 								<p class="risk-response">{decisionDueDateLabel(decision.dueDate)}</p>
+								<div class="affected-work-items">
+									<p class="affected-work-items-label">Trabalhos afetados</p>
+									{#if decision.affectedWorkItems.length === 0}
+										<p class="empty">Nenhum trabalho relacionado.</p>
+									{:else}
+										<ul class="affected-work-items-list">
+											{#each decision.affectedWorkItems as link (link.decisionAffectedWorkItemId)}
+												<li>
+													<span>{link.title}</span>
+													<form method="POST" action="?/unlinkWorkItem" use:enhance>
+														<input
+															type="hidden"
+															name="decisionAffectedWorkItemId"
+															value={link.decisionAffectedWorkItemId}
+														/>
+														<button type="submit" class="link-button">Remover</button>
+													</form>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+									{#if availableWorkItemsFor(decision).length > 0}
+										<form method="POST" action="?/linkWorkItem" use:enhance class="affected-work-items-form">
+											<input type="hidden" name="decisionId" value={decision.id} />
+											<label class="visually-hidden" for="affected-work-item-{decision.id}">
+												Adicionar trabalho afetado
+											</label>
+											<select id="affected-work-item-{decision.id}" name="workItemId" required>
+												<option value="">Adicionar trabalho afetado…</option>
+												{#each availableWorkItemsFor(decision) as option (option.id)}
+													<option value={option.id}>{option.title}</option>
+												{/each}
+											</select>
+											<button type="submit" class="button-secondary">Associar</button>
+										</form>
+									{/if}
+								</div>
 								<div class="risk-actions">
 									<button type="button" class="link-button" onclick={() => toggleEditDecision(decision.id)}>
 										Corrigir resultado
@@ -1314,6 +1395,50 @@
 		margin: 0;
 		font-size: 0.85rem;
 		color: var(--hydra-muted);
+	}
+
+	.affected-work-items {
+		flex-basis: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		border-top: 1px solid rgba(101, 104, 108, 0.16);
+		padding-top: var(--space-2);
+		margin-top: var(--space-1);
+	}
+
+	.affected-work-items-label {
+		margin: 0;
+		font-size: var(--font-size-caption);
+		font-weight: 600;
+		color: var(--hydra-muted);
+	}
+
+	.affected-work-items-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.affected-work-items-list li {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-2);
+	}
+
+	.affected-work-items-form {
+		display: flex;
+		gap: var(--space-2);
+		align-items: center;
+	}
+
+	.affected-work-items-form select {
+		flex: 1;
+		min-width: 12rem;
 	}
 
 	.risk-actions {

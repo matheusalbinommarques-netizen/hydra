@@ -19,6 +19,7 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		milestoneWorkItems: [],
 		risks: [],
 		decisions: [],
+		decisionAffectedWorkItems: [],
 		changes: [],
 		affectedGroups: [],
 		externalActions: [],
