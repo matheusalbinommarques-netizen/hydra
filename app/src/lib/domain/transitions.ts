@@ -1953,11 +1953,12 @@ export function setRiskResponse(
 	};
 }
 
-// --- Decision (ETAPA 11 do rework, primeiro microcorte, §41) --------------
+// --- Decision (ETAPA 11 do rework, §41) ------------------------------------
 //
 // Objeto em nível de projeto, sem vínculo obrigatório com WorkItem,
-// Deliverable, Milestone, Risk, Impediment ou pessoa/responsável nesta
-// primeira fatia. `status` é declarado, nunca inferido.
+// Deliverable, Milestone, Risk ou Impediment nesta fatia. `status` é
+// declarado, nunca inferido. `responsible` (quarto microcorte) é texto livre
+// declarativo, mesmo grupo de subject/options/dueDate.
 
 function findDecision(state: ProjectState, decisionId: string): Decision | undefined {
 	return state.decisions.find((decision) => decision.id === decisionId);
@@ -1980,6 +1981,7 @@ export function addDecision(
 		subject,
 		options: null,
 		dueDate: null,
+		responsible: null,
 		status: 'pendente',
 		outcome: null,
 		decidedAt: null,
@@ -1990,13 +1992,15 @@ export function addDecision(
 	return { ok: true, value: { ...state, decisions: [...state.decisions, decision] } };
 }
 
-// Edita subject/options/dueDate juntos (mesmo formulário, mesmo fato sendo
-// escrito) — nunca altera status/outcome/decidedAt, mesmo molde de
+// Edita subject/options/dueDate/responsible juntos (mesmo formulário, mesmo
+// fato sendo escrito) — nunca altera status/outcome/decidedAt, mesmo molde de
 // editRiskStatement: o mesmo fato sendo reescrito, não uma transição de
 // lifecycle. Só permitido enquanto 'pendente' — depois de tomada, o assunto,
-// as opções e o prazo ficam congelados (o registro passa a ser sobre a
-// decisão que foi tomada, não sobre a pergunta em aberto); a única correção
-// possível a partir daí é o outcome, via editDecisionOutcome abaixo.
+// as opções, o prazo e o responsável ficam congelados (o registro passa a ser
+// sobre a decisão que foi tomada, não sobre a pergunta em aberto); a única
+// correção possível a partir daí é o outcome, via editDecisionOutcome abaixo.
+// `responsible` não tem validação de obrigatoriedade — null é estado normal
+// e permanentemente válido (ETAPA 11 do rework, quarto microcorte, §41).
 export function editDecision(
 	catalog: Catalog,
 	state: ProjectState,
@@ -2004,6 +2008,7 @@ export function editDecision(
 	subject: string,
 	options: string | null,
 	dueDate: string | null,
+	responsible: string | null,
 	occurredAt: string
 ): Result<ProjectState, DomainTransitionError> {
 	const decision = findDecision(state, decisionId);
@@ -2017,7 +2022,12 @@ export function editDecision(
 	if (dueDate !== null && !isCivilDate(dueDate)) {
 		return { ok: false, error: { kind: 'decision_due_date_invalid' } };
 	}
-	if (decision.subject === subject && decision.options === options && decision.dueDate === dueDate) {
+	if (
+		decision.subject === subject &&
+		decision.options === options &&
+		decision.dueDate === dueDate &&
+		decision.responsible === responsible
+	) {
 		return { ok: true, value: state };
 	}
 
@@ -2026,7 +2036,9 @@ export function editDecision(
 		value: {
 			...state,
 			decisions: state.decisions.map((item) =>
-				item.id === decisionId ? { ...item, subject, options, dueDate, updatedAt: occurredAt } : item
+				item.id === decisionId
+					? { ...item, subject, options, dueDate, responsible, updatedAt: occurredAt }
+					: item
 			)
 		}
 	};

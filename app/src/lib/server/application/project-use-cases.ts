@@ -1280,6 +1280,7 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				input.subject,
 				input.options,
 				input.dueDate,
+				input.responsible,
 				clock.now()
 			);
 			if (!result.ok) return { ok: false, error: result.error };

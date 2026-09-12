@@ -315,6 +315,7 @@ export interface DecisionRow {
 	subject: string;
 	options: string | null;
 	due_date: string | null;
+	responsible: string | null;
 	status: DecisionStatus;
 	outcome: string | null;
 	decided_at: string | null;
@@ -329,6 +330,7 @@ export function mapDecisionRow(row: DecisionRow): Decision {
 		subject: row.subject,
 		options: row.options,
 		dueDate: row.due_date,
+		responsible: row.responsible,
 		status: row.status,
 		outcome: row.outcome,
 		decidedAt: row.decided_at,

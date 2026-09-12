@@ -1090,7 +1090,7 @@ describe('confirmDecisionsAndChangesReview (S11)', () => {
 });
 
 describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
-	it('nasce pendente, sem outcome/decidedAt/options/dueDate', () => {
+	it('nasce pendente, sem outcome/decidedAt/options/dueDate/responsible', () => {
 		const state = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
 		expect(state.decisions).toEqual([
 			{
@@ -1099,6 +1099,7 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 				subject: 'Adiar o SMS?',
 				options: null,
 				dueDate: null,
+				responsible: null,
 				status: 'pendente',
 				outcome: null,
 				decidedAt: null,
@@ -1113,15 +1114,27 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_subject_required' } });
 	});
 
-	it('editDecision atualiza subject/options/dueDate juntos, sem alterar status/outcome/decidedAt', () => {
+	it('editDecision atualiza subject/options/dueDate/responsible juntos, sem alterar status/outcome/decidedAt', () => {
 		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
-		const edited = unwrap(editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', 'A: agora; B: depois', '2026-02-01', T2));
+		const edited = unwrap(
+			editDecision(
+				catalog,
+				created,
+				'dec-1',
+				'Adiar o SMS?',
+				'A: agora; B: depois',
+				'2026-02-01',
+				'Ana (produto)',
+				T2
+			)
+		);
 		expect(edited.decisions[0]).toEqual({
 			id: 'dec-1',
 			projectId: 'proj-1',
 			subject: 'Adiar o SMS?',
 			options: 'A: agora; B: depois',
 			dueDate: '2026-02-01',
+			responsible: 'Ana (produto)',
 			status: 'pendente',
 			outcome: null,
 			decidedAt: null,
@@ -1132,8 +1145,31 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 
 	it('editDecision recusa dueDate que não é data civil válida', () => {
 		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
-		const result = editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', null, '2026-13-40', T2);
+		const result = editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', null, '2026-13-40', null, T2);
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_due_date_invalid' } });
+	});
+
+	it('editDecision define, troca e limpa responsible independentemente de status/outcome/decidedAt', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+
+		const withResponsible = unwrap(
+			editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', null, null, 'Ana', T2)
+		);
+		expect(withResponsible.decisions[0]).toMatchObject({ responsible: 'Ana', status: 'pendente' });
+
+		const swapped = unwrap(
+			editDecision(catalog, withResponsible, 'dec-1', 'Adiar o SMS?', null, null, 'Bruno', T3)
+		);
+		expect(swapped.decisions[0]).toMatchObject({ responsible: 'Bruno' });
+
+		const cleared = unwrap(editDecision(catalog, swapped, 'dec-1', 'Adiar o SMS?', null, null, null, T3));
+		expect(cleared.decisions[0]).toMatchObject({ responsible: null });
+	});
+
+	it('decideDecision não exige responsible — Decision sem responsável também pode ser tomada', () => {
+		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
+		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		expect(decided.decisions[0]).toMatchObject({ responsible: null, status: 'tomada', outcome: 'Adiado para v2' });
 	});
 
 	it('decideDecision exige outcome não vazio, grava status/outcome/decidedAt juntos', () => {
@@ -1156,14 +1192,16 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
 	});
 
-	it('editDecisionOutcome corrige o outcome de uma decisão tomada sem alterar status/decidedAt', () => {
+	it('editDecisionOutcome corrige o outcome de uma decisão tomada sem alterar status/decidedAt/responsible', () => {
 		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
-		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
+		const withResponsible = unwrap(editDecision(catalog, created, 'dec-1', 'Adiar o SMS?', null, null, 'Ana', T1));
+		const decided = unwrap(decideDecision(catalog, withResponsible, 'dec-1', 'Adiado para v2', T2));
 		const corrected = unwrap(editDecisionOutcome(catalog, decided, 'dec-1', 'Adiado para v3', T3));
 		expect(corrected.decisions[0]).toMatchObject({
 			status: 'tomada',
 			outcome: 'Adiado para v3',
 			decidedAt: T2,
+			responsible: 'Ana',
 			createdAt: T1,
 			updatedAt: T3
 		});
@@ -1182,13 +1220,13 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_outcome_required' } });
 	});
 
-	it('editDecision recusa alterar subject/options/dueDate de uma decisão já tomada — outcome é a única correção possível', () => {
+	it('editDecision recusa alterar subject/options/dueDate/responsible de uma decisão já tomada — outcome é a única correção possível', () => {
 		const created = unwrap(addDecision(catalog, freshState(), 'dec-1', 'Adiar o SMS?', T1));
 		const decided = unwrap(decideDecision(catalog, created, 'dec-1', 'Adiado para v2', T2));
-		const result = editDecision(catalog, decided, 'dec-1', 'Novo assunto', 'Novas opções', '2026-03-01', T3);
+		const result = editDecision(catalog, decided, 'dec-1', 'Novo assunto', 'Novas opções', '2026-03-01', 'Ana', T3);
 		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
 		// Nenhum campo foi alterado pela tentativa recusada.
-		expect(decided.decisions[0]).toMatchObject({ subject: 'Adiar o SMS?', options: null, dueDate: null });
+		expect(decided.decisions[0]).toMatchObject({ subject: 'Adiar o SMS?', options: null, dueDate: null, responsible: null });
 	});
 });
 

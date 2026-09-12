@@ -374,27 +374,29 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 10 do rework ("Risk como objeto vivo",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §40) está concluída. O resultado
-macro entregue — a primeira versão de `Risk` permite identificar, avaliar
-qualitativamente, registrar resposta planejada e monitorar/revisar
-continuamente, com lifecycle próprio e fonte canônica única, sem
-transformar risco em formulário fixo de fase — está registrado em
-D049–D052 (`docs/07-management/decision-log.md`).
+A ETAPA 11 do rework ("Decision e Change",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §41) está concluída. O resultado
+macro entregue — `Decision` e `Change` como objetos canônicos separados,
+`Decision` com subject/opções/responsável/prazo/status/resultado e
+lifecycle pendente→tomada, entidades afetadas provadas inicialmente por
+`DecisionAffectedWorkItem` (`WorkItem`), `decisao_pendente` reconciliado
+via `Impediment.decisionId`, e o legado misto preservado só para leitura
+— está registrado em D053–D057 (`docs/07-management/decision-log.md`).
 
-D052 fecha a etapa e reclassifica, sem resolver, os residuais que
-permaneciam abertos — owner/`Responsible`, materialização em `Issue`,
-`Risk → Impediment`, relações com outros objetos, histórico/event types,
-cadence/SLA/atenção automática, score/matriz, razão de encerramento,
-premortem/sugestões e IA —, cada um com a condição semântica que o
+D057 fecha a etapa e reclassifica, sem resolver, os residuais que
+permaneciam abertos — ampliar entidades afetadas para
+Deliverable/Milestone/Risk/Dependency/Change/AffectedGroup,
+Participant/Stakeholder/pessoas canônicas, captura automática de
+`Change`, novos ProjectEvents/histórico, lifecycle adicional,
+sinais/Atenções derivados e IA —, cada um com a condição semântica que o
 reabre, sem congelar arquitetura ainda não decidida.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S11` (ETAPA 11, "Decision e Change", §41) com status `in_progress`.
-Nenhuma decisão de S11 foi tomada ainda — o ponteiro abre a etapa porque o
-repo já possui objetos estruturados suficientes para calcular impacto,
-mas não decide modelo de `Decision`, modelo de `Change`, relações, schema
-ou superfície.
+`S12` (ETAPA 12, "Scheduling e Gantt", §42) com status `in_progress`.
+Nenhuma decisão de S12 foi tomada ainda — o ponteiro abre a etapa, mas não
+decide se as pré-condições de §42 (WorkItem/Deliverable estáveis, datas,
+durações, dependências, marcos) já estão maduras, nem nenhum modelo de
+precedência, propagação, folga, caminho crítico ou Gantt.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

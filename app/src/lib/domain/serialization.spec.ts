@@ -2316,7 +2316,7 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 	it('preserva decisões no round-trip completo', () => {
 		let state = createInitialProjectState(catalog, 'proj-1', T1);
 		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
-		state = unwrap(editDecision(catalog, state, 'dec-1', 'Adiar o SMS?', 'A ou B', '2026-02-01', T2));
+		state = unwrap(editDecision(catalog, state, 'dec-1', 'Adiar o SMS?', 'A ou B', '2026-02-01', 'Ana', T2));
 		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Adiado', T2));
 		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T2));
 
@@ -2334,6 +2334,28 @@ describe('Decision (ETAPA 11 do rework, primeiro microcorte, §41)', () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.value.decisions).toEqual([]);
+	});
+
+	// responsible — ETAPA 11 do rework, quarto microcorte, §41.
+	it('Decision.responsible ausente (snapshot anterior a este corte) importa como null', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		const envelope = JSON.parse(serializeProjectState(state)) as { state: { decisions: Record<string, unknown>[] } };
+		delete envelope.state.decisions[0].responsible;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.decisions[0].responsible).toBeNull();
+	});
+
+	it('rejeita Decision.responsible que não é string, null ou ausente', () => {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
+		const envelope = JSON.parse(serializeProjectState(state)) as { state: { decisions: Record<string, unknown>[] } };
+		envelope.state.decisions[0].responsible = 42;
+
+		expectError(JSON.stringify(envelope), 'invalid_shape');
 	});
 
 	it('zero Decision é estado legítimo — confirmDecisionsAndChangesReview nunca exige nenhuma', () => {

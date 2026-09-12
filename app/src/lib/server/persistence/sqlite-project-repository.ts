@@ -337,6 +337,20 @@ function ensureImpedimentDecisionIdColumn(db: Database.Database): void {
 	db.exec('CREATE INDEX IF NOT EXISTS idx_impediment_decision_id ON impediment (decision_id)');
 }
 
+// Décima segunda evolução do schema desde 0001_init.sql (ETAPA 11 do rework,
+// quarto microcorte, §41) — mesmo caso de ensureRiskReviewedAtColumn:
+// responsible é uma COLUNA nova na tabela `decision`, já existente desde
+// D053. Idempotente, isolado da inicialização, mesmo padrão. Decisions já
+// persistidas ficam com responsible NULL — nenhum valor é inferido de
+// `decisor_principal` ou de qualquer outro dado (§13.2, sem dual-write).
+function ensureDecisionResponsibleColumn(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(decision)').all() as TableInfoRow[];
+	const hasColumn = columns.some((column) => column.name === 'responsible');
+	if (!hasColumn) {
+		db.exec('ALTER TABLE decision ADD COLUMN responsible TEXT');
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -351,6 +365,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureRiskReviewedAtColumn(db);
 	ensureRiskAssessmentAndResponseColumns(db);
 	ensureImpedimentDecisionIdColumn(db);
+	ensureDecisionResponsibleColumn(db);
 	ensureProjectEventTaxonomyOpen(db);
 
 	function insertChildren(state: ProjectState): void {
@@ -420,9 +435,9 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// problema — mesmo raciocínio de risk abaixo.
 		const insertDecision = db.prepare(
 			`INSERT INTO decision
-			   (id, project_id, subject, options, due_date, status, outcome, decided_at, created_at, updated_at)
+			   (id, project_id, subject, options, due_date, responsible, status, outcome, decided_at, created_at, updated_at)
 			 VALUES
-			   (@id, @projectId, @subject, @options, @dueDate, @status, @outcome, @decidedAt, @createdAt, @updatedAt)`
+			   (@id, @projectId, @subject, @options, @dueDate, @responsible, @status, @outcome, @decidedAt, @createdAt, @updatedAt)`
 		);
 		for (const decision of state.decisions) {
 			insertDecision.run(decision);
@@ -774,7 +789,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const decisionRows = db
 				.prepare(
-					`SELECT id, project_id, subject, options, due_date, status, outcome, decided_at, created_at, updated_at
+					`SELECT id, project_id, subject, options, due_date, responsible, status, outcome, decided_at, created_at, updated_at
 					 FROM decision WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as DecisionRow[];

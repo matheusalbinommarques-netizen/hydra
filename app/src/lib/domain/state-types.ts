@@ -378,8 +378,8 @@ export interface Risk {
 // Decision — ETAPA 11 do rework ("Decision e Change",
 // docs/core/HYDRA_PRODUCT_REWORK.md §41), primeiro microcorte. Objeto em
 // nível de projeto, sem vínculo obrigatório com WorkItem, Deliverable,
-// Milestone, Risk, Impediment ou pessoa/responsável — mesmo adiamento
-// deliberado que Risk fez na ETAPA 10 (D049) para essas mesmas associações.
+// Milestone, Risk ou Impediment — mesmo adiamento deliberado que Risk fez na
+// ETAPA 10 (D049) para essas mesmas associações.
 //
 // Substitui, como fonte de escrita, o campo de texto livre legado
 // `decisoes_mudancas_recentes` (atividade `decisoes_mudancas`), que passa a
@@ -392,11 +392,8 @@ export interface Risk {
 //   pendente => outcome === null && decidedAt === null
 //   tomada    => outcome não vazio && decidedAt !== null
 //
-// Sem responsável/owner, entidades afetadas estruturadas, revertida,
-// cancelada, reopen, delete, score/prioridade ou alerta por prazo nesta
-// primeira fatia — nenhum objeto vivo hoje representa "responsável" (ver
-// §13 do rework), e recriar isso como texto livre reintroduziria a mesma
-// segunda fonte de verdade que a regra de promoção proíbe.
+// Sem entidades afetadas polimórficas, revertida, cancelada, reopen, delete,
+// score/prioridade ou alerta por prazo nesta primeira fatia.
 export type DecisionStatus = 'pendente' | 'tomada';
 
 export interface Decision {
@@ -411,6 +408,17 @@ export interface Decision {
 	// (caso normal). Ter prazo não implica nenhuma regra de urgência
 	// automática nesta fatia.
 	dueDate: string | null;
+	// Responsável por conduzir/ser dono desta Decision específica (ETAPA 11 do
+	// rework, quarto microcorte, §41) — texto livre curto, mesmo tratamento de
+	// normalização de `options` (trim; vazio -> null). Não é `decisor_principal`
+	// (papel geral do projeto, atividade `papeis_responsabilidades`), não é
+	// autoridade formal de governança, não é executor do resultado, e não
+	// referencia nenhuma identidade — nenhum objeto Participant/Stakeholder
+	// existe no repositório e este campo não cria um. Mesmo grupo declarativo
+	// de subject/options/dueDate: editável só enquanto `pendente`, congela
+	// junto com eles depois de `tomada`. Ausência (null) nunca impede
+	// `decideDecision`.
+	responsible: string | null;
 	status: DecisionStatus;
 	outcome: string | null;
 	decidedAt: string | null;

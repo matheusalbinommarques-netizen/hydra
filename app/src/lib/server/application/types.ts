@@ -204,6 +204,9 @@ export interface DecisionView {
 	subject: string;
 	options: string | null;
 	dueDate: string | null;
+	// Responsável por conduzir esta Decision (ETAPA 11 do rework, quarto
+	// microcorte, §41) — texto livre, não identidade. Ver domain/state-types.ts.
+	responsible: string | null;
 	status: DecisionStatus;
 	outcome: string | null;
 	decidedAt: string | null;
@@ -882,14 +885,15 @@ export interface AddDecisionInput {
 	subject: string;
 }
 
-// subject/options/dueDate editados juntos (mesmo formulário) — nunca uma
-// transição de lifecycle.
+// subject/options/dueDate/responsible editados juntos (mesmo formulário) —
+// nunca uma transição de lifecycle.
 export interface EditDecisionInput {
 	projectId: string;
 	decisionId: string;
 	subject: string;
 	options: string | null;
 	dueDate: string | null;
+	responsible: string | null;
 }
 
 export interface DecideDecisionInput {

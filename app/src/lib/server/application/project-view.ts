@@ -181,6 +181,7 @@ function buildDecisionView(state: ProjectState, decision: ProjectState['decision
 		subject: decision.subject,
 		options: decision.options,
 		dueDate: decision.dueDate,
+		responsible: decision.responsible,
 		status: decision.status,
 		outcome: decision.outcome,
 		decidedAt: decision.decidedAt,

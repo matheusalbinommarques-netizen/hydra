@@ -366,6 +366,7 @@ describe('buildProjectView — impediments', () => {
 					subject: 'Qual fornecedor escolher?',
 					options: null,
 					dueDate: null,
+					responsible: null,
 					status: 'pendente',
 					outcome: null,
 					decidedAt: null,

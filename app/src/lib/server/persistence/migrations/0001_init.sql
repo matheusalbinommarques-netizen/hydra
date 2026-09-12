@@ -311,12 +311,19 @@ CREATE TABLE IF NOT EXISTS risk (
 -- espelhando risk_closed_at_matches_status: pendente exige os dois NULL;
 -- tomada exige os dois preenchidos. Garantida atomicamente por
 -- decideDecision/editDecisionOutcome (domain/transitions.ts), reforçada aqui.
+--
+-- responsible (ETAPA 11 do rework, quarto microcorte, §41) — texto livre,
+-- sem CHECK de obrigatoriedade (NULL é estado normal e permanentemente
+-- válido). Bancos criados entre D053/D055 e este corte recebem a coluna via
+-- ALTER TABLE idempotente em sqlite-project-repository.ts
+-- (ensureDecisionResponsibleColumn).
 CREATE TABLE IF NOT EXISTS decision (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
 	subject TEXT NOT NULL,
 	options TEXT,
 	due_date TEXT,
+	responsible TEXT,
 	status TEXT NOT NULL,
 	outcome TEXT,
 	decided_at TEXT,

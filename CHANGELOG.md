@@ -4,6 +4,16 @@
 
 ### Adicionado
 
+- Rework, ETAPA 11 ("Decision e Change") — `Decision` e `Change` passam a
+  existir como objetos canônicos de nível de projeto: registrar uma
+  decisão (assunto, opções, responsável, prazo), marcá-la como tomada com
+  resultado, associar os trabalhos afetados por ela, e registrar mudanças
+  relevantes (o que mudou, impacto) — com a captura legada de texto livre
+  reconciliada para leitura apenas e o impedimento de "decisão pendente"
+  podendo se relacionar à decisão real. Ver D053–D057
+  (`docs/07-management/decision-log.md`); D057 fecha a etapa e registra o
+  que permanece adiado.
+
 - Rework, ETAPA 10 ("Risk como objeto vivo") — `Risk` passa a existir como
   objeto canônico de nível de projeto: identificar, avaliar (probabilidade/
   impacto qualitativos), registrar resposta planejada e monitorar/revisar

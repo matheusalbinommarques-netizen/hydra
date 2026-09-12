@@ -673,6 +673,12 @@ function parseDecisionList(value: unknown): Result<Decision[], ProjectStateParse
 		if (item.dueDate !== null && !isCivilDate(item.dueDate)) {
 			return shapeError('Decision.dueDate deve ser uma data civil YYYY-MM-DD válida ou null');
 		}
+		// responsible (ETAPA 11 do rework, quarto microcorte, §41) — ausente em
+		// snapshots exportados antes deste corte: tratado como null, mesmo
+		// espírito de Impediment.decisionId acima.
+		if (item.responsible !== undefined && item.responsible !== null && !isString(item.responsible)) {
+			return shapeError('Decision.responsible deve ser uma string, null ou ausente');
+		}
 		if (!isDecisionStatus(item.status)) return shapeError('Decision.status deve ser um dos literais aprovados');
 		if (item.outcome !== null && !isString(item.outcome)) {
 			return shapeError('Decision.outcome deve ser uma string ou null');
@@ -688,6 +694,7 @@ function parseDecisionList(value: unknown): Result<Decision[], ProjectStateParse
 			subject: item.subject,
 			options: item.options,
 			dueDate: item.dueDate,
+			responsible: (item.responsible as string | null | undefined) ?? null,
 			status: item.status,
 			outcome: item.outcome,
 			decidedAt: item.decidedAt,

@@ -1522,7 +1522,7 @@ describe('createSqliteProjectRepository — Decision/Change (ETAPA 11 do rework,
 		const repo = memoryRepo();
 		let state = nonTrivialState();
 		state = unwrap(addDecision(catalog, state, 'dec-1', 'Adiar o SMS?', T1));
-		state = unwrap(editDecision(catalog, state, 'dec-1', 'Adiar o SMS?', 'A ou B', '2026-02-01', T1));
+		state = unwrap(editDecision(catalog, state, 'dec-1', 'Adiar o SMS?', 'A ou B', '2026-02-01', 'Ana', T1));
 		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T1));
 		state = unwrap(decideDecision(catalog, state, 'dec-2', 'Mantido o atual', T2));
 		state = unwrap(addChange(catalog, state, 'chg-1', 'Trocou o fornecedor de e-mail', T1));
@@ -1563,6 +1563,32 @@ describe('createSqliteProjectRepository — Decision/Change (ETAPA 11 do rework,
 		const restored = await repo.findById('proj-1');
 		expect(restored?.decisions).toEqual([]);
 		expect(restored?.changes).toEqual([]);
+	});
+
+	it('abre um banco anterior a este corte (sem a coluna responsible), adiciona-a de forma idempotente, e Decisions existentes ficam com responsible null', async () => {
+		const filePath = tempFilePath();
+
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addDecision(catalog, state, 'dec-legacy', 'Decisão anterior a este corte', T1));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('ALTER TABLE decision DROP COLUMN responsible');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const restored = await repo.findById('proj-1');
+		const legacyDecision = restored?.decisions.find((decision) => decision.id === 'dec-legacy');
+		expect(legacyDecision?.responsible).toBeNull();
+
+		// Reabrir de novo não falha nem duplica a coluna.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
 	});
 });
 

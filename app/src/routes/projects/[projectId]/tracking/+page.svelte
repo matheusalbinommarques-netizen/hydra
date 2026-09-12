@@ -165,6 +165,10 @@
 		return options ? `Opções: ${options}` : 'Nenhuma opção registrada';
 	}
 
+	function decisionResponsibleLabel(responsible: string | null): string {
+		return responsible ? `Responsável: ${responsible}` : 'Sem responsável definido';
+	}
+
 	// "Trabalhos afetados" (ETAPA 11 do rework, terceiro microcorte, §41) —
 	// opções do seletor excluem WorkItems já associados a esta Decision, para
 	// não oferecer uma duplicata que o domínio recusaria (mesmo espírito de
@@ -727,6 +731,14 @@
 								placeholder="Opções consideradas (opcional)"
 								value={decision.options ?? ''}
 							></textarea>
+							<label class="visually-hidden" for="responsible-{decision.id}">Responsável</label>
+							<input
+								id="responsible-{decision.id}"
+								type="text"
+								name="responsible"
+								placeholder="Responsável (opcional)"
+								value={decision.responsible ?? ''}
+							/>
 							<button type="submit" class="button-secondary">Salvar</button>
 						</form>
 						<form method="POST" action="?/decideDecision" use:enhance class="risk-response-form">
@@ -747,6 +759,7 @@
 						<p class="risk-text">{decision.subject}</p>
 						<p class="risk-assessment">{decisionOptionsLabel(decision.options)}</p>
 						<p class="risk-response">{decisionDueDateLabel(decision.dueDate)}</p>
+						<p class="risk-response">{decisionResponsibleLabel(decision.responsible)}</p>
 						<div class="affected-work-items">
 							<p class="affected-work-items-label">Trabalhos afetados</p>
 							{#if decision.affectedWorkItems.length === 0}
@@ -826,6 +839,7 @@
 								<p class="risk-text">{decision.subject}</p>
 								<p class="risk-assessment">Resultado: {decision.outcome}</p>
 								<p class="risk-response">{decisionDueDateLabel(decision.dueDate)}</p>
+								<p class="risk-response">{decisionResponsibleLabel(decision.responsible)}</p>
 								<div class="affected-work-items">
 									<p class="affected-work-items-label">Trabalhos afetados</p>
 									{#if decision.affectedWorkItems.length === 0}

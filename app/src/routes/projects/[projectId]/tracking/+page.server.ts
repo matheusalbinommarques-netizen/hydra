@@ -248,13 +248,15 @@ export const actions: Actions = {
 		if (!decisionId || !subject) return fail(400, { message: 'Decisão ou assunto inválido.' });
 		const options = readString(formData, 'options');
 		const dueDate = readString(formData, 'dueDate');
+		const responsible = readString(formData, 'responsible');
 
 		const result = await getProjectUseCases().editDecision({
 			projectId: params.projectId,
 			decisionId,
 			subject,
 			options,
-			dueDate
+			dueDate,
+			responsible
 		});
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
