@@ -16,7 +16,7 @@ import {
 	computeScopeSuggestions,
 	computeSnapshot
 } from '$lib/orientation-engine';
-import { findWorkItemPrecedenceConflict, hasOpenImpediment } from '$lib/domain';
+import { findWorkItemKnownFreeSlack, findWorkItemPrecedenceConflict, hasOpenImpediment } from '$lib/domain';
 import type {
 	AffectedGroupView,
 	CauseExplorationView,
@@ -38,6 +38,7 @@ import type {
 	MilestoneWorkItemView,
 	RiskView,
 	WorkItemDependencyView,
+	WorkItemKnownFreeSlackView,
 	WorkItemPrecedenceConflictView,
 	WorkItemView
 } from './types';
@@ -226,7 +227,8 @@ function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][
 		deliverable: deliverable ? { deliverableId: deliverable.id, title: deliverable.title } : null,
 		plannedStart: item.plannedStart,
 		durationDays: item.durationDays,
-		precedenceConflict: buildWorkItemPrecedenceConflictView(state, item.id)
+		precedenceConflict: buildWorkItemPrecedenceConflictView(state, item.id),
+		knownFreeSlack: buildWorkItemKnownFreeSlackView(state, item.id)
 	};
 }
 
@@ -270,6 +272,33 @@ function buildWorkItemPrecedenceConflictView(
 		dependsOnWorkItemTitle: predecessor.title,
 		knownRequiredStart: conflict.knownRequiredStart
 	};
+}
+
+// knownFreeSlack (ETAPA 12 do rework, §42, quarto microcorte) — mesmo
+// espírito de buildWorkItemPrecedenceConflictView acima: nunca persistido,
+// sempre recalculado na montagem da view a partir do schedule e das
+// Dependency atuais. `known`/`conflict` denormalizam o título do sucessor
+// limitante (`limitingWorkItemTitle`) pelo mesmo motivo de
+// dependsOnWorkItemTitle — a interface não cruza a lista de WorkItems.
+// Sucessor ausente só seria estado corrompido (FK garante existência
+// hoje) — tratado como ausência de folga calculável, nunca quebra a tela.
+function buildWorkItemKnownFreeSlackView(state: ProjectState, workItemId: string): WorkItemKnownFreeSlackView | null {
+	const slack = findWorkItemKnownFreeSlack(state, workItemId);
+	if (!slack) return null;
+	if (slack.kind === 'known' || slack.kind === 'conflict') {
+		const limiting = state.workItems.find((item) => item.id === slack.limitingWorkItemId);
+		if (!limiting) return null;
+		return slack.kind === 'known'
+			? {
+					kind: 'known',
+					slackDays: slack.slackDays,
+					limitingWorkItemId: limiting.id,
+					limitingWorkItemTitle: limiting.title,
+					partial: slack.partial
+				}
+			: { kind: 'conflict', limitingWorkItemId: limiting.id, limitingWorkItemTitle: limiting.title };
+	}
+	return slack;
 }
 
 // "Aguardando" nunca é persistido — é sempre derivado aqui do status do

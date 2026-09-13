@@ -10,6 +10,7 @@ import type { WorkItemStatus } from '$lib/domain';
 import type {
 	SchedulePropagationChangeView,
 	WorkItemDependencyView,
+	WorkItemKnownFreeSlackView,
 	WorkItemPrecedenceConflictView,
 	WorkItemView
 } from '$lib/server/application/types';
@@ -131,6 +132,52 @@ export function precedenceConflictMessage(conflict: WorkItemPrecedenceConflictVi
 		`Conflito de precedência. Este trabalho começa antes de "${conflict.dependsOnWorkItemTitle}" terminar. ` +
 		`Considerando as dependências com cronograma, o início precisa ser ${formatCivilDate(conflict.knownRequiredStart)} ou depois.`
 	);
+}
+
+// Texto da folga conhecida do cronograma (ETAPA 12 do rework, §42, quarto
+// microcorte) — só formata, nunca decide. Copy explicável, deliberadamente
+// sem jargão de CPM (nunca "free float"/"total float"/"buffer"/"margem de
+// segurança" — ver contrato do quarto microcorte): folga é sobre o
+// PRÓXIMO trabalho agendado conhecido, nunca sobre a rede inteira.
+export function knownFreeSlackMessage(slack: WorkItemKnownFreeSlackView): string {
+	switch (slack.kind) {
+		case 'known': {
+			if (slack.slackDays === 0) {
+				return `Sem folga conhecida. Qualquer atraso deste trabalho pressiona "${slack.limitingWorkItemTitle}".`;
+			}
+			const dayWord = slack.slackDays === 1 ? 'dia' : 'dias';
+			return (
+				`Folga conhecida: ${slack.slackDays} ${dayWord}. Este trabalho pode deslizar até ${slack.slackDays} ` +
+				`${dayWord} sem pressionar o próximo trabalho agendado: "${slack.limitingWorkItemTitle}".`
+			);
+		}
+		case 'conflict':
+			return (
+				`Não há folga calculável: "${slack.limitingWorkItemTitle}" já começa antes do limite exigido por ` +
+				`esta dependência.`
+			);
+		case 'unknown':
+			return 'Folga ainda não calculável. Os trabalhos dependentes ainda não têm cronograma.';
+		case 'no_known_limit':
+			return 'Sem limite conhecido por dependências.';
+		case 'unrepresentable':
+			return (
+				'Não é possível calcular a folga: o limite desta dependência cai fora do intervalo suportado ' +
+				'(até 31/12/9999).'
+			);
+	}
+}
+
+// Nota de conhecimento parcial (ETAPA 12 do rework, §42, quarto
+// microcorte) — separada de knownFreeSlackMessage porque só se aplica a
+// `known`: existe sucessor sem cronograma que a conta não considerou.
+// `null` quando não há nota a mostrar (mesmo padrão de outras funções de
+// apresentação puras deste arquivo).
+export function knownFreeSlackPartialHint(slack: WorkItemKnownFreeSlackView): string | null {
+	if (slack.kind === 'known' && slack.partial) {
+		return 'Há trabalhos dependentes sem cronograma; este valor considera somente os que já estão agendados.';
+	}
+	return null;
 }
 
 // Texto de uma mudança individual do preview de propagação (ETAPA 12 do

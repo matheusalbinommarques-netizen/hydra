@@ -271,6 +271,13 @@ export interface WorkItemView {
 	// já compatível com o maior início exigido CONHECIDO (predecessor sem
 	// schedule nunca aparece aqui, nem esconde conflito provado por outro).
 	precedenceConflict: WorkItemPrecedenceConflictView | null;
+	// knownFreeSlack (ETAPA 12 do rework, §42, quarto microcorte) — folga
+	// LIVRE LOCAL derivada (nunca persistida, nunca folga de rede): quantos
+	// dias este item ainda pode deslizar antes de pressionar o sucessor
+	// direto agendado mais próximo. `null` é o caso normal — sem schedule
+	// completo, ou precedenceConflict próprio ainda não resolvido (ver
+	// domain/transitions.ts, findWorkItemKnownFreeSlack).
+	knownFreeSlack: WorkItemKnownFreeSlackView | null;
 }
 
 // Uma aresta de precedência vista a partir do item que depende. `title`/
@@ -302,6 +309,29 @@ export interface WorkItemDependencyView {
 export type WorkItemPrecedenceConflictView =
 	| { kind: 'conflict'; dependsOnWorkItemId: string; dependsOnWorkItemTitle: string; knownRequiredStart: string }
 	| { kind: 'unrepresentable'; dependsOnWorkItemId: string; dependsOnWorkItemTitle: string };
+
+// Folga conhecida do cronograma (ETAPA 12 do rework, §42, quarto
+// microcorte) — projeção de domain/transitions.ts, findWorkItemKnownFreeSlack.
+// `limitingWorkItemTitle` é denormalizado aqui, mesmo espírito de
+// dependsOnWorkItemTitle acima: nomeia o sucessor que prova o limite sem a
+// interface cruzar a lista de WorkItems.
+//
+// Cinco estados, nunca um número fictício: `known` (valor calculado,
+// `partial` true quando existe sucessor sem cronograma que não entrou na
+// conta), `conflict` (uma aresta de saída já viola precedência — nunca
+// gap negativo), `unknown` (existem sucessores, mas nenhum tem cronograma
+// suficiente para calcular nada), `no_known_limit` (nenhuma Dependency
+// sucessora — ausência de limite, não folga zero nem infinita) e
+// `unrepresentable` (a aritmética de precedência deste item excede a
+// faixa civil 0000-9999). `null` em `WorkItemView.knownFreeSlack` continua
+// significando "nada a mostrar" (sem schedule, ou precedenceConflict
+// próprio ainda não resolvido).
+export type WorkItemKnownFreeSlackView =
+	| { kind: 'known'; slackDays: number; limitingWorkItemId: string; limitingWorkItemTitle: string; partial: boolean }
+	| { kind: 'conflict'; limitingWorkItemId: string; limitingWorkItemTitle: string }
+	| { kind: 'unknown' }
+	| { kind: 'no_known_limit' }
+	| { kind: 'unrepresentable' };
 
 // Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte) —
 // resultado de previewSchedulePropagation/applySchedulePropagation.

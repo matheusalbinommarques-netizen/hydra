@@ -8,6 +8,7 @@ import {
 	addDependency,
 	applySchedulePropagation,
 	computeSchedulePropagationPlan,
+	findWorkItemKnownFreeSlack,
 	findWorkItemPrecedenceConflict,
 	removeDependency,
 	addMilestone,
@@ -1586,6 +1587,257 @@ describe('findWorkItemPrecedenceConflict (ETAPA 12 do rework, §42, segundo micr
 			dependsOnWorkItemId: 'wi-b',
 			knownRequiredStart: '2026-09-15'
 		});
+	});
+});
+
+// findWorkItemKnownFreeSlack (ETAPA 12 do rework, "Scheduling e Gantt",
+// §42, quarto microcorte) — folga LIVRE LOCAL derivada, nunca folga de
+// rede/caminho crítico. Falsificadores centrais: fórmula exata do gap,
+// múltiplos sucessores usa o menor gap, sucessor sem schedule marca
+// `partial` sem impedir o cálculo dos agendados, sucessores todos sem
+// schedule produz `unknown` (não `no_known_limit`), ausência de sucessor
+// produz `no_known_limit` (nunca 0/Infinity), aresta em conflito nunca
+// produz gap negativo, precedência de entrada não resolvida suprime a
+// folga inteira, diamond permanece local às arestas diretas, status de
+// execução é irrelevante, e overflow civil nunca lança.
+describe('findWorkItemKnownFreeSlack (ETAPA 12 do rework, §42, quarto microcorte)', () => {
+	it('exemplo canônico: A 12/09 dur.3 (fim 14/09) -> S 18/09 = 3 dias de folga', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-s', '2026-09-18', 1, T2));
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({
+			kind: 'known',
+			slackDays: 3,
+			limitingWorkItemId: 'wi-s',
+			partial: false
+		});
+	});
+
+	it('sucessor no requiredStart exato: 0 dias de folga, nunca negativo', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-s', '2026-09-15', 1, T2));
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({
+			kind: 'known',
+			slackDays: 0,
+			limitingWorkItemId: 'wi-s',
+			partial: false
+		});
+	});
+
+	it('sucessor antes do requiredStart: conflict, nunca gap negativo', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-s', '2026-09-14', 1, T2));
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({
+			kind: 'conflict',
+			limitingWorkItemId: 'wi-s'
+		});
+	});
+
+	it('múltiplos sucessores agendados: vence o menor gap', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-b', 'wi-a', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-c', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2)); // requiredStart 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-18', 1, T2)); // gap 3
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-16', 1, T2)); // gap 1
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({
+			kind: 'known',
+			slackDays: 1,
+			limitingWorkItemId: 'wi-c',
+			partial: false
+		});
+	});
+
+	it('empate exato de gap entre sucessores: tie-break determinístico por createdAt/id, independente da ordem de inserção de Dependency', () => {
+		// wi-b e wi-c produzem o MESMO gap (2 dias) — o resultado não pode
+		// depender da ordem em que as Dependency foram adicionadas.
+		function buildState(firstDependency: 'b' | 'c'): ProjectState {
+			let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+			if (firstDependency === 'b') {
+				state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-b', 'wi-a', T1));
+				state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-c', 'wi-a', T1));
+			} else {
+				state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-c', 'wi-a', T1));
+				state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-b', 'wi-a', T1));
+			}
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2)); // requiredStart 15/09
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-17', 1, T2)); // gap 2
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-17', 1, T2)); // gap 2
+			return state;
+		}
+
+		// wi-b e wi-c têm o mesmo createdAt (T1) — tie-break cai para id:
+		// 'wi-b' < 'wi-c' vence, em ambas as ordens de inserção.
+		expect(findWorkItemKnownFreeSlack(buildState('b'), 'wi-a')).toEqual({
+			kind: 'known',
+			slackDays: 2,
+			limitingWorkItemId: 'wi-b',
+			partial: false
+		});
+		expect(findWorkItemKnownFreeSlack(buildState('c'), 'wi-a')).toEqual({
+			kind: 'known',
+			slackDays: 2,
+			limitingWorkItemId: 'wi-b',
+			partial: false
+		});
+	});
+
+	it('empate exato de severidade entre sucessores em conflito: tie-break determinístico, ainda `conflict`', () => {
+		// wi-b e wi-c começam na MESMA data, ambos violando a precedência — o
+		// estado continua `conflict`, mas o sucessor nomeado é estável.
+		function buildState(firstDependency: 'b' | 'c'): ProjectState {
+			let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+			if (firstDependency === 'b') {
+				state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-b', 'wi-a', T1));
+				state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-c', 'wi-a', T1));
+			} else {
+				state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-c', 'wi-a', T1));
+				state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-b', 'wi-a', T1));
+			}
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2)); // requiredStart 15/09
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-14', 1, T2)); // conflito
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-14', 1, T2)); // conflito, mesma data
+			return state;
+		}
+
+		expect(findWorkItemKnownFreeSlack(buildState('b'), 'wi-a')).toEqual({
+			kind: 'conflict',
+			limitingWorkItemId: 'wi-b'
+		});
+		expect(findWorkItemKnownFreeSlack(buildState('c'), 'wi-a')).toEqual({
+			kind: 'conflict',
+			limitingWorkItemId: 'wi-b'
+		});
+	});
+
+	it('sucessor agendado + sucessor sem schedule: valor do agendado, partial true', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-b', 'wi-a', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-c', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-18', 1, T2));
+		// wi-c permanece sem schedule.
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({
+			kind: 'known',
+			slackDays: 3,
+			limitingWorkItemId: 'wi-b',
+			partial: true
+		});
+	});
+
+	it('só existem sucessores sem schedule: unknown, não no_known_limit', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		// wi-s permanece sem schedule.
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({ kind: 'unknown' });
+	});
+
+	it('nenhuma Dependency sucessora: no_known_limit, nunca 0 nem Infinity', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({ kind: 'no_known_limit' });
+	});
+
+	it('item sem schedule: null, nenhuma folga exibida', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toBeNull();
+	});
+
+	it('precedência de entrada não resolvida suprime a folga inteira (nunca duplica o warning de D059)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-p', 'P', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-p-a', 'wi-a', 'wi-p', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-a-s', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-p', '2026-09-12', 3, T2)); // exige 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2)); // conflita com P
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-s', '2026-09-30', 1, T2));
+
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).not.toBeNull();
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toBeNull();
+	});
+
+	it('diamond: folga permanece local às arestas de saída diretas, sem traversal', () => {
+		// B -> A, B -> C, A -> X, C -> X — folga de B só olha A e C
+		// diretamente, nunca atravessa até X.
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-x', 'X', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-a-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c-b', 'wi-c', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-x-a', 'wi-x', 'wi-a', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-x-c', 'wi-x', 'wi-c', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2)); // requiredStart 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-18', 1, T2)); // gap 3
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-16', 1, T2)); // gap 1
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-x', '2026-01-01', 1, T2)); // bem antes, irrelevante
+
+		expect(findWorkItemKnownFreeSlack(state, 'wi-b')).toEqual({
+			kind: 'known',
+			slackDays: 1,
+			limitingWorkItemId: 'wi-c',
+			partial: false
+		});
+	});
+
+	it('status de execução (inclusive concluido) nunca muda o resultado', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-s', '2026-09-18', 1, T2));
+
+		const before = findWorkItemKnownFreeSlack(state, 'wi-a');
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'em_andamento', T3));
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'concluido', T3));
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual(before);
+	});
+
+	it('overflow civil na própria aritmética do item: nunca lança, devolve unrepresentable', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		// semanticEnd(A) já é 9999-12-31; exigir +1 dia estoura a faixa civil.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '9999-12-31', 1, T2));
+
+		expect(() => findWorkItemKnownFreeSlack(state, 'wi-a')).not.toThrow();
+		expect(findWorkItemKnownFreeSlack(state, 'wi-a')).toEqual({ kind: 'unrepresentable' });
+	});
+
+	it('nenhum cálculo persiste estado: recalcular não muda a referência do state', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-s', 'S', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-s', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-s', '2026-09-18', 1, T2));
+
+		const before = state;
+		findWorkItemKnownFreeSlack(state, 'wi-a');
+		expect(state).toBe(before);
 	});
 });
 

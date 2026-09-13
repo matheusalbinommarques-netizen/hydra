@@ -41,7 +41,7 @@ import type {
 	WorkItemStatus
 } from './state-types';
 import type { Result } from './result';
-import { addCivilDays, isCivilDate } from './civil-date';
+import { addCivilDays, civilDaysBetween, isCivilDate } from './civil-date';
 import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
 import { decodePlanningItems } from './planning-items';
 
@@ -1732,6 +1732,167 @@ export function findWorkItemPrecedenceConflict(
 	if (unrepresentable !== null) return unrepresentable;
 	if (binding === null || item.plannedStart >= binding.knownRequiredStart) return null;
 	return binding;
+}
+
+/**
+ * Folga conhecida do cronograma (ETAPA 12 do rework, §42, quarto
+ * microcorte) — folga LIVRE LOCAL, nunca folga total de rede: quantos dias
+ * corridos este WorkItem ainda pode deslizar para frente antes de
+ * pressionar o `plannedStart` do sucessor direto agendado mais próximo.
+ * Não é intenção do usuário, não é reserva planejada, não é folga da rede
+ * inteira e não é garantia contra restrições ainda não modeladas — mesmo
+ * espírito de conhecimento PARCIAL já estabelecido por D059/D060.
+ *
+ * `null` é o caso normal em duas situações: item sem schedule completo
+ * (nada a avaliar), ou item com precedenceConflict próprio (D059,
+ * incluindo `unrepresentable`) — o schedule deste item ainda precisa ser
+ * corrigido antes de sua margem discricionária ser interpretável, e o
+ * mecanismo de precedência/replanejamento já existente já cobre esse
+ * aviso; esta função nunca duplica esse warning com um número.
+ *
+ * Sucessor direto = uma Dependency cujo `dependsOnWorkItemId` é este item
+ * (este item é o predecessor). Reusa a MESMA fórmula de
+ * findWorkItemPrecedenceConflict (semanticEnd + 1 dia, finish-to-start lag
+ * zero) para o limite de folga zero deste item, e `civilDaysBetween`
+ * (civil-date.ts) para o tamanho do gap.
+ *
+ * Múltiplos sucessores agendados: a folga é o MENOR gap entre eles (o
+ * sucessor mais restritivo vence) — nunca o maior, e nunca a média.
+ * Sucessor cuja aresta já está em conflito de precedência nunca produz
+ * gap negativo: um único sucessor em conflito já basta para reportar
+ * `conflict` (mais severo que qualquer gap positivo de outro sucessor,
+ * mesmo espírito de "esconder um conflito real é pior" de D059) — entre
+ * múltiplos sucessores em conflito, o que exige o maior atraso (menor
+ * `plannedStart`) é o reportado.
+ *
+ * Sucessor sem schedule nunca participa do cálculo numérico, mas também
+ * nunca é ignorado silenciosamente: marca o resultado como `partial`
+ * quando existe ao menos um sucessor agendado (contrato parcial, D060), ou
+ * produz `unknown` quando NENHUM sucessor tem schedule completo (diferente
+ * de "sem sucessor" — aqui existe Dependency, só falta o dado). Ausência
+ * completa de Dependency sucessora produz `no_known_limit` — nunca `0`,
+ * nunca Infinity: ausência de limite não é a mesma coisa que "não pode
+ * atrasar".
+ *
+ * Status de execução (a_fazer/em_andamento/concluido) nunca entra nesta
+ * conta, mesmo tratamento de findWorkItemPrecedenceConflict — folga é fato
+ * de PLANO, não de execução.
+ *
+ * Sem traversal downstream, sem backward pass: olha só as arestas de saída
+ * diretas deste item, nunca atravessa um diamond além do primeiro nível.
+ * Totalmente DERIVADA a cada leitura — nenhum campo persistido.
+ */
+export interface WorkItemKnownFreeSlackKnown {
+	kind: 'known';
+	slackDays: number;
+	limitingWorkItemId: string;
+	partial: boolean;
+}
+
+export interface WorkItemKnownFreeSlackConflict {
+	kind: 'conflict';
+	limitingWorkItemId: string;
+}
+
+export interface WorkItemKnownFreeSlackUnknown {
+	kind: 'unknown';
+}
+
+export interface WorkItemKnownFreeSlackNoKnownLimit {
+	kind: 'no_known_limit';
+}
+
+export interface WorkItemKnownFreeSlackUnrepresentable {
+	kind: 'unrepresentable';
+}
+
+export type WorkItemKnownFreeSlack =
+	| WorkItemKnownFreeSlackKnown
+	| WorkItemKnownFreeSlackConflict
+	| WorkItemKnownFreeSlackUnknown
+	| WorkItemKnownFreeSlackNoKnownLimit
+	| WorkItemKnownFreeSlackUnrepresentable;
+
+export function findWorkItemKnownFreeSlack(state: ProjectState, workItemId: string): WorkItemKnownFreeSlack | null {
+	const item = findWorkItem(state, workItemId);
+	if (!item || item.plannedStart === null || item.durationDays === null) return null;
+
+	// Precedência de entrada não resolvida domina — nunca calcular folga de
+	// saída sobre um schedule que o próprio item ainda viola.
+	if (findWorkItemPrecedenceConflict(state, workItemId) !== null) return null;
+
+	let requiredStartAtZeroSlack: string;
+	try {
+		requiredStartAtZeroSlack = addCivilDays(semanticEnd(item.plannedStart, item.durationDays), 1);
+	} catch {
+		return { kind: 'unrepresentable' };
+	}
+
+	let hasScheduledSuccessor = false;
+	let hasUnscheduledSuccessor = false;
+	let conflictBest: { workItem: WorkItem } | null = null;
+	let knownBest: { gap: number; workItem: WorkItem } | null = null;
+
+	for (const dependency of state.dependencies) {
+		if (dependency.dependsOnWorkItemId !== workItemId) continue;
+		const successor = findWorkItem(state, dependency.workItemId);
+		if (!successor) continue;
+		if (successor.plannedStart === null || successor.durationDays === null) {
+			hasUnscheduledSuccessor = true;
+			continue;
+		}
+		hasScheduledSuccessor = true;
+
+		// Comparação lexicográfica de string é segura aqui: civil date é
+		// sempre YYYY-MM-DD, largura fixa — ordem textual == ordem cronológica.
+		if (successor.plannedStart < requiredStartAtZeroSlack) {
+			// Mais severo (menor plannedStart) vence; empate exato resolvido pelo
+			// mesmo tie-break neutro createdAt/id de computeSchedulePropagationPlan
+			// (D060) — nunca pela ordem de inserção de Dependency, que é
+			// acidental, não contrato.
+			if (
+				conflictBest === null ||
+				successor.plannedStart < conflictBest.workItem.plannedStart! ||
+				(successor.plannedStart === conflictBest.workItem.plannedStart! &&
+					isEarlierByCreatedAtThenId(successor, conflictBest.workItem))
+			) {
+				conflictBest = { workItem: successor };
+			}
+			continue;
+		}
+
+		const gap = civilDaysBetween(requiredStartAtZeroSlack, successor.plannedStart);
+		if (
+			knownBest === null ||
+			gap < knownBest.gap ||
+			(gap === knownBest.gap && isEarlierByCreatedAtThenId(successor, knownBest.workItem))
+		) {
+			knownBest = { gap, workItem: successor };
+		}
+	}
+
+	if (conflictBest !== null) return { kind: 'conflict', limitingWorkItemId: conflictBest.workItem.id };
+	if (knownBest !== null) {
+		return {
+			kind: 'known',
+			slackDays: knownBest.gap,
+			limitingWorkItemId: knownBest.workItem.id,
+			partial: hasUnscheduledSuccessor
+		};
+	}
+	if (hasUnscheduledSuccessor && !hasScheduledSuccessor) return { kind: 'unknown' };
+	return { kind: 'no_known_limit' };
+}
+
+// Tie-break neutro createdAt/id — mesmo padrão já usado por
+// computeSchedulePropagationPlan (D060) e TrackingTimelineEntry
+// (tracking-view.ts): nenhuma prioridade de scheduling nova, só uma
+// ordenação estável e independente da ordem de inserção de Dependency.
+// `true` quando `a` vence `b` como representante determinístico de um
+// empate.
+function isEarlierByCreatedAtThenId(a: WorkItem, b: WorkItem): boolean {
+	if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt;
+	return a.id < b.id;
 }
 
 // --- Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte) --

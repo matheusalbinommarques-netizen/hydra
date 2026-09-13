@@ -8,6 +8,8 @@
 		allMilestonesLinkedHint,
 		buildWorkView,
 		dependencyPresentation,
+		knownFreeSlackMessage,
+		knownFreeSlackPartialHint,
 		nextWorkItemStatus,
 		precedenceConflictMessage,
 		previousWorkItemStatus,
@@ -749,6 +751,25 @@
 							<button type="submit" class="button-secondary">Replanejar sequência</button>
 						</form>
 					{/if}
+				{/if}
+			{/if}
+			<!-- Folga conhecida (ETAPA 12 do rework, §42, quarto microcorte) — folga
+			     LIVRE LOCAL derivada, nunca folga de rede/caminho crítico: null
+			     (sem UI nenhuma) já cobre tanto "sem schedule" quanto "precedência
+			     de entrada ainda não resolvida" (ver domain/transitions.ts,
+			     findWorkItemKnownFreeSlack). Só `conflict` usa role="alert" —
+			     `no_known_limit` é deliberadamente discreto (L6: não criar
+			     attention/signal só porque não há dependência sucessora). -->
+			{#if selectedItem.knownFreeSlack !== null}
+				<p
+					class="panel-hint"
+					class:precedence-conflict={selectedItem.knownFreeSlack.kind === 'conflict'}
+					role={selectedItem.knownFreeSlack.kind === 'conflict' ? 'alert' : undefined}
+				>
+					{knownFreeSlackMessage(selectedItem.knownFreeSlack)}
+				</p>
+				{#if knownFreeSlackPartialHint(selectedItem.knownFreeSlack) !== null}
+					<p class="panel-hint">{knownFreeSlackPartialHint(selectedItem.knownFreeSlack)}</p>
 				{/if}
 			{/if}
 			{#if selectedItem.plannedStart !== null}

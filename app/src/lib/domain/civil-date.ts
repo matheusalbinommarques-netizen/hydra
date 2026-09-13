@@ -91,3 +91,28 @@ export function addCivilDays(date: string, days: number): string {
 	const resultDay = String(shifted.getUTCDate()).padStart(2, '0');
 	return `${resultYearStr}-${resultMonth}-${resultDay}`;
 }
+
+// Diferença assinada em dias corridos entre duas datas civis já validadas
+// (positivo quando `to` é depois de `from`) — ETAPA 12 do rework (§42,
+// quarto microcorte: folga conhecida do cronograma), primeiro consumidor
+// de subtração de datas civis (até aqui só havia soma, addCivilDays).
+//
+// Mesmo motor de addCivilDays (setUTCFullYear, nunca Date.UTC/construtor
+// com o ano como argumento posicional) e pelo mesmo motivo: preservar sem
+// remapeamento legado qualquer ano civil de 0000 a 0099 que isCivilDate
+// aceita. Ambas as datas já vieram validadas como civis (0000-9999), então
+// a diferença em milissegundos nunca se aproxima de um limite de precisão
+// do `Date`.
+export function civilDaysBetween(from: string, to: string): number {
+	const fromMatch = CIVIL_DATE_SHAPE.exec(from);
+	if (!fromMatch) throw new Error(`civilDaysBetween: not a civil date: ${from}`);
+	const toMatch = CIVIL_DATE_SHAPE.exec(to);
+	if (!toMatch) throw new Error(`civilDaysBetween: not a civil date: ${to}`);
+
+	const fromDate = new Date(0);
+	fromDate.setUTCFullYear(Number(fromMatch[1]), Number(fromMatch[2]) - 1, Number(fromMatch[3]));
+	const toDate = new Date(0);
+	toDate.setUTCFullYear(Number(toMatch[1]), Number(toMatch[2]) - 1, Number(toMatch[3]));
+
+	return Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000);
+}

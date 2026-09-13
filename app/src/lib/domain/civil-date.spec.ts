@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCivilDays, isCivilDate } from './civil-date';
+import { addCivilDays, civilDaysBetween, isCivilDate } from './civil-date';
 
 // Contrato estreito e deliberadamente rígido: Milestone.plannedDate é um DIA,
 // não um instante. Os casos negativos abaixo são exatamente os que Date.parse
@@ -113,5 +113,58 @@ describe('addCivilDays', () => {
 		// A borda exata (ano 9999/0000) continua representável.
 		expect(addCivilDays('9999-12-30', 1)).toBe('9999-12-31');
 		expect(addCivilDays('0000-01-02', -1)).toBe('0000-01-01');
+	});
+});
+
+// civilDaysBetween (ETAPA 12 do rework, §42, quarto microcorte: folga
+// conhecida) — primeiro consumidor de subtração de datas civis (até aqui
+// só havia soma, addCivilDays). Mesmo contrato de ausência de drift de
+// timezone e de preservação de anos 0000-0099 sem remapeamento legado.
+describe('civilDaysBetween', () => {
+	it('mesma data: 0 dias', () => {
+		expect(civilDaysBetween('2026-09-12', '2026-09-12')).toBe(0);
+	});
+
+	it('positivo quando "to" é depois de "from"', () => {
+		expect(civilDaysBetween('2026-09-15', '2026-09-18')).toBe(3);
+	});
+
+	it('negativo quando "to" é antes de "from"', () => {
+		expect(civilDaysBetween('2026-09-18', '2026-09-15')).toBe(-3);
+	});
+
+	it('atravessa virada de mês, de ano e ano bissexto', () => {
+		expect(civilDaysBetween('2026-01-31', '2026-02-01')).toBe(1);
+		expect(civilDaysBetween('2026-09-30', '2026-10-01')).toBe(1);
+		expect(civilDaysBetween('2026-12-31', '2027-01-01')).toBe(1);
+		expect(civilDaysBetween('2024-02-28', '2024-03-01')).toBe(2);
+		expect(civilDaysBetween('2026-02-28', '2026-03-01')).toBe(1); // 2026 não é bissexto
+	});
+
+	it('fevereiro bissexto: 28->29 e 29->01 de março, cada um 1 dia', () => {
+		expect(civilDaysBetween('2024-02-28', '2024-02-29')).toBe(1);
+		expect(civilDaysBetween('2024-02-29', '2024-03-01')).toBe(1);
+	});
+
+	it('preserva anos de dois dígitos (0000-0099), sem o remapeamento legado de Date.UTC/construtor Date', () => {
+		expect(civilDaysBetween('0099-01-01', '0099-01-02')).toBe(1);
+		expect(civilDaysBetween('0099-12-31', '0100-01-01')).toBe(1); // virada de ano 0099 -> 0100
+		expect(civilDaysBetween('0000-12-31', '0001-01-01')).toBe(1);
+	});
+
+	it('recusa entrada fora do shape YYYY-MM-DD (mesmo contrato de addCivilDays: shape, não calendário)', () => {
+		expect(() => civilDaysBetween('2026-9-1', '2026-09-02')).toThrow();
+		expect(() => civilDaysBetween('2026-09-01', '01/09/2026')).toThrow();
+	});
+
+	it('nunca produz resultado fracionário (grade fixa de 86400000ms, sem drift de timezone/DST)', () => {
+		for (const [from, to] of [
+			['2026-09-12', '2026-09-18'],
+			['2024-02-28', '2024-03-01'],
+			['0099-12-31', '0100-01-01'],
+			['2027-01-01', '2026-12-31']
+		]) {
+			expect(Number.isInteger(civilDaysBetween(from, to))).toBe(true);
+		}
 	});
 });

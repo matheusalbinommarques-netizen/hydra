@@ -20,7 +20,8 @@ function makeItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): 
 		deliverable: overrides.deliverable ?? null,
 		plannedStart: overrides.plannedStart ?? null,
 		durationDays: overrides.durationDays ?? null,
-		precedenceConflict: overrides.precedenceConflict ?? null
+		precedenceConflict: overrides.precedenceConflict ?? null,
+		knownFreeSlack: overrides.knownFreeSlack ?? null
 	};
 }
 
