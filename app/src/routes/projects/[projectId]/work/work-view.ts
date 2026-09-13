@@ -8,6 +8,7 @@
 
 import type { WorkItemStatus } from '$lib/domain';
 import type {
+	SchedulePropagationChangeView,
 	WorkItemDependencyView,
 	WorkItemPrecedenceConflictView,
 	WorkItemView
@@ -112,9 +113,33 @@ function formatCivilDate(civilDate: string): string {
 // se há conflito. Nomeia o predecessor que prova o limite e nunca afirma
 // compatibilidade completa — pode existir outro predecessor sem schedule,
 // ainda não avaliável.
+//
+// `kind: 'unrepresentable'` (reparo pós-dogfood do terceiro microcorte) —
+// a aritmética de precedência exigiria uma data fora da faixa civil
+// 0000-9999: não existe knownRequiredStart para formatar, então o aviso
+// nomeia o predecessor e explica a impossibilidade em vez de mostrar uma
+// data. Quem chama esta função (o template) nunca oferece replanejamento
+// para este caso — não há para onde propagar.
 export function precedenceConflictMessage(conflict: WorkItemPrecedenceConflictView): string {
+	if (conflict.kind === 'unrepresentable') {
+		return (
+			`Não é possível calcular uma data válida para respeitar a dependência de "${conflict.dependsOnWorkItemTitle}" ` +
+			`dentro do intervalo suportado (até 31/12/9999). Ajuste o cronograma do predecessor ou a dependência.`
+		);
+	}
 	return (
 		`Conflito de precedência. Este trabalho começa antes de "${conflict.dependsOnWorkItemTitle}" terminar. ` +
 		`Considerando as dependências com cronograma, o início precisa ser ${formatCivilDate(conflict.knownRequiredStart)} ou depois.`
+	);
+}
+
+// Texto de uma mudança individual do preview de propagação (ETAPA 12 do
+// rework, §42, terceiro microcorte) — mesmo espírito de
+// precedenceConflictMessage: só formata, nunca decide. Nomeia o
+// predecessor que prova o movimento, mesmo quando é o próprio item raiz.
+export function schedulePropagationChangeMessage(change: SchedulePropagationChangeView): string {
+	return (
+		`${change.workItemTitle}: ${formatCivilDate(change.fromPlannedStart)} → ${formatCivilDate(change.toPlannedStart)} ` +
+		`(dependência: "${change.viaWorkItemTitle}")`
 	);
 }

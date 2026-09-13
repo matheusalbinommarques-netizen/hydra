@@ -17,6 +17,8 @@ import {
 	addTreatmentStep as addTreatmentStepInDomain,
 	addDeliverable as addDeliverableInDomain,
 	addDependency as addDependencyInDomain,
+	applySchedulePropagation as applySchedulePropagationInDomain,
+	computeSchedulePropagationPlan as computeSchedulePropagationPlanInDomain,
 	moveDeliverable as moveDeliverableInDomain,
 	promoteScopeItemToDeliverable as promoteScopeItemToDeliverableInDomain,
 	removeDeliverable as removeDeliverableInDomain,
@@ -119,6 +121,8 @@ import type {
 	AddTreatmentStepInput,
 	AddDeliverableInput,
 	AddDependencyInput,
+	ApplySchedulePropagationInput,
+	PreviewSchedulePropagationInput,
 	MoveDeliverableInput,
 	PromoteScopeItemToDeliverableInput,
 	RemoveDeliverableInput,
@@ -178,6 +182,8 @@ import type {
 	ReorderAgoraItemsInput,
 	ResolveImpedimentInput,
 	ReviewRiskInput,
+	SchedulePropagationChangeView,
+	SchedulePropagationPlanView,
 	SetAffectedGroupFrequencyInput,
 	SetAffectedGroupImpactInput,
 	SetCauseHypothesisExpectedIfTrueInput,
@@ -1095,6 +1101,56 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Propagação de cronograma (ETAPA 12 do rework, §42, terceiro
+		// microcorte) — previewSchedulePropagation é só leitura, nenhum
+		// repository.save. Denormaliza título do WorkItem e do predecessor que
+		// prova cada movimento, mesmo espírito de buildWorkItemPrecedenceConflictView
+		// (project-view.ts).
+		async previewSchedulePropagation(
+			input: PreviewSchedulePropagationInput
+		): Promise<UseCaseOutcome<SchedulePropagationPlanView>> {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = computeSchedulePropagationPlanInDomain(state, input.workItemId);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			const titleOf = (workItemId: string) =>
+				state.workItems.find((item) => item.id === workItemId)?.title ?? '';
+			const changes: SchedulePropagationChangeView[] = result.value.changes.map((change) => ({
+				workItemId: change.workItemId,
+				workItemTitle: titleOf(change.workItemId),
+				fromPlannedStart: change.fromPlannedStart,
+				toPlannedStart: change.toPlannedStart,
+				viaWorkItemId: change.viaWorkItemId,
+				viaWorkItemTitle: titleOf(change.viaWorkItemId)
+			}));
+			return {
+				ok: true,
+				value: { rootWorkItemId: result.value.rootWorkItemId, changes, partial: result.value.partial }
+			};
+		},
+
+		// applySchedulePropagation recalcula o plano contra o estado atual
+		// (domain/transitions.ts, applySchedulePropagation) — nunca confia num
+		// plano vindo do cliente, só compara contra `input.expected` (o que a
+		// interface efetivamente mostrou) para recusar como preview obsoleto se
+		// divergirem (work_item_precedence_stale_preview). Plano vazio (conflito
+		// já resolvido por outro caminho, e coerente com o que foi confirmado)
+		// devolve a view sem gravar nada de novo.
+		async applySchedulePropagation(input: ApplySchedulePropagationInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = applySchedulePropagationInDomain(catalog, state, input.workItemId, input.expected, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			if (result.value !== state) {
+				await repository.save(result.value);
+			}
 			return viewOf(result.value);
 		},
 

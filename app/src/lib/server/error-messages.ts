@@ -55,6 +55,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Informe uma data de início válida (dia, mês e ano).';
 		case 'work_item_duration_invalid':
 			return 'A duração deve ser um número inteiro de dias, maior ou igual a 1.';
+		case 'work_item_precedence_date_overflow':
+			return 'O replanejamento levaria uma data além do limite representável (ano 9999). Nada foi alterado.';
+		case 'work_item_precedence_stale_preview':
+			return 'O cronograma mudou desde este preview. Gere o replanejamento novamente antes de confirmar.';
 		case 'dependency_not_found':
 			return 'Dependência não encontrada.';
 		case 'dependency_self_reference':

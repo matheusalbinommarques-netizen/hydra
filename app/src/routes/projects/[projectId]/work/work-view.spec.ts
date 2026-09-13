@@ -128,6 +128,7 @@ describe('allMilestonesLinkedHint', () => {
 describe('precedenceConflictMessage', () => {
 	it('nomeia o predecessor e formata a data em dd/mm/aaaa', () => {
 		const message = precedenceConflictMessage({
+			kind: 'conflict',
 			dependsOnWorkItemId: 'wi-b',
 			dependsOnWorkItemTitle: 'Definir schema',
 			knownRequiredStart: '2026-09-15'
@@ -135,5 +136,18 @@ describe('precedenceConflictMessage', () => {
 		expect(message).toContain('Definir schema');
 		expect(message).toContain('15/09/2026');
 		expect(message).not.toMatch(/bloquead|imped|não pode executar/i);
+	});
+
+	// kind === 'unrepresentable' (reparo pós-dogfood do terceiro microcorte,
+	// §42) — não há knownRequiredStart para formatar; a mensagem precisa
+	// nomear o predecessor e explicar a impossibilidade, sem inventar data.
+	it('estado irrepresentável: nomeia o predecessor e explica a impossibilidade, sem data', () => {
+		const message = precedenceConflictMessage({
+			kind: 'unrepresentable',
+			dependsOnWorkItemId: 'wi-b',
+			dependsOnWorkItemTitle: 'Migrar infraestrutura'
+		});
+		expect(message).toContain('Migrar infraestrutura');
+		expect(message).toMatch(/não é possível calcular/i);
 	});
 });

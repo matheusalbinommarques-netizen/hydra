@@ -2291,6 +2291,7 @@ describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
 		if (!result.ok) throw new Error('esperado ok');
 
 		expect(result.value.workItems.find((item) => item.id === a)?.precedenceConflict).toEqual({
+			kind: 'conflict',
 			dependsOnWorkItemId: b,
 			dependsOnWorkItemTitle: 'B',
 			knownRequiredStart: '2026-09-15'
@@ -2299,6 +2300,43 @@ describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
 		// schedule e Dependency de saída, nunca do predecessor.
 		expect(result.value.workItems.find((item) => item.id === b)?.precedenceConflict).toBeNull();
 		expect(result.value.workItems.find((item) => item.id === c)?.precedenceConflict).toBeNull();
+	});
+
+	// Reparo pós-dogfood do terceiro microcorte de §42 — o defeito original
+	// (D059) fazia buildWorkItemPrecedenceConflictView lançar (500 real na
+	// leitura normal de ProjectView) quando a precedência exigia uma data
+	// fora da faixa civil 0000-9999. Ponta a ponta: loadProjectView (o mesmo
+	// caminho que qualquer carregamento de página usa) precisa continuar
+	// funcionando, expondo o estado honestamente em vez de quebrar.
+	it('precedenceConflict: predecessor cujo requiredStart estoura a faixa civil não derruba a leitura da ProjectView', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '9999-12-31', durationDays: 1 });
+		const scheduled = await useCases.setWorkItemSchedule({
+			projectId,
+			workItemId: a,
+			plannedStart: '9999-01-01',
+			durationDays: 1
+		});
+		if (!scheduled.ok) throw new Error('esperado ok');
+
+		expect(scheduled.value.workItems.find((item) => item.id === a)?.precedenceConflict).toEqual({
+			kind: 'unrepresentable',
+			dependsOnWorkItemId: b,
+			dependsOnWorkItemTitle: 'B'
+		});
+
+		// loadProjectView é o caminho real de qualquer carregamento de página —
+		// precisa continuar funcionando (nunca lançar) para este mesmo projeto.
+		const reloaded = await useCases.loadProjectView(projectId);
+		expect(reloaded.ok).toBe(true);
+		if (!reloaded.ok) throw new Error('esperado ok');
+		expect(reloaded.value.workItems.find((item) => item.id === a)?.precedenceConflict).toEqual({
+			kind: 'unrepresentable',
+			dependsOnWorkItemId: b,
+			dependsOnWorkItemTitle: 'B'
+		});
 	});
 
 	it('precedenceConflict desaparece quando o schedule do dependente passa a respeitar o limite conhecido', async () => {
@@ -2341,6 +2379,78 @@ describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
 				createdAt: '2026-01-01T00:00:00.000Z'
 			}
 		]);
+	});
+
+	// Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte,
+	// hardening pós-dogfood) — ponta a ponta pelo mesmo caminho da interface:
+	// previewSchedulePropagation (só leitura) -> applySchedulePropagation
+	// (recalcula e só aplica se corresponder ao `expected`, hardening contra
+	// preview obsoleto). `expected` aqui é sempre extraído do próprio
+	// preview retornado, mesmo padrão que a action do SvelteKit monta a
+	// partir do JSON do campo oculto.
+	function expectedFromPreview(preview: { changes: { workItemId: string; fromPlannedStart: string; toPlannedStart: string; viaWorkItemId: string }[]; partial: boolean }) {
+		return {
+			changes: preview.changes.map((change) => ({
+				workItemId: change.workItemId,
+				fromPlannedStart: change.fromPlannedStart,
+				toPlannedStart: change.toPlannedStart,
+				viaWorkItemId: change.viaWorkItemId
+			})),
+			partial: preview.partial
+		};
+	}
+
+	it('previewSchedulePropagation não grava; applySchedulePropagation aplica quando nada mudou desde o preview', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['B', 'A', 'X']);
+		const [b, a, x] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		await useCases.addDependency({ projectId, workItemId: x, dependsOnWorkItemId: a });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '2026-09-12', durationDays: 3 });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-14', durationDays: 2 });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: x, plannedStart: '2026-09-16', durationDays: 2 });
+
+		const preview = await useCases.previewSchedulePropagation({ projectId, workItemId: a });
+		if (!preview.ok) throw new Error('esperado ok');
+		expect(preview.value.changes.map((change) => change.workItemId)).toEqual([a, x]);
+
+		// previewSchedulePropagation não grava — a leitura seguinte continua
+		// mostrando o conflito original, intocado.
+		const stillConflicting = await useCases.loadProjectView(projectId);
+		if (!stillConflicting.ok) throw new Error('esperado ok');
+		expect(stillConflicting.value.workItems.find((item) => item.id === a)?.plannedStart).toBe('2026-09-14');
+
+		const applied = await useCases.applySchedulePropagation({
+			projectId,
+			workItemId: a,
+			expected: expectedFromPreview(preview.value)
+		});
+		if (!applied.ok) throw new Error('esperado ok');
+		expect(applied.value.workItems.find((item) => item.id === a)?.plannedStart).toBe('2026-09-15');
+		expect(applied.value.workItems.find((item) => item.id === x)?.plannedStart).toBe('2026-09-17');
+	});
+
+	it('applySchedulePropagation recusa como preview obsoleto quando o predecessor muda entre preview e confirmação', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['B', 'A']);
+		const [b, a] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '2026-09-12', durationDays: 3 });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-14', durationDays: 2 });
+
+		const preview = await useCases.previewSchedulePropagation({ projectId, workItemId: a });
+		if (!preview.ok) throw new Error('esperado ok');
+		const expected = expectedFromPreview(preview.value);
+
+		// B estica depois do preview: o requiredStart real de A não é mais o
+		// que o preview mostrou.
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '2026-09-12', durationDays: 5 });
+
+		const applied = await useCases.applySchedulePropagation({ projectId, workItemId: a, expected });
+		expect(applied).toEqual({ ok: false, error: { kind: 'work_item_precedence_stale_preview' } });
+
+		// Zero escrita: A continua exatamente onde estava antes da confirmação recusada.
+		const reloaded = await useCases.loadProjectView(projectId);
+		if (!reloaded.ok) throw new Error('esperado ok');
+		expect(reloaded.value.workItems.find((item) => item.id === a)?.plannedStart).toBe('2026-09-14');
 	});
 });
 

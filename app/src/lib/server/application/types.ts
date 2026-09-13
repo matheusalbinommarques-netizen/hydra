@@ -288,10 +288,44 @@ export interface WorkItemDependencyView {
 // Dependency que possuem schedule completo, nunca o "início mínimo
 // compatível" absoluto — um predecessor sem schedule pode existir e não
 // entrar nesta conta (ver findWorkItemPrecedenceConflict).
-export interface WorkItemPrecedenceConflictView {
-	dependsOnWorkItemId: string;
-	dependsOnWorkItemTitle: string;
-	knownRequiredStart: string;
+//
+// União discriminada (ETAPA 12 do rework, §42, reparo pós-dogfood do
+// terceiro microcorte) — 'conflict' é o caso já existente (data conhecida,
+// oferece replanejamento); 'unrepresentable' é o caso em que a aritmética
+// de precedência exigiria uma data fora da faixa civil 0000-9999
+// (domain/transitions.ts, WorkItemPrecedenceUnrepresentable): não existe
+// knownRequiredStart para mostrar, e nenhuma ação de replanejamento é
+// oferecida (não há para onde propagar). `null` no campo
+// `WorkItemView.precedenceConflict` continua significando "sem conflito
+// nenhum" — esta união só cobre os dois estados em que EXISTE um problema
+// de precedência a comunicar.
+export type WorkItemPrecedenceConflictView =
+	| { kind: 'conflict'; dependsOnWorkItemId: string; dependsOnWorkItemTitle: string; knownRequiredStart: string }
+	| { kind: 'unrepresentable'; dependsOnWorkItemId: string; dependsOnWorkItemTitle: string };
+
+// Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte) —
+// resultado de previewSchedulePropagation/applySchedulePropagation.
+// `viaWorkItemTitle` é denormalizado aqui, mesmo espírito de
+// dependsOnWorkItemTitle acima: a interface nomeia o predecessor que prova
+// cada movimento sem cruzar a lista de WorkItems.
+export interface SchedulePropagationChangeView {
+	workItemId: string;
+	workItemTitle: string;
+	fromPlannedStart: string;
+	toPlannedStart: string;
+	viaWorkItemId: string;
+	viaWorkItemTitle: string;
+}
+
+// `partial` (ver domain/transitions.ts, SchedulePropagationPlan) — true
+// quando a cascata encontrou dependência sem cronograma (predecessor ou
+// sucessor) que impede afirmar o resultado como completo. `changes` só
+// lista WorkItems que realmente mudariam — plano vazio é caso normal
+// (conflito do item raiz já foi resolvido por outro caminho).
+export interface SchedulePropagationPlanView {
+	rootWorkItemId: string;
+	changes: SchedulePropagationChangeView[];
+	partial: boolean;
 }
 
 // Deliverable (ETAPA 9 do rework, primeiro microcorte) — view leve, sem
@@ -789,6 +823,38 @@ export interface RemoveDependencyInput {
 	dependencyId: string;
 }
 
+// Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte) —
+// preview e confirmação usam a mesma entrada base: qual WorkItem, com
+// conflito de precedência já provado, inicia a cascata. Nenhum plano
+// PRONTO é recebido do cliente em nenhuma das duas — previewSchedulePropagation
+// só lê, applySchedulePropagation sempre recalcula contra o estado atual
+// antes de gravar.
+export interface PreviewSchedulePropagationInput {
+	projectId: string;
+	workItemId: string;
+}
+
+// Subconjunto canônico do plano que a interface mostrou e o usuário
+// confirmou (hardening pós-dogfood, §42 terceiro microcorte) — só o que foi
+// efetivamente exibido: WorkItem afetado, data de origem esperada, nova
+// data e o predecessor que a prova. Nunca inclui título (denormalização de
+// apresentação, irrelevante para o significado do consentimento) nem o id
+// da Dependency (nunca mostrado na interface). Servido de volta pelo
+// próprio cliente só como EXPECTATIVA para comparação — o navegador nunca é
+// fonte de verdade; ver applySchedulePropagation.
+export interface SchedulePropagationExpectedChange {
+	workItemId: string;
+	fromPlannedStart: string;
+	toPlannedStart: string;
+	viaWorkItemId: string;
+}
+
+export interface ApplySchedulePropagationInput {
+	projectId: string;
+	workItemId: string;
+	expected: { changes: SchedulePropagationExpectedChange[]; partial: boolean };
+}
+
 // Entregas (ETAPA 9 do rework) — mesmo padrão dos demais inputs: o id é
 // gerado pelo caso de uso (idGenerator), nunca recebido do cliente.
 export interface AddDeliverableInput {
@@ -1195,6 +1261,10 @@ export interface ProjectUseCases {
 	setWorkItemSchedule(input: SetWorkItemScheduleInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDependency(input: AddDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDependency(input: RemoveDependencyInput): Promise<UseCaseOutcome<ProjectView>>;
+	previewSchedulePropagation(
+		input: PreviewSchedulePropagationInput
+	): Promise<UseCaseOutcome<SchedulePropagationPlanView>>;
+	applySchedulePropagation(input: ApplySchedulePropagationInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDeliverable(input: AddDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDeliverableTitle(input: SetDeliverableTitleInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDeliverableEffort(input: SetDeliverableEffortInput): Promise<UseCaseOutcome<ProjectView>>;

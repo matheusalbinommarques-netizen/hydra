@@ -6,6 +6,8 @@ import {
 	addDecision,
 	addDeliverable,
 	addDependency,
+	applySchedulePropagation,
+	computeSchedulePropagationPlan,
 	findWorkItemPrecedenceConflict,
 	removeDependency,
 	addMilestone,
@@ -1522,6 +1524,440 @@ describe('findWorkItemPrecedenceConflict (ETAPA 12 do rework, §42, segundo micr
 
 		const result = setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T3);
 		expect(result.ok).toBe(true);
+	});
+
+	// Reparo pós-dogfood do terceiro microcorte de §42 — findWorkItemPrecedenceConflict
+	// NUNCA lança, mesmo quando a aritmética de precedência exigiria uma data
+	// fora da faixa civil 0000-9999. Falsificadores A/B/G do pedido de reparo.
+	it('predecessor cujo requiredStart estoura a faixa civil: nunca lança, devolve unrepresentable', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		// Fim semântico de B já é 31/12/9999 — exigir +1 dia estoura a faixa civil.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '9999-12-31', 1, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '9999-01-01', 1, T2));
+
+		expect(() => findWorkItemPrecedenceConflict(state, 'wi-a')).not.toThrow();
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toEqual({
+			kind: 'unrepresentable',
+			dependencyId: 'dep-1',
+			dependsOnWorkItemId: 'wi-b'
+		});
+	});
+
+	it('estouro pela própria duração do predecessor (não só pelo +1 dia final): mesmo tratamento seguro', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		// semanticEnd(B) = 9999-12-01 + 60 dias já ultrapassa 9999-12-31 por si
+		// só, antes mesmo de somar o +1 dia de finish-to-start.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '9999-12-01', 60, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '9999-01-01', 1, T2));
+
+		expect(() => findWorkItemPrecedenceConflict(state, 'wi-a')).not.toThrow();
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toMatchObject({ kind: 'unrepresentable' });
+	});
+
+	it('um predecessor irrepresentável não impede reportar outro predecessor com conflito comum representável', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-a', 'wi-c', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '9999-12-31', 1, T2)); // irrepresentável
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-12', 3, T2)); // exige 15/09/2026
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-01', 1, T2));
+
+		// Irrepresentável vence a agregação: é mais severo do que qualquer
+		// conflito comum (D059 nunca esconderia um problema real).
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toMatchObject({ kind: 'unrepresentable', dependsOnWorkItemId: 'wi-b' });
+	});
+
+	it('conflito comum continua exatamente como antes quando não há estouro em nenhum predecessor', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toEqual({
+			kind: 'conflict',
+			dependencyId: 'dep-1',
+			dependsOnWorkItemId: 'wi-b',
+			knownRequiredStart: '2026-09-15'
+		});
+	});
+});
+
+// computeSchedulePropagationPlan / applySchedulePropagation (ETAPA 12 do
+// rework, "Scheduling e Gantt", §42, terceiro microcorte) — propagação
+// FORWARD-ONLY, explícita e atômica. Falsificadores centrais: cadeia só
+// avança o necessário, item já compatível nunca é puxado para trás,
+// predecessor mais cedo/mais curto nunca antecipa sucessor, diamonds
+// convergem independente da ordem, múltiplos predecessores usa o maior
+// limite, dados parciais nunca inventam schedule (só marcam `partial`),
+// status de execução é irrelevante, plano vazio quando nada precisa mudar,
+// aplicação recalcula contra o estado atual (nunca confia em plano
+// obsoleto), estouro de faixa civil falha o plano inteiro sem aplicar
+// nada, e só os itens realmente movidos ganham updatedAt (mesmo
+// occurredAt entre eles).
+describe('computeSchedulePropagationPlan / applySchedulePropagation (ETAPA 12 do rework, §42, terceiro microcorte)', () => {
+	// B → A → X, mesmo cenário do dogfood do item: B 12/09 (3 dias, fim
+	// 14/09, exige 15/09); A 14/09 (2 dias) conflita com B.
+	function chainState(xPlannedStart: string, xDurationDays: number): ProjectState {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-x', 'X', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-a-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-x-a', 'wi-x', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-x', xPlannedStart, xDurationDays, T2));
+		return state;
+	}
+
+	it('cadeia: move A para o limite de B; move X só porque o novo fim de A agora o exige', () => {
+		const state = chainState('2026-09-16', 2);
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan.partial).toBe(false);
+		expect(plan.changes).toEqual([
+			{
+				workItemId: 'wi-a',
+				fromPlannedStart: '2026-09-14',
+				toPlannedStart: '2026-09-15',
+				viaDependencyId: 'dep-a-b',
+				viaWorkItemId: 'wi-b'
+			},
+			{
+				workItemId: 'wi-x',
+				fromPlannedStart: '2026-09-16',
+				toPlannedStart: '2026-09-17',
+				viaDependencyId: 'dep-x-a',
+				viaWorkItemId: 'wi-a'
+			}
+		]);
+	});
+
+	it('item já depois do requiredStart nunca é puxado para trás: X com folga suficiente não entra no plano', () => {
+		const state = chainState('2026-09-25', 2);
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan.changes.map((change) => change.workItemId)).toEqual(['wi-a']);
+	});
+
+	it('sem conflito na raiz: plano vazio, nunca oferece aplicação sem mudança', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan).toEqual({ rootWorkItemId: 'wi-a', changes: [], partial: false });
+	});
+
+	it('predecessor movido para mais cedo ou encurtado nunca antecipa o sucessor', () => {
+		// A e X já compatíveis com B (sem conflito nenhum na cadeia).
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-a-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-20', 2, T2));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toBeNull();
+
+		// Move B para mais cedo e encurta a duração — A não tem conflito
+		// (continua muito à frente), então propagar em A não move nada.
+		const earlier = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-01', 1, T3));
+		expect(unwrap(computeSchedulePropagationPlan(earlier, 'wi-a')).changes).toEqual([]);
+	});
+
+	it('removeDependency nunca puxa datas: remover a Dependency não altera nenhum plannedStart', () => {
+		const state = chainState('2026-09-16', 2);
+		const withoutDependency = unwrap(removeDependency(catalog, state, 'dep-a-b'));
+		expect(withoutDependency.workItems).toEqual(state.workItems);
+	});
+
+	it('addDependency nunca propaga automaticamente: criar a Dependency não move nenhum plannedStart', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+
+		const withDependency = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T3));
+		expect(withDependency.workItems).toEqual(state.workItems);
+		// O conflito passa a existir só como leitura — nada foi escrito.
+		expect(findWorkItemPrecedenceConflict(withDependency, 'wi-a')).not.toBeNull();
+	});
+
+	it('predecessor sem schedule não bloqueia o conflito conhecido e marca o plano como parcial', () => {
+		let state = chainState('2026-09-16', 2);
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-a-c', 'wi-a', 'wi-c', T1));
+		// wi-c permanece sem schedule.
+
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan.partial).toBe(true);
+		expect(plan.changes.find((change) => change.workItemId === 'wi-a')).toMatchObject({
+			toPlannedStart: '2026-09-15',
+			viaWorkItemId: 'wi-b'
+		});
+	});
+
+	it('sucessor sem schedule nunca recebe schedule inventado; a cascata para naquele ramo e marca parcial', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-x', 'X', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-y', 'Y', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-a-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-x-a', 'wi-x', 'wi-a', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-y-x', 'wi-y', 'wi-x', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-y', '2026-09-20', 2, T2));
+		// wi-x (sucessor de A, predecessor de Y) permanece sem schedule.
+
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan.partial).toBe(true);
+		expect(plan.changes.map((change) => change.workItemId)).toEqual(['wi-a']);
+		expect(plan.changes.some((change) => change.workItemId === 'wi-x' || change.workItemId === 'wi-y')).toBe(false);
+	});
+
+	it('diamond (B→A, B→C, A→X, C→X): resultado independe da ordem de visita', () => {
+		function diamondState(dependencyOrder: readonly ['ab' | 'ac' | 'xa' | 'xc', string][]): ProjectState {
+			let state = unwrap(addWorkItem(catalog, freshState(), 'wi-b', 'B', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+			state = unwrap(addWorkItem(catalog, state, 'wi-x', 'X', T1));
+			const edges: Record<string, [string, string]> = {
+				ab: ['wi-a', 'wi-b'],
+				ac: ['wi-c', 'wi-b'],
+				xa: ['wi-x', 'wi-a'],
+				xc: ['wi-x', 'wi-c']
+			};
+			for (const [key, dependencyId] of dependencyOrder) {
+				const [workItemId, dependsOnWorkItemId] = edges[key];
+				state = unwrap(addDependency(catalog, state, dependencyId, workItemId, dependsOnWorkItemId, T1));
+			}
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-01', 5, T2)); // fim 05/09, exige 06/09
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-01', 2, T2)); // conflita com B
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-10', 3, T2)); // já compatível com B; fim 12/09, exige 13/09
+			state = unwrap(setWorkItemSchedule(catalog, state, 'wi-x', '2026-09-07', 2, T2));
+			return state;
+		}
+
+		const orderOne = diamondState([
+			['ab', 'dep-1'],
+			['ac', 'dep-2'],
+			['xa', 'dep-3'],
+			['xc', 'dep-4']
+		]);
+		const orderTwo = diamondState([
+			['xc', 'dep-4'],
+			['xa', 'dep-3'],
+			['ac', 'dep-2'],
+			['ab', 'dep-1']
+		]);
+
+		const planOne = unwrap(computeSchedulePropagationPlan(orderOne, 'wi-a'));
+		const planTwo = unwrap(computeSchedulePropagationPlan(orderTwo, 'wi-a'));
+
+		// Ordem determinística (hardening pós-dogfood, §42 terceiro
+		// microcorte) — igualdade exata de array, sem normalizar por sort:
+		// a ordem de inserção das Dependency (invertida entre as duas
+		// construções acima) não pode vazar para a ordem observável de
+		// `changes`, porque o preview agora participa da comparação de
+		// staleness em applySchedulePropagation.
+		expect(planOne.changes).toEqual(planTwo.changes);
+
+		// A move para o limite de B (06/09); X é decidido pelo maior limite
+		// CONHECIDO — o de C (13/09), não o de A (08/09) — porque C nunca se
+		// move (não é descendente de A) e seu limite já era maior.
+		expect(planOne.changes).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ workItemId: 'wi-a', toPlannedStart: '2026-09-06' }),
+				expect.objectContaining({ workItemId: 'wi-x', toPlannedStart: '2026-09-13', viaWorkItemId: 'wi-c' })
+			])
+		);
+		expect(planOne.changes).toHaveLength(2);
+	});
+
+	it('múltiplos predecessores: A usa o maior limite conhecido entre B e C', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-a', 'wi-c', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2)); // exige 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-20', 1, T2)); // exige 21/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-01', 1, T2));
+
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan.changes).toEqual([
+			{
+				workItemId: 'wi-a',
+				fromPlannedStart: '2026-09-01',
+				toPlannedStart: '2026-09-21',
+				viaDependencyId: 'dep-c',
+				viaWorkItemId: 'wi-c'
+			}
+		]);
+	});
+
+	it('WorkItem concluído: participa da cascata com a mesma matemática dos demais', () => {
+		let state = chainState('2026-09-16', 2);
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'em_andamento', T2));
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'concluido', T2));
+
+		const plan = unwrap(computeSchedulePropagationPlan(state, 'wi-a'));
+		expect(plan.changes.map((change) => change.workItemId)).toEqual(['wi-a', 'wi-x']);
+	});
+
+	// expectationOf — mesma extração canônica que a camada de aplicação faz
+	// do preview antes de devolvê-lo ao cliente (ver
+	// SchedulePropagationExpectedChange, application/types.ts): só os campos
+	// que a interface efetivamente mostrou, nunca viaDependencyId.
+	function expectationOf(plan: { changes: readonly { workItemId: string; fromPlannedStart: string; toPlannedStart: string; viaWorkItemId: string }[]; partial: boolean }) {
+		return {
+			changes: plan.changes.map((change) => ({
+				workItemId: change.workItemId,
+				fromPlannedStart: change.fromPlannedStart,
+				toPlannedStart: change.toPlannedStart,
+				viaWorkItemId: change.viaWorkItemId
+			})),
+			partial: plan.partial
+		};
+	}
+
+	it('applySchedulePropagation: transição atômica, só os itens movidos ganham updatedAt, mesmo occurredAt', () => {
+		const state = chainState('2026-09-16', 2);
+		const before = new Map(state.workItems.map((item) => [item.id, item]));
+		const expected = expectationOf(unwrap(computeSchedulePropagationPlan(state, 'wi-a')));
+
+		const applied = unwrap(applySchedulePropagation(catalog, state, 'wi-a', expected, T3));
+		const a = applied.workItems.find((item) => item.id === 'wi-a')!;
+		const x = applied.workItems.find((item) => item.id === 'wi-x')!;
+		const b = applied.workItems.find((item) => item.id === 'wi-b')!;
+
+		expect(a.plannedStart).toBe('2026-09-15');
+		expect(a.updatedAt).toBe(T3);
+		expect(x.plannedStart).toBe('2026-09-17');
+		expect(x.updatedAt).toBe(T3);
+		// B não fez parte do plano: permanece idêntico por referência.
+		expect(b).toBe(before.get('wi-b'));
+	});
+
+	it('estouro de faixa civil: plano inválido, zero mudanças aplicadas', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		// Fim semântico de B já é 31/12/9999 — exigir +1 dia estoura a faixa civil.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '9999-12-31', 1, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '9999-01-01', 1, T2));
+
+		expect(computeSchedulePropagationPlan(state, 'wi-a')).toEqual({
+			ok: false,
+			error: { kind: 'work_item_precedence_date_overflow' }
+		});
+
+		// Falsificador G do hardening — overflow no recálculo da confirmação
+		// (o `expected` é irrelevante aqui: o recálculo falha antes de
+		// qualquer comparação de staleness) continua erro explícito, zero
+		// escrita.
+		const before = state;
+		const applied = applySchedulePropagation(catalog, state, 'wi-a', { changes: [], partial: false }, T3);
+		expect(applied).toEqual({ ok: false, error: { kind: 'work_item_precedence_date_overflow' } });
+		expect(state).toBe(before);
+	});
+
+	it('WorkItem inexistente: recusado', () => {
+		const state = freshState();
+		expect(computeSchedulePropagationPlan(state, 'inexistente')).toEqual({
+			ok: false,
+			error: { kind: 'work_item_not_found' }
+		});
+	});
+
+	// Hardening pós-dogfood — preview obsoleto (§42 terceiro microcorte):
+	// recalcular contra o estado atual é necessário mas não suficiente. Se o
+	// plano recém-calculado não corresponder ao que o usuário confirmou
+	// (`expected`), a confirmação é recusada por inteiro, nunca aplicada
+	// parcialmente — mesmo quando o recálculo por si só teria sido um
+	// resultado "válido" (ex.: plano vazio).
+	describe('preview obsoleto (hardening pós-dogfood)', () => {
+		// Falsificador A — nada mudou entre preview e confirmação: aplica
+		// normalmente (já coberto pelo teste de atomicidade acima, que usa
+		// exatamente este padrão: expected = plano recém-calculado do mesmo
+		// estado). Este teste isola o caso sem side-effects de updatedAt.
+		it('nada mudou entre preview e confirmação: aplica normalmente', () => {
+			const state = chainState('2026-09-16', 2);
+			const expected = expectationOf(unwrap(computeSchedulePropagationPlan(state, 'wi-a')));
+
+			const applied = unwrap(applySchedulePropagation(catalog, state, 'wi-a', expected, T3));
+			expect(applied.workItems.find((item) => item.id === 'wi-a')?.plannedStart).toBe('2026-09-15');
+			expect(applied.workItems.find((item) => item.id === 'wi-x')?.plannedStart).toBe('2026-09-17');
+		});
+
+		// Falsificador B — o predecessor muda depois do preview, e o plano
+		// recalculado exige datas diferentes: recusado como stale, zero
+		// WorkItem movido (nem mesmo os que coincidiriam, porque a aplicação
+		// é tudo-ou-nada contra UM `expected` coerente).
+		it('predecessor muda depois do preview e altera as datas: stale, zero escrita', () => {
+			const state = chainState('2026-09-16', 2);
+			const expected = expectationOf(unwrap(computeSchedulePropagationPlan(state, 'wi-a')));
+			// B estica para 4 dias depois do preview — novo requiredStart de A é 16/09, não mais 15/09.
+			const changed = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 4, T2));
+
+			const result = applySchedulePropagation(catalog, changed, 'wi-a', expected, T3);
+			expect(result).toEqual({ ok: false, error: { kind: 'work_item_precedence_stale_preview' } });
+			expect(changed.workItems.find((item) => item.id === 'wi-a')?.plannedStart).toBe('2026-09-14');
+			expect(changed.workItems.find((item) => item.id === 'wi-x')?.plannedStart).toBe('2026-09-16');
+		});
+
+		// Falsificador C — a Dependency relevante é removida depois do
+		// preview: o plano recalculado passa a ser vazio (nada para
+		// resolver), o que diverge do `expected` (que tinha mudanças) —
+		// stale, zero aplicação. Nunca "aplica o que ainda faz sentido".
+		it('Dependency relevante é removida depois do preview: plano muda, stale, zero aplicação', () => {
+			const state = chainState('2026-09-16', 2);
+			const expected = expectationOf(unwrap(computeSchedulePropagationPlan(state, 'wi-a')));
+			const changed = unwrap(removeDependency(catalog, state, 'dep-a-b'));
+
+			const result = applySchedulePropagation(catalog, changed, 'wi-a', expected, T3);
+			expect(result).toEqual({ ok: false, error: { kind: 'work_item_precedence_stale_preview' } });
+			expect(changed.workItems.find((item) => item.id === 'wi-a')?.plannedStart).toBe('2026-09-14');
+		});
+
+		// Falsificador D — uma alteração que NÃO muda o plano (aqui: mover o
+		// item concluído de status, que D059 já estabelece como ortogonal)
+		// não é rejeitada por uma "versão global" artificial: a confirmação
+		// aplica normalmente porque o plano recalculado é idêntico ao
+		// confirmado.
+		it('alteração irrelevante ao plano (status de um WorkItem envolvido) não gera falso stale', () => {
+			const state = chainState('2026-09-16', 2);
+			const expected = expectationOf(unwrap(computeSchedulePropagationPlan(state, 'wi-a')));
+			let changed = unwrap(moveWorkItem(catalog, state, 'wi-b', 'em_andamento', T2));
+			changed = unwrap(moveWorkItem(catalog, changed, 'wi-b', 'concluido', T2));
+
+			const applied = unwrap(applySchedulePropagation(catalog, changed, 'wi-a', expected, T3));
+			expect(applied.workItems.find((item) => item.id === 'wi-a')?.plannedStart).toBe('2026-09-15');
+			expect(applied.workItems.find((item) => item.id === 'wi-x')?.plannedStart).toBe('2026-09-17');
+		});
+
+		// Falsificador E — as datas do plano coincidem, mas `partial` muda
+		// (um novo predecessor sem schedule entra na conta do item raiz):
+		// stale mesmo assim, porque partial é parte do que o usuário
+		// confirmou (conhecimento completo vs. parcial nunca é detalhe).
+		it('partial muda entre preview e confirmação, mesmo com as mesmas datas: stale', () => {
+			const state = chainState('2026-09-16', 2);
+			const expected = expectationOf(unwrap(computeSchedulePropagationPlan(state, 'wi-a')));
+			expect(expected.partial).toBe(false);
+
+			let changed = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+			changed = unwrap(addDependency(catalog, changed, 'dep-a-c', 'wi-a', 'wi-c', T1));
+			// wi-c permanece sem schedule — não muda nenhuma data do plano de
+			// 'wi-a', mas o item raiz agora tem um predecessor sem schedule.
+			const recomputed = unwrap(computeSchedulePropagationPlan(changed, 'wi-a'));
+			expect(recomputed.changes).toEqual(unwrap(computeSchedulePropagationPlan(state, 'wi-a')).changes);
+			expect(recomputed.partial).toBe(true);
+
+			const result = applySchedulePropagation(catalog, changed, 'wi-a', expected, T3);
+			expect(result).toEqual({ ok: false, error: { kind: 'work_item_precedence_stale_preview' } });
+		});
 	});
 });
 

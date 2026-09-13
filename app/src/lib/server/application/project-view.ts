@@ -239,6 +239,17 @@ function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][
 // bloqueia nada — findWorkItemPrecedenceConflict (domain/transitions.ts)
 // só enxerga predecessores com schedule completo; um predecessor sem
 // schedule nunca aparece aqui nem esconde este conflito.
+//
+// findWorkItemPrecedenceConflict nunca lança (reparo pós-dogfood do
+// terceiro microcorte de §42): quando a aritmética de precedência exigiria
+// uma data fora da faixa civil 0000-9999, ela devolve
+// WorkItemPrecedenceUnrepresentable em vez de propagar a exceção de
+// addCivilDays — e esta função projeta isso honestamente como
+// `{ kind: 'unrepresentable' }` (WorkItemPrecedenceConflictView,
+// types.ts), sem knownRequiredStart fictício e sem esconder o problema.
+// Antes deste reparo, um ProjectState válido e persistível podia fazer
+// esta montagem lançar (500) apenas porque a precedência exigia uma data
+// não representável — o estado nunca foi o problema, só o cálculo.
 function buildWorkItemPrecedenceConflictView(
 	state: ProjectState,
 	workItemId: string
@@ -250,7 +261,11 @@ function buildWorkItemPrecedenceConflictView(
 	// hoje) — tratado como ausência de conflito, mesmo espírito de
 	// buildWorkItemDependencyViews acima, nunca quebra a tela.
 	if (!predecessor) return null;
+	if (conflict.kind === 'unrepresentable') {
+		return { kind: 'unrepresentable', dependsOnWorkItemId: predecessor.id, dependsOnWorkItemTitle: predecessor.title };
+	}
 	return {
+		kind: 'conflict',
 		dependsOnWorkItemId: predecessor.id,
 		dependsOnWorkItemTitle: predecessor.title,
 		knownRequiredStart: conflict.knownRequiredStart

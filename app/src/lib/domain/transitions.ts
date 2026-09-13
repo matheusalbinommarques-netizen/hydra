@@ -79,6 +79,8 @@ export type DomainTransitionError =
 	| { kind: 'work_item_schedule_incomplete' }
 	| { kind: 'work_item_planned_start_invalid' }
 	| { kind: 'work_item_duration_invalid' }
+	| { kind: 'work_item_precedence_date_overflow' }
+	| { kind: 'work_item_precedence_stale_preview' }
 	| { kind: 'dependency_not_found' }
 	| { kind: 'dependency_self_reference' }
 	| { kind: 'dependency_already_exists' }
@@ -1655,37 +1657,341 @@ function semanticEnd(plannedStart: string, durationDays: number): string {
  * conta — é ortogonal ao plano temporal (ver D058: Dependency nunca
  * bloqueia moveWorkItem, e o inverso também vale aqui: status nunca
  * silencia nem resolve conflito de schedule).
+ *
+ * Retorna `WorkItemPrecedenceUnrepresentable` (ETAPA 12 do rework, §42,
+ * reparo pós-dogfood do terceiro microcorte) quando o fim semântico de UM
+ * predecessor específico + 1 dia (finish-to-start) ultrapassa a faixa
+ * civil representável (0000-9999, ver addCivilDays/civil-date.ts): esse
+ * predecessor, sozinho, já prova que NENHUMA data representável poderia
+ * respeitar esta Dependency — mais severo que qualquer conflito comum
+ * (vence a agregação de múltiplos predecessores), nunca "sem conflito"
+ * (D059 já estabelece que esconder um conflito provado é pior do que
+ * mostrar conhecimento parcial honestamente). Aritmética nunca escapa
+ * como exceção: addCivilDays continua falhando alto (contrato dela não
+ * muda), mas esta função a envolve em vez de deixar a exceção subir para
+ * quem só quer LER o estado (buildWorkItemPrecedenceConflictView,
+ * project-view.ts, chamada em toda montagem normal de WorkItemView).
  */
 export interface WorkItemPrecedenceConflict {
+	kind: 'conflict';
 	dependencyId: string;
 	dependsOnWorkItemId: string;
 	knownRequiredStart: string;
 }
 
+export interface WorkItemPrecedenceUnrepresentable {
+	kind: 'unrepresentable';
+	dependencyId: string;
+	dependsOnWorkItemId: string;
+}
+
 export function findWorkItemPrecedenceConflict(
 	state: ProjectState,
 	workItemId: string
-): WorkItemPrecedenceConflict | null {
+): WorkItemPrecedenceConflict | WorkItemPrecedenceUnrepresentable | null {
 	const item = findWorkItem(state, workItemId);
 	if (!item || item.plannedStart === null || item.durationDays === null) return null;
 
 	let binding: WorkItemPrecedenceConflict | null = null;
+	let unrepresentable: WorkItemPrecedenceUnrepresentable | null = null;
 
 	for (const dependency of state.dependencies) {
 		if (dependency.workItemId !== workItemId) continue;
 		const predecessor = findWorkItem(state, dependency.dependsOnWorkItemId);
 		if (!predecessor || predecessor.plannedStart === null || predecessor.durationDays === null) continue;
 
-		const requiredStart = addCivilDays(semanticEnd(predecessor.plannedStart, predecessor.durationDays), 1);
+		let requiredStart: string;
+		try {
+			requiredStart = addCivilDays(semanticEnd(predecessor.plannedStart, predecessor.durationDays), 1);
+		} catch {
+			// Primeiro predecessor irrepresentável encontrado é reportado — não
+			// há "maior" entre estouros (nenhum dos dois tem data para comparar),
+			// e um só já basta para provar a impossibilidade.
+			if (unrepresentable === null) {
+				unrepresentable = {
+					kind: 'unrepresentable',
+					dependencyId: dependency.id,
+					dependsOnWorkItemId: predecessor.id
+				};
+			}
+			continue;
+		}
+
 		// Comparação lexicográfica de string é segura aqui: civil date é
 		// sempre YYYY-MM-DD, largura fixa — ordem textual == ordem cronológica.
 		if (binding === null || requiredStart > binding.knownRequiredStart) {
-			binding = { dependencyId: dependency.id, dependsOnWorkItemId: predecessor.id, knownRequiredStart: requiredStart };
+			binding = {
+				kind: 'conflict',
+				dependencyId: dependency.id,
+				dependsOnWorkItemId: predecessor.id,
+				knownRequiredStart: requiredStart
+			};
 		}
 	}
 
+	if (unrepresentable !== null) return unrepresentable;
 	if (binding === null || item.plannedStart >= binding.knownRequiredStart) return null;
 	return binding;
+}
+
+// --- Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte) --
+//
+// FORWARD-ONLY: satisfaz o limite mínimo conhecido de precedência, nunca
+// antecipa nada. Um predecessor movido para mais cedo, encurtado, ou uma
+// Dependency removida jamais puxam um sucessor para trás — o plano só
+// aumenta plannedStart, nunca diminui (ver requiredStart abaixo: sempre um
+// `max`, e só aplicado quando currentStart < requiredStart).
+//
+// Reusa a MESMA fórmula de findWorkItemPrecedenceConflict (semanticEnd +
+// finish-to-start lag zero) para cada nó da cascata — raiz incluída, sem
+// caso especial: a raiz só é oferecida na interface quando já tem
+// conflito provado (mesma pré-condição), então o primeiro passo do
+// algoritmo genérico abaixo sempre a move.
+//
+// Algoritmo: relaxação por fila de trabalho (mesmo espírito de
+// Bellman-Ford restrito a arestas que só aumentam a data) — cada nó
+// processado recalcula seu requiredStart a partir do estado EFETIVO
+// (já propagado) dos predecessores; se isso exceder seu início efetivo
+// atual, o nó se move e todos os seus sucessores agendados voltam à fila.
+// Como o grafo de Dependency é acíclico (addDependency recusa ciclo) e
+// cada nó só pode se mover para uma data estritamente posterior (bounded
+// pela faixa civil 0000-9999), a fila sempre termina — e o resultado
+// final independe da ordem de visita: diamonds (B→A, B→C, A→X, C→X)
+// convergem ao mesmo ponto fixo porque cada nó sempre recalcula contra o
+// estado efetivo mais atual de TODOS os seus predecessores, não contra um
+// valor congelado no momento em que foi enfileirado.
+export interface SchedulePropagationChange {
+	workItemId: string;
+	fromPlannedStart: string;
+	toPlannedStart: string;
+	viaDependencyId: string;
+	viaWorkItemId: string;
+}
+
+// `partial` (ver §42, terceiro microcorte) — true quando a cascata
+// encontrou, em qualquer nó visitado, um predecessor sem schedule (não
+// participou do cálculo, pode existir limite real desconhecido) ou um
+// sucessor sem schedule (aresta que não conseguiu transmitir a nova data
+// adiante). Nunca inventa schedule para nenhum dos dois casos — é só um
+// sinalizador de conhecimento incompleto para a interface.
+export interface SchedulePropagationPlan {
+	rootWorkItemId: string;
+	changes: SchedulePropagationChange[];
+	partial: boolean;
+}
+
+/**
+ * Calcula, sem alterar nada, o menor conjunto de WorkItems que precisariam
+ * mover para frente para que `workItemId` (e sua cadeia de sucessores)
+ * respeite os limites de precedência conhecidos hoje. Plano vazio quando
+ * `workItemId` não tem conflito provado (nada a fazer) — nunca erro.
+ *
+ * Chamada tanto pelo preview quanto por applySchedulePropagation (que
+ * recalcula contra o estado atual antes de aplicar, nunca confia num
+ * plano vindo do cliente) — mesma fórmula, uma só fonte de verdade.
+ */
+export function computeSchedulePropagationPlan(
+	state: ProjectState,
+	workItemId: string
+): Result<SchedulePropagationPlan, DomainTransitionError> {
+	const root = findWorkItem(state, workItemId);
+	if (!root) return { ok: false, error: { kind: 'work_item_not_found' } };
+
+	const workItemById = new Map(state.workItems.map((item) => [item.id, item]));
+	const originalStart = new Map<string, string>();
+	const effectiveStart = new Map<string, string>();
+	for (const item of state.workItems) {
+		if (item.plannedStart !== null) {
+			originalStart.set(item.id, item.plannedStart);
+			effectiveStart.set(item.id, item.plannedStart);
+		}
+	}
+
+	const changed = new Map<string, SchedulePropagationChange>();
+	let partial = false;
+	const queue: string[] = [workItemId];
+	const queued = new Set<string>(queue);
+
+	// findWorkItemPrecedenceConflict nunca lança (ver comentário dela) — um
+	// predecessor irrepresentável da própria raiz já invalida o plano por
+	// inteiro aqui, mesmo erro de faixa civil que a cascata abaixo produziria
+	// de qualquer forma ao tentar mover a raiz para um requiredStart que não
+	// existe.
+	const rootCheck = findWorkItemPrecedenceConflict(state, workItemId);
+	if (rootCheck === null) {
+		return { ok: true, value: { rootWorkItemId: workItemId, changes: [], partial: false } };
+	}
+	if (rootCheck.kind === 'unrepresentable') {
+		return { ok: false, error: { kind: 'work_item_precedence_date_overflow' } };
+	}
+
+	try {
+		while (queue.length > 0) {
+			const currentId = queue.shift() as string;
+			queued.delete(currentId);
+			const current = workItemById.get(currentId);
+			const currentStart = effectiveStart.get(currentId);
+			if (!current || currentStart === undefined || current.durationDays === null) continue;
+
+			let requiredStart: string | null = null;
+			let viaDependencyId = '';
+			let viaWorkItemId = '';
+			for (const dependency of state.dependencies) {
+				if (dependency.workItemId !== currentId) continue;
+				const predecessorStart = effectiveStart.get(dependency.dependsOnWorkItemId);
+				if (predecessorStart === undefined) {
+					partial = true;
+					continue;
+				}
+				const predecessor = workItemById.get(dependency.dependsOnWorkItemId) as WorkItem;
+				const candidate = addCivilDays(semanticEnd(predecessorStart, predecessor.durationDays as number), 1);
+				if (requiredStart === null || candidate > requiredStart) {
+					requiredStart = candidate;
+					viaDependencyId = dependency.id;
+					viaWorkItemId = dependency.dependsOnWorkItemId;
+				}
+			}
+
+			if (requiredStart !== null && currentStart < requiredStart) {
+				effectiveStart.set(currentId, requiredStart);
+				changed.set(currentId, {
+					workItemId: currentId,
+					fromPlannedStart: originalStart.get(currentId) as string,
+					toPlannedStart: requiredStart,
+					viaDependencyId,
+					viaWorkItemId
+				});
+
+				for (const dependency of state.dependencies) {
+					if (dependency.dependsOnWorkItemId !== currentId) continue;
+					if (!effectiveStart.has(dependency.workItemId)) {
+						// Sucessor sem schedule: não recebe schedule inventado, e essa
+						// aresta não transmite a nova data adiante — a cascata continua
+						// por outros caminhos agendados, se existirem.
+						partial = true;
+						continue;
+					}
+					if (!queued.has(dependency.workItemId)) {
+						queue.push(dependency.workItemId);
+						queued.add(dependency.workItemId);
+					}
+				}
+			}
+		}
+	} catch {
+		// addCivilDays estourou a faixa civil 0000-9999 (ver civil-date.ts) —
+		// plano inválido por inteiro, nunca aplicação parcial.
+		return { ok: false, error: { kind: 'work_item_precedence_date_overflow' } };
+	}
+
+	// Ordem observável determinística (hardening pós-dogfood, §42 terceiro
+	// microcorte) — `changed` é povoado na ordem de processamento da fila, que
+	// depende da ordem de inserção de `state.dependencies` (accidental, não
+	// contrato). O preview agora é dado que o usuário lê e confirma, e passa a
+	// participar da comparação de staleness em applySchedulePropagation —
+	// então a ordem do array `changes` não pode variar por um motivo que não
+	// diz respeito ao significado do plano. Tie-break createdAt/id, mesmo
+	// padrão já usado por TrackingTimelineEntry (tracking-view.ts): nenhuma
+	// prioridade de scheduling nova, só uma ordenação estável e neutra.
+	const orderedChanges = Array.from(changed.values()).sort((a, b) => {
+		const itemA = workItemById.get(a.workItemId) as WorkItem;
+		const itemB = workItemById.get(b.workItemId) as WorkItem;
+		if (itemA.createdAt !== itemB.createdAt) return itemA.createdAt < itemB.createdAt ? -1 : 1;
+		return itemA.id < itemB.id ? -1 : itemA.id > itemB.id ? 1 : 0;
+	});
+
+	return { ok: true, value: { rootWorkItemId: workItemId, changes: orderedChanges, partial } };
+}
+
+// Subconjunto canônico do plano que o usuário efetivamente vê e confirma
+// (hardening pós-dogfood, §42 terceiro microcorte) — deliberadamente NÃO
+// inclui `viaDependencyId`: essa aresta específica nunca foi mostrada na
+// interface (só o predecessor e as datas), então uma Dependency trocada por
+// outra entre os dois MESMOS WorkItems, produzindo o mesmo resultado, não é
+// uma mudança de significado do consentimento — rejeitar isso seria "versão
+// global artificial" (ver falsificador D do hardening), não staleness real.
+export interface SchedulePropagationExpectedChange {
+	workItemId: string;
+	fromPlannedStart: string;
+	toPlannedStart: string;
+	viaWorkItemId: string;
+}
+
+export interface SchedulePropagationExpectation {
+	changes: SchedulePropagationExpectedChange[];
+	partial: boolean;
+}
+
+// Compara o plano recém-recalculado (fonte de verdade) com o que o usuário
+// confirmou. Ambos os lados já vêm na mesma ordem determinística (ver
+// comentário de `orderedChanges` acima), então a comparação é posicional —
+// nenhuma mudança de significado do consentimento passa despercebida:
+// WorkItems afetados, data esperada de origem, nova data e o predecessor
+// que a prova, mais `partial` (conhecimento completo vs. parcial é, em si,
+// parte do que o usuário confirmou).
+function schedulePropagationPlanMatchesExpectation(
+	plan: SchedulePropagationPlan,
+	expected: SchedulePropagationExpectation
+): boolean {
+	if (plan.partial !== expected.partial) return false;
+	if (plan.changes.length !== expected.changes.length) return false;
+	return plan.changes.every((change, index) => {
+		const exp = expected.changes[index];
+		return (
+			change.workItemId === exp.workItemId &&
+			change.fromPlannedStart === exp.fromPlannedStart &&
+			change.toPlannedStart === exp.toPlannedStart &&
+			change.viaWorkItemId === exp.viaWorkItemId
+		);
+	});
+}
+
+/**
+ * Aplica o plano de propagação — recalculado aqui contra `state` atual,
+ * nunca recebido pronto do chamador (defesa contra preview obsoleto: o
+ * estado do projeto é sempre a fonte de verdade). Transição atômica única:
+ * ou todos os WorkItems do plano mudam, com o mesmo `occurredAt`, ou
+ * nenhum muda (plano vazio, erro de faixa civil, ou preview obsoleto
+ * devolvem o estado inalterado/erro sem tocar nada). Itens fora do plano
+ * permanecem idênticos por referência — mesmo espírito de idempotência de
+ * setWorkItemSchedule.
+ *
+ * `expected` (hardening pós-dogfood, §42 terceiro microcorte) — o plano que
+ * o usuário efetivamente viu e confirmou (montado pela camada de aplicação
+ * a partir do preview que a interface mostrou, nunca persistido). Recalcular
+ * contra o estado atual é necessário mas não suficiente: se o plano
+ * recém-calculado não corresponder semanticamente a `expected` — porque o
+ * predecessor mudou, a Dependency mudou, ou o conhecimento passou a ser
+ * parcial (ou deixou de ser) — a confirmação é recusada por inteiro como
+ * preview obsoleto, nunca aplicada parcialmente. O navegador nunca é fonte
+ * de verdade: `expected` só serve como EXPECTATIVA para esta comparação, o
+ * estado persistido continua vindo inteiramente do recálculo.
+ */
+export function applySchedulePropagation(
+	catalog: Catalog,
+	state: ProjectState,
+	workItemId: string,
+	expected: SchedulePropagationExpectation,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const planResult = computeSchedulePropagationPlan(state, workItemId);
+	if (!planResult.ok) return planResult;
+	if (!schedulePropagationPlanMatchesExpectation(planResult.value, expected)) {
+		return { ok: false, error: { kind: 'work_item_precedence_stale_preview' } };
+	}
+	if (planResult.value.changes.length === 0) return { ok: true, value: state };
+
+	const changeByWorkItemId = new Map(planResult.value.changes.map((change) => [change.workItemId, change]));
+	return {
+		ok: true,
+		value: {
+			...state,
+			workItems: state.workItems.map((item) => {
+				const change = changeByWorkItemId.get(item.id);
+				return change ? { ...item, plannedStart: change.toPlannedStart, updatedAt: occurredAt } : item;
+			})
+		}
+	};
 }
 
 // --- Milestone (ETAPA 8 do rework, segundo microcorte) --------------------

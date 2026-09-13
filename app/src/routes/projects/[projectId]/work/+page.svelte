@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { WorkItemStatus } from '$lib/domain';
+	import type { SchedulePropagationPlanView } from '$lib/server/application/types';
 	import type { DependencyPresentation } from './work-view';
 	import {
 		allMilestonesLinkedHint,
@@ -9,7 +10,8 @@
 		dependencyPresentation,
 		nextWorkItemStatus,
 		precedenceConflictMessage,
-		previousWorkItemStatus
+		previousWorkItemStatus,
+		schedulePropagationChangeMessage
 	} from './work-view';
 
 	let { data, form } = $props();
@@ -125,6 +127,7 @@
 		newImpedTipo = '';
 		newDependencyTargetId = '';
 		newMilestoneTargetId = '';
+		propagationPreview = null;
 	}
 
 	// Candidatos a predecessor: todo item do projeto menos o próprio e os que
@@ -152,6 +155,50 @@
 	// campos refletem selectedItem depois do reload, sem estado local próprio.
 	function handleScheduleSubmit() {
 		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			await update({ reset: false });
+		};
+	}
+
+	// Propagação de cronograma (ETAPA 12 do rework, §42, terceiro microcorte)
+	// — preview NUNCA grava: guarda o plano localmente a partir do retorno da
+	// própria action, sem chamar update()/invalidar a página (nada mudou no
+	// servidor). Confirmar aplica de fato e recarrega a ProjectView, mesmo
+	// espírito de handleScheduleSubmit; Cancelar só limpa o estado local.
+	let propagationPreview = $state<SchedulePropagationPlanView | null>(null);
+
+	function handlePropagationPreviewSubmit() {
+		return async ({ result }: { result: ActionResult }) => {
+			if (result.type === 'success' && result.data && 'preview' in result.data) {
+				propagationPreview = result.data.preview as SchedulePropagationPlanView;
+			}
+		};
+	}
+
+	function cancelPropagationPreview() {
+		propagationPreview = null;
+	}
+
+	// Subconjunto canônico do preview enviado de volta na confirmação
+	// (hardening pós-dogfood, §42 terceiro microcorte) — só o que a interface
+	// efetivamente mostrou (WorkItem, datas, predecessor, partial), nunca
+	// título (denormalização de apresentação) nem id de Dependency (nunca
+	// exibido). O servidor recalcula e compara; isto é só a EXPECTATIVA que
+	// a confirmação carrega, o navegador nunca é fonte de verdade.
+	function expectedPropagationPlanJson(preview: SchedulePropagationPlanView): string {
+		return JSON.stringify({
+			changes: preview.changes.map((change) => ({
+				workItemId: change.workItemId,
+				fromPlannedStart: change.fromPlannedStart,
+				toPlannedStart: change.toPlannedStart,
+				viaWorkItemId: change.viaWorkItemId
+			})),
+			partial: preview.partial
+		});
+	}
+
+	function handlePropagationConfirmSubmit() {
+		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			propagationPreview = null;
 			await update({ reset: false });
 		};
 	}
@@ -632,8 +679,9 @@
 		<div class="panel-section">
 			<p class="panel-label">Cronograma</p>
 			<p class="panel-hint">
-				Quando este trabalho começa e por quantos dias corridos ocupa — um fato manual, sem cálculo de
-				precedência ou propagação ainda.
+				Quando este trabalho começa e por quantos dias corridos ocupa — um fato manual. Conflitos de
+				precedência com dependências aparecem abaixo; replanejar sempre mostra um preview antes de mover
+				qualquer data.
 			</p>
 			<form method="POST" action="?/setWorkItemSchedule" use:enhance={handleScheduleSubmit}>
 				<input type="hidden" name="workItemId" value={selectedItem.id} />
@@ -660,6 +708,48 @@
 				<p class="panel-hint precedence-conflict" role="alert">
 					{precedenceConflictMessage(selectedItem.precedenceConflict)}
 				</p>
+				<!-- kind === 'unrepresentable' (reparo pós-dogfood do terceiro
+				     microcorte) — não há knownRequiredStart para propagar, então
+				     nenhuma ação de replanejamento é oferecida: o aviso acima já
+				     nomeia o predecessor e explica a impossibilidade. -->
+				{#if selectedItem.precedenceConflict.kind === 'conflict'}
+					{#if propagationPreview !== null && propagationPreview.rootWorkItemId === selectedItem.id}
+						<div class="propagation-preview">
+							{#if propagationPreview.changes.length === 0}
+								<p class="panel-hint">
+									Nenhuma mudança necessária — o conflito já foi resolvido por outro caminho.
+								</p>
+							{:else}
+								<p class="panel-label">Replanejamento proposto</p>
+								<ul>
+									{#each propagationPreview.changes as change (change.workItemId)}
+										<li>{schedulePropagationChangeMessage(change)}</li>
+									{/each}
+								</ul>
+								{#if propagationPreview.partial}
+									<p class="panel-hint">
+										Cálculo parcial: existem dependências sem cronograma que não entraram nesta conta.
+									</p>
+								{/if}
+								<form
+									method="POST"
+									action="?/confirmSchedulePropagation"
+									use:enhance={handlePropagationConfirmSubmit}
+								>
+									<input type="hidden" name="workItemId" value={selectedItem.id} />
+									<input type="hidden" name="expectedPlan" value={expectedPropagationPlanJson(propagationPreview)} />
+									<button type="submit" class="button-secondary">Confirmar replanejamento</button>
+								</form>
+							{/if}
+							<button type="button" class="link-button" onclick={cancelPropagationPreview}>Cancelar</button>
+						</div>
+					{:else}
+						<form method="POST" action="?/previewSchedulePropagation" use:enhance={handlePropagationPreviewSubmit}>
+							<input type="hidden" name="workItemId" value={selectedItem.id} />
+							<button type="submit" class="button-secondary">Replanejar sequência</button>
+						</form>
+					{/if}
+				{/if}
 			{/if}
 			{#if selectedItem.plannedStart !== null}
 				<form method="POST" action="?/setWorkItemSchedule" use:enhance={handleScheduleSubmit}>
