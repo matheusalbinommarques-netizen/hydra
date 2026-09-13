@@ -62,7 +62,8 @@ function makeWorkItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'
 		dependsOn: overrides.dependsOn ?? [],
 		deliverable: overrides.deliverable ?? null,
 		plannedStart: overrides.plannedStart ?? null,
-		durationDays: overrides.durationDays ?? null
+		durationDays: overrides.durationDays ?? null,
+		precedenceConflict: overrides.precedenceConflict ?? null
 	};
 }
 

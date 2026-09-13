@@ -41,7 +41,7 @@ import type {
 	WorkItemStatus
 } from './state-types';
 import type { Result } from './result';
-import { isCivilDate } from './civil-date';
+import { addCivilDays, isCivilDate } from './civil-date';
 import { decodeMultiSelectValue, isValidMultiSelectValue } from './multi-select';
 import { decodePlanningItems } from './planning-items';
 
@@ -1625,6 +1625,67 @@ export function removeDependency(
 		ok: true,
 		value: { ...state, dependencies: state.dependencies.filter((dependency) => dependency.id !== dependencyId) }
 	};
+}
+
+// Fim semântico de um schedule já completo (par atômico garantido por
+// setWorkItemSchedule/validateInvariants) — congelado por D058:
+// fim = plannedStart + (durationDays - 1) dias corridos, contagem
+// inclusiva. Nunca persistido; só existe como leitura derivada.
+function semanticEnd(plannedStart: string, durationDays: number): string {
+	return addCivilDays(plannedStart, durationDays - 1);
+}
+
+/**
+ * Regra de precedência temporal DERIVADA (ETAPA 12 do rework, §42, segundo
+ * microcorte) — nunca persistida, nunca bloqueante: nem addDependency nem
+ * setWorkItemSchedule consultam esta função para recusar escrita (ver
+ * comentários acima delas). É só leitura: dado o estado atual, existe uma
+ * Dependency cujo predecessor tem schedule completo e cujo fim semântico +
+ * 1 dia (finish-to-start, lag zero) é posterior ao plannedStart do próprio
+ * item?
+ *
+ * Retorna `null` quando o item não tem schedule completo (nada a avaliar),
+ * quando nenhum predecessor tem schedule completo (verificação
+ * indeterminada, não é "sem conflito") ou quando o maior início exigido
+ * pelos predecessores agendados já é respeitado. Predecessor sem schedule
+ * é ignorado — nunca conta como conflito nem esconde um conflito provado
+ * por outro predecessor (múltiplos predecessores: maior exigência vence).
+ *
+ * Status de execução (a_fazer/em_andamento/concluido) nunca entra nesta
+ * conta — é ortogonal ao plano temporal (ver D058: Dependency nunca
+ * bloqueia moveWorkItem, e o inverso também vale aqui: status nunca
+ * silencia nem resolve conflito de schedule).
+ */
+export interface WorkItemPrecedenceConflict {
+	dependencyId: string;
+	dependsOnWorkItemId: string;
+	knownRequiredStart: string;
+}
+
+export function findWorkItemPrecedenceConflict(
+	state: ProjectState,
+	workItemId: string
+): WorkItemPrecedenceConflict | null {
+	const item = findWorkItem(state, workItemId);
+	if (!item || item.plannedStart === null || item.durationDays === null) return null;
+
+	let binding: WorkItemPrecedenceConflict | null = null;
+
+	for (const dependency of state.dependencies) {
+		if (dependency.workItemId !== workItemId) continue;
+		const predecessor = findWorkItem(state, dependency.dependsOnWorkItemId);
+		if (!predecessor || predecessor.plannedStart === null || predecessor.durationDays === null) continue;
+
+		const requiredStart = addCivilDays(semanticEnd(predecessor.plannedStart, predecessor.durationDays), 1);
+		// Comparação lexicográfica de string é segura aqui: civil date é
+		// sempre YYYY-MM-DD, largura fixa — ordem textual == ordem cronológica.
+		if (binding === null || requiredStart > binding.knownRequiredStart) {
+			binding = { dependencyId: dependency.id, dependsOnWorkItemId: predecessor.id, knownRequiredStart: requiredStart };
+		}
+	}
+
+	if (binding === null || item.plannedStart >= binding.knownRequiredStart) return null;
+	return binding;
 }
 
 // --- Milestone (ETAPA 8 do rework, segundo microcorte) --------------------

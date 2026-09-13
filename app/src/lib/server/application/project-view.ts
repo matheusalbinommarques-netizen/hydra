@@ -16,7 +16,7 @@ import {
 	computeScopeSuggestions,
 	computeSnapshot
 } from '$lib/orientation-engine';
-import { hasOpenImpediment } from '$lib/domain';
+import { findWorkItemPrecedenceConflict, hasOpenImpediment } from '$lib/domain';
 import type {
 	AffectedGroupView,
 	CauseExplorationView,
@@ -38,6 +38,7 @@ import type {
 	MilestoneWorkItemView,
 	RiskView,
 	WorkItemDependencyView,
+	WorkItemPrecedenceConflictView,
 	WorkItemView
 } from './types';
 
@@ -224,7 +225,35 @@ function buildWorkItemView(state: ProjectState, item: ProjectState['workItems'][
 		// nunca quebra a tela.
 		deliverable: deliverable ? { deliverableId: deliverable.id, title: deliverable.title } : null,
 		plannedStart: item.plannedStart,
-		durationDays: item.durationDays
+		durationDays: item.durationDays,
+		precedenceConflict: buildWorkItemPrecedenceConflictView(state, item.id)
+	};
+}
+
+// precedenceConflict (ETAPA 12 do rework, §42, segundo microcorte) — regra
+// de precedência temporal DERIVADA, mesmo espírito de blockedBy acima:
+// nunca persistido, sempre recalculado na montagem da view a partir do
+// schedule atual e das Dependency atuais. `null` é o caso normal (sem
+// schedule completo, sem predecessor com schedule completo, ou schedule
+// que já respeita o maior início exigido conhecido). Presença não
+// bloqueia nada — findWorkItemPrecedenceConflict (domain/transitions.ts)
+// só enxerga predecessores com schedule completo; um predecessor sem
+// schedule nunca aparece aqui nem esconde este conflito.
+function buildWorkItemPrecedenceConflictView(
+	state: ProjectState,
+	workItemId: string
+): WorkItemPrecedenceConflictView | null {
+	const conflict = findWorkItemPrecedenceConflict(state, workItemId);
+	if (!conflict) return null;
+	const predecessor = state.workItems.find((item) => item.id === conflict.dependsOnWorkItemId);
+	// Predecessor ausente só seria estado corrompido (FK garante existência
+	// hoje) — tratado como ausência de conflito, mesmo espírito de
+	// buildWorkItemDependencyViews acima, nunca quebra a tela.
+	if (!predecessor) return null;
+	return {
+		dependsOnWorkItemId: predecessor.id,
+		dependsOnWorkItemTitle: predecessor.title,
+		knownRequiredStart: conflict.knownRequiredStart
 	};
 }
 

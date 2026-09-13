@@ -39,3 +39,55 @@ export function isCivilDate(value: unknown): value is string {
 	const maxDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
 	return day >= 1 && day <= maxDay;
 }
+
+// Soma `days` (pode ser negativo) a uma data civil já validada, preservando
+// dia real do calendário (mês/ano corretos, inclusive bissexto) — ETAPA 12
+// do rework (§42, segundo microcorte: regra de precedência temporal
+// derivada), primeiro consumidor real de aritmética de data civil.
+//
+// Usa `Date`/`getUTC*` deliberadamente: isto NÃO é o `new Date(...)` que o
+// comentário do topo deste arquivo proíbe para round-trip/formatação de
+// valor do usuário (aquele drift vem de interpretar 'YYYY-MM-DD' como
+// meia-noite UTC e depois formatar de volta em timezone local). Aqui o
+// `Date` nunca escapa da função nem é lido por accessor local — entra como
+// três inteiros UTC, sai como três inteiros UTC — então não há timezone
+// para causar drift; é só o motor de calendário (meses de tamanho
+// variável, bissexto) sem reescrever manualmente.
+//
+// Deliberadamente `setUTCFullYear`, nunca `Date.UTC`/`new Date(y, m, d)`
+// com o ano como argumento: o motor JS remapeia legado qualquer ano de
+// 0 a 99 passado a `Date.UTC`/ao construtor para 1900-1999 (`Date.UTC(99,
+// 0, 1)` vira 1999, não 99) — comportamento herdado do `Date` de duas
+// posições, nunca documentado como parte da semântica de data civil.
+// `isCivilDate` aceita legitimamente qualquer YYYY de 0000 a 9999
+// calendaricamente válido, e essa função não pode estreitar esse contrato
+// silenciosamente. `setUTCFullYear` (ao contrário do construtor/`Date.UTC`)
+// não tem esse caso especial — grava o ano exatamente como recebido.
+export function addCivilDays(date: string, days: number): string {
+	const match = CIVIL_DATE_SHAPE.exec(date);
+	if (!match) throw new Error(`addCivilDays: not a civil date: ${date}`);
+
+	const year = Number(match[1]);
+	const month = Number(match[2]);
+	const day = Number(match[3]);
+
+	const base = new Date(0);
+	base.setUTCFullYear(year, month - 1, day);
+	const shifted = new Date(base.getTime() + days * 86_400_000);
+
+	const resultYear = shifted.getUTCFullYear();
+	// YYYY tem exatamente 4 dígitos: um resultado fora de 0000-9999 não tem
+	// representação civil válida. Falhar alto aqui, em vez de produzir uma
+	// string truncada/negativa que passaria batido por quem não valida o
+	// retorno com isCivilDate — nunca uma recusa de escrita nova em
+	// setWorkItemSchedule, e nunca schema novo: é só a própria aritmética
+	// derivada recusando devolver algo que ela sabe ser inválido.
+	if (resultYear < 0 || resultYear > 9999) {
+		throw new Error(`addCivilDays: resultado fora da faixa representável em YYYY-MM-DD (ano ${resultYear})`);
+	}
+
+	const resultYearStr = String(resultYear).padStart(4, '0');
+	const resultMonth = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+	const resultDay = String(shifted.getUTCDate()).padStart(2, '0');
+	return `${resultYearStr}-${resultMonth}-${resultDay}`;
+}

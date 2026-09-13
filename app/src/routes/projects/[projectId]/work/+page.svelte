@@ -8,6 +8,7 @@
 		buildWorkView,
 		dependencyPresentation,
 		nextWorkItemStatus,
+		precedenceConflictMessage,
 		previousWorkItemStatus
 	} from './work-view';
 
@@ -655,6 +656,11 @@
 				/>
 				<button type="submit" class="button-secondary">Salvar cronograma</button>
 			</form>
+			{#if selectedItem.precedenceConflict !== null}
+				<p class="panel-hint precedence-conflict" role="alert">
+					{precedenceConflictMessage(selectedItem.precedenceConflict)}
+				</p>
+			{/if}
 			{#if selectedItem.plannedStart !== null}
 				<form method="POST" action="?/setWorkItemSchedule" use:enhance={handleScheduleSubmit}>
 					<input type="hidden" name="workItemId" value={selectedItem.id} />
@@ -1086,6 +1092,14 @@
 		font-size: var(--font-size-caption);
 		color: var(--hydra-muted);
 		margin: 0 0 var(--space-3);
+	}
+
+	/* Regra de precedência temporal DERIVADA (ETAPA 12 do rework, §42,
+	   segundo microcorte) — mesmo --hydra-warning de .blocked-badge acima:
+	   conteúdo calculado pelo sistema, nunca bloqueio operacional. */
+	.precedence-conflict {
+		color: var(--hydra-warning);
+		font-weight: 600;
 	}
 
 	.panel-section form {

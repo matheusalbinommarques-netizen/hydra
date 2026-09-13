@@ -4,6 +4,7 @@ import {
 	buildWorkView,
 	dependencyPresentation,
 	nextWorkItemStatus,
+	precedenceConflictMessage,
 	previousWorkItemStatus
 } from './work-view';
 import type { WorkItemDependencyView, WorkItemView } from '$lib/server/application/types';
@@ -18,7 +19,8 @@ function makeItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): 
 		dependsOn: overrides.dependsOn ?? [],
 		deliverable: overrides.deliverable ?? null,
 		plannedStart: overrides.plannedStart ?? null,
-		durationDays: overrides.durationDays ?? null
+		durationDays: overrides.durationDays ?? null,
+		precedenceConflict: overrides.precedenceConflict ?? null
 	};
 }
 
@@ -117,5 +119,21 @@ describe('allMilestonesLinkedHint', () => {
 	it('preserva o plural com dois ou mais marcos', () => {
 		expect(allMilestonesLinkedHint(2)).toBe('Este trabalho já está relacionado a todos os marcos existentes.');
 		expect(allMilestonesLinkedHint(5)).toBe('Este trabalho já está relacionado a todos os marcos existentes.');
+	});
+});
+
+// precedenceConflictMessage (ETAPA 12 do rework, §42, segundo microcorte) —
+// só formata; a decisão de "há conflito" já veio pronta em `conflict`
+// (findWorkItemPrecedenceConflict, domain/transitions.ts).
+describe('precedenceConflictMessage', () => {
+	it('nomeia o predecessor e formata a data em dd/mm/aaaa', () => {
+		const message = precedenceConflictMessage({
+			dependsOnWorkItemId: 'wi-b',
+			dependsOnWorkItemTitle: 'Definir schema',
+			knownRequiredStart: '2026-09-15'
+		});
+		expect(message).toContain('Definir schema');
+		expect(message).toContain('15/09/2026');
+		expect(message).not.toMatch(/bloquead|imped|não pode executar/i);
 	});
 });

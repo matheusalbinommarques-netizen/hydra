@@ -2269,6 +2269,53 @@ describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
 		});
 	});
 
+	// precedenceConflict (ETAPA 12 do rework, §42, segundo microcorte) — ponta
+	// a ponta pelo mesmo caminho que a interface usa: caso de uso →
+	// ProjectView. Cenário de conhecimento parcial pedido no hardening: A
+	// depende de B (agendado, prova conflito) e de C (sem schedule) — C não
+	// pode esconder o conflito provado por B, nem ser tratado como conflito
+	// ele mesmo.
+	it('precedenceConflict: predecessor agendado prova conflito; predecessor sem schedule não esconde nem inventa', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B', 'C']);
+		const [a, b, c] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: c });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '2026-09-12', durationDays: 3 });
+		// C permanece sem schedule.
+		const result = await useCases.setWorkItemSchedule({
+			projectId,
+			workItemId: a,
+			plannedStart: '2026-09-14',
+			durationDays: 2
+		});
+		if (!result.ok) throw new Error('esperado ok');
+
+		expect(result.value.workItems.find((item) => item.id === a)?.precedenceConflict).toEqual({
+			dependsOnWorkItemId: b,
+			dependsOnWorkItemTitle: 'B',
+			knownRequiredStart: '2026-09-15'
+		});
+		// B e C não carregam conflito: a leitura é sempre do item que tem
+		// schedule e Dependency de saída, nunca do predecessor.
+		expect(result.value.workItems.find((item) => item.id === b)?.precedenceConflict).toBeNull();
+		expect(result.value.workItems.find((item) => item.id === c)?.precedenceConflict).toBeNull();
+	});
+
+	it('precedenceConflict desaparece quando o schedule do dependente passa a respeitar o limite conhecido', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '2026-09-12', durationDays: 3 });
+		const result = await useCases.setWorkItemSchedule({
+			projectId,
+			workItemId: a,
+			plannedStart: '2026-09-15',
+			durationDays: 2
+		});
+		if (!result.ok) throw new Error('esperado ok');
+		expect(result.value.workItems.find((item) => item.id === a)?.precedenceConflict).toBeNull();
+	});
+
 	it('não emite nenhum ProjectEvent (taxonomia fechada permanece a do loop S6)', async () => {
 		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
 		const [a, b] = ids;

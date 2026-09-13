@@ -6,6 +6,8 @@ import {
 	addDecision,
 	addDeliverable,
 	addDependency,
+	findWorkItemPrecedenceConflict,
+	removeDependency,
 	addMilestone,
 	setMilestonePlannedDate,
 	addWorkItem,
@@ -1320,6 +1322,206 @@ describe('setWorkItemSchedule (ETAPA 12 do rework, §42, primeiro microcorte fun
 			ok: false,
 			error: { kind: 'work_item_blocked' }
 		});
+	});
+});
+
+// findWorkItemPrecedenceConflict (ETAPA 12 do rework, "Scheduling e
+// Gantt", §42, segundo microcorte) — regra de precedência temporal
+// DERIVADA, nunca persistida, nunca bloqueante. Falsificadores centrais:
+// fórmula exata do fim semântico/início exigido, múltiplos predecessores
+// usa o maior limite CONHECIDO, predecessor sem schedule nem gera falso
+// conflito nem esconde conflito real, status de execução é irrelevante, e
+// nenhuma das duas escritas (addDependency/setWorkItemSchedule) ganha
+// recusa nova por causa disto.
+describe('findWorkItemPrecedenceConflict (ETAPA 12 do rework, §42, segundo microcorte)', () => {
+	it('sem Dependency, sem conflito', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toBeNull();
+	});
+
+	it('sucessor sem schedule: indeterminado, não é conflito', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toBeNull();
+	});
+
+	it('predecessor sem schedule: indeterminado, não é conflito', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toBeNull();
+	});
+
+	it('duração 1: fim semântico == início; sucessor no mesmo dia é conflito, no dia seguinte não', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 1, T2));
+
+		let withConflict = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 2, T2));
+		expect(findWorkItemPrecedenceConflict(withConflict, 'wi-a')).toMatchObject({
+			dependencyId: 'dep-1',
+			dependsOnWorkItemId: 'wi-b',
+			knownRequiredStart: '2026-09-13'
+		});
+
+		const withoutConflict = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-13', 2, T2));
+		expect(findWorkItemPrecedenceConflict(withoutConflict, 'wi-a')).toBeNull();
+	});
+
+	it('duração 3: fim semântico = início + 2 dias; 14/09 conflita, 15/09 e 16/09 não', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+
+		const conflicting = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+		expect(findWorkItemPrecedenceConflict(conflicting, 'wi-a')).toMatchObject({
+			knownRequiredStart: '2026-09-15'
+		});
+
+		for (const start of ['2026-09-15', '2026-09-16']) {
+			const ok = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', start, 2, T2));
+			expect(findWorkItemPrecedenceConflict(ok, 'wi-a')).toBeNull();
+		}
+	});
+
+	it('múltiplos predecessores: usa o maior início exigido entre os agendados', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-a', 'wi-c', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2)); // exige 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-20', 1, T2)); // exige 21/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-15', 1, T2));
+
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toMatchObject({
+			dependencyId: 'dep-c',
+			dependsOnWorkItemId: 'wi-c',
+			knownRequiredStart: '2026-09-21'
+		});
+	});
+
+	it('um predecessor sem schedule não esconde conflito provado por outro predecessor', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-b', 'wi-a', 'wi-b', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-c', 'wi-a', 'wi-c', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2)); // exige 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 1, T2));
+		// wi-c permanece sem schedule.
+
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toMatchObject({
+			dependencyId: 'dep-b',
+			dependsOnWorkItemId: 'wi-b',
+			knownRequiredStart: '2026-09-15'
+		});
+	});
+
+	it('todos os predecessores sem schedule: nenhum conflito derivável', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 1, T2));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toBeNull();
+	});
+
+	it('status de execução (inclusive concluido) nunca muda o resultado', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+
+		const before = findWorkItemPrecedenceConflict(state, 'wi-a');
+		state = unwrap(moveWorkItem(catalog, state, 'wi-b', 'em_andamento', T3));
+		state = unwrap(moveWorkItem(catalog, state, 'wi-b', 'concluido', T3));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).toEqual(before);
+	});
+
+	it('criar a Dependency depois dos schedules revela o mesmo conflito que editar o schedule depois da Dependency', () => {
+		let scheduleFirst = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		scheduleFirst = unwrap(addWorkItem(catalog, scheduleFirst, 'wi-b', 'B', T1));
+		scheduleFirst = unwrap(setWorkItemSchedule(catalog, scheduleFirst, 'wi-b', '2026-09-12', 3, T2));
+		scheduleFirst = unwrap(setWorkItemSchedule(catalog, scheduleFirst, 'wi-a', '2026-09-14', 2, T2));
+		scheduleFirst = unwrap(addDependency(catalog, scheduleFirst, 'dep-1', 'wi-a', 'wi-b', T2));
+
+		let dependencyFirst = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		dependencyFirst = unwrap(addWorkItem(catalog, dependencyFirst, 'wi-b', 'B', T1));
+		dependencyFirst = unwrap(addDependency(catalog, dependencyFirst, 'dep-1', 'wi-a', 'wi-b', T1));
+		dependencyFirst = unwrap(setWorkItemSchedule(catalog, dependencyFirst, 'wi-b', '2026-09-12', 3, T2));
+		dependencyFirst = unwrap(setWorkItemSchedule(catalog, dependencyFirst, 'wi-a', '2026-09-14', 2, T2));
+
+		expect(findWorkItemPrecedenceConflict(scheduleFirst, 'wi-a')).toEqual(
+			findWorkItemPrecedenceConflict(dependencyFirst, 'wi-a')
+		);
+	});
+
+	it('remover a Dependency remove o conflito; limpar o schedule remove a possibilidade de avaliar o par', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+		expect(findWorkItemPrecedenceConflict(state, 'wi-a')).not.toBeNull();
+
+		const withoutDependency = unwrap(removeDependency(catalog, state, 'dep-1'));
+		expect(findWorkItemPrecedenceConflict(withoutDependency, 'wi-a')).toBeNull();
+
+		const withoutPredecessorSchedule = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', null, null, T3));
+		expect(findWorkItemPrecedenceConflict(withoutPredecessorSchedule, 'wi-a')).toBeNull();
+	});
+
+	it('mudar o predecessor pode criar/remover conflito sem que o sucessor mude', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+
+		const noConflict = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-01', 1, T2));
+		expect(findWorkItemPrecedenceConflict(noConflict, 'wi-a')).toBeNull();
+
+		const conflicting = unwrap(setWorkItemSchedule(catalog, noConflict, 'wi-b', '2026-09-13', 3, T3));
+		expect(findWorkItemPrecedenceConflict(conflicting, 'wi-a')).toMatchObject({ knownRequiredStart: '2026-09-16' });
+		expect(conflicting.workItems.find((item) => item.id === 'wi-a')).toMatchObject({ plannedStart: '2026-09-14' });
+	});
+
+	it('nenhum cálculo persiste estado: recalcular não muda a referência do state', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+
+		const before = state;
+		findWorkItemPrecedenceConflict(state, 'wi-a');
+		expect(state).toBe(before);
+	});
+
+	it('addDependency não ganha recusa temporal: aceita ligar schedules já conflitantes', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T2));
+
+		const result = addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T3);
+		expect(result.ok).toBe(true);
+	});
+
+	it('setWorkItemSchedule não ganha recusa nova: aceita schedule que conflita com Dependency existente', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-a', 'wi-b', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-12', 3, T2));
+
+		const result = setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 2, T3);
+		expect(result.ok).toBe(true);
 	});
 });
 

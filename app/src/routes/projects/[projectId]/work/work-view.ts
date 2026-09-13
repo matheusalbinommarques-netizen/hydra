@@ -7,7 +7,11 @@
 // bruto. Mesmo padrão de buildRecordsView/buildMapView.
 
 import type { WorkItemStatus } from '$lib/domain';
-import type { WorkItemDependencyView, WorkItemView } from '$lib/server/application/types';
+import type {
+	WorkItemDependencyView,
+	WorkItemPrecedenceConflictView,
+	WorkItemView
+} from '$lib/server/application/types';
 
 export interface WorkItemBoardGroups {
 	a_fazer: WorkItemView[];
@@ -88,4 +92,29 @@ export function allMilestonesLinkedHint(milestoneCount: number): string {
 	return milestoneCount === 1
 		? 'Este trabalho já está relacionado ao marco existente.'
 		: 'Este trabalho já está relacionado a todos os marcos existentes.';
+}
+
+// dd/mm/aaaa a partir das partes da própria string — mesmo tratamento de
+// tracking-view.ts (formatCivilDate): deliberadamente sem Date/Intl, porque
+// a semântica é dia civil, e converter para instante desloca o dia em
+// qualquer fuso a oeste de Greenwich. A string já chegou validada
+// (domain/civil-date.ts, isCivilDate).
+function formatCivilDate(civilDate: string): string {
+	const [year, month, day] = civilDate.split('-');
+	return `${day}/${month}/${year}`;
+}
+
+// Texto do aviso de precedência temporal DERIVADA (ETAPA 12 do rework,
+// §42, segundo microcorte) — presença de `conflict` já significa "conflito
+// provado" (buildWorkItemPrecedenceConflictView só retorna algo quando
+// plannedStart do item é anterior ao maior início exigido por um
+// predecessor agendado); esta função só formata a explicação, nunca decide
+// se há conflito. Nomeia o predecessor que prova o limite e nunca afirma
+// compatibilidade completa — pode existir outro predecessor sem schedule,
+// ainda não avaliável.
+export function precedenceConflictMessage(conflict: WorkItemPrecedenceConflictView): string {
+	return (
+		`Conflito de precedência. Este trabalho começa antes de "${conflict.dependsOnWorkItemTitle}" terminar. ` +
+		`Considerando as dependências com cronograma, o início precisa ser ${formatCivilDate(conflict.knownRequiredStart)} ou depois.`
+	);
 }

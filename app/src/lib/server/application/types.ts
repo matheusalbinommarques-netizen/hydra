@@ -263,6 +263,14 @@ export interface WorkItemView {
 	// ainda). Par sempre coerente: ver WorkItem em domain/state-types.ts.
 	plannedStart: string | null;
 	durationDays: number | null;
+	// precedenceConflict (ETAPA 12 do rework, §42, segundo microcorte) —
+	// regra de precedência temporal DERIVADA (nunca persistida, nunca
+	// bloqueante): existe uma Dependency com predecessor agendado cujo fim
+	// exige um início posterior ao plannedStart atual deste item? `null` é
+	// o caso normal — sem schedule, sem predecessor agendado, ou schedule
+	// já compatível com o maior início exigido CONHECIDO (predecessor sem
+	// schedule nunca aparece aqui, nem esconde conflito provado por outro).
+	precedenceConflict: WorkItemPrecedenceConflictView | null;
 }
 
 // Uma aresta de precedência vista a partir do item que depende. `title`/
@@ -273,6 +281,17 @@ export interface WorkItemDependencyView {
 	dependsOnWorkItemId: string;
 	title: string;
 	satisfied: boolean;
+}
+
+// knownRequiredStart (ETAPA 12 do rework, §42, segundo microcorte) — data
+// civil YYYY-MM-DD: o maior início exigido entre os predecessores DESTA
+// Dependency que possuem schedule completo, nunca o "início mínimo
+// compatível" absoluto — um predecessor sem schedule pode existir e não
+// entrar nesta conta (ver findWorkItemPrecedenceConflict).
+export interface WorkItemPrecedenceConflictView {
+	dependsOnWorkItemId: string;
+	dependsOnWorkItemTitle: string;
+	knownRequiredStart: string;
 }
 
 // Deliverable (ETAPA 9 do rework, primeiro microcorte) — view leve, sem
