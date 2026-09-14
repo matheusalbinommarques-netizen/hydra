@@ -19,6 +19,8 @@ import {
 	addDependency as addDependencyInDomain,
 	applySchedulePropagation as applySchedulePropagationInDomain,
 	computeSchedulePropagationPlan as computeSchedulePropagationPlanInDomain,
+	previewScheduleBaselineCapture as previewScheduleBaselineCaptureInDomain,
+	captureScheduleBaseline as captureScheduleBaselineInDomain,
 	moveDeliverable as moveDeliverableInDomain,
 	promoteScopeItemToDeliverable as promoteScopeItemToDeliverableInDomain,
 	removeDeliverable as removeDeliverableInDomain,
@@ -123,6 +125,8 @@ import type {
 	AddDependencyInput,
 	ApplySchedulePropagationInput,
 	PreviewSchedulePropagationInput,
+	PreviewScheduleBaselineCaptureInput,
+	CaptureScheduleBaselineInput,
 	MoveDeliverableInput,
 	PromoteScopeItemToDeliverableInput,
 	RemoveDeliverableInput,
@@ -184,6 +188,7 @@ import type {
 	ReviewRiskInput,
 	SchedulePropagationChangeView,
 	SchedulePropagationPlanView,
+	ScheduleBaselineCapturePreviewView,
 	SetAffectedGroupFrequencyInput,
 	SetAffectedGroupImpactInput,
 	SetCauseHypothesisExpectedIfTrueInput,
@@ -1151,6 +1156,56 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (result.value !== state) {
 				await repository.save(result.value);
 			}
+			return viewOf(result.value);
+		},
+
+		// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+		// hardening pós-dogfood) — previewScheduleBaselineCapture é só leitura,
+		// nenhum repository.save. `entries` (candidato canônico completo, um
+		// por WorkItem existente) é devolvido sem alteração — a interface
+		// serializa exatamente isso de volta como `expected` na confirmação,
+		// nunca reconstrói o candidato no cliente.
+		async previewScheduleBaselineCapture(
+			input: PreviewScheduleBaselineCaptureInput
+		): Promise<UseCaseOutcome<ScheduleBaselineCapturePreviewView>> {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = previewScheduleBaselineCaptureInDomain(state);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			return {
+				ok: true,
+				value: {
+					entries: result.value.entries,
+					scheduledCount: result.value.scheduledCount,
+					uncoveredCount: result.value.uncoveredCount,
+					partial: result.value.partial
+				}
+			};
+		},
+
+		// captureScheduleBaseline recalcula o candidato contra o estado atual
+		// (domain/transitions.ts, previewScheduleBaselineCapture) — nunca
+		// confia no candidato vindo do cliente, só compara contra
+		// `input.expected` (o que a interface efetivamente mostrou) para
+		// recusar como preview obsoleto se divergirem
+		// (schedule_baseline_stale_preview). O navegador nunca é fonte de
+		// verdade: `expected` só serve de expectativa para essa comparação.
+		async captureScheduleBaseline(input: CaptureScheduleBaselineInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = captureScheduleBaselineInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.expected,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
 			return viewOf(result.value);
 		},
 

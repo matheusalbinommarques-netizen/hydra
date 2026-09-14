@@ -25,6 +25,8 @@ import {
 	addTreatmentStep,
 	addWorkItem,
 	setWorkItemSchedule,
+	captureScheduleBaseline,
+	previewScheduleBaselineCapture,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
@@ -1500,6 +1502,84 @@ describe('createSqliteProjectRepository — WorkItem.plannedStart/durationDays (
 			freshDb.prepare('UPDATE work_item SET planned_start = ? WHERE id = ?').run('2026-09-12', 'wi-sched-1')
 		).toThrow(/work_item_schedule_pair/);
 		freshDb.close();
+	});
+});
+
+// ScheduleBaseline (ETAPA 12 do rework, §42, quinto microcorte, hardening
+// pós-dogfood) — tabelas NOVAS (schedule_baseline/schedule_baseline_entry),
+// mesmo molde de decision_affected_work_item: o risco concreto é de
+// UPGRADE (banco anterior a este corte não tem as tabelas), não de coluna
+// nova em tabela existente — CREATE TABLE IF NOT EXISTS sozinho já basta,
+// sem ensureX nenhum. schedule_baseline_entry.planned_start/duration_days
+// são NULLABLE (membership: toda captura registra uma entry por WorkItem
+// existente, com ou sem schedule) — round-trip precisa provar os dois.
+describe('createSqliteProjectRepository — ScheduleBaseline (ETAPA 12 do rework, §42, quinto microcorte, hardening pós-dogfood)', () => {
+	function captureWithFreshPreview(state: ProjectState, baselineId: string, occurredAt: string): ProjectState {
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+		return unwrap(captureScheduleBaseline(catalog, state, baselineId, { entries: preview.entries }, occurredAt));
+	}
+
+	it('round-trip preserva baseline e entradas (inclusive null/null), rebaseline com version crescente', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		state = unwrap(addWorkItem(catalog, state, 'wi-new', 'Tarefa', T2));
+		state = unwrap(addWorkItem(catalog, state, 'wi-sem-schedule', 'Sem cronograma', T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-new', '2026-09-12', 3, T2));
+		await repo.insert(state);
+
+		state = captureWithFreshPreview(state, 'baseline-1', T2);
+		await repo.save(state);
+		let restored = await repo.findById('proj-1');
+		expect(restored?.scheduleBaselines).toEqual(state.scheduleBaselines);
+		expect(restored?.scheduleBaselineEntries).toEqual(state.scheduleBaselineEntries);
+		expect(restored?.scheduleBaselineEntries).toContainEqual({
+			baselineId: 'baseline-1',
+			workItemId: 'wi-sem-schedule',
+			plannedStart: null,
+			durationDays: null
+		});
+
+		// Rebaseline: segunda captura ADICIONA, nunca sobrescreve a primeira,
+		// com version estritamente crescente.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-new', '2026-09-14', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-2', T2);
+		await repo.save(state);
+		restored = await repo.findById('proj-1');
+		expect(restored?.scheduleBaselines.map((b) => ({ id: b.id, version: b.version }))).toEqual([
+			{ id: 'baseline-1', version: 1 },
+			{ id: 'baseline-2', version: 2 }
+		]);
+		expect(restored?.scheduleBaselineEntries).toEqual(state.scheduleBaselineEntries);
+	});
+
+	it('banco anterior a este corte (sem as tabelas schedule_baseline/schedule_baseline_entry) abre e importa como coleções vazias, e volta a aceitar escrita', async () => {
+		const filePath = tempFilePath();
+		const seed = createSqliteProjectRepository(filePath);
+		let state = nonTrivialState();
+		state = unwrap(addWorkItem(catalog, state, 'wi-new', 'Tarefa', T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-new', '2026-09-12', 3, T2));
+		await seed.insert(state);
+		seed.close();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec('DROP TABLE schedule_baseline_entry; DROP TABLE schedule_baseline;');
+		legacyDb.close();
+
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		const loaded = await repo.findById('proj-1');
+		expect(loaded?.scheduleBaselines).toEqual([]);
+		expect(loaded?.scheduleBaselineEntries).toEqual([]);
+
+		if (!loaded) throw new Error('esperado estado');
+		const next = captureWithFreshPreview(loaded, 'baseline-1', T2);
+		await repo.save(next);
+		await expect(repo.findById('proj-1')).resolves.toEqual(next);
+
+		// Reabrir de novo não falha nem duplica as tabelas.
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.not.toBeNull();
 	});
 });
 

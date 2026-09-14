@@ -30,6 +30,7 @@ function baseInput(overrides: Partial<TrackingViewInput> = {}): TrackingViewInpu
 		nextActivity: { kind: 'recommendation', activityDefinitionId: 'impedimentos' },
 		workItems: [],
 		milestones: [],
+		scheduleBaseline: null,
 		impediments: [],
 		risks: [],
 		decisions: [],

@@ -246,6 +246,79 @@ export interface Dependency {
 	createdAt: string;
 }
 
+// ProjectScheduleBaseline / ProjectScheduleBaselineEntry — ETAPA 12 do
+// rework ("Scheduling e Gantt", docs/core/HYDRA_PRODUCT_REWORK.md §42),
+// quinto microcorte ("baseline quando aplicável"). REFERÊNCIA
+// explicitamente aprovada pelo usuário para medir variação do cronograma
+// atual contra um estado anterior — nunca criada automaticamente, nunca
+// event log de toda alteração de schedule (só o gesto explícito de
+// captureScheduleBaseline produz uma).
+//
+// IMUTÁVEL: nasce inteira numa única transição e nunca é alterada depois.
+// Capturar de novo (rebaseline) sempre ADICIONA uma nova baseline; a(s)
+// anterior(es) permanecem intactas como histórico — sem sobrescrita, sem
+// exclusão, sem seleção/diff entre baselines nesta rodada (DEFER, sem
+// consumidor real ainda).
+//
+// Escopo: projeto inteiro, e a captura registra o MEMBRO — todo WorkItem
+// existente no instante da captura ganha uma entry, com ou sem schedule
+// (ver ProjectScheduleBaselineEntry abaixo). Isso é o que permite
+// distinguir honestamente, sem depender de WorkItem.createdAt (que não
+// prova nada sobre o instante da captura de uma baseline específica):
+// "existia sem schedule e foi agendado depois" (entry null/null) de
+// "não existia ainda" (nenhuma entry). Congela só `plannedStart`/
+// `durationDays` por WorkItem — nunca título (variação de nome não é
+// variação de cronograma), status (ortogonal ao plano, mesmo tratamento
+// de D059/D061), finish (sempre derivado via semanticEnd, nunca
+// persistido, mesmo motivo de D058) ou Dependency (nenhum consumidor real
+// pede comparação de topologia ainda; ver decision-log.md).
+// Milestone.plannedDate não participa — continua fato independente, sem
+// papel de baseline/deadline (D040/D041).
+//
+// `version` (hardening pós-dogfood) — inteiro positivo, monotônico por
+// projeto (primeira captura = 1, próxima = maior version existente + 1).
+// A baseline ATIVA é sempre a de maior `version`, nunca inferida de
+// `createdAt`/`id`: dois `createdAt` iguais (relógio não estritamente
+// monotônico) não podem empatar a noção de "mais recente" — só a ordem
+// real de captura prova isso, e só `version` a registra. `createdAt`
+// continua sendo o instante exibido, nunca usado para ordenar.
+//
+// Sem `partial` persistido: cobertura (existe WorkItem sem schedule na
+// captura?) é sempre DERIVÁVEL varrendo as entries por `baselineId` e
+// checando se alguma é null/null — segunda fonte da mesma verdade seria
+// redundante sem necessidade comprovada (§13.2).
+//
+// Baseline NÃO resolve nem antecipa caminho crítico (§42 item 4): o
+// finish congelado aqui é fato PASSADO de comparação, nunca anchor de
+// rede/deadline — usá-lo para backward pass de CPM reabriria exatamente o
+// problema que a ausência de anchor honesto já bloqueia.
+export interface ProjectScheduleBaseline {
+	id: string;
+	projectId: string;
+	createdAt: string;
+	version: number;
+}
+
+// Sem `id` próprio, deliberadamente: a chave natural (baselineId,
+// workItemId) já é única por construção (uma captura nunca insere duas
+// entradas para o mesmo WorkItem) e a relação é imutável — nasce com a
+// baseline e nunca é lida, alterada ou removida isoladamente. Introduzir
+// um id sintético aqui não teria consumidor.
+//
+// `plannedStart`/`durationDays` (hardening pós-dogfood) — TODO WorkItem
+// existente no instante da captura ganha uma entry, mesmo sem schedule:
+// o par é null/null (existia, sem schedule) ou ambos preenchidos (existia,
+// agendado) — mesma invariância fechada de WorkItem.plannedStart/
+// durationDays (D058), nunca um sozinho. Ausência de entry para um
+// WorkItem (nenhuma linha com este workItemId+baselineId) significa
+// exclusivamente "não existia ainda quando esta baseline foi capturada".
+export interface ProjectScheduleBaselineEntry {
+	baselineId: string;
+	workItemId: string;
+	plannedStart: string | null;
+	durationDays: number | null;
+}
+
 // Milestone — ETAPA 8 do rework ("Dependency + Milestone + Roadmap/Timeline",
 // docs/core/HYDRA_PRODUCT_REWORK.md §38), segundo microcorte. Checkpoint de
 // progresso DECLARADO no nível do projeto: um ponto verificável que a equipe
@@ -776,6 +849,8 @@ export interface ProjectState {
 	impediments: Impediment[];
 	workItems: WorkItem[];
 	dependencies: Dependency[];
+	scheduleBaselines: ProjectScheduleBaseline[];
+	scheduleBaselineEntries: ProjectScheduleBaselineEntry[];
 	milestones: Milestone[];
 	milestoneWorkItems: MilestoneWorkItem[];
 	risks: Risk[];

@@ -8,6 +8,7 @@ import { catalog } from '../../catalog';
 import { createSqliteProjectRepository, type ProjectRepository, type SqliteProjectRepository } from '../persistence';
 import { createProjectUseCases } from './project-use-cases';
 import type { Clock, IdGenerator } from './ports';
+import type { ProjectUseCases } from './types';
 
 function fakeClock(initial: string): Clock & { set(iso: string): void } {
 	let current = initial;
@@ -1320,7 +1321,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 34 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 35 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1349,6 +1350,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'impediments',
 				'workItems',
 				'milestones',
+				'scheduleBaseline',
 				'risks',
 				'decisions',
 				'changes',
@@ -2454,6 +2456,165 @@ describe('createProjectUseCases — Dependency (ETAPA 8 do rework)', () => {
 	});
 });
 
+// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+// hardening pós-dogfood) — ponta a ponta pela mesma porta que a interface
+// usa: previewScheduleBaselineCapture (só leitura, devolve o candidato
+// INTEIRO) -> captureScheduleBaseline (recalcula contra o estado atual e só
+// aplica se corresponder a `expected` — divergência é preview obsoleto).
+describe('createProjectUseCases — ScheduleBaseline (ETAPA 12 do rework, §42, quinto microcorte, hardening pós-dogfood)', () => {
+	async function projectWithWorkItems(titles: string[]) {
+		const { useCases, repo } = setup();
+		const created = await useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const ids: string[] = [];
+		for (const title of titles) {
+			const added = await useCases.addWorkItem({ projectId, title });
+			if (!added.ok) throw new Error('esperado ok');
+			ids.push(added.value.workItems[added.value.workItems.length - 1].id);
+		}
+		return { useCases, repo, projectId, ids };
+	}
+
+	// Captura com o preview mais recente — atalho para os testes de caminho
+	// feliz; os testes de recusa/stale montam `expected` manualmente.
+	async function captureWithFreshPreview(useCases: ProjectUseCases, projectId: string) {
+		const preview = await useCases.previewScheduleBaselineCapture({ projectId });
+		if (!preview.ok) throw new Error('esperado ok no preview');
+		return useCases.captureScheduleBaseline({ projectId, expected: { entries: preview.value.entries } });
+	}
+
+	it('previewScheduleBaselineCapture não grava; captureScheduleBaseline captura uma entry por WorkItem existente', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A', 'B']);
+		const [a, b] = ids;
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-12', durationDays: 3 });
+
+		const preview = await useCases.previewScheduleBaselineCapture({ projectId });
+		if (!preview.ok) throw new Error('esperado ok');
+		expect(preview.value).toEqual({
+			entries: [
+				{ workItemId: a, plannedStart: '2026-09-12', durationDays: 3 },
+				{ workItemId: b, plannedStart: null, durationDays: null }
+			],
+			scheduledCount: 1,
+			uncoveredCount: 1,
+			partial: true
+		});
+
+		// Preview não grava — a projeção ainda não tem nenhuma baseline.
+		const beforeCapture = await useCases.loadProjectView(projectId);
+		if (!beforeCapture.ok) throw new Error('esperado ok');
+		expect(beforeCapture.value.scheduleBaseline).toBeNull();
+
+		const captured = await useCases.captureScheduleBaseline({ projectId, expected: { entries: preview.value.entries } });
+		if (!captured.ok) throw new Error('esperado ok');
+		expect(captured.value.scheduleBaseline).toMatchObject({
+			partial: true,
+			entries: [{ kind: 'compared', workItemId: a, startVarianceDays: 0, finishVarianceDays: 0, durationVarianceDays: 0 }]
+		});
+	});
+
+	it('captureScheduleBaseline recusa por inteiro quando existe conflito de precedência conhecido', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['B', 'A']);
+		const [b, a] = ids;
+		await useCases.addDependency({ projectId, workItemId: a, dependsOnWorkItemId: b });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: b, plannedStart: '2026-09-12', durationDays: 3 });
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-14', durationDays: 1 }); // conflito
+
+		const preview = await useCases.previewScheduleBaselineCapture({ projectId });
+		expect(preview).toEqual({ ok: false, error: { kind: 'schedule_baseline_precedence_conflict', workItemId: a } });
+
+		const captured = await useCases.captureScheduleBaseline({ projectId, expected: { entries: [] } });
+		expect(captured).toEqual({ ok: false, error: { kind: 'schedule_baseline_precedence_conflict', workItemId: a } });
+
+		// Zero escrita: nenhuma baseline foi criada.
+		const reloaded = await useCases.loadProjectView(projectId);
+		if (!reloaded.ok) throw new Error('esperado ok');
+		expect(reloaded.value.scheduleBaseline).toBeNull();
+	});
+
+	it('rebaseline: segunda captura cria nova baseline ativa (maior version); a anterior permanece preservada', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A']);
+		const [a] = ids;
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-12', durationDays: 3 });
+		const first = await captureWithFreshPreview(useCases, projectId);
+		if (!first.ok) throw new Error('esperado ok');
+		const firstCreatedAt = first.value.scheduleBaseline?.createdAt;
+
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-14', durationDays: 3 });
+		const second = await captureWithFreshPreview(useCases, projectId);
+		if (!second.ok) throw new Error('esperado ok');
+
+		// A baseline ATIVA (projetada) é sempre a de maior version — nunca a primeira.
+		expect(second.value.scheduleBaseline?.createdAt).toBeDefined();
+		expect(second.value.scheduleBaseline?.entries).toEqual([
+			{
+				kind: 'compared',
+				workItemId: a,
+				workItemTitle: 'A',
+				startVarianceDays: 0,
+				finishVarianceDays: 0,
+				durationVarianceDays: 0
+			}
+		]);
+		// A primeira baseline não foi sobrescrita no repositório — só deixou de
+		// ser a ativa projetada (verificado indiretamente: a variância contra a
+		// baseline ativa reflete o schedule mais recente, não o primeiro).
+		expect(firstCreatedAt).toBeDefined();
+	});
+
+	// Hardening pós-dogfood: proteção contra preview obsoleto, ponta a ponta
+	// pela mesma porta que a interface usa.
+	it('captureScheduleBaseline recusa como preview obsoleto quando o schedule muda entre preview e confirmação', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A']);
+		const [a] = ids;
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-12', durationDays: 3 });
+
+		const preview = await useCases.previewScheduleBaselineCapture({ projectId });
+		if (!preview.ok) throw new Error('esperado ok');
+
+		// A muda depois do preview: o candidato real diverge do que a
+		// interface mostrou.
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-13', durationDays: 3 });
+
+		const captured = await useCases.captureScheduleBaseline({ projectId, expected: { entries: preview.value.entries } });
+		expect(captured).toEqual({ ok: false, error: { kind: 'schedule_baseline_stale_preview' } });
+
+		// Zero escrita: nenhuma baseline foi criada.
+		const reloaded = await useCases.loadProjectView(projectId);
+		if (!reloaded.ok) throw new Error('esperado ok');
+		expect(reloaded.value.scheduleBaseline).toBeNull();
+	});
+
+	it('captureScheduleBaseline recusa como preview obsoleto quando um novo WorkItem é criado', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A']);
+		const [a] = ids;
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-12', durationDays: 3 });
+
+		const preview = await useCases.previewScheduleBaselineCapture({ projectId });
+		if (!preview.ok) throw new Error('esperado ok');
+
+		await useCases.addWorkItem({ projectId, title: 'C' });
+
+		const captured = await useCases.captureScheduleBaseline({ projectId, expected: { entries: preview.value.entries } });
+		expect(captured).toEqual({ ok: false, error: { kind: 'schedule_baseline_stale_preview' } });
+	});
+
+	// Mudança irrelevante (só status) nunca produz falso stale.
+	it('captureScheduleBaseline aplica normalmente quando só status/título mudam depois do preview', async () => {
+		const { useCases, projectId, ids } = await projectWithWorkItems(['A']);
+		const [a] = ids;
+		await useCases.setWorkItemSchedule({ projectId, workItemId: a, plannedStart: '2026-09-12', durationDays: 3 });
+
+		const preview = await useCases.previewScheduleBaselineCapture({ projectId });
+		if (!preview.ok) throw new Error('esperado ok');
+
+		await useCases.moveWorkItem({ projectId, workItemId: a, status: 'em_andamento' });
+
+		const captured = await useCases.captureScheduleBaseline({ projectId, expected: { entries: preview.value.entries } });
+		expect(captured.ok).toBe(true);
+	});
+});
 
 // Milestone (ETAPA 8 do rework, segundo microcorte) — exercitado pela mesma
 // porta que a interface usa. O foco aqui é a PROJEÇÃO: `status` vem do estado

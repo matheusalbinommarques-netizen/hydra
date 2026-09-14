@@ -59,6 +59,12 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'O replanejamento levaria uma data além do limite representável (ano 9999). Nada foi alterado.';
 		case 'work_item_precedence_stale_preview':
 			return 'O cronograma mudou desde este preview. Gere o replanejamento novamente antes de confirmar.';
+		case 'schedule_baseline_no_eligible_work_items':
+			return 'Nenhum item de trabalho tem cronograma completo ainda — defina início e duração antes de capturar uma referência.';
+		case 'schedule_baseline_precedence_conflict':
+			return 'Um item de trabalho que entraria na referência tem um conflito de precedência conhecido. Resolva o conflito antes de capturar.';
+		case 'schedule_baseline_stale_preview':
+			return 'O cronograma mudou desde este preview. Gere a prévia novamente antes de confirmar a referência.';
 		case 'dependency_not_found':
 			return 'Dependência não encontrada.';
 		case 'dependency_self_reference':

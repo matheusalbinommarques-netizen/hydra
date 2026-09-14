@@ -224,6 +224,64 @@ CREATE TABLE IF NOT EXISTS dependency (
 	CONSTRAINT dependency_unique_pair UNIQUE (work_item_id, depends_on_work_item_id)
 );
 
+-- ProjectScheduleBaseline (ETAPA 12 do rework, "Scheduling e Gantt", §42,
+-- quinto microcorte, hardening pós-dogfood) — ver
+-- app/src/lib/domain/state-types.ts. REFERÊNCIA explicitamente aprovada
+-- pelo usuário, IMUTÁVEL: nasce inteira por captureScheduleBaseline (nunca
+-- UPDATE), e capturar de novo insere uma nova linha em vez de sobrescrever
+-- — sem coluna de status "ativa". `version` (hardening) prova a ordem real
+-- de captura: inteiro positivo, monotônico por projeto (primeira = 1,
+-- próxima = maior já existente + 1) — a baseline ativa é sempre derivada
+-- na leitura como a de maior `version`, nunca por `created_at`/`id`
+-- (nenhum dos dois sobrevive a duas capturas no mesmo instante ou a um
+-- relógio não estritamente monotônico). A UNIQUE nomeada abaixo é a mesma
+-- invariante de unicidade por projeto que a desserialização também
+-- reforça (validateInvariants, domain/serialization.ts). Sem `partial`:
+-- cobertura é sempre DERIVADA varrendo schedule_baseline_entry por
+-- baseline_id (existe alguma linha com planned_start/duration_days NULL?)
+-- — segunda fonte da mesma verdade seria redundante. Tabela nova (mesmo
+-- caso de `decision`/`risk` desde D053/D049): não exige `ensureX` de
+-- backfill — um banco anterior a este corte simplesmente ainda não tem a
+-- tabela, e `CREATE TABLE IF NOT EXISTS` sozinho já basta.
+CREATE TABLE IF NOT EXISTS schedule_baseline (
+	id TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+	created_at TEXT NOT NULL,
+	version INTEGER NOT NULL CHECK (version >= 1),
+	CONSTRAINT schedule_baseline_unique_version UNIQUE (project_id, version)
+);
+
+-- ProjectScheduleBaselineEntry — sem coluna `id` própria (ver
+-- state-types.ts): a chave primária composta (baseline_id, work_item_id)
+-- já é a chave natural e única da relação, que nunca é lida, alterada ou
+-- removida isoladamente fora da baseline inteira.
+--
+-- planned_start/duration_days (hardening pós-dogfood) — MEMBERSHIP: toda
+-- captura grava uma linha para CADA WorkItem existente naquele instante,
+-- com ou sem schedule — null/null é estado LEGÍTIMO (o WorkItem existia,
+-- mas não tinha schedule ainda), nunca um dos dois sozinho. Ausência de
+-- linha para um WorkItem+baseline é o único jeito de expressar "não
+-- existia ainda" — nunca inferido de work_item.created_at. A CHECK
+-- cruzada do par é nomeada e cabe aqui (ao contrário de
+-- work_item_schedule_pair — ver comentário em work_item acima): esta
+-- tabela é nova por este corte, então toda instância dela (fresh ou
+-- upgrade futuro) já nasce com a CHECK, sem o caso de banco pré-existente
+-- sem ela.
+CREATE TABLE IF NOT EXISTS schedule_baseline_entry (
+	baseline_id TEXT NOT NULL REFERENCES schedule_baseline (id),
+	work_item_id TEXT NOT NULL REFERENCES work_item (id),
+	planned_start TEXT,
+	duration_days INTEGER,
+	PRIMARY KEY (baseline_id, work_item_id),
+	CONSTRAINT schedule_baseline_entry_planned_start_format CHECK (
+		planned_start IS NULL OR planned_start GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+	),
+	CONSTRAINT schedule_baseline_entry_duration_days_positive CHECK (duration_days IS NULL OR duration_days >= 1),
+	CONSTRAINT schedule_baseline_entry_schedule_pair CHECK (
+		(planned_start IS NULL AND duration_days IS NULL) OR (planned_start IS NOT NULL AND duration_days IS NOT NULL)
+	)
+);
+
 -- Milestone (ETAPA 8 do rework, segundo microcorte) — ver
 -- app/src/lib/domain/state-types.ts. Checkpoint DECLARADO no nível do
 -- projeto: status é a única autoridade sobre aberto/alcancado, nunca
@@ -584,6 +642,12 @@ CREATE INDEX IF NOT EXISTS idx_work_item_project_id ON work_item (project_id);
 -- bancos (a coluna ainda não existiria neste ponto do exec). O índice é
 -- criado junto com a coluna, na própria função idempotente.
 CREATE INDEX IF NOT EXISTS idx_dependency_project_id ON dependency (project_id);
+-- schedule_baseline_entry não recebe índice de project_id próprio: sua PK
+-- composta (baseline_id, work_item_id) já cobre a leitura real (por
+-- baseline_id, sempre a partir de uma schedule_baseline já filtrada por
+-- projeto) — nenhuma consulta filtra schedule_baseline_entry por project_id
+-- diretamente.
+CREATE INDEX IF NOT EXISTS idx_schedule_baseline_project_id ON schedule_baseline (project_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_project_id ON milestone (project_id);
 CREATE INDEX IF NOT EXISTS idx_milestone_work_item_project_id ON milestone_work_item (project_id);
 CREATE INDEX IF NOT EXISTS idx_risk_project_id ON risk (project_id);

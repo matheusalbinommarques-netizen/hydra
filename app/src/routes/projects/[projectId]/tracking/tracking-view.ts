@@ -14,6 +14,7 @@ import type {
 	ImpedimentView,
 	MilestoneView,
 	RiskView,
+	ScheduleBaselineView,
 	WorkItemView
 } from '$lib/server/application/types';
 import type { NextActivityResult, PendingItemView } from '$lib/orientation-engine';
@@ -183,6 +184,11 @@ export interface TrackingView {
 	// simplesmente não existe na página (§17: surface só aparece quando há
 	// dados suficientes; nada de aba/placeholder vazio).
 	timeline: TrackingTimelineEntry[];
+	// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+	// passthrough direto de ProjectView.scheduleBaseline (já projetado com
+	// títulos denormalizados por project-view.ts); `null` é o caso normal
+	// (nenhuma baseline capturada ainda).
+	scheduleBaseline: ScheduleBaselineView | null;
 	blockedWorkItems: TrackingBlockedWorkItem[];
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
@@ -201,6 +207,7 @@ export interface TrackingViewInput {
 	nextActivity: NextActivityResult;
 	workItems: WorkItemView[];
 	milestones: MilestoneView[];
+	scheduleBaseline: ScheduleBaselineView | null;
 	impediments: ImpedimentView[];
 	risks: RiskView[];
 	decisions: DecisionView[];
@@ -461,6 +468,7 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		situation,
 		work: buildWork(input.workItems),
 		timeline: buildTimeline(input.milestones, input.workItems),
+		scheduleBaseline: input.scheduleBaseline,
 		blockedWorkItems: buildBlockedWorkItems(input.workItems),
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
 		impediments: buildImpediments(input.impediments),

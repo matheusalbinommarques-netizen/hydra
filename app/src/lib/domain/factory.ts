@@ -31,6 +31,8 @@ export function createInitialProjectState(
 		impediments: [],
 		workItems: [],
 		dependencies: [],
+		scheduleBaselines: [],
+		scheduleBaselineEntries: [],
 		milestones: [],
 		milestoneWorkItems: [],
 		risks: [],

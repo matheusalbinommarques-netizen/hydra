@@ -23,6 +23,8 @@ import type {
 	DeliverableEffort,
 	MilestoneStatus,
 	MilestoneWorkItem,
+	ProjectScheduleBaseline,
+	ProjectScheduleBaselineEntry,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -212,6 +214,37 @@ export function mapDependencyRow(row: DependencyRow): Dependency {
 		workItemId: row.work_item_id,
 		dependsOnWorkItemId: row.depends_on_work_item_id,
 		createdAt: row.created_at
+	};
+}
+
+export interface ScheduleBaselineRow {
+	id: string;
+	project_id: string;
+	created_at: string;
+	version: number;
+}
+
+export function mapScheduleBaselineRow(row: ScheduleBaselineRow): ProjectScheduleBaseline {
+	return { id: row.id, projectId: row.project_id, createdAt: row.created_at, version: row.version };
+}
+
+// Sem `id` (ver ProjectScheduleBaselineEntry, domain/state-types.ts) — a
+// linha SQLite também não tem: a PK é composta (baseline_id, work_item_id).
+// planned_start/duration_days são nullable (hardening pós-dogfood): toda
+// captura registra uma linha por WorkItem existente, com ou sem schedule.
+export interface ScheduleBaselineEntryRow {
+	baseline_id: string;
+	work_item_id: string;
+	planned_start: string | null;
+	duration_days: number | null;
+}
+
+export function mapScheduleBaselineEntryRow(row: ScheduleBaselineEntryRow): ProjectScheduleBaselineEntry {
+	return {
+		baselineId: row.baseline_id,
+		workItemId: row.work_item_id,
+		plannedStart: row.planned_start,
+		durationDays: row.duration_days
 	};
 }
 

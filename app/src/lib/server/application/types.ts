@@ -358,6 +358,63 @@ export interface SchedulePropagationPlanView {
 	partial: boolean;
 }
 
+// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+// hardening pós-dogfood) — candidato canônico de domain/transitions.ts,
+// ScheduleBaselineCandidateEntry: um por WorkItem existente no momento do
+// preview, com ou sem schedule. Passthrough direto (sem denormalização de
+// título — nunca exibido individualmente, só serializado de volta como
+// `expected` na confirmação; ver PreviewScheduleBaselineCaptureInput).
+export interface ScheduleBaselineCandidateEntryView {
+	workItemId: string;
+	plannedStart: string | null;
+	durationDays: number | null;
+}
+
+// Resultado de previewScheduleBaselineCapture. `entries` é o candidato
+// INTEIRO (todo WorkItem existente) — a interface devolve exatamente isso
+// como `expected` na confirmação (ver CaptureScheduleBaselineInput), nunca
+// reconstrói o candidato do zero no cliente. `scheduledCount`/
+// `uncoveredCount`/`partial` são só para texto de apresentação
+// ("N trabalhos serão capturados").
+export interface ScheduleBaselineCapturePreviewView {
+	entries: ScheduleBaselineCandidateEntryView[];
+	scheduledCount: number;
+	uncoveredCount: number;
+	partial: boolean;
+}
+
+// Comparação contra a baseline ativa (a de maior `version` — hardening
+// pós-dogfood, nunca `createdAt`/`id`) — projeção de
+// domain/transitions.ts, computeScheduleBaselineComparison.
+// `workItemTitle` é denormalizado aqui, mesmo espírito de
+// dependsOnWorkItemTitle (WorkItemPrecedenceConflictView) acima: a
+// interface não cruza a lista de WorkItems. `compared_unrepresentable` é
+// defesa (ver domain): a própria aritmética de variância estourou a faixa
+// civil — caso extremo, nunca esperado num projeto real.
+export type ScheduleBaselineComparisonEntryView =
+	| {
+			kind: 'compared';
+			workItemId: string;
+			workItemTitle: string;
+			startVarianceDays: number;
+			finishVarianceDays: number;
+			durationVarianceDays: number;
+	  }
+	| { kind: 'compared_unrepresentable'; workItemId: string; workItemTitle: string }
+	| { kind: 'removed'; workItemId: string; workItemTitle: string }
+	| { kind: 'scheduled_after'; workItemId: string; workItemTitle: string }
+	| { kind: 'added_after'; workItemId: string; workItemTitle: string };
+
+// `null` é o caso normal e permanentemente válido — nenhuma baseline foi
+// capturada ainda (ver ProjectView.scheduleBaseline). `partial` é sempre
+// DERIVADO na montagem desta view a partir das entries da baseline ativa
+// (existe alguma null/null?) — nunca persistido (hardening pós-dogfood).
+export interface ScheduleBaselineView {
+	createdAt: string;
+	partial: boolean;
+	entries: ScheduleBaselineComparisonEntryView[];
+}
+
 // Deliverable (ETAPA 9 do rework, primeiro microcorte) — view leve, sem
 // projectId/createdAt/updatedAt, que a interface não precisa (mesmo padrão de
 // ScopeItemView/WorkItemView).
@@ -551,6 +608,13 @@ export interface ProjectView {
 	// projeção existente onde eles caibam.
 	deliverables: DeliverableView[];
 	milestones: MilestoneView[];
+	// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+	// `null` enquanto nenhuma baseline foi capturada (caso normal e
+	// permanentemente válido). Quando existe, é sempre a baseline ATIVA (a
+	// mais recente por createdAt) — baselines anteriores continuam
+	// persistidas como histórico, mas não têm projeção própria nesta rodada
+	// (sem seletor/diff entre baselines, DEFER, sem consumidor).
+	scheduleBaseline: ScheduleBaselineView | null;
 	// Riscos do projeto (ETAPA 10 do rework, primeiro microcorte, D049) —
 	// todos os Risks (abertos e encerrados); Acompanhamento filtra por status
 	// diretamente, mesmo padrão de impediments acima. Deliberadamente NÃO
@@ -952,6 +1016,27 @@ export interface SetMilestonePlannedDateInput {
 	plannedDate: string | null;
 }
 
+// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+// hardening pós-dogfood) — mesmo par preview/confirmação de
+// PreviewSchedulePropagationInput/ApplySchedulePropagationInput:
+// previewScheduleBaselineCapture só lê; captureScheduleBaseline sempre
+// recalcula a prontidão contra o estado atual antes de gravar (nunca
+// confia no candidato vindo do cliente) e só grava se o recálculo
+// corresponder exatamente a `expected` — o candidato que a interface
+// efetivamente mostrou (ScheduleBaselineCapturePreviewView.entries,
+// devolvido sem alteração). Divergência (WorkItem criado, schedule
+// mudado, cobertura mudada) é recusada por inteiro como preview obsoleto,
+// nunca aplicada parcialmente — mesmo espírito de
+// work_item_precedence_stale_preview.
+export interface PreviewScheduleBaselineCaptureInput {
+	projectId: string;
+}
+
+export interface CaptureScheduleBaselineInput {
+	projectId: string;
+	expected: { entries: ScheduleBaselineCandidateEntryView[] };
+}
+
 export interface LinkWorkItemToMilestoneInput {
 	projectId: string;
 	milestoneId: string;
@@ -1295,6 +1380,10 @@ export interface ProjectUseCases {
 		input: PreviewSchedulePropagationInput
 	): Promise<UseCaseOutcome<SchedulePropagationPlanView>>;
 	applySchedulePropagation(input: ApplySchedulePropagationInput): Promise<UseCaseOutcome<ProjectView>>;
+	previewScheduleBaselineCapture(
+		input: PreviewScheduleBaselineCaptureInput
+	): Promise<UseCaseOutcome<ScheduleBaselineCapturePreviewView>>;
+	captureScheduleBaseline(input: CaptureScheduleBaselineInput): Promise<UseCaseOutcome<ProjectView>>;
 	addDeliverable(input: AddDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDeliverableTitle(input: SetDeliverableTitleInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDeliverableEffort(input: SetDeliverableEffortInput): Promise<UseCaseOutcome<ProjectView>>;

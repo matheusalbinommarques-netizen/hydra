@@ -44,6 +44,8 @@ import type {
 	Milestone,
 	MilestoneStatus,
 	MilestoneWorkItem,
+	ProjectScheduleBaseline,
+	ProjectScheduleBaselineEntry,
 	Risk,
 	RiskImpact,
 	RiskLikelihood,
@@ -547,6 +549,66 @@ function parseDependencyList(value: unknown): Result<Dependency[], ProjectStateP
 			workItemId: item.workItemId,
 			dependsOnWorkItemId: item.dependsOnWorkItemId,
 			createdAt: item.createdAt
+		});
+	}
+	return { ok: true, value: result };
+}
+
+// ProjectScheduleBaseline (ETAPA 12 do rework, §42, quinto microcorte,
+// hardening pós-dogfood) — ausente em snapshots exportados antes deste
+// corte: tratado como coleção vazia, mesmo espírito de parseDependencyList
+// acima. Nunca inferida de nenhum dado existente — só nasce do gesto
+// explícito de captura. `version` (hardening) é inteiro positivo — a
+// unicidade/monotonicidade por projeto é invariante cruzada, verificada
+// em assembleProjectState (precisa do conjunto completo, não cabe aqui).
+function parseScheduleBaselineList(value: unknown): Result<ProjectScheduleBaseline[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('scheduleBaselines deve ser um array');
+	const result: ProjectScheduleBaseline[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada ProjectScheduleBaseline deve ser um objeto');
+		if (!isString(item.id)) return shapeError('ProjectScheduleBaseline.id deve ser uma string');
+		if (!isString(item.projectId)) return shapeError('ProjectScheduleBaseline.projectId deve ser uma string');
+		if (!isIsoDateString(item.createdAt)) {
+			return shapeError('ProjectScheduleBaseline.createdAt deve ser uma data ISO 8601 válida');
+		}
+		if (typeof item.version !== 'number' || !Number.isInteger(item.version) || item.version < 1) {
+			return shapeError('ProjectScheduleBaseline.version deve ser um número inteiro maior ou igual a 1');
+		}
+		result.push({ id: item.id, projectId: item.projectId, createdAt: item.createdAt, version: item.version });
+	}
+	return { ok: true, value: result };
+}
+
+// ProjectScheduleBaselineEntry — sem id próprio (ver state-types.ts): a
+// chave natural (baselineId, workItemId) já é única por construção. Mesmo
+// tratamento de ausência de parseScheduleBaselineList acima.
+// plannedStart/durationDays (hardening pós-dogfood) — o par é null/null
+// (WorkItem existia sem schedule na captura) ou ambos preenchidos, nunca
+// um sozinho: mesma invariância fechada de WorkItem.plannedStart/
+// durationDays (D058), validada aqui do mesmo jeito.
+function parseScheduleBaselineEntryList(value: unknown): Result<ProjectScheduleBaselineEntry[], ProjectStateParseError> {
+	if (value === undefined) return { ok: true, value: [] };
+	if (!Array.isArray(value)) return shapeError('scheduleBaselineEntries deve ser um array');
+	const result: ProjectScheduleBaselineEntry[] = [];
+	for (const item of value) {
+		if (!isRecord(item)) return shapeError('cada ProjectScheduleBaselineEntry deve ser um objeto');
+		if (!isString(item.baselineId)) return shapeError('ProjectScheduleBaselineEntry.baselineId deve ser uma string');
+		if (!isString(item.workItemId)) return shapeError('ProjectScheduleBaselineEntry.workItemId deve ser uma string');
+		if (item.plannedStart !== null && !isCivilDate(item.plannedStart)) {
+			return shapeError('ProjectScheduleBaselineEntry.plannedStart deve ser uma data civil YYYY-MM-DD válida ou null');
+		}
+		if (
+			item.durationDays !== null &&
+			(typeof item.durationDays !== 'number' || !Number.isInteger(item.durationDays) || item.durationDays < 1)
+		) {
+			return shapeError('ProjectScheduleBaselineEntry.durationDays deve ser um número inteiro maior ou igual a 1, ou null');
+		}
+		result.push({
+			baselineId: item.baselineId,
+			workItemId: item.workItemId,
+			plannedStart: item.plannedStart as string | null,
+			durationDays: item.durationDays as number | null
 		});
 	}
 	return { ok: true, value: result };
@@ -1098,6 +1160,8 @@ interface AssembleProjectStateInput {
 	impediments: Impediment[];
 	workItems: WorkItem[];
 	dependencies: Dependency[];
+	scheduleBaselines: ProjectScheduleBaseline[];
+	scheduleBaselineEntries: ProjectScheduleBaselineEntry[];
 	milestones: Milestone[];
 	milestoneWorkItems: MilestoneWorkItem[];
 	risks: Risk[];
@@ -1126,6 +1190,8 @@ function assembleProjectState({
 	impediments,
 	workItems,
 	dependencies,
+	scheduleBaselines,
+	scheduleBaselineEntries,
 	milestones,
 	milestoneWorkItems,
 	risks,
@@ -1556,6 +1622,62 @@ function assembleProjectState({
 		}
 	}
 
+	// referências + invariantes: ProjectScheduleBaseline/
+	// ProjectScheduleBaselineEntry (ETAPA 12 do rework, §42, quinto
+	// microcorte, hardening pós-dogfood) — mesmo padrão do bloco de
+	// Dependency acima: id único, projectId correto, e `version` única e
+	// estritamente positiva por projeto (hardening: prova a ordem real de
+	// captura — nunca `createdAt`/`id`, que não sobrevivem a um relógio não
+	// estritamente monotônico nem a duas capturas no mesmo instante).
+	const seenScheduleBaselineIds = new Set<string>();
+	const seenScheduleBaselineVersions = new Set<number>();
+	for (const baseline of scheduleBaselines) {
+		if (baseline.projectId !== project.id) {
+			return invariantError(`ProjectScheduleBaseline "${baseline.id}" usa projectId diferente do Project`);
+		}
+		if (seenScheduleBaselineIds.has(baseline.id)) {
+			return invariantError(`ProjectScheduleBaseline.id duplicado: "${baseline.id}"`);
+		}
+		seenScheduleBaselineIds.add(baseline.id);
+		if (seenScheduleBaselineVersions.has(baseline.version)) {
+			return invariantError(`ProjectScheduleBaseline.version duplicada: "${baseline.version}"`);
+		}
+		seenScheduleBaselineVersions.add(baseline.version);
+	}
+
+	// Cada entrada referencia uma baseline e um WorkItem que realmente
+	// existem, sem par duplicado (a chave natural baselineId+workItemId já
+	// é única por construção — reforçada aqui contra estado
+	// desserializado/importado), e a invariância fechada do par
+	// plannedStart/durationDays (hardening: null/null é estado LEGÍTIMO —
+	// WorkItem existia sem schedule na captura — nunca um sozinho), mesmo
+	// molde do bloco de WorkItem acima.
+	const seenScheduleBaselineEntryPairs = new Set<string>();
+	for (const entry of scheduleBaselineEntries) {
+		if (!seenScheduleBaselineIds.has(entry.baselineId)) {
+			return referenceError(
+				`ProjectScheduleBaselineEntry referencia baselineId "${entry.baselineId}", que não existe`
+			);
+		}
+		if (!workItemById.has(entry.workItemId)) {
+			return referenceError(
+				`ProjectScheduleBaselineEntry referencia workItemId "${entry.workItemId}", que não existe`
+			);
+		}
+		const pair = `${entry.baselineId} -> ${entry.workItemId}`;
+		if (seenScheduleBaselineEntryPairs.has(pair)) {
+			return invariantError(
+				`Entrada de baseline duplicada para o WorkItem "${entry.workItemId}" na baseline "${entry.baselineId}"`
+			);
+		}
+		seenScheduleBaselineEntryPairs.add(pair);
+		if ((entry.plannedStart === null) !== (entry.durationDays === null)) {
+			return invariantError(
+				`Entrada de baseline do WorkItem "${entry.workItemId}" tem schedule parcial (plannedStart/durationDays devem ser ambos null ou ambos preenchidos)`
+			);
+		}
+	}
+
 	// referências + invariantes: Milestone (ETAPA 8 do rework, segundo
 	// microcorte) — a invariante FECHADA do lifecycle (aberto => reachedAt
 	// null; alcancado => reachedAt não-null) é reforçada aqui contra estado
@@ -1963,6 +2085,8 @@ function assembleProjectState({
 			impediments,
 			workItems,
 			dependencies,
+			scheduleBaselines,
+			scheduleBaselineEntries,
 			milestones,
 			milestoneWorkItems,
 			risks,
@@ -2043,6 +2167,12 @@ export function deserializeProjectState(
 	const dependenciesResult = parseDependencyList(state.dependencies);
 	if (!dependenciesResult.ok) return dependenciesResult;
 
+	const scheduleBaselinesResult = parseScheduleBaselineList(state.scheduleBaselines);
+	if (!scheduleBaselinesResult.ok) return scheduleBaselinesResult;
+
+	const scheduleBaselineEntriesResult = parseScheduleBaselineEntryList(state.scheduleBaselineEntries);
+	if (!scheduleBaselineEntriesResult.ok) return scheduleBaselineEntriesResult;
+
 	const milestonesResult = parseMilestoneList(state.milestones);
 	if (!milestonesResult.ok) return milestonesResult;
 
@@ -2120,6 +2250,8 @@ export function deserializeProjectState(
 		impediments: impedimentsResult.value,
 		workItems: workItemsResult.value,
 		dependencies: dependenciesResult.value,
+		scheduleBaselines: scheduleBaselinesResult.value,
+		scheduleBaselineEntries: scheduleBaselineEntriesResult.value,
 		milestones: milestonesResult.value,
 		milestoneWorkItems: milestoneWorkItemsResult.value,
 		risks: risksResult.value,

@@ -15,6 +15,8 @@ function baseState(overrides: Partial<ProjectState> = {}): ProjectState {
 		impediments: [],
 		workItems: [],
 		dependencies: [],
+		scheduleBaselines: [],
+		scheduleBaselineEntries: [],
 		milestones: [],
 		milestoneWorkItems: [],
 		risks: [],
@@ -246,6 +248,7 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'impediments',
 				'workItems',
 				'milestones',
+				'scheduleBaseline',
 				'risks',
 				'decisions',
 				'changes',
@@ -393,5 +396,104 @@ describe('buildProjectView — impediments', () => {
 			createdAt: '2026-01-02T00:00:00.000Z',
 			resolvedAt: null
 		});
+	});
+});
+
+// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+// hardening pós-dogfood) — foco na PROJEÇÃO: `null` sem baseline, seleção
+// determinística da baseline ATIVA pela maior `version` (nunca
+// createdAt/id — não sobrevivem a empate ou a relógio não estritamente
+// monotônico), `partial` sempre DERIVADO das entries (nunca persistido), e
+// denormalização de título nas entradas de comparação.
+describe('buildProjectView — scheduleBaseline', () => {
+	it('é null quando nenhuma baseline foi capturada', () => {
+		const view = buildProjectView(catalog, baseState());
+		expect(view.scheduleBaseline).toBeNull();
+	});
+
+	it('projeta a baseline de maior version como ativa, com título denormalizado', () => {
+		const state = baseState({
+			workItems: [
+				{
+					id: 'wi-a',
+					projectId: 'p1',
+					title: 'A',
+					status: 'a_fazer',
+					deliverableId: null,
+					plannedStart: '2026-09-12',
+					durationDays: 3,
+					createdAt: '2026-01-01T00:00:00.000Z',
+					updatedAt: '2026-01-01T00:00:00.000Z'
+				}
+			],
+			scheduleBaselines: [
+				{ id: 'baseline-1', projectId: 'p1', createdAt: '2026-01-01T00:00:00.000Z', version: 1 },
+				{ id: 'baseline-2', projectId: 'p1', createdAt: '2026-01-02T00:00:00.000Z', version: 2 }
+			],
+			scheduleBaselineEntries: [
+				{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-01', durationDays: 1 },
+				{ baselineId: 'baseline-2', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 }
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.scheduleBaseline).toEqual({
+			createdAt: '2026-01-02T00:00:00.000Z',
+			partial: false,
+			entries: [
+				{
+					kind: 'compared',
+					workItemId: 'wi-a',
+					workItemTitle: 'A',
+					startVarianceDays: 0,
+					finishVarianceDays: 0,
+					durationVarianceDays: 0
+				}
+			]
+		});
+	});
+
+	// Hardening pós-dogfood: mesmo createdAt (relógio não estritamente
+	// monotônico) não pode empatar a noção de "mais recente" — só `version`
+	// prova a ordem real de captura.
+	it('mesmo createdAt entre baselines é resolvido por version, nunca por empate de id', () => {
+		const state = baseState({
+			scheduleBaselines: [
+				{ id: 'baseline-z', projectId: 'p1', createdAt: '2026-01-01T00:00:00.000Z', version: 1 },
+				{ id: 'baseline-a', projectId: 'p1', createdAt: '2026-01-01T00:00:00.000Z', version: 2 }
+			],
+			scheduleBaselineEntries: []
+		});
+
+		const view = buildProjectView(catalog, state);
+		// version 2 vence mesmo com id lexicograficamente menor que baseline-z
+		// e mesmo createdAt — se a seleção usasse id como tie-break,
+		// baseline-z (id maior) venceria erroneamente.
+		expect(view.scheduleBaseline).toEqual({ createdAt: '2026-01-01T00:00:00.000Z', partial: false, entries: [] });
+	});
+
+	it('partial é derivado de qualquer entry null/null na baseline ativa, nunca de um campo persistido', () => {
+		const state = baseState({
+			workItems: [
+				{
+					id: 'wi-a',
+					projectId: 'p1',
+					title: 'A',
+					status: 'a_fazer',
+					deliverableId: null,
+					plannedStart: null,
+					durationDays: null,
+					createdAt: '2026-01-01T00:00:00.000Z',
+					updatedAt: '2026-01-01T00:00:00.000Z'
+				}
+			],
+			scheduleBaselines: [{ id: 'baseline-1', projectId: 'p1', createdAt: '2026-01-01T00:00:00.000Z', version: 1 }],
+			scheduleBaselineEntries: [
+				{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: null, durationDays: null }
+			]
+		});
+
+		const view = buildProjectView(catalog, state);
+		expect(view.scheduleBaseline?.partial).toBe(true);
 	});
 });

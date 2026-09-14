@@ -393,10 +393,13 @@ reabre, sem congelar arquitetura ainda não decidida.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 `S12` (ETAPA 12, "Scheduling e Gantt", §42) com status `in_progress`.
-Nenhuma decisão de S12 foi tomada ainda — o ponteiro abre a etapa, mas não
-decide se as pré-condições de §42 (WorkItem/Deliverable estáveis, datas,
-durações, dependências, marcos) já estão maduras, nem nenhum modelo de
-precedência, propagação, folga, caminho crítico ou Gantt.
+Itens 1–3 e 5 da lista incremental de §42 (precedência, propagação, folga
+e baseline explícita do cronograma) estão entregues, cada um no escopo
+explicitamente estreito registrado em D058–D062
+(`docs/07-management/decision-log.md`). Item 4 (caminho crítico) segue
+deliberadamente DEFER — falta uma decisão de anchor/target de rede antes
+de ser honestamente implementável, não é omissão. Item 6 (Gantt) segue
+bloqueado por 4, conforme `HYDRA_PRODUCT_REWORK.md` §49.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

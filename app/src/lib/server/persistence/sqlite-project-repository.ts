@@ -30,6 +30,8 @@ import {
 	mapMilestoneRow,
 	mapMilestoneWorkItemRow,
 	mapRiskRow,
+	mapScheduleBaselineRow,
+	mapScheduleBaselineEntryRow,
 	mapWorkItemRow,
 	type ActivityProgressRow,
 	type AffectedGroupRow,
@@ -55,6 +57,8 @@ import {
 	type MilestoneRow,
 	type MilestoneWorkItemRow,
 	type RiskRow,
+	type ScheduleBaselineRow,
+	type ScheduleBaselineEntryRow,
 	type WorkItemRow
 } from './mappers';
 import initSql from './migrations/0001_init.sql?raw';
@@ -515,6 +519,26 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertDependency.run(dependency);
 		}
 
+		// schedule_baseline não depende de work_item (só de project) — pode
+		// nascer em qualquer ponto depois do project row. schedule_baseline_entry
+		// depende dos dois (FKs checadas imediatamente, foreign_keys = ON), por
+		// isso vem depois do bloco de work_item acima.
+		const insertScheduleBaseline = db.prepare(
+			`INSERT INTO schedule_baseline (id, project_id, created_at, version)
+			 VALUES (@id, @projectId, @createdAt, @version)`
+		);
+		for (const baseline of state.scheduleBaselines) {
+			insertScheduleBaseline.run(baseline);
+		}
+
+		const insertScheduleBaselineEntry = db.prepare(
+			`INSERT INTO schedule_baseline_entry (baseline_id, work_item_id, planned_start, duration_days)
+			 VALUES (@baselineId, @workItemId, @plannedStart, @durationDays)`
+		);
+		for (const entry of state.scheduleBaselineEntries) {
+			insertScheduleBaselineEntry.run(entry);
+		}
+
 		// milestone antes de milestone_work_item, e ambos depois de work_item:
 		// milestone_work_item tem FK para os dois (checagem imediata,
 		// foreign_keys = ON).
@@ -699,6 +723,14 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// referenciam work_item.id (FK checada imediatamente, foreign_keys = ON).
 		db.prepare('DELETE FROM impediment WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM dependency WHERE project_id = ?').run(state.project.id);
+		// schedule_baseline_entry antes de schedule_baseline e de work_item (FKs
+		// para os dois, checagem imediata) — schedule_baseline_entry não tem
+		// coluna project_id própria, então o DELETE é indireto via subquery.
+		db.prepare(
+			`DELETE FROM schedule_baseline_entry
+			 WHERE baseline_id IN (SELECT id FROM schedule_baseline WHERE project_id = ?)`
+		).run(state.project.id);
+		db.prepare('DELETE FROM schedule_baseline WHERE project_id = ?').run(state.project.id);
 		// milestone_work_item antes de milestone e de work_item (FKs para ambos).
 		db.prepare('DELETE FROM milestone_work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM milestone WHERE project_id = ?').run(state.project.id);
@@ -802,6 +834,22 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 					 FROM dependency WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as DependencyRow[];
+
+			const scheduleBaselineRows = db
+				.prepare(
+					`SELECT id, project_id, created_at, version
+					 FROM schedule_baseline WHERE project_id = ? ORDER BY rowid`
+				)
+				.all(projectId) as ScheduleBaselineRow[];
+
+			const scheduleBaselineEntryRows = db
+				.prepare(
+					`SELECT baseline_id, work_item_id, planned_start, duration_days
+					 FROM schedule_baseline_entry
+					 WHERE baseline_id IN (SELECT id FROM schedule_baseline WHERE project_id = ?)
+					 ORDER BY rowid`
+				)
+				.all(projectId) as ScheduleBaselineEntryRow[];
 
 			const milestoneRows = db
 				.prepare(
@@ -913,6 +961,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 				impediments: impedimentRows.map(mapImpedimentRow),
 				workItems: workItemRows.map(mapWorkItemRow),
 				dependencies: dependencyRows.map(mapDependencyRow),
+				scheduleBaselines: scheduleBaselineRows.map(mapScheduleBaselineRow),
+				scheduleBaselineEntries: scheduleBaselineEntryRows.map(mapScheduleBaselineEntryRow),
 				milestones: milestoneRows.map(mapMilestoneRow),
 				milestoneWorkItems: milestoneWorkItemRows.map(mapMilestoneWorkItemRow),
 				risks: riskRows.map(mapRiskRow),

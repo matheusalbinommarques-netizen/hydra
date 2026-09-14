@@ -19,6 +19,8 @@ import type {
 	Dependency,
 	Milestone,
 	MilestoneWorkItem,
+	ProjectScheduleBaseline,
+	ProjectScheduleBaselineEntry,
 	DesiredOutcome,
 	Evidence,
 	EvidenceOutcome,
@@ -118,7 +120,10 @@ export type DomainTransitionError =
 	| { kind: 'decision_work_item_not_found' }
 	| { kind: 'decision_work_item_already_linked' }
 	| { kind: 'change_not_found' }
-	| { kind: 'change_statement_required' };
+	| { kind: 'change_statement_required' }
+	| { kind: 'schedule_baseline_no_eligible_work_items' }
+	| { kind: 'schedule_baseline_precedence_conflict'; workItemId: string }
+	| { kind: 'schedule_baseline_stale_preview' };
 
 export type ProjectStateChange =
 	| { kind: 'answer'; activityDefinitionId: string }
@@ -2153,6 +2158,254 @@ export function applySchedulePropagation(
 			})
 		}
 	};
+}
+
+// --- Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+// hardening pós-dogfood) --------------------------------------------------
+//
+// REFERÊNCIA explicitamente aprovada pelo usuário (ver ProjectScheduleBaseline
+// em state-types.ts), nunca criada automaticamente. IMUTÁVEL: capturar de
+// novo sempre ADICIONA uma nova baseline; nenhuma função aqui altera ou
+// remove uma baseline já existente.
+//
+// MEMBERSHIP (hardening): a captura registra uma entry para TODO WorkItem
+// existente no instante da captura, com ou sem schedule — nunca só os
+// agendados. É isso que permite distinguir, sem depender de
+// WorkItem.createdAt (que não prova nada sobre quando ESTA baseline foi
+// capturada, e não sobrevive a um relógio não estritamente monotônico):
+// "existia sem schedule, agendado depois" (entry null/null) de "não
+// existia ainda" (nenhuma entry).
+//
+// Prontidão: captura recusada por INTEIRO (zero baseline criada) quando
+// nenhum WorkItem tem schedule completo, ou quando qualquer WorkItem
+// agendado que entraria na baseline tem precedenceConflict conhecido
+// (D059), incluindo `unrepresentable`.
+//
+// STALE PREVIEW (hardening): o navegador nunca é fonte de verdade — a
+// confirmação sempre recalcula o candidato contra o estado ATUAL e só
+// grava se corresponder exatamente ao que o preview mostrou (`expected`),
+// mesmo padrão de applySchedulePropagation/work_item_precedence_stale_preview.
+// O candidato canônico é a lista ordenada de (workItemId, plannedStart,
+// durationDays) de todo WorkItem existente — título/status/Milestone nunca
+// entram nele, então nunca causam falso stale.
+
+// Ordenação determinística do candidato — mesmo padrão de tie-break
+// neutro createdAt/id já usado por computeSchedulePropagationPlan/
+// findWorkItemKnownFreeSlack: nunca depende da ordem de inserção em
+// state.workItems, só de um critério estável e alheio a scheduling.
+function compareWorkItemsByCreatedAtThenId(a: WorkItem, b: WorkItem): number {
+	if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+export interface ScheduleBaselineCandidateEntry {
+	workItemId: string;
+	plannedStart: string | null;
+	durationDays: number | null;
+}
+
+function buildScheduleBaselineCandidateEntries(state: ProjectState): ScheduleBaselineCandidateEntry[] {
+	return [...state.workItems]
+		.sort(compareWorkItemsByCreatedAtThenId)
+		.map((item) => ({ workItemId: item.id, plannedStart: item.plannedStart, durationDays: item.durationDays }));
+}
+
+export interface ScheduleBaselineCapturePreview {
+	entries: ScheduleBaselineCandidateEntry[];
+	scheduledCount: number;
+	uncoveredCount: number;
+	partial: boolean;
+}
+
+/**
+ * Só leitura, nunca persiste nada — usada tanto pelo preview quanto por
+ * captureScheduleBaseline (que recalcula contra o estado atual antes de
+ * gravar, nunca confia num preview vindo do cliente, mesmo espírito de
+ * computeSchedulePropagationPlan/applySchedulePropagation).
+ */
+export function previewScheduleBaselineCapture(
+	state: ProjectState
+): Result<ScheduleBaselineCapturePreview, DomainTransitionError> {
+	const entries = buildScheduleBaselineCandidateEntries(state);
+	let scheduledCount = 0;
+	let uncoveredCount = 0;
+
+	for (const entry of entries) {
+		if (entry.plannedStart === null || entry.durationDays === null) {
+			uncoveredCount += 1;
+			continue;
+		}
+		scheduledCount += 1;
+		if (findWorkItemPrecedenceConflict(state, entry.workItemId) !== null) {
+			return { ok: false, error: { kind: 'schedule_baseline_precedence_conflict', workItemId: entry.workItemId } };
+		}
+	}
+
+	if (scheduledCount === 0) {
+		return { ok: false, error: { kind: 'schedule_baseline_no_eligible_work_items' } };
+	}
+
+	return { ok: true, value: { entries, scheduledCount, uncoveredCount, partial: uncoveredCount > 0 } };
+}
+
+// Subconjunto canônico que a interface efetivamente mostrou e o usuário
+// confirmou — mesmo espírito de SchedulePropagationExpectation.
+export interface ScheduleBaselineCaptureExpectation {
+	entries: ScheduleBaselineCandidateEntry[];
+}
+
+// Comparação por CONJUNTO, nunca posicional (hardening pós-dogfood,
+// falsificador de ordem): a expectativa é semanticamente um conjunto de
+// fatos "workItemId tem este plannedStart/durationDays", não uma
+// sequência — dois candidatos com os MESMOS pares (workItemId,
+// plannedStart, durationDays) em ordem diferente são o MESMO candidato,
+// nunca stale. Só uma diferença real de membership (workItemId presente
+// só de um lado) ou de schedule (mesmo workItemId, valores diferentes)
+// conta como divergência. Tamanho diferente já basta como atalho barato
+// (elimina o caso óbvio de WorkItem novo/removido sem precisar montar o
+// Map), mas a igualdade de conteúdo nunca depende de índice.
+function scheduleBaselineCandidatesMatchExpectation(
+	candidates: ScheduleBaselineCandidateEntry[],
+	expected: ScheduleBaselineCandidateEntry[]
+): boolean {
+	if (candidates.length !== expected.length) return false;
+	const expectedByWorkItemId = new Map(expected.map((entry) => [entry.workItemId, entry]));
+	return candidates.every((candidate) => {
+		const exp = expectedByWorkItemId.get(candidate.workItemId);
+		return (
+			exp !== undefined && exp.plannedStart === candidate.plannedStart && exp.durationDays === candidate.durationDays
+		);
+	});
+}
+
+/**
+ * Transição atômica única: ou uma nova ProjectScheduleBaseline + suas
+ * entradas (uma por WorkItem existente, ver buildScheduleBaselineCandidateEntries)
+ * nascem juntas, ou nada muda. Recalcula a prontidão contra `state` atual
+ * (nunca confia em `expected`) e só grava se o candidato recém-calculado
+ * corresponder exatamente ao que a interface mostrou — divergência é
+ * recusada por inteiro como preview obsoleto, nunca aplicada parcialmente
+ * (mesmo padrão de applySchedulePropagation). Rebaseline: sempre ADICIONA
+ * a `state.scheduleBaselines`/`scheduleBaselineEntries`, com `version`
+ * estritamente maior que qualquer baseline já existente — nenhuma baseline
+ * anterior é tocada.
+ */
+export function captureScheduleBaseline(
+	catalog: Catalog,
+	state: ProjectState,
+	baselineId: string,
+	expected: ScheduleBaselineCaptureExpectation,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const previewResult = previewScheduleBaselineCapture(state);
+	if (!previewResult.ok) return previewResult;
+	if (!scheduleBaselineCandidatesMatchExpectation(previewResult.value.entries, expected.entries)) {
+		return { ok: false, error: { kind: 'schedule_baseline_stale_preview' } };
+	}
+
+	const version = state.scheduleBaselines.reduce((max, existing) => Math.max(max, existing.version), 0) + 1;
+	const baseline: ProjectScheduleBaseline = {
+		id: baselineId,
+		projectId: state.project.id,
+		createdAt: occurredAt,
+		version
+	};
+	const entries: ProjectScheduleBaselineEntry[] = previewResult.value.entries.map((entry) => ({
+		baselineId,
+		workItemId: entry.workItemId,
+		plannedStart: entry.plannedStart,
+		durationDays: entry.durationDays
+	}));
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			scheduleBaselines: [...state.scheduleBaselines, baseline],
+			scheduleBaselineEntries: [...state.scheduleBaselineEntries, ...entries]
+		}
+	};
+}
+
+// Comparação contra uma baseline específica — QUATRO estados distintos,
+// nunca colapsados, mais um quinto de defesa (`compared_unrepresentable`)
+// para o caso extremo em que a própria aritmética de variância estouraria
+// a faixa civil (nunca lança, mesmo espírito de findWorkItemPrecedenceConflict).
+// Ausência nunca é tratada como zero (ver decision-log.md). Nenhum dos
+// cinco depende de WorkItem.createdAt — a existência histórica é sempre
+// provada pela PRESENÇA/AUSÊNCIA de uma entry (ver
+// ProjectScheduleBaselineEntry, state-types.ts), nunca por comparação de
+// timestamp:
+//
+// - `compared` — existe entry com schedule E o WorkItem tem schedule
+//   atual completo: variâncias numéricas.
+// - `removed` — existe entry com schedule, mas o schedule atual foi
+//   limpo (setWorkItemSchedule(null, null)) — "cronograma removido", o
+//   WorkItem em si continua existindo.
+// - `scheduled_after` — existe entry null/null (o WorkItem existia na
+//   captura, sem schedule então) e o WorkItem tem schedule atual completo.
+// - `added_after` — NENHUMA entry para este WorkItem nesta baseline (não
+//   existia no instante da captura), com ou sem schedule atual.
+//
+// Uma entry null/null cujo WorkItem CONTINUA sem schedule não aparece em
+// nenhum estado: não há fato novo para reportar.
+export type ScheduleBaselineComparisonEntry =
+	| { kind: 'compared'; workItemId: string; startVarianceDays: number; finishVarianceDays: number; durationVarianceDays: number }
+	| { kind: 'compared_unrepresentable'; workItemId: string }
+	| { kind: 'removed'; workItemId: string }
+	| { kind: 'scheduled_after'; workItemId: string }
+	| { kind: 'added_after'; workItemId: string };
+
+/**
+ * Baseline inexistente devolve lista vazia (nunca erro) — mesmo espírito
+ * de findWorkItemKnownFreeSlack devolvendo `null` para "nada a avaliar":
+ * a interface só chama isto quando já sabe que existe uma baseline ativa.
+ */
+export function computeScheduleBaselineComparison(
+	state: ProjectState,
+	baselineId: string
+): ScheduleBaselineComparisonEntry[] {
+	const baseline = state.scheduleBaselines.find((candidate) => candidate.id === baselineId);
+	if (!baseline) return [];
+
+	const entryByWorkItemId = new Map(
+		state.scheduleBaselineEntries.filter((entry) => entry.baselineId === baselineId).map((entry) => [entry.workItemId, entry])
+	);
+
+	const results: ScheduleBaselineComparisonEntry[] = [];
+	for (const item of state.workItems) {
+		const entry = entryByWorkItemId.get(item.id);
+		if (!entry) {
+			results.push({ kind: 'added_after', workItemId: item.id });
+			continue;
+		}
+
+		const baselineScheduled = entry.plannedStart !== null && entry.durationDays !== null;
+		const currentScheduled = item.plannedStart !== null && item.durationDays !== null;
+
+		if (baselineScheduled && currentScheduled) {
+			try {
+				const baselineFinish = semanticEnd(entry.plannedStart as string, entry.durationDays as number);
+				const currentFinish = semanticEnd(item.plannedStart as string, item.durationDays as number);
+				results.push({
+					kind: 'compared',
+					workItemId: item.id,
+					startVarianceDays: civilDaysBetween(entry.plannedStart as string, item.plannedStart as string),
+					finishVarianceDays: civilDaysBetween(baselineFinish, currentFinish),
+					durationVarianceDays: (item.durationDays as number) - (entry.durationDays as number)
+				});
+			} catch {
+				results.push({ kind: 'compared_unrepresentable', workItemId: item.id });
+			}
+		} else if (baselineScheduled && !currentScheduled) {
+			results.push({ kind: 'removed', workItemId: item.id });
+		} else if (!baselineScheduled && currentScheduled) {
+			results.push({ kind: 'scheduled_after', workItemId: item.id });
+		}
+		// !baselineScheduled && !currentScheduled: existia sem schedule e
+		// continua sem schedule — nenhum fato novo, omitido de propósito.
+	}
+	return results;
 }
 
 // --- Milestone (ETAPA 8 do rework, segundo microcorte) --------------------

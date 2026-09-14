@@ -16,7 +16,13 @@ import {
 	computeScopeSuggestions,
 	computeSnapshot
 } from '$lib/orientation-engine';
-import { findWorkItemKnownFreeSlack, findWorkItemPrecedenceConflict, hasOpenImpediment } from '$lib/domain';
+import {
+	computeScheduleBaselineComparison,
+	findWorkItemKnownFreeSlack,
+	findWorkItemPrecedenceConflict,
+	hasOpenImpediment
+} from '$lib/domain';
+import type { ScheduleBaselineComparisonEntry } from '$lib/domain';
 import type {
 	AffectedGroupView,
 	CauseExplorationView,
@@ -31,6 +37,8 @@ import type {
 	ImpedimentView,
 	PendingItemHistoryView,
 	ProjectView,
+	ScheduleBaselineComparisonEntryView,
+	ScheduleBaselineView,
 	ScopeItemView,
 	TreatmentStepView,
 	DeliverableView,
@@ -360,6 +368,67 @@ function buildMilestoneView(state: ProjectState, milestone: ProjectState['milest
 	};
 }
 
+// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+// denormaliza o título do WorkItem, mesmo espírito de
+// buildWorkItemPrecedenceConflictView acima. WorkItem ausente só seria
+// estado corrompido (WorkItem nunca é removido no domínio hoje) — filtrado
+// em vez de quebrar a tela, mesmo tratamento das demais projeções.
+function buildScheduleBaselineComparisonEntryView(
+	state: ProjectState,
+	entry: ScheduleBaselineComparisonEntry
+): ScheduleBaselineComparisonEntryView | null {
+	const workItem = state.workItems.find((item) => item.id === entry.workItemId);
+	if (!workItem) return null;
+	const workItemTitle = workItem.title;
+	switch (entry.kind) {
+		case 'compared':
+			return {
+				kind: 'compared',
+				workItemId: workItem.id,
+				workItemTitle,
+				startVarianceDays: entry.startVarianceDays,
+				finishVarianceDays: entry.finishVarianceDays,
+				durationVarianceDays: entry.durationVarianceDays
+			};
+		case 'compared_unrepresentable':
+			return { kind: 'compared_unrepresentable', workItemId: workItem.id, workItemTitle };
+		case 'removed':
+			return { kind: 'removed', workItemId: workItem.id, workItemTitle };
+		case 'scheduled_after':
+			return { kind: 'scheduled_after', workItemId: workItem.id, workItemTitle };
+		case 'added_after':
+			return { kind: 'added_after', workItemId: workItem.id, workItemTitle };
+	}
+}
+
+// A baseline ATIVA é sempre a de maior `version` (hardening pós-dogfood)
+// — nunca `createdAt`/`id`, que não provam ordem real de captura quando o
+// relógio não é estritamente monotônico ou duas capturas caem no mesmo
+// instante. `null` quando nenhuma baseline foi capturada ainda, caso
+// normal. `partial` é sempre DERIVADO aqui varrendo as entries da baseline
+// ativa (existe alguma null/null?) — nunca persistido (ver
+// ProjectScheduleBaseline, domain/state-types.ts).
+function buildScheduleBaselineView(state: ProjectState): ScheduleBaselineView | null {
+	if (state.scheduleBaselines.length === 0) return null;
+
+	let active = state.scheduleBaselines[0];
+	for (const baseline of state.scheduleBaselines) {
+		if (baseline.version > active.version) active = baseline;
+	}
+
+	const entries: ScheduleBaselineComparisonEntryView[] = [];
+	for (const entry of computeScheduleBaselineComparison(state, active.id)) {
+		const view = buildScheduleBaselineComparisonEntryView(state, entry);
+		if (view) entries.push(view);
+	}
+
+	const partial = state.scheduleBaselineEntries.some(
+		(entry) => entry.baselineId === active.id && entry.plannedStart === null
+	);
+
+	return { createdAt: active.createdAt, partial, entries };
+}
+
 function buildAffectedGroupView(group: ProjectState['affectedGroups'][number]): AffectedGroupView {
 	return { id: group.id, label: group.label, impact: group.impact, frequency: group.frequency };
 }
@@ -458,6 +527,7 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		impediments: state.impediments.map((impediment) => buildImpedimentView(state, impediment)),
 		workItems: state.workItems.map((item) => buildWorkItemView(state, item)),
 		milestones: state.milestones.map((milestone) => buildMilestoneView(state, milestone)),
+		scheduleBaseline: buildScheduleBaselineView(state),
 		risks: state.risks.map(buildRiskView),
 		decisions: state.decisions.map((decision) => buildDecisionView(state, decision)),
 		changes: state.changes.map(buildChangeView),

@@ -8,6 +8,9 @@ import {
 	addDependency,
 	applySchedulePropagation,
 	computeSchedulePropagationPlan,
+	captureScheduleBaseline,
+	computeScheduleBaselineComparison,
+	previewScheduleBaselineCapture,
 	findWorkItemKnownFreeSlack,
 	findWorkItemPrecedenceConflict,
 	removeDependency,
@@ -1837,6 +1840,410 @@ describe('findWorkItemKnownFreeSlack (ETAPA 12 do rework, §42, quarto microcort
 
 		const before = state;
 		findWorkItemKnownFreeSlack(state, 'wi-a');
+		expect(state).toBe(before);
+	});
+});
+
+// Baseline do cronograma (ETAPA 12 do rework, "Scheduling e Gantt", §42,
+// quinto microcorte, hardening pós-dogfood) — falsificadores centrais:
+// captura recusada por inteiro sem WorkItem elegível ou com
+// precedenceConflict conhecido, zero data inventada para item sem
+// schedule, captura atômica e imutável, rebaseline sempre adiciona (nunca
+// sobrescreve) com `version` estritamente crescente, PREVIEW OBSOLETO
+// nunca é aplicado (título/status/Milestone nunca causam falso stale), e
+// os quatro estados de comparação nunca colapsados
+// (compared/removed/scheduled_after/added_after) — todos provados pela
+// PRESENÇA/AUSÊNCIA de entry, nunca por WorkItem.createdAt.
+describe('previewScheduleBaselineCapture / captureScheduleBaseline (ETAPA 12 do rework, §42, quinto microcorte)', () => {
+	// Captura com o preview mais recente — helper usado pelos testes de
+	// caminho feliz; os testes de recusa/stale chamam previewScheduleBaselineCapture/
+	// captureScheduleBaseline diretamente, sem passar por este atalho.
+	function captureWithFreshPreview(state: ProjectState, baselineId: string, occurredAt: string) {
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+		return captureScheduleBaseline(catalog, state, baselineId, { entries: preview.entries }, occurredAt);
+	}
+
+	it('recusa captura quando nenhum WorkItem tem schedule completo', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		expect(previewScheduleBaselineCapture(state)).toEqual({
+			ok: false,
+			error: { kind: 'schedule_baseline_no_eligible_work_items' }
+		});
+	});
+
+	it('recusa captura por inteiro quando um WorkItem agendado tem precedenceConflict (falsificador L)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-b', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2)); // requiredStart 15/09
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-14', 1, T2)); // conflito
+
+		expect(previewScheduleBaselineCapture(state)).toEqual({
+			ok: false,
+			error: { kind: 'schedule_baseline_precedence_conflict', workItemId: 'wi-b' }
+		});
+		expect(captureScheduleBaseline(catalog, state, 'baseline-1', { entries: [] }, T3)).toEqual({
+			ok: false,
+			error: { kind: 'schedule_baseline_precedence_conflict', workItemId: 'wi-b' }
+		});
+		// Nenhuma baseline foi criada — recusa é por inteiro, zero escrita.
+		expect(state.scheduleBaselines).toEqual([]);
+	});
+
+	it('captura uma entry por WorkItem existente (com ou sem schedule); partial deriva de entry null/null (falsificador J)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+
+		const preview = previewScheduleBaselineCapture(state);
+		expect(preview).toEqual({
+			ok: true,
+			value: {
+				entries: [
+					{ workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 },
+					{ workItemId: 'wi-b', plannedStart: null, durationDays: null }
+				],
+				scheduledCount: 1,
+				uncoveredCount: 1,
+				partial: true
+			}
+		});
+
+		const result = unwrap(captureWithFreshPreview(state, 'baseline-1', T3));
+		expect(result.scheduleBaselines).toEqual([{ id: 'baseline-1', projectId: state.project.id, createdAt: T3, version: 1 }]);
+		expect(result.scheduleBaselineEntries).toEqual([
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 },
+			{ baselineId: 'baseline-1', workItemId: 'wi-b', plannedStart: null, durationDays: null }
+		]);
+		// partial é sempre DERIVADO das entries, nunca persistido — não há
+		// campo `partial` em ProjectScheduleBaseline (ver state-types.ts).
+		expect(result.scheduleBaselines[0]).not.toHaveProperty('partial');
+	});
+
+	it('captura não é parcial quando todo WorkItem tem schedule completo', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+
+		const result = unwrap(captureWithFreshPreview(state, 'baseline-1', T3));
+		expect(result.scheduleBaselineEntries.some((entry) => entry.plannedStart === null)).toBe(false);
+	});
+
+	it('captura nunca altera WorkItem/Dependency/status — só adiciona baseline', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		const workItemsBefore = state.workItems;
+
+		const result = unwrap(captureWithFreshPreview(state, 'baseline-1', T3));
+		expect(result.workItems).toBe(workItemsBefore);
+	});
+
+	it('rebaseline: capturar de novo adiciona uma nova baseline com version crescente, preserva a anterior', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(captureWithFreshPreview(state, 'baseline-1', T3));
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 3, T4));
+		state = unwrap(captureWithFreshPreview(state, 'baseline-2', T4));
+
+		expect(state.scheduleBaselines).toEqual([
+			{ id: 'baseline-1', projectId: state.project.id, createdAt: T3, version: 1 },
+			{ id: 'baseline-2', projectId: state.project.id, createdAt: T4, version: 2 }
+		]);
+		expect(state.scheduleBaselineEntries).toEqual([
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 },
+			{ baselineId: 'baseline-2', workItemId: 'wi-a', plannedStart: '2026-09-14', durationDays: 3 }
+		]);
+	});
+
+	// Falsificador I — duas capturas com o MESMO createdAt (relógio não
+	// estritamente monotônico) ainda produzem versões distintas e
+	// crescentes; a segunda é inequivocamente a mais recente por version,
+	// nunca por empate de createdAt/id.
+	it('duas capturas com o mesmo createdAt produzem versões distintas e crescentes (falsificador I)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(captureWithFreshPreview(state, 'baseline-1', T3));
+		state = unwrap(captureWithFreshPreview(state, 'baseline-2', T3));
+
+		expect(state.scheduleBaselines.map((b) => ({ id: b.id, createdAt: b.createdAt, version: b.version }))).toEqual([
+			{ id: 'baseline-1', createdAt: T3, version: 1 },
+			{ id: 'baseline-2', createdAt: T3, version: 2 }
+		]);
+	});
+
+	// --- Falsificadores A-E: proteção contra preview obsoleto -------------
+
+	it('A: preview P -> nada muda -> confirmar: baseline criada exatamente com P', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+		const result = unwrap(captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T3));
+		expect(result.scheduleBaselineEntries).toEqual([
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 }
+		]);
+	});
+
+	it('B: preview P -> schedule de A muda -> confirmação stale, zero baseline', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-13', 3, T3));
+
+		const result = captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T4);
+		expect(result).toEqual({ ok: false, error: { kind: 'schedule_baseline_stale_preview' } });
+		expect(state.scheduleBaselines).toEqual([]);
+	});
+
+	it('C: preview P -> WorkItem sem schedule ganha schedule -> stale', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-20', 1, T3));
+
+		const result = captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T4);
+		expect(result).toEqual({ ok: false, error: { kind: 'schedule_baseline_stale_preview' } });
+		expect(state.scheduleBaselines).toEqual([]);
+	});
+
+	it('D: preview P -> novo WorkItem é criado -> stale', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T3));
+
+		const result = captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T4);
+		expect(result).toEqual({ ok: false, error: { kind: 'schedule_baseline_stale_preview' } });
+		expect(state.scheduleBaselines).toEqual([]);
+	});
+
+	it('E: preview P -> só status/título muda -> não gera falso stale', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'em_andamento', T3));
+
+		const result = unwrap(captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T4));
+		expect(result.scheduleBaselineEntries).toEqual([
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 }
+		]);
+	});
+
+	// Falsificador de ordem (hardening pós-dogfood, segunda rodada): a
+	// equivalência preview<->confirmação é por CONJUNTO de
+	// (workItemId, plannedStart, durationDays), nunca posicional — a mesma
+	// coleção em ordem diferente é o MESMO candidato, nunca stale.
+	it('mesma coleção de entries em ordem diferente não é stale (comparação por conjunto, não posicional)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T3));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-20', 1, T3));
+
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+		expect(preview.entries.map((e) => e.workItemId)).toEqual(['wi-a', 'wi-b']); // ordem natural (createdAt)
+
+		// Mesmo conteúdo, ordem invertida — nada mudou de fato no projeto.
+		const reordered = [...preview.entries].reverse();
+		expect(reordered.map((e) => e.workItemId)).toEqual(['wi-b', 'wi-a']);
+
+		const result = unwrap(captureScheduleBaseline(catalog, state, 'baseline-1', { entries: reordered }, T4));
+		expect(result.scheduleBaselineEntries).toEqual([
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 },
+			{ baselineId: 'baseline-1', workItemId: 'wi-b', plannedStart: '2026-09-20', durationDays: 1 }
+		]);
+	});
+
+	// Contraste do teste acima: mesma ordem, mas um dos valores realmente
+	// mudou — precisa continuar recusando como stale (a comparação por
+	// conjunto não pode virar comparação frouxa que ignora divergência real).
+	it('divergência real de schedule continua stale mesmo comparando por conjunto', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T3));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-20', 1, T3));
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-21', 1, T4));
+
+		const result = captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T4);
+		expect(result).toEqual({ ok: false, error: { kind: 'schedule_baseline_stale_preview' } });
+		expect(state.scheduleBaselines).toEqual([]);
+	});
+
+	it('confirmação continua falhando com zero baseline quando a situação deixou de ser capturável por conflito', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-b', 'wi-a', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-20', 1, T2));
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+
+		// B entra em conflito depois do preview — a confirmação recalcula e
+		// recusa pelo motivo real (conflito), nunca por "stale" genérico.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-b', '2026-09-14', 1, T3));
+
+		const result = captureScheduleBaseline(catalog, state, 'baseline-1', { entries: preview.entries }, T4);
+		expect(result).toEqual({ ok: false, error: { kind: 'schedule_baseline_precedence_conflict', workItemId: 'wi-b' } });
+		expect(state.scheduleBaselines).toEqual([]);
+	});
+});
+
+describe('computeScheduleBaselineComparison (ETAPA 12 do rework, §42, quinto microcorte, hardening pós-dogfood)', () => {
+	function captureWithFreshPreview(state: ProjectState, baselineId: string, occurredAt: string) {
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+		return unwrap(captureScheduleBaseline(catalog, state, baselineId, { entries: preview.entries }, occurredAt));
+	}
+
+	it('baseline inexistente devolve lista vazia', () => {
+		const state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		expect(computeScheduleBaselineComparison(state, 'no-such-baseline')).toEqual([]);
+	});
+
+	it('compared: variações positivas, negativas e zero', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+
+		// Sem alteração: variâncias todas zero.
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
+			{ kind: 'compared', workItemId: 'wi-a', startVarianceDays: 0, finishVarianceDays: 0, durationVarianceDays: 0 }
+		]);
+
+		// Atraso de 2 dias, duração cresce 1 dia: início e fim mais tarde, positivo.
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 4, T4));
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
+			{ kind: 'compared', workItemId: 'wi-a', startVarianceDays: 2, finishVarianceDays: 3, durationVarianceDays: 1 }
+		]);
+
+		// Adiantamento de 2 dias, duração encolhe 1 dia: negativo. Baseline
+		// finish 2026-09-14 (12 + 2 dias); novo finish 2026-09-11 (10 + 1 dia).
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-10', 2, T4));
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
+			{ kind: 'compared', workItemId: 'wi-a', startVarianceDays: -2, finishVarianceDays: -3, durationVarianceDays: -1 }
+		]);
+	});
+
+	it('removed: schedule limpo depois da baseline — WorkItem não desaparece', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', null, null, T4));
+
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([{ kind: 'removed', workItemId: 'wi-a' }]);
+	});
+
+	// Falsificador F — WorkItem existente sem schedule NA CAPTURA (ganha uma
+	// entry null/null, nunca fica de fora) vira scheduled_after quando
+	// agendado depois, mesmo com createdAt igual ou anterior ao da baseline.
+	it('F: WorkItem existente sem schedule na captura -> agendado depois => scheduled_after', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-d', 'D', T1)); // sem schedule, existe antes da baseline
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-d', '2026-09-20', 1, T4));
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toContainEqual({
+			kind: 'scheduled_after',
+			workItemId: 'wi-d'
+		});
+	});
+
+	it('WorkItem sem entry preenchida, existia antes da baseline e continua sem schedule: omitido', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-d', 'D', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+
+		const entries = computeScheduleBaselineComparison(state, 'baseline-1');
+		expect(entries.find((entry) => entry.workItemId === 'wi-d')).toBeUndefined();
+	});
+
+	// Falsificador G — WorkItem criado DEPOIS da captura (nenhuma entry,
+	// nunca null/null) vira added_after, com ou sem schedule atual.
+	it('G: WorkItem criado depois da captura => added_after', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+
+		state = unwrap(addWorkItem(catalog, state, 'wi-c', 'C', T4));
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toContainEqual({
+			kind: 'added_after',
+			workItemId: 'wi-c'
+		});
+	});
+
+	// Falsificador H — classificação F/G não pode depender de timestamp:
+	// aqui D (sem schedule na captura) e C (criado depois) têm o MESMO
+	// createdAt entre si e um createdAt ANTERIOR ao da baseline não prova
+	// nada por si só — é a presença/ausência de entry que decide.
+	it('H: F/G continuam corretos mesmo com timestamps iguais entre WorkItems (createdAt não decide membership)', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-d', 'D', T1)); // existe na captura, sem schedule
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+
+		// C é criado DEPOIS da captura, com o MESMO createdAt de D (T1) —
+		// se a classificação dependesse de createdAt, C seria confundido
+		// com "existia sem schedule" (scheduled_after) em vez de added_after.
+		state = {
+			...state,
+			workItems: [
+				...state.workItems,
+				{
+					id: 'wi-c',
+					projectId: state.project.id,
+					title: 'C',
+					status: 'a_fazer',
+					deliverableId: null,
+					plannedStart: null,
+					durationDays: null,
+					createdAt: T1,
+					updatedAt: T1
+				}
+			]
+		};
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-d', '2026-09-20', 1, T4));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-c', '2026-09-21', 1, T4));
+
+		const entries = computeScheduleBaselineComparison(state, 'baseline-1');
+		expect(entries).toContainEqual({ kind: 'scheduled_after', workItemId: 'wi-d' });
+		expect(entries).toContainEqual({ kind: 'added_after', workItemId: 'wi-c' });
+	});
+
+	it('Dependency alterada depois não muda o conteúdo histórico da baseline', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+		const before = computeScheduleBaselineComparison(state, 'baseline-1');
+
+		state = unwrap(addDependency(catalog, state, 'dep-1', 'wi-b', 'wi-a', T4));
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual(before);
+	});
+
+	it('status de execução não participa da comparação', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+		const before = computeScheduleBaselineComparison(state, 'baseline-1');
+
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'em_andamento', T4));
+		state = unwrap(moveWorkItem(catalog, state, 'wi-a', 'concluido', T4));
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual(before);
+	});
+
+	it('nenhuma variância é persistida: recalcular não muda a referência do state', () => {
+		let state = unwrap(addWorkItem(catalog, freshState(), 'wi-a', 'A', T1));
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T2));
+		state = captureWithFreshPreview(state, 'baseline-1', T3);
+
+		const before = state;
+		computeScheduleBaselineComparison(state, 'baseline-1');
 		expect(state).toBe(before);
 	});
 });

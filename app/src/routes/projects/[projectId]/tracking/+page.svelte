@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { ActionResult } from '@sveltejs/kit';
+	import type { ScheduleBaselineCapturePreviewView } from '$lib/server/application/types';
 
 	let { data, form } = $props();
 	let projectId = $derived(data.view.projectId);
@@ -24,6 +25,56 @@
 	// juntas: relacionar uma Decision já tomada é um estado válido (o vínculo é
 	// factual, não uma condição de decisão em aberto).
 	let allDecisions = $derived([...tracking.decisions.pending, ...tracking.decisions.decided]);
+
+	// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte,
+	// hardening pós-dogfood) — preview NUNCA grava; guarda o candidato
+	// completo localmente a partir do retorno da própria action, mesmo
+	// espírito de propagationPreview (work/+page.svelte). A captura pode ser
+	// recusada por inteiro (sem WorkItem elegível, conflito de precedência
+	// conhecido, ou preview obsoleto — ver expectedBaselineCandidateJson
+	// abaixo) — `update()` sempre roda, mesmo em falha, para `form?.message`
+	// refletir a recusa em vez de falhar silenciosamente.
+	let baselinePreview = $state<ScheduleBaselineCapturePreviewView | null>(null);
+
+	function handleBaselinePreviewSubmit() {
+		return async ({
+			result,
+			update
+		}: {
+			result: ActionResult;
+			update: (opts?: { reset?: boolean }) => Promise<void>;
+		}) => {
+			if (result.type === 'success' && result.data && 'baselinePreview' in result.data) {
+				baselinePreview = result.data.baselinePreview as ScheduleBaselineCapturePreviewView;
+			}
+			await update({ reset: false });
+		};
+	}
+
+	function cancelBaselinePreview() {
+		baselinePreview = null;
+	}
+
+	// Candidato canônico que a interface efetivamente mostrou (hardening
+	// pós-dogfood) — devolvido sem alteração como `expected` na confirmação;
+	// o servidor recalcula e compara, nunca confia neste JSON como fonte de
+	// verdade (mesmo espírito de expectedPropagationPlanJson, work/+page.svelte).
+	function expectedBaselineCandidateJson(preview: ScheduleBaselineCapturePreviewView): string {
+		return JSON.stringify({
+			entries: preview.entries.map((entry) => ({
+				workItemId: entry.workItemId,
+				plannedStart: entry.plannedStart,
+				durationDays: entry.durationDays
+			}))
+		});
+	}
+
+	function handleBaselineCaptureSubmit() {
+		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			baselinePreview = null;
+			await update({ reset: false });
+		};
+	}
 
 	let newText = $state('');
 	let newTipo = $state('');
@@ -77,6 +128,17 @@
 	function riskReviewLabel(reviewedAt: string | null): string {
 		if (!reviewedAt) return 'Sem revisão registrada';
 		return `Última revisão: ${timestampFormatter.format(new Date(reviewedAt))}`;
+	}
+
+	// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+	// positivo = atual mais tarde/mais longo, negativo = atual mais
+	// cedo/mais curto, zero = sem alteração (convenção congelada em
+	// domain/transitions.ts, computeScheduleBaselineComparison). Nunca
+	// percentual, health score, atraso ou impacto crítico.
+	function formatVarianceDays(days: number): string {
+		if (days === 0) return 'sem alteração';
+		const label = Math.abs(days) === 1 ? '1 dia' : `${Math.abs(days)} dias`;
+		return days > 0 ? `+${label}` : `-${label}`;
 	}
 
 	// Avaliação qualitativa (ETAPA 10 do rework, terceiro microcorte) — só
@@ -420,6 +482,96 @@
 		<a class="section-link" href="/projects/{projectId}/work">Ver Trabalho →</a>
 	</section>
 {/if}
+
+<!-- Referência do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+     REFERÊNCIA explicitamente aprovada pelo usuário, nunca criada
+     automaticamente: o primeiro clique sempre mostra um preview com
+     confirmação explícita antes de congelar qualquer coisa. Compara
+     plannedStart/durationDays atuais contra a baseline ATIVA (a mais
+     recente); não congela Dependency, título, status ou Milestone, e não
+     resolve nem antecipa caminho crítico. -->
+<section class="card schedule-baseline" aria-labelledby="schedule-baseline-heading">
+	<h2 id="schedule-baseline-heading">Referência do cronograma</h2>
+	<p class="subtitle-inline">
+		Uma referência congela o início e a duração de cada trabalho com cronograma completo, para comparar
+		depois contra o cronograma atual. Nunca é criada automaticamente.
+	</p>
+
+	{#if tracking.scheduleBaseline !== null}
+		<p class="subtitle-inline">
+			Referência ativa criada em {timestampFormatter.format(new Date(tracking.scheduleBaseline.createdAt))}.
+			{#if tracking.scheduleBaseline.partial}
+				Parcial: nem todo trabalho tinha cronograma completo no momento da captura.
+			{/if}
+		</p>
+
+		{#if tracking.scheduleBaseline.entries.length === 0}
+			<p class="empty">Sem variação desde a referência.</p>
+		{:else}
+			<ul class="baseline-comparison-list">
+				{#each tracking.scheduleBaseline.entries as entry (entry.workItemId)}
+					<li class="baseline-comparison-row">
+						<span class="baseline-comparison-title">{entry.workItemTitle}</span>
+						{#if entry.kind === 'compared'}
+							{#if entry.startVarianceDays === 0 && entry.finishVarianceDays === 0 && entry.durationVarianceDays === 0}
+								<span class="baseline-comparison-state">Sem variação desde a referência.</span>
+							{:else}
+								<span class="baseline-comparison-state">
+									Início {formatVarianceDays(entry.startVarianceDays)} · Término {formatVarianceDays(
+										entry.finishVarianceDays
+									)} · Duração {formatVarianceDays(entry.durationVarianceDays)}
+								</span>
+							{/if}
+						{:else if entry.kind === 'compared_unrepresentable'}
+							<span class="baseline-comparison-state">Variação não pôde ser calculada.</span>
+						{:else if entry.kind === 'removed'}
+							<span class="baseline-comparison-state">Cronograma removido após a referência.</span>
+						{:else if entry.kind === 'scheduled_after'}
+							<span class="baseline-comparison-state">Agendado após a referência.</span>
+						{:else if entry.kind === 'added_after'}
+							<span class="baseline-comparison-state">Adicionado após a referência.</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+
+	{#if baselinePreview !== null}
+		<div class="baseline-preview">
+			<p class="subtitle-inline"><strong>Prévia da referência</strong></p>
+			<p class="subtitle-inline">
+				{baselinePreview.scheduledCount}
+				{baselinePreview.scheduledCount === 1 ? 'trabalho será capturado' : 'trabalhos serão capturados'}.
+				{#if baselinePreview.uncoveredCount > 0}
+					{baselinePreview.uncoveredCount}
+					{baselinePreview.uncoveredCount === 1
+						? 'trabalho ficará de fora, por não ter cronograma.'
+						: 'trabalhos ficarão de fora, por não terem cronograma.'}
+				{/if}
+			</p>
+			{#if baselinePreview.partial}
+				<p class="subtitle-inline">Esta referência será parcial: nem todo trabalho tem cronograma completo ainda.</p>
+			{/if}
+			<form method="POST" action="?/captureScheduleBaseline" use:enhance={handleBaselineCaptureSubmit}>
+				<input type="hidden" name="expectedCandidate" value={expectedBaselineCandidateJson(baselinePreview)} />
+				<button type="submit" class="button-secondary">Confirmar referência</button>
+			</form>
+			<button type="button" class="link-button" onclick={cancelBaselinePreview}>Cancelar</button>
+		</div>
+	{:else}
+		<form method="POST" action="?/previewScheduleBaselineCapture" use:enhance={handleBaselinePreviewSubmit}>
+			<button type="submit" class="button-secondary">
+				{tracking.scheduleBaseline === null
+					? 'Congelar cronograma atual como referência'
+					: 'Criar nova referência do cronograma'}
+			</button>
+		</form>
+		{#if tracking.scheduleBaseline !== null}
+			<p class="subtitle-inline">A referência atual será preservada — nenhuma sobrescrita.</p>
+		{/if}
+	{/if}
+</section>
 
 <section class="card impediment-management" aria-labelledby="impediment-management-heading">
 	<h2 id="impediment-management-heading">Gestão de impedimentos</h2>
@@ -1127,6 +1279,54 @@
 		flex: none;
 		font-size: var(--font-size-caption);
 		color: var(--hydra-muted);
+	}
+
+	/* Referência do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+	   mesmo molde de .timeline-list/.timeline-row acima: lista enxuta, sem
+	   barra nem escala. */
+	.baseline-comparison-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.baseline-comparison-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		padding: var(--space-2) 0;
+		border-bottom: 1px solid rgba(101, 104, 108, 0.18);
+	}
+
+	.baseline-comparison-row:last-child {
+		border-bottom: none;
+	}
+
+	.baseline-comparison-title {
+		flex: 1;
+		min-width: 10rem;
+		font-weight: 700;
+	}
+
+	.baseline-comparison-state {
+		flex: none;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.baseline-preview {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-2);
+		margin-top: var(--space-3);
+		padding: var(--space-3);
+		border: 1px solid rgba(101, 104, 108, 0.3);
+		border-radius: var(--hydra-radius);
 	}
 
 	.summary-grid {

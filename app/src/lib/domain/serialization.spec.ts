@@ -35,6 +35,8 @@ import {
 	addTreatmentStep,
 	addWorkItem,
 	setWorkItemSchedule,
+	captureScheduleBaseline,
+	previewScheduleBaselineCapture,
 	answerActivity,
 	completeExternalAction,
 	confirmAffectedGroups,
@@ -2023,6 +2025,160 @@ describe('Milestone (ETAPA 8 do rework, segundo microcorte)', () => {
 		expect(result.value.answers.find((answer) => answer.fieldDefinitionId === 'marcos_principais')?.value).toBe(
 			'Marco 1: tela de abertura funcionando; Marco 2: fluxo de aprovação completo'
 		);
+	});
+});
+
+// ProjectScheduleBaseline/ProjectScheduleBaselineEntry (ETAPA 12 do rework,
+// §42, quinto microcorte) — mesmo molde dos blocos de Dependency/Milestone
+// acima: round-trip, compatibilidade com snapshot anterior ao corte, e
+// invariantes de referência (baselineId/workItemId inexistentes, par
+// duplicado) reforçadas contra estado persistido.
+describe('ProjectScheduleBaseline (ETAPA 12 do rework, §42, quinto microcorte, hardening pós-dogfood)', () => {
+	function stateWithWorkItems(): ProjectState {
+		let state = createInitialProjectState(catalog, 'proj-1', T1);
+		state = unwrap(addWorkItem(catalog, state, 'wi-a', 'A', T1));
+		state = unwrap(addWorkItem(catalog, state, 'wi-b', 'B', T1));
+		return state;
+	}
+
+	function captureWithFreshPreview(state: ProjectState, baselineId: string, occurredAt: string): ProjectState {
+		const preview = unwrap(previewScheduleBaselineCapture(state));
+		return unwrap(captureScheduleBaseline(catalog, state, baselineId, { entries: preview.entries }, occurredAt));
+	}
+
+	it('preserva baseline e entradas no round-trip completo, inclusive entry null/null (WorkItem sem schedule)', () => {
+		let state = stateWithWorkItems();
+		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-12', 3, T1));
+		state = captureWithFreshPreview(state, 'baseline-1', T2);
+
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+		if (result.ok) {
+			expect(result.value.scheduleBaselineEntries).toContainEqual({
+				baselineId: 'baseline-1',
+				workItemId: 'wi-b',
+				plannedStart: null,
+				durationDays: null
+			});
+		}
+	});
+
+	it('snapshot anterior a este corte (sem as chaves de baseline) importa como coleções vazias', () => {
+		const envelope = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		delete envelope.state.scheduleBaselines;
+		delete envelope.state.scheduleBaselineEntries;
+
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.scheduleBaselines).toEqual([]);
+		expect(result.value.scheduleBaselineEntries).toEqual([]);
+	});
+
+	it('recusa entrada referenciando baselineId ou workItemId inexistente', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 1 }];
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'nao-existe', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 }
+		];
+		expectError(JSON.stringify(base), 'invalid_reference');
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'nao-existe', plannedStart: '2026-09-12', durationDays: 3 }
+		];
+		expectError(JSON.stringify(base), 'invalid_reference');
+	});
+
+	it('recusa entrada duplicada (mesma baseline, mesmo WorkItem) vinda de estado persistido', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 1 }];
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 3 },
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-14', durationDays: 1 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('recusa ProjectScheduleBaseline.id duplicado', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [
+			{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 1 },
+			{ id: 'baseline-1', projectId: 'proj-1', createdAt: T2, version: 2 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	// Hardening pós-dogfood: version prova a ordem real de captura — duas
+	// baselines do mesmo projeto nunca podem compartilhar version, mesmo com
+	// id/createdAt distintos.
+	it('recusa ProjectScheduleBaseline.version duplicada no mesmo projeto', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [
+			{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 1 },
+			{ id: 'baseline-2', projectId: 'proj-1', createdAt: T1, version: 1 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+
+	it('recusa ProjectScheduleBaseline.version menor que 1', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 0 }];
+		expectError(JSON.stringify(base), 'invalid_shape');
+	});
+
+	it('recusa plannedStart persistido que não é dia civil real, e durationDays menor que 1', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 1 }];
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-02-30', durationDays: 3 }
+		];
+		expectError(JSON.stringify(base), 'invalid_shape');
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: 0 }
+		];
+		expectError(JSON.stringify(base), 'invalid_shape');
+	});
+
+	// Hardening pós-dogfood: null/null é MEMBERSHIP legítimo (WorkItem
+	// existia sem schedule na captura) — só um sozinho é inválido.
+	it('aceita entry null/null (membership sem schedule) e recusa schedule parcial (só um dos dois null)', () => {
+		const base = JSON.parse(serializeProjectState(stateWithWorkItems())) as {
+			state: Record<string, unknown>;
+		};
+		base.state.scheduleBaselines = [{ id: 'baseline-1', projectId: 'proj-1', createdAt: T1, version: 1 }];
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: null, durationDays: null }
+		];
+		const result = deserializeProjectState(JSON.stringify(base), catalog);
+		expect(result.ok).toBe(true);
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: '2026-09-12', durationDays: null }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
+
+		base.state.scheduleBaselineEntries = [
+			{ baselineId: 'baseline-1', workItemId: 'wi-a', plannedStart: null, durationDays: 3 }
+		];
+		expectError(JSON.stringify(base), 'invariant_violation');
 	});
 });
 
