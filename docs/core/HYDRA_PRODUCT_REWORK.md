@@ -2055,6 +2055,14 @@ Implementar incrementalmente:
 5. baseline quando aplicável;
 6. Gantt.
 
+Esta é uma ordem de evolução de capacidades, não um gate sequencial
+rígido: readiness do Gantt é a de `§17` (datas + duração + dependências
+suficientes), não a posição de um item nesta lista. Se caminho crítico
+(item 4) permanecer DEFER, o Gantt (item 6) pode existir sem ele — apenas
+sem calcular caminho crítico, sem destacar barra como crítica e sem
+afirmar total float/CPM enquanto essa camada não tiver contrato honesto
+(D063, `docs/07-management/decision-log.md`).
+
 O Gantt é projeção do modelo, não editor isolado.
 
 ---

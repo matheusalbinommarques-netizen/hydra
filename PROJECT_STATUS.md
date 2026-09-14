@@ -398,8 +398,10 @@ e baseline explícita do cronograma) estão entregues, cada um no escopo
 explicitamente estreito registrado em D058–D062
 (`docs/07-management/decision-log.md`). Item 4 (caminho crítico) segue
 deliberadamente DEFER — falta uma decisão de anchor/target de rede antes
-de ser honestamente implementável, não é omissão. Item 6 (Gantt) segue
-bloqueado por 4, conforme `HYDRA_PRODUCT_REWORK.md` §49.
+de ser honestamente implementável, não é omissão. Caminho crítico não é
+pré-requisito obrigatório do Gantt (D063,
+`docs/07-management/decision-log.md`) — item 6 (Gantt) é agora o próximo
+problema de produto/design de S12, independentemente do estado de item 4.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
