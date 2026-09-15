@@ -134,7 +134,7 @@
 					>
 						<span class="item-title">{entry.item.title}</span>
 						<span class="item-meta">
-							{#if entry.item.removedFromBaseline}
+							{#if entry.item.removedFromBaseline || entry.item.unscheduled}
 								{entry.item.statusLabel}
 							{:else}
 								{entry.item.statusLabel} · {entry.item.durationLabel}
@@ -142,6 +142,8 @@
 						</span>
 						{#if entry.item.removedNote}
 							<span class="item-removed-note">{entry.item.removedNote}</span>
+						{:else if entry.item.unscheduled}
+							<span class="item-removed-note">Sem cronograma</span>
 						{:else if entry.item.conflictLabel}
 							<span class="item-conflict-note">{entry.item.conflictLabel}</span>
 						{:else if entry.item.geometry === null}

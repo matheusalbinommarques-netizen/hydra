@@ -43,13 +43,25 @@ function makeDeliverable(overrides: Partial<DeliverableView> & Pick<DeliverableV
 }
 
 describe('buildCronogramaView — inclusão e agrupamento', () => {
-	it('só inclui WorkItems com schedule completo', () => {
+	it('inclui todo WorkItem CURRENT — agendado com geometria, sem schedule só como identidade', () => {
 		const scheduled = makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 3 });
 		const unscheduled = makeWorkItem({ id: 'wi-2' });
 		const result = buildCronogramaView({ workItems: [scheduled, unscheduled], deliverables: [], milestones: [] });
 
 		const ids = result.groups.flatMap((group) => group.items.map((item) => item.id));
-		expect(ids).toEqual(['wi-1']);
+		expect(ids).toEqual(['wi-1', 'wi-2']);
+
+		const scheduledRow = result.groups[0].items.find((item) => item.id === 'wi-1');
+		expect(scheduledRow?.unscheduled).toBe(false);
+		expect(scheduledRow?.geometry).not.toBeNull();
+
+		const unscheduledRow = result.groups[0].items.find((item) => item.id === 'wi-2');
+		expect(unscheduledRow?.unscheduled).toBe(true);
+		expect(unscheduledRow?.plannedStartLabel).toBeNull();
+		expect(unscheduledRow?.durationLabel).toBeNull();
+		expect(unscheduledRow?.geometry).toBeNull();
+		expect(unscheduledRow?.ghost).toBeNull();
+		expect(unscheduledRow?.removedFromBaseline).toBe(false);
 	});
 
 	it('agrupa por Deliverable, respeitando order, e coloca "Sem entrega" por último', () => {
@@ -123,11 +135,89 @@ describe('buildCronogramaView — geometria e eixo', () => {
 		expect(items.find((item) => item.id === 'wi-2')?.geometry).toEqual({ offsetDays: 4, widthDays: 4 });
 	});
 
-	it('sem nenhum WorkItem agendado nem Milestone datado, eixo é null e listas ficam vazias', () => {
+	it('sem nenhum WorkItem agendado nem Milestone datado, eixo é null mas identidade sem cronograma continua visível', () => {
 		const result = buildCronogramaView({ workItems: [makeWorkItem({ id: 'wi-1' })], deliverables: [], milestones: [] });
 		expect(result.axis).toBeNull();
-		expect(result.groups).toEqual([]);
+		expect(result.groups.flatMap((group) => group.items.map((item) => item.id))).toEqual(['wi-1']);
+		expect(result.groups[0].items[0].unscheduled).toBe(true);
+		expect(result.groups[0].items[0].geometry).toBeNull();
 		expect(result.milestones).toEqual([]);
+	});
+});
+
+// Identidade sem cronograma (ETAPA 12 do rework, §42, oitavo microcorte).
+// Falsificadores do briefing.
+describe('buildCronogramaView — identidade sem cronograma', () => {
+	it('agrupa WorkItem sem cronograma pela sua Deliverable atual', () => {
+		const deliverables = [makeDeliverable({ id: 'd-1', title: 'Portal', order: 1 })];
+		const workItems = [
+			makeWorkItem({ id: 'wi-scheduled', plannedStart: '2026-09-01', durationDays: 1 }),
+			makeWorkItem({ id: 'wi-unscheduled', deliverable: { deliverableId: 'd-1', title: 'Portal' } })
+		];
+		const result = buildCronogramaView({ workItems, deliverables, milestones: [] });
+		const portalGroup = result.groups.find((group) => group.key === 'd-1');
+		expect(portalGroup?.items.map((item) => item.id)).toEqual(['wi-unscheduled']);
+	});
+
+	it('WorkItem sem cronograma e sem Deliverable cai em "Sem entrega"', () => {
+		const workItems = [
+			makeWorkItem({ id: 'wi-scheduled', plannedStart: '2026-09-01', durationDays: 1 }),
+			makeWorkItem({ id: 'wi-unscheduled' })
+		];
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [] });
+		const semEntregaGroup = result.groups.find((group) => group.key === '__sem_entrega__');
+		expect(semEntregaGroup?.items.map((item) => item.id)).toContain('wi-unscheduled');
+	});
+
+	it('WorkItem CURRENT `removed` na baseline aparece exatamente uma vez, nunca duplicado como linha genérica', () => {
+		const workItems = [makeWorkItem({ id: 'wi-removed', title: 'Removido', plannedStart: null, durationDays: null })];
+		const scheduleBaseline: ScheduleBaselineView = {
+			createdAt: '2026-01-01T00:00:00.000Z',
+			partial: false,
+			entries: [
+				{
+					kind: 'removed',
+					workItemId: 'wi-removed',
+					workItemTitle: 'Removido',
+					baselinePlannedStart: '2026-09-01',
+					baselineDurationDays: 1
+				}
+			]
+		};
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const rows = result.groups.flatMap((group) => group.items.filter((item) => item.id === 'wi-removed'));
+		expect(rows).toHaveLength(1);
+		expect(rows[0].removedFromBaseline).toBe(true);
+		expect(rows[0].unscheduled).toBe(false);
+	});
+
+	it('Dependency com ponta sem cronograma não produz conector, mas ambas as identidades continuam visíveis', () => {
+		const workItems = [
+			makeWorkItem({ id: 'wi-unscheduled' }),
+			makeWorkItem({
+				id: 'wi-b',
+				plannedStart: '2026-09-05',
+				durationDays: 1,
+				dependsOn: [{ dependencyId: 'dep-1', dependsOnWorkItemId: 'wi-unscheduled', title: 'wi-unscheduled', satisfied: true }]
+			})
+		];
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [] });
+		expect(result.dependencies).toEqual([]);
+		const ids = result.groups.flatMap((group) => group.items.map((item) => item.id));
+		expect(ids).toEqual(expect.arrayContaining(['wi-unscheduled', 'wi-b']));
+	});
+
+	it('adicionar identidades sem cronograma não altera os limites do eixo', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const baseAxis = buildCronogramaView({ workItems, deliverables: [], milestones: [] }).axis;
+
+		const withUnscheduled = [
+			...workItems,
+			makeWorkItem({ id: 'wi-unscheduled-a' }),
+			makeWorkItem({ id: 'wi-unscheduled-b' })
+		];
+		const result = buildCronogramaView({ workItems: withUnscheduled, deliverables: [], milestones: [] });
+		expect(result.axis).toEqual(baseAxis);
 	});
 });
 

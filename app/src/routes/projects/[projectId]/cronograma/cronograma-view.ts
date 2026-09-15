@@ -5,10 +5,13 @@
 // precedência/propagação/folga já foram decididas em domain/transitions.ts
 // (D059-D061) e chegam prontas via WorkItemView.
 //
-// Escopo deste microcorte (instrução do Design Gate, não o estado final
-// congelado do artefato): só entram WorkItems com schedule COMPLETO.
-// Referência (baseline), folga, zoom, filtros adicionais e caminho crítico
-// continuam DEFER — nenhum deles muda o layout base desta rodada.
+// Escopo original do sexto microcorte (instrução do Design Gate, não o
+// estado final congelado do artefato): só entravam WorkItems com schedule
+// COMPLETO. O oitavo microcorte (§42, "identidade sem cronograma") amplia
+// isso: todo WorkItem CURRENT agora aparece — com geometria completa
+// quando tem schedule, ou só identidade + "Sem cronograma" quando não tem
+// e não é `removed` na baseline. Folga, zoom, filtros adicionais e caminho
+// crítico continuam DEFER.
 
 import { addCivilDays, civilDaysBetween } from '$lib/domain';
 import type { MilestoneStatus, WorkItemStatus } from '$lib/domain';
@@ -58,6 +61,12 @@ export interface CronogramaWorkItemRow {
 	// linha `removed` nunca tem `geometry`.
 	removedFromBaseline: boolean;
 	removedNote: string | null;
+	// `true` para um WorkItem CURRENT sem schedule completo que não é
+	// `removed` na baseline ativa (ETAPA 12 do rework, §42, oitavo
+	// microcorte — visibilidade de identidade sem cronograma). Identidade e
+	// agrupamento normais, nenhuma geometria/ghost/conector — só o rótulo
+	// factual "Sem cronograma".
+	unscheduled: boolean;
 }
 
 export interface CronogramaGroup {
@@ -221,7 +230,8 @@ function buildRow(
 			? buildGhost(baselineGhostEntry.baselinePlannedStart, baselineGhostEntry.baselineDurationDays, axisStart)
 			: null,
 		removedFromBaseline: false,
-		removedNote: null
+		removedNote: null,
+		unscheduled: false
 	};
 }
 
@@ -247,7 +257,38 @@ function buildRemovedRow(
 		geometry: null,
 		ghost: buildGhost(baselinePlannedStart, baselineDurationDays, axisStart),
 		removedFromBaseline: true,
-		removedNote: REMOVED_NOTE
+		removedNote: REMOVED_NOTE,
+		unscheduled: false
+	};
+}
+
+// Sentinela de ordenação (ETAPA 12 do rework, §42, oitavo microcorte) — um
+// WorkItem sem schedule e sem baseline não tem nenhuma data honesta para
+// ordenar; maior que qualquer YYYY-MM-DD civil real, garante que a linha
+// vá para o fim do próprio grupo em vez de competir por uma posição
+// cronológica que não existe.
+const UNSCHEDULED_SORT_KEY = '9999-99-99';
+
+// Linha de identidade sem cronograma (ETAPA 12 do rework, §42, oitavo
+// microcorte) — o WorkItem CURRENT existe e é visível (identidade +
+// agrupamento), mas não tem schedule completo nem é `removed` na baseline
+// ativa. Nenhuma geometria, ghost ou conector: só o fato "Sem cronograma".
+function buildUnscheduledRow(item: WorkItemView): CronogramaWorkItemRow {
+	return {
+		id: item.id,
+		title: item.title,
+		status: item.status,
+		statusLabel: WORK_STATUS_LABEL[item.status],
+		plannedStartLabel: null,
+		durationLabel: null,
+		semanticEndLabel: null,
+		hasConflict: false,
+		conflictLabel: null,
+		geometry: null,
+		ghost: null,
+		removedFromBaseline: false,
+		removedNote: null,
+		unscheduled: true
 	};
 }
 
@@ -433,9 +474,11 @@ export function buildCronogramaView(input: {
 	// existindo); WorkItem ausente seria estado corrompido — filtrado, nunca
 	// quebra a surface (mesmo tratamento de buildScheduleBaselineComparisonEntryView).
 	const removedRows: GroupableRow[] = [];
+	const removedWorkItemIds = new Set<string>();
 	for (const entry of removedEntries) {
 		const item = workItemById.get(entry.workItemId);
 		if (!item) continue;
+		removedWorkItemIds.add(entry.workItemId);
 		removedRows.push({
 			deliverableId: item.deliverable?.deliverableId ?? null,
 			sortDate: entry.baselinePlannedStart,
@@ -445,8 +488,26 @@ export function buildCronogramaView(input: {
 		});
 	}
 
+	// Identidade sem cronograma (ETAPA 12 do rework, §42, oitavo microcorte)
+	// — todo WorkItem CURRENT que não tem schedule completo e não já
+	// apareceu como `removed` (essa linha já cobre sua identidade sozinha,
+	// nunca duplicada aqui). Não participa de axis nem de Dependency —
+	// scheduledIds/axisStart continuam derivados só de scheduledItems.
+	const scheduledWorkItemIds = new Set(scheduledItems.map((item) => item.id));
+	const unscheduledRows: GroupableRow[] = [];
+	for (const item of input.workItems) {
+		if (scheduledWorkItemIds.has(item.id) || removedWorkItemIds.has(item.id)) continue;
+		unscheduledRows.push({
+			deliverableId: item.deliverable?.deliverableId ?? null,
+			sortDate: UNSCHEDULED_SORT_KEY,
+			createdAt: item.createdAt,
+			id: item.id,
+			row: buildUnscheduledRow(item)
+		});
+	}
+
 	return {
-		groups: buildGroups([...scheduledRows, ...removedRows], input.deliverables),
+		groups: buildGroups([...scheduledRows, ...removedRows, ...unscheduledRows], input.deliverables),
 		milestones: buildMilestones(input.milestones, axisStart),
 		dependencies: buildDependencies(scheduledItems),
 		axis

@@ -428,8 +428,19 @@ para cobrir referência histórica antes/depois do plano atual. Escopo
 Nível 2 (domínio só expõe campos derivados já lidos, sem nova regra/
 persistência). Conscientemente DEFER: folga conhecida no Gantt, filtro
 por Deliverable na toolbar, zoom, seletor de baseline histórica,
-drag/resize, e tudo que já era DEFER de item 4/5. S12 permanece
-`in_progress` — o próximo microcorte de item 6 ainda não foi decidido.
+drag/resize, e tudo que já era DEFER de item 4/5.
+
+Oitavo microcorte de item 6 entregue: identidade sem cronograma — todo
+WorkItem CURRENT sem schedule completo e que não é `removed` na baseline
+ativa passa a aparecer no Cronograma (identidade, agrupamento por
+Deliverable/"Sem entrega", rótulo factual "Sem cronograma"), sem nenhuma
+geometria, ghost ou conector inventado; não participa de axis nem de
+Dependency. Readiness continua exigindo ≥1 WorkItem com schedule ATUAL
+(inalterada); um WorkItem `removed` continua aparecendo exatamente uma
+vez, com sua apresentação ghost-only preexistente, nunca duplicado como
+linha genérica. Escopo Nível 2 (só projeção/UI, sem tocar `domain/`,
+schema ou persistência). S12 permanece `in_progress` — o próximo
+microcorte de item 6 ainda não foi decidido.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
