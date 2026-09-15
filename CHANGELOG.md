@@ -4,6 +4,19 @@
 
 ### Adicionado
 
+- Rework, ETAPA 12 ("Scheduling e Gantt") — `WorkItem` ganha schedule
+  manual real (data civil + duração), com precedência finish-to-start
+  lag-zero derivada, propagação explícita preview→confirmação, folga
+  conhecida local do cronograma e baseline histórica com comparação; o
+  Cronograma (`/cronograma`) projeta esse modelo somente leitura,
+  agrupado por Deliverable, com marcos, conflitos de precedência,
+  referência (baseline) visual e identidade "Sem cronograma" para
+  WorkItems sem schedule. Ver D058–D064
+  (`docs/07-management/decision-log.md`); D064 fecha a etapa e registra o
+  que permanece adiado (caminho crítico/CPM, SS/FF/SF e lag não-zero,
+  calendário de dias úteis, drag/resize, zoom e demais refinamentos de
+  projeção).
+
 - Rework, ETAPA 11 ("Decision e Change") — `Decision` e `Change` passam a
   existir como objetos canônicos de nível de projeto: registrar uma
   decisão (assunto, opções, responsável, prazo), marcá-la como tomada com

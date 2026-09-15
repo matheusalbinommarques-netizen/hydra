@@ -374,73 +374,40 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 11 do rework ("Decision e Change",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §41) está concluída. O resultado
-macro entregue — `Decision` e `Change` como objetos canônicos separados,
-`Decision` com subject/opções/responsável/prazo/status/resultado e
-lifecycle pendente→tomada, entidades afetadas provadas inicialmente por
-`DecisionAffectedWorkItem` (`WorkItem`), `decisao_pendente` reconciliado
-via `Impediment.decisionId`, e o legado misto preservado só para leitura
-— está registrado em D053–D057 (`docs/07-management/decision-log.md`).
+A ETAPA 12 do rework ("Scheduling e Gantt",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §42) está concluída. O resultado
+macro entregue — `WorkItem` com schedule manual real (`plannedStart`/
+`durationDays`, par atômico, data civil e duração inclusiva com fórmula
+de fim congelada), precedência temporal finish-to-start lag-zero
+inteiramente derivada, propagação explícita e atômica sempre
+preview → confirmação (nunca auto-scheduling implícito), folga conhecida
+local do cronograma atual (explicitamente distinta de total float/CPM),
+baseline histórica real (captura por gesto humano, append-only,
+imutável, com comparação derivada em quatro estados) e readiness do
+Gantt reconciliada como a de `§17` — está registrado em D058–D063
+(`docs/07-management/decision-log.md`). Sobre essa fundação, o Gantt
+(`/cronograma`) teve seis microcortes Nível 2 entregues: rota somente
+leitura com readiness compartilhada, agrupamento por Deliverable + "Sem
+entrega", conectores de Dependency e precedenceConflict sem geometria
+inventada, marcos em lane própria, deep-link até o WorkItem em Trabalho,
+baseline visual honesta (ghost de `compared`/`removed`, nunca geometria
+fabricada para `scheduled_after`/`added_after`/`compared_unrepresentable`)
+e identidade "Sem cronograma" para todo WorkItem CURRENT sem schedule
+completo.
 
-D057 fecha a etapa e reclassifica, sem resolver, os residuais que
-permaneciam abertos — ampliar entidades afetadas para
-Deliverable/Milestone/Risk/Dependency/Change/AffectedGroup,
-Participant/Stakeholder/pessoas canônicas, captura automática de
-`Change`, novos ProjectEvents/histórico, lifecycle adicional,
-sinais/Atenções derivados e IA —, cada um com a condição semântica que o
-reabre, sem congelar arquitetura ainda não decidida.
+D064 fecha a etapa e reclassifica, sem resolver, os residuais que
+permaneciam abertos — caminho crítico/CPM/total float, SS/FF/SF e lag
+não-zero, calendário de trabalho/dias úteis, drag/resize e
+auto-scheduling, baseline como constraint/deadline, zoom Day/Week,
+seletor de múltiplas baselines, filtros/grouping adicionais (incluindo
+filtro de Deliverable na toolbar do Cronograma) e folga conhecida visível
+diretamente no Gantt —, cada um com a condição semântica que o reabre,
+sem congelar arquitetura ainda não decidida.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S12` (ETAPA 12, "Scheduling e Gantt", §42) com status `in_progress`.
-Itens 1–3 e 5 da lista incremental de §42 (precedência, propagação, folga
-e baseline explícita do cronograma) estão entregues, cada um no escopo
-explicitamente estreito registrado em D058–D062
-(`docs/07-management/decision-log.md`). Item 4 (caminho crítico) segue
-deliberadamente DEFER — falta uma decisão de anchor/target de rede antes
-de ser honestamente implementável, não é omissão. Caminho crítico não é
-pré-requisito obrigatório do Gantt (D063,
-`docs/07-management/decision-log.md`) — item 6 (Gantt) é agora o próximo
-problema de produto/design de S12, independentemente do estado de item 4.
-
-Item 6 (Gantt) teve seu primeiro microcorte entregue: rota `/cronograma`
-somente leitura (corredor Acompanhamento → Cronograma → WorkItem, Design
-Gate aprovado), com readiness compartilhada (`$lib/schedule-readiness`,
-≥1 WorkItem com schedule completo), agrupamento por Deliverable + "Sem
-entrega", conectores de Dependency FS lag-zero, precedenceConflict
-perceptível, marcos em lane própria, e deep-link `?item=` de Cronograma
-até o WorkItem exato em Trabalho. Escopo Nível 2 (só rotas/projeções/UI,
-sem tocar `domain/`, schema ou persistência) — sem decisão de arquitetura
-nova, por isso sem entrada própria em decision-log.
-
-Sétimo microcorte de item 6 entregue: referência (baseline) visual no
-Gantt — `compared`/`removed` passam a expor `baselinePlannedStart`/
-`baselineDurationDays` (dado já persistido, sem escrita nova), e o
-Cronograma renderiza um "ghost" da baseline ativa (linha fina sob a barra
-atual quando há divergência; retângulo tracejado standalone quando o
-WorkItem foi `removed`, sem barra atual, com nota textual). Um WorkItem
-`removed` passa a existir na projeção mesmo sem schedule atual, mas
-readiness continua exclusivamente sobre WorkItems com schedule ATUAL
-(`isCronogramaReady` não recebe baseline) — falsificador coberto em
-`tracking-view.spec.ts`. Nenhuma geometria fabricada para
-`scheduled_after`/`added_after`/`compared_unrepresentable`; eixo expande
-para cobrir referência histórica antes/depois do plano atual. Escopo
-Nível 2 (domínio só expõe campos derivados já lidos, sem nova regra/
-persistência). Conscientemente DEFER: folga conhecida no Gantt, filtro
-por Deliverable na toolbar, zoom, seletor de baseline histórica,
-drag/resize, e tudo que já era DEFER de item 4/5.
-
-Oitavo microcorte de item 6 entregue: identidade sem cronograma — todo
-WorkItem CURRENT sem schedule completo e que não é `removed` na baseline
-ativa passa a aparecer no Cronograma (identidade, agrupamento por
-Deliverable/"Sem entrega", rótulo factual "Sem cronograma"), sem nenhuma
-geometria, ghost ou conector inventado; não participa de axis nem de
-Dependency. Readiness continua exigindo ≥1 WorkItem com schedule ATUAL
-(inalterada); um WorkItem `removed` continua aparecendo exatamente uma
-vez, com sua apresentação ghost-only preexistente, nunca duplicado como
-linha genérica. Escopo Nível 2 (só projeção/UI, sem tocar `domain/`,
-schema ou persistência). S12 permanece `in_progress` — o próximo
-microcorte de item 6 ainda não foi decidido.
+`S13` (ETAPA 13, "Execução como workspace completo", §43) com status
+`in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou corte
+de S13 — isso é trabalho de uma passagem futura.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
