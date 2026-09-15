@@ -2097,6 +2097,20 @@ tensão entre a conclusão do catálogo de Execução e
 `computeProjectStatus`/`computePhaseStatus` fica registrada e DEFER, sem
 completion semantics nova neste corte.
 
+D066 (`docs/07-management/decision-log.md`) registra a aprovação humana
+do Product Owner sobre o Design Gate final do corredor
+`Agora → Quadro → Cronograma → Entregas → Riscos → Atenções → Decisões`
+("Hydra S13 - Design Gate — Execução como workspace completo"),
+congelando intenção visual/interacional e o mapa de ownership —
+incluindo a absorção de Acompanhamento (`/tracking`) na navegação, com
+destino explícito para cada responsabilidade real — e a classificação
+A/B/C do próprio Gate. O Gate não decide domínio novo, completion
+semantics nem ranking, e não autoriza implementação big-bang: o primeiro
+microcorte de S13 permanece escolha futura. Dois conflitos seguem
+sinalizados, não resolvidos: gestão de referência (baseline) dentro de
+um Cronograma nominalmente somente-leitura; peso de Mudanças dentro de
+Decisões.
+
 ---
 
 # 44. ETAPA 14 — Ações externas maduras

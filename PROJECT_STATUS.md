@@ -419,7 +419,16 @@ Execução e `computeProjectStatus`/`computePhaseStatus` fica registrada e
 DEFER — completion semantics exige decisão própria antes do microcorte
 que alterar o gating. O Design Gate do corredor
 Agora → Quadro → Cronograma → Entregas → Riscos → Atenções → Decisões
-pode agora prosseguir sobre essas bases.
+prosseguiu sobre essas bases e foi **aprovado pelo Product Owner e
+congelado em D066** (`docs/07-management/decision-log.md`) — intenção
+visual/interacional e mapa de ownership entre surfaces, incluindo a
+absorção de Acompanhamento (`/tracking`) na navegação. Dois conflitos
+seguem sinalizados, não resolvidos: gestão de referência (baseline)
+dentro de um Cronograma nominalmente somente-leitura; peso de Mudanças
+dentro de Decisões. `docs/core/CURRENT_WORK.json` continua apontando
+para `S13`, `in_progress` — D066 não altera `app/`, não cria/renomeia
+rota, não toca domain/schema/persistence e não escolhe o primeiro
+microcorte de implementação, que permanece a próxima decisão relevante.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
