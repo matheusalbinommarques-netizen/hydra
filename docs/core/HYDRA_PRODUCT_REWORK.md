@@ -2087,6 +2087,16 @@ Check-ins curtos podem perguntar:
 
 > O que mudou desde a última vez?
 
+D065 (`docs/07-management/decision-log.md`) registra a decisão de
+boundary desta etapa: Execução passa a workspace sobre objetos vivos
+(não renderer obrigatório de atividade); `registrar_andamento` deixa de
+ser obrigatório, sem criar `CheckIn` — a frase acima sobre check-ins
+continua DEFER até microcorte com contrato próprio; "Atenções" é
+projeção factual (não sinônimo do atual `attentionPendingItems`); a
+tensão entre a conclusão do catálogo de Execução e
+`computeProjectStatus`/`computePhaseStatus` fica registrada e DEFER, sem
+completion semantics nova neste corte.
+
 ---
 
 # 44. ETAPA 14 — Ações externas maduras

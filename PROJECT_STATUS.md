@@ -406,8 +406,20 @@ sem congelar arquitetura ainda não decidida.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 `S13` (ETAPA 13, "Execução como workspace completo", §43) com status
-`in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou corte
-de S13 — isso é trabalho de uma passagem futura.
+`in_progress`. D065 (`docs/07-management/decision-log.md`) registra a
+decisão de boundary que desbloqueia o Design Gate de S13, sem implementar
+comportamento de app: Execução deixa de ser dirigida por sequência
+obrigatória de atividades e passa a workspace sobre objetos vivos
+(WorkItem, Impediment, Decision, PendingItem); `registrar_andamento`
+deixa de ser obrigatório, sem apagar Answers históricas nem criar
+`CheckIn`; "Atenções" congela como projeção factual (WorkItem
+bloqueado/Impediment aberto e PendingItem aberto, sem promoção automática
+de Risk/Decision); a tensão entre a conclusão literal do catálogo de
+Execução e `computeProjectStatus`/`computePhaseStatus` fica registrada e
+DEFER — completion semantics exige decisão própria antes do microcorte
+que alterar o gating. O Design Gate do corredor
+Agora → Quadro → Cronograma → Entregas → Riscos → Atenções → Decisões
+pode agora prosseguir sobre essas bases.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
