@@ -2,6 +2,7 @@
 	import { setContext } from 'svelte';
 	import { page } from '$app/state';
 	import { enhance } from '$app/forms';
+	import { isCronogramaReady } from '$lib/schedule-readiness';
 	import { projectStatusLabel } from '$lib/project-status-label';
 	import { EVIDENCE_OUTCOME_OPTIONS } from '$lib/catalog/external-action';
 	import {
@@ -105,12 +106,21 @@
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
 		{ key: 'work', label: 'Trabalho' },
+		{ key: 'cronograma', label: 'Cronograma' },
 		{ key: 'summary', label: 'Resumo' },
 		{ key: 'document', label: 'Documento' },
 		{ key: 'closure', label: 'Encerramento' },
 		{ key: 'export', label: 'Exportar' },
 		{ key: 'settings', label: 'Configurações' }
 	] as const;
+
+	// Cronograma (ETAPA 12 do rework, §42, sexto microcorte, Design Gate
+	// "Corredor") — mesmo critério de readiness de tracking-view.ts/rota
+	// /cronograma: só aparece na navegação quando ao menos um WorkItem tem
+	// schedule completo. Nunca uma aba/link morto apontando para uma rota
+	// que redireciona de volta.
+	let cronogramaReady = $derived(isCronogramaReady(data.view.workItems));
+	let visibleNavItems = $derived(NAV_ITEMS.filter((item) => item.key !== 'cronograma' || cronogramaReady));
 
 	let currentAreaLabel = $derived(
 		NAV_ITEMS.find((item) => isCurrentRoute(`/projects/${projectId}/${item.key}`))?.label ?? ''
@@ -184,6 +194,14 @@
 				>
 					Trabalho
 				</a>
+				{#if cronogramaReady}
+					<a
+						href="/projects/{projectId}/cronograma"
+						aria-current={isCurrentRoute(`/projects/${projectId}/cronograma`) ? 'page' : undefined}
+					>
+						Cronograma
+					</a>
+				{/if}
 				<a
 					href="/projects/{projectId}/summary"
 					aria-current={isCurrentRoute(`/projects/${projectId}/summary`) ? 'page' : undefined}
@@ -244,7 +262,7 @@
 		</div>
 		{#if mobileMenuOpen}
 			<nav id="mobile-nav-menu" class="mobile-nav-menu" aria-label="Navegação do projeto">
-				{#each NAV_ITEMS as item (item.key)}
+				{#each visibleNavItems as item (item.key)}
 					<a
 						href="/projects/{projectId}/{item.key}"
 						aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}

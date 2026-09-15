@@ -514,54 +514,163 @@ describe('buildTrackingView — Linha do tempo', () => {
 		expect(entry.reachedAt).toBeNull();
 	});
 
-	// WorkItem com schedule (ETAPA 12 do rework, §42, primeiro microcorte
-	// fundacional) — segunda variante da mesma Linha do tempo, mesmos
-	// falsificadores: nenhuma barra, nenhum plannedEnd, nenhuma propagação.
-	it('inclui WorkItem com schedule completo e exclui WorkItem sem schedule', () => {
-		const workItems = [
-			makeWorkItem({ id: 'w1', title: 'Com schedule', plannedStart: '2026-09-12', durationDays: 3 }),
-			makeWorkItem({ id: 'w2', title: 'Sem schedule' })
-		];
-		const result = buildTrackingView(baseInput({ workItems }));
-		expect(result.timeline.map((entry) => entry.id)).toEqual(['w1']);
-		expect(result.timeline[0].kind).toBe('workItem');
-	});
-
-	it('WorkItem no schedule expõe exatamente os campos do contrato, sem plannedEnd', () => {
-		const workItems = [makeWorkItem({ id: 'w1', title: 'Migração', plannedStart: '2026-09-12', durationDays: 3 })];
-		const [entry] = buildTrackingView(baseInput({ workItems })).timeline;
-		expect(entry).toMatchObject({
-			kind: 'workItem',
-			id: 'w1',
-			title: 'Migração',
-			plannedDate: '2026-09-12',
-			plannedDateLabel: '12/09/2026',
-			durationDays: 3,
-			durationLabel: '3 dias'
-		});
-		expect(Object.keys(entry).sort()).toEqual(
-			['createdAt', 'durationDays', 'durationLabel', 'id', 'kind', 'plannedDate', 'plannedDateLabel', 'status', 'statusLabel', 'title'].sort()
-		);
-		expect('plannedEnd' in entry).toBe(false);
-	});
-
-	it('duração de 1 dia usa singular no rótulo', () => {
-		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-12', durationDays: 1 })];
-		const [entry] = buildTrackingView(baseInput({ workItems })).timeline;
-		expect(entry.kind === 'workItem' && entry.durationLabel).toBe('1 dia');
-	});
-
-	it('marcos e WorkItems com schedule aparecem juntos, ordenados por data civil', () => {
+	// D058 (WorkItem com schedule entrando na Linha do tempo) foi o primeiro
+	// consumidor real do fato temporal, mas o sexto microcorte de §42 (Design
+	// Gate "Corredor") substitui a Timeline por um card assim que o
+	// Cronograma atinge readiness — ver describe('buildTrackingView —
+	// Cronograma (readiness e card)') abaixo: qualquer WorkItem agendado
+	// torna o Cronograma ready, então a Linha do tempo nunca mais chega a
+	// listar um WorkItem através de buildTrackingView.
+	it('WorkItem agendado dispara readiness e esvazia a Linha do tempo, mesmo com marco datado', () => {
 		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-20' })];
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const result = buildTrackingView(baseInput({ milestones, workItems }));
+		expect(result.timeline).toEqual([]);
+	});
+});
+
+describe('buildTrackingView — Cronograma (readiness e card)', () => {
+	it('não ready sem nenhum WorkItem agendado — Timeline permanece intacta', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-20' })];
+		const workItems = [makeWorkItem({ id: 'w1', title: 'Sem schedule' })];
+		const result = buildTrackingView(baseInput({ milestones, workItems }));
+		expect(result.cronogramaReady).toBe(false);
+		expect(result.cronogramaCard).toBeNull();
+		expect(result.timeline.map((entry) => entry.id)).toEqual(['m1']);
+	});
+
+	// Caminho inverso 1 → 0 (hardening pós-dogfood): limpar o schedule do
+	// único WorkItem agendado precisa reverter integralmente a apresentação
+	// — Timeline volta a existir com o marco datado, card desaparece. Duas
+	// chamadas de buildTrackingView com o MESMO marco simulam o "antes
+	// ready" e o "depois de limpar o schedule", mesmo espírito de D058
+	// (limpar é uma escrita atômica normal, não um estado defeituoso).
+	it('reverte Timeline/card quando o único WorkItem agendado tem o schedule limpo, preservando o marco datado', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-20' })];
+
+		const ready = buildTrackingView(
+			baseInput({ milestones, workItems: [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })] })
+		);
+		expect(ready.cronogramaReady).toBe(true);
+		expect(ready.cronogramaCard).not.toBeNull();
+		expect(ready.timeline).toEqual([]);
+
+		const afterClear = buildTrackingView(
+			baseInput({ milestones, workItems: [makeWorkItem({ id: 'w1', plannedStart: null, durationDays: null })] })
+		);
+		expect(afterClear.cronogramaReady).toBe(false);
+		expect(afterClear.cronogramaCard).toBeNull();
+		expect(afterClear.timeline.map((entry) => entry.id)).toEqual(['m1']);
+	});
+
+	it('ready com um WorkItem agendado — card presente, Timeline vazia', () => {
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const result = buildTrackingView(baseInput({ workItems }));
+		expect(result.cronogramaReady).toBe(true);
+		expect(result.cronogramaCard).toEqual({
+			conflictCount: 0,
+			divergingFromBaselineCount: null,
+			unrepresentableFromBaselineCount: null
+		});
+		expect(result.timeline).toEqual([]);
+	});
+
+	it('conflictCount conta WorkItems com precedenceConflict conhecido', () => {
 		const workItems = [
 			makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 }),
-			makeWorkItem({ id: 'w2', title: 'Sem schedule' })
+			makeWorkItem({
+				id: 'w2',
+				plannedStart: '2026-09-05',
+				durationDays: 1,
+				precedenceConflict: { kind: 'conflict', dependsOnWorkItemId: 'w1', dependsOnWorkItemTitle: 'w1', knownRequiredStart: '2026-09-12' }
+			})
 		];
-		const result = buildTrackingView(baseInput({ milestones, workItems }));
-		expect(result.timeline.map((entry) => ({ id: entry.id, kind: entry.kind }))).toEqual([
-			{ id: 'w1', kind: 'workItem' },
-			{ id: 'm1', kind: 'milestone' }
-		]);
+		const result = buildTrackingView(baseInput({ workItems }));
+		expect(result.cronogramaCard).toEqual({
+			conflictCount: 1,
+			divergingFromBaselineCount: null,
+			unrepresentableFromBaselineCount: null
+		});
+	});
+
+	// Auditoria do contrato completo de divergência (hardening pós-dogfood):
+	// cada kind de ScheduleBaselineComparisonEntryView (D062) conta em NO
+	// MÁXIMO um dos dois campos, nunca nos dois, e `compared` com as três
+	// variâncias em zero não conta em nenhum — "sem variação desde a
+	// referência" não é uma divergência.
+	it('divergingFromBaselineCount/unrepresentableFromBaselineCount são null juntos sem baseline ativa', () => {
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const result = buildTrackingView(baseInput({ workItems }));
+		expect(result.cronogramaCard?.divergingFromBaselineCount).toBeNull();
+		expect(result.cronogramaCard?.unrepresentableFromBaselineCount).toBeNull();
+	});
+
+	it('compared com as três variâncias em zero não conta como divergência', () => {
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const scheduleBaseline = {
+			createdAt: '2026-09-01T00:00:00.000Z',
+			partial: false,
+			entries: [
+				{
+					kind: 'compared' as const,
+					workItemId: 'w1',
+					workItemTitle: 'w1',
+					startVarianceDays: 0,
+					finishVarianceDays: 0,
+					durationVarianceDays: 0
+				}
+			]
+		};
+		const result = buildTrackingView(baseInput({ workItems, scheduleBaseline }));
+		expect(result.cronogramaCard).toEqual({
+			conflictCount: 0,
+			divergingFromBaselineCount: 0,
+			unrepresentableFromBaselineCount: 0
+		});
+	});
+
+	it('compared com qualquer variância não-zero, removed, scheduled_after e added_after contam como divergência; compared_unrepresentable conta separado, sem afirmar "difere"', () => {
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const scheduleBaseline = {
+			createdAt: '2026-09-01T00:00:00.000Z',
+			partial: false,
+			entries: [
+				{
+					kind: 'compared' as const,
+					workItemId: 'w-start',
+					workItemTitle: 'difere no início',
+					startVarianceDays: 1,
+					finishVarianceDays: 0,
+					durationVarianceDays: 0
+				},
+				{
+					kind: 'compared' as const,
+					workItemId: 'w-finish',
+					workItemTitle: 'difere no fim',
+					startVarianceDays: 0,
+					finishVarianceDays: 1,
+					durationVarianceDays: 0
+				},
+				{
+					kind: 'compared' as const,
+					workItemId: 'w-duration',
+					workItemTitle: 'difere na duração',
+					startVarianceDays: 0,
+					finishVarianceDays: 0,
+					durationVarianceDays: 1
+				},
+				{ kind: 'removed' as const, workItemId: 'w-removed', workItemTitle: 'removido' },
+				{ kind: 'scheduled_after' as const, workItemId: 'w-sched-after', workItemTitle: 'agendado depois' },
+				{ kind: 'added_after' as const, workItemId: 'w-added-after', workItemTitle: 'adicionado depois' },
+				{ kind: 'compared_unrepresentable' as const, workItemId: 'w-unrep', workItemTitle: 'não calculável' }
+			]
+		};
+		const result = buildTrackingView(baseInput({ workItems, scheduleBaseline }));
+		expect(result.cronogramaCard).toEqual({
+			conflictCount: 0,
+			divergingFromBaselineCount: 6,
+			unrepresentableFromBaselineCount: 1
+		});
 	});
 });
 

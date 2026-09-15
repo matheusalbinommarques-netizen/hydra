@@ -483,6 +483,41 @@
 	</section>
 {/if}
 
+<!-- Card do Cronograma (ETAPA 12 do rework, §42, sexto microcorte —
+     Design Gate "Corredor"): substitui a Linha do tempo assim que o
+     Cronograma atinge readiness (tracking.timeline já vem vazio nesse
+     caso — ver buildTrackingView) — as duas nunca aparecem juntas. Só
+     fatos honestamente deriváveis, cada um condicional à sua própria
+     existência (nunca linha vazia para fato inexistente). -->
+{#if tracking.cronogramaReady && tracking.cronogramaCard}
+	<section class="card cronograma-card" aria-labelledby="cronograma-heading">
+		<h2 id="cronograma-heading">Cronograma</h2>
+		{#if tracking.cronogramaCard.conflictCount > 0}
+			<p class="cronograma-fact cronograma-fact-warning">
+				{tracking.cronogramaCard.conflictCount}
+				{tracking.cronogramaCard.conflictCount === 1
+					? 'conflito de precedência conhecido.'
+					: 'conflitos de precedência conhecidos.'}
+			</p>
+		{/if}
+		{#if tracking.cronogramaCard.divergingFromBaselineCount !== null && tracking.cronogramaCard.divergingFromBaselineCount > 0}
+			<p class="cronograma-fact">
+				{tracking.cronogramaCard.divergingFromBaselineCount}
+				{tracking.cronogramaCard.divergingFromBaselineCount === 1 ? 'trabalho difere' : 'trabalhos diferem'} da referência.
+			</p>
+		{/if}
+		{#if tracking.cronogramaCard.unrepresentableFromBaselineCount !== null && tracking.cronogramaCard.unrepresentableFromBaselineCount > 0}
+			<p class="cronograma-fact">
+				{tracking.cronogramaCard.unrepresentableFromBaselineCount}
+				{tracking.cronogramaCard.unrepresentableFromBaselineCount === 1
+					? 'comparação com a referência não pôde ser calculada.'
+					: 'comparações com a referência não puderam ser calculadas.'}
+			</p>
+		{/if}
+		<a class="section-link" href="/projects/{projectId}/cronograma">Abrir Cronograma →</a>
+	</section>
+{/if}
+
 <!-- Referência do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
      REFERÊNCIA explicitamente aprovada pelo usuário, nunca criada
      automaticamente: o primeiro clique sempre mostra um preview com
@@ -1279,6 +1314,19 @@
 		flex: none;
 		font-size: var(--font-size-caption);
 		color: var(--hydra-muted);
+	}
+
+	/* Card do Cronograma (ETAPA 12 do rework, §42, sexto microcorte) — mesmo
+	   --hydra-warning já usado para conteúdo derivado pelo sistema em
+	   work/+page.svelte (.precedence-conflict). */
+	.cronograma-fact {
+		margin: 0 0 var(--space-2);
+		font-size: var(--font-size-body);
+	}
+
+	.cronograma-fact-warning {
+		color: var(--hydra-warning);
+		font-weight: 600;
 	}
 
 	/* Referência do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —

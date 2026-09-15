@@ -403,6 +403,20 @@ pré-requisito obrigatório do Gantt (D063,
 `docs/07-management/decision-log.md`) — item 6 (Gantt) é agora o próximo
 problema de produto/design de S12, independentemente do estado de item 4.
 
+Item 6 (Gantt) teve seu primeiro microcorte entregue: rota `/cronograma`
+somente leitura (corredor Acompanhamento → Cronograma → WorkItem, Design
+Gate aprovado), com readiness compartilhada (`$lib/schedule-readiness`,
+≥1 WorkItem com schedule completo), agrupamento por Deliverable + "Sem
+entrega", conectores de Dependency FS lag-zero, precedenceConflict
+perceptível, marcos em lane própria, e deep-link `?item=` de Cronograma
+até o WorkItem exato em Trabalho. Escopo Nível 2 (só rotas/projeções/UI,
+sem tocar `domain/`, schema ou persistência) — sem decisão de arquitetura
+nova, por isso sem entrada própria em decision-log. Conscientemente DEFER
+nesta fatia: referência (baseline) visual no Gantt, folga conhecida no
+Gantt, filtro por Deliverable na toolbar, zoom, e tudo que já era DEFER de
+item 4/5. S12 permanece `in_progress` — o próximo microcorte de item 6
+(elasticidade B do Gate) ainda não foi decidido.
+
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
 narrativo e não foram sincronizadas com cada entrega intermediária.

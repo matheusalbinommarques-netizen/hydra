@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { WorkItemStatus } from '$lib/domain';
 	import type { SchedulePropagationPlanView } from '$lib/server/application/types';
@@ -131,6 +132,25 @@
 		newMilestoneTargetId = '';
 		propagationPreview = null;
 	}
+
+	// Deep-link até um WorkItem específico (ETAPA 12 do rework, §42, sexto
+	// microcorte — mecanismo pedido pelo Cronograma para abrir o item exato,
+	// não só a rota /work). Estado só do cliente, nunca persistido (mesmo
+	// padrão de selectedItemId acima): a query string `?item=` é só um PONTO
+	// DE ENTRADA. `appliedDeepLinkItemId` garante que o efeito reage somente
+	// quando o parâmetro da URL muda (não a cada reload de `data.view`
+	// disparado por uma mutação qualquer dentro do painel já aberto, o que
+	// reabriria o painel e descartaria o formulário em edição). A abertura
+	// normal de /work (clique num item do Quadro) nunca toca a URL e continua
+	// idêntica.
+	let appliedDeepLinkItemId: string | null = null;
+	$effect(() => {
+		const itemId = page.url.searchParams.get('item');
+		if (itemId && itemId !== appliedDeepLinkItemId) {
+			appliedDeepLinkItemId = itemId;
+			openDetail(itemId);
+		}
+	});
 
 	// Candidatos a predecessor: todo item do projeto menos o próprio e os que
 	// já são predecessores dele. Ciclo transitivo NÃO é filtrado aqui — a

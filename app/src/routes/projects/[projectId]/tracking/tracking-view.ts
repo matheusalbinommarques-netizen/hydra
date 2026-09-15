@@ -7,6 +7,7 @@
 // diretamente, não decide nada (isso já foi decidido por orientation-engine/
 // e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
+import { isCronogramaReady } from '$lib/schedule-readiness';
 import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
 import type {
 	ChangeView,
@@ -177,9 +178,45 @@ export interface TrackingWorkItemOption {
 	title: string;
 }
 
+// Card temporal enxuto (ETAPA 12 do rework, §42, sexto microcorte —
+// primeiro corte do Gantt, Design Gate "Corredor") — substitui a Timeline
+// completa quando o Cronograma atinge readiness (isCronogramaReady); as
+// duas apresentações nunca coexistem (ver buildTrackingView). Só fatos
+// honestamente deriváveis já existentes na ProjectView: `conflictCount` é a
+// contagem de WorkItems com precedenceConflict != null (D059).
+//
+// `divergingFromBaselineCount`/`unrepresentableFromBaselineCount` são
+// `null` juntos enquanto não existe baseline ativa (caso normal) — nunca
+// um `null` e o outro número. Quando existe baseline, cada entry de
+// `ScheduleBaselineComparisonEntryView` (D062) conta em NO MÁXIMO um dos
+// dois, nunca nos dois (hardening pós-dogfood, auditoria do contrato):
+//   - `compared` com as três variâncias em zero → não conta em nenhum dos
+//     dois (sem diferença honesta a relatar);
+//   - `compared` com alguma variância != 0, `removed`, `scheduled_after`
+//     ou `added_after` → soma `divergingFromBaselineCount` (todos são
+//     fatos honestamente conhecidos de que o WorkItem difere da
+//     referência, mesmo sem uma variância numérica para `removed`/
+//     `scheduled_after`/`added_after`);
+//   - `compared_unrepresentable` → soma `unrepresentableFromBaselineCount`
+//     em vez de `divergingFromBaselineCount` — a aritmética de variância
+//     estourou a faixa civil (D062), então afirmar "difere" fingiria
+//     conhecer uma magnitude que não existe; a interface relata a
+//     contagem como fato mínimo ("N não puderam ser comparados"), nunca
+//     como sinônimo de divergência.
+export interface TrackingCronogramaCardView {
+	conflictCount: number;
+	divergingFromBaselineCount: number | null;
+	unrepresentableFromBaselineCount: number | null;
+}
+
 export interface TrackingView {
 	situation: TrackingSituationView | undefined;
 	work: TrackingWorkView;
+	// Prontidão do Cronograma (mesmo critério de isCronogramaReady,
+	// compartilhado com o shell e a rota /cronograma) — controla a troca
+	// Timeline ↔ card, nunca as duas ao mesmo tempo.
+	cronogramaReady: boolean;
+	cronogramaCard: TrackingCronogramaCardView | null;
 	// Vazia quando nenhum marco tem data planejada — nesse caso a seção
 	// simplesmente não existe na página (§17: surface só aparece quando há
 	// dados suficientes; nada de aba/placeholder vazio).
@@ -407,6 +444,37 @@ function buildTimeline(milestones: MilestoneView[], workItems: WorkItemView[]): 
 	);
 }
 
+function buildCronogramaCard(
+	workItems: WorkItemView[],
+	scheduleBaseline: ScheduleBaselineView | null
+): TrackingCronogramaCardView {
+	const conflictCount = workItems.filter((item) => item.precedenceConflict !== null).length;
+	if (scheduleBaseline === null) {
+		return { conflictCount, divergingFromBaselineCount: null, unrepresentableFromBaselineCount: null };
+	}
+
+	let divergingFromBaselineCount = 0;
+	let unrepresentableFromBaselineCount = 0;
+	for (const entry of scheduleBaseline.entries) {
+		switch (entry.kind) {
+			case 'compared':
+				if (entry.startVarianceDays !== 0 || entry.finishVarianceDays !== 0 || entry.durationVarianceDays !== 0) {
+					divergingFromBaselineCount++;
+				}
+				break;
+			case 'removed':
+			case 'scheduled_after':
+			case 'added_after':
+				divergingFromBaselineCount++;
+				break;
+			case 'compared_unrepresentable':
+				unrepresentableFromBaselineCount++;
+				break;
+		}
+	}
+	return { conflictCount, divergingFromBaselineCount, unrepresentableFromBaselineCount };
+}
+
 function buildAttentionPendingItems(openPendingItems: PendingItemView[]): TrackingAttentionPendingItem[] {
 	return openPendingItems.map((item) => ({
 		id: item.id,
@@ -463,11 +531,16 @@ function buildWorkItemOptions(workItems: WorkItemView[]): TrackingWorkItemOption
 
 export function buildTrackingView(input: TrackingViewInput): TrackingView {
 	const situation = buildSituation(input.journeyContext, input.phaseProgress);
+	const cronogramaReady = isCronogramaReady(input.workItems);
 
 	return {
 		situation,
 		work: buildWork(input.workItems),
-		timeline: buildTimeline(input.milestones, input.workItems),
+		cronogramaReady,
+		cronogramaCard: cronogramaReady ? buildCronogramaCard(input.workItems, input.scheduleBaseline) : null,
+		// Nunca as duas juntas (Design Gate "Corredor"): Timeline completa some
+		// assim que o Cronograma atinge readiness, mesmo com marcos datados.
+		timeline: cronogramaReady ? [] : buildTimeline(input.milestones, input.workItems),
 		scheduleBaseline: input.scheduleBaseline,
 		blockedWorkItems: buildBlockedWorkItems(input.workItems),
 		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
