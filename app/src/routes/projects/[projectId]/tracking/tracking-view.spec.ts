@@ -539,6 +539,32 @@ describe('buildTrackingView — Cronograma (readiness e card)', () => {
 		expect(result.timeline.map((entry) => entry.id)).toEqual(['m1']);
 	});
 
+	// Hardening pós-dogfood (ETAPA 12, §42, sétimo microcorte) — readiness
+	// nunca deve passar a depender da baseline: 0 WorkItems com schedule
+	// ATUAL, mesmo havendo uma referência histórica `removed`, continua
+	// NOT ready. `isCronogramaReady` só recebe `workItems`, nunca
+	// `scheduleBaseline` — este teste falsifica a interação real, não só a
+	// assinatura da função.
+	it('não ready mesmo com baseline contendo um WorkItem removed — readiness não depende da baseline', () => {
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: null, durationDays: null })];
+		const scheduleBaseline = {
+			createdAt: '2026-09-01T00:00:00.000Z',
+			partial: false,
+			entries: [
+				{
+					kind: 'removed' as const,
+					workItemId: 'w1',
+					workItemTitle: 'w1',
+					baselinePlannedStart: '2026-09-10',
+					baselineDurationDays: 2
+				}
+			]
+		};
+		const result = buildTrackingView(baseInput({ workItems, scheduleBaseline }));
+		expect(result.cronogramaReady).toBe(false);
+		expect(result.cronogramaCard).toBeNull();
+	});
+
 	// Caminho inverso 1 → 0 (hardening pós-dogfood): limpar o schedule do
 	// único WorkItem agendado precisa reverter integralmente a apresentação
 	// — Timeline volta a existir com o marco datado, card desaparece. Duas
@@ -617,7 +643,9 @@ describe('buildTrackingView — Cronograma (readiness e card)', () => {
 					workItemTitle: 'w1',
 					startVarianceDays: 0,
 					finishVarianceDays: 0,
-					durationVarianceDays: 0
+					durationVarianceDays: 0,
+					baselinePlannedStart: '2026-09-10',
+					baselineDurationDays: 2
 				}
 			]
 		};
@@ -641,7 +669,9 @@ describe('buildTrackingView — Cronograma (readiness e card)', () => {
 					workItemTitle: 'difere no início',
 					startVarianceDays: 1,
 					finishVarianceDays: 0,
-					durationVarianceDays: 0
+					durationVarianceDays: 0,
+					baselinePlannedStart: '2026-09-09',
+					baselineDurationDays: 2
 				},
 				{
 					kind: 'compared' as const,
@@ -649,7 +679,9 @@ describe('buildTrackingView — Cronograma (readiness e card)', () => {
 					workItemTitle: 'difere no fim',
 					startVarianceDays: 0,
 					finishVarianceDays: 1,
-					durationVarianceDays: 0
+					durationVarianceDays: 0,
+					baselinePlannedStart: '2026-09-10',
+					baselineDurationDays: 2
 				},
 				{
 					kind: 'compared' as const,
@@ -657,9 +689,17 @@ describe('buildTrackingView — Cronograma (readiness e card)', () => {
 					workItemTitle: 'difere na duração',
 					startVarianceDays: 0,
 					finishVarianceDays: 0,
-					durationVarianceDays: 1
+					durationVarianceDays: 1,
+					baselinePlannedStart: '2026-09-10',
+					baselineDurationDays: 1
 				},
-				{ kind: 'removed' as const, workItemId: 'w-removed', workItemTitle: 'removido' },
+				{
+					kind: 'removed' as const,
+					workItemId: 'w-removed',
+					workItemTitle: 'removido',
+					baselinePlannedStart: '2026-09-10',
+					baselineDurationDays: 2
+				},
 				{ kind: 'scheduled_after' as const, workItemId: 'w-sched-after', workItemTitle: 'agendado depois' },
 				{ kind: 'added_after' as const, workItemId: 'w-added-after', workItemTitle: 'adicionado depois' },
 				{ kind: 'compared_unrepresentable' as const, workItemId: 'w-unrep', workItemTitle: 'não calculável' }

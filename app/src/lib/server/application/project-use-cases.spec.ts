@@ -2554,7 +2554,9 @@ describe('createProjectUseCases — ScheduleBaseline (ETAPA 12 do rework, §42, 
 				workItemTitle: 'A',
 				startVarianceDays: 0,
 				finishVarianceDays: 0,
-				durationVarianceDays: 0
+				durationVarianceDays: 0,
+				baselinePlannedStart: '2026-09-14',
+				baselineDurationDays: 3
 			}
 		]);
 		// A primeira baseline não foi sobrescrita no repositório — só deixou de

@@ -447,7 +447,9 @@ describe('buildProjectView — scheduleBaseline', () => {
 					workItemTitle: 'A',
 					startVarianceDays: 0,
 					finishVarianceDays: 0,
-					durationVarianceDays: 0
+					durationVarianceDays: 0,
+					baselinePlannedStart: '2026-09-12',
+					baselineDurationDays: 3
 				}
 			]
 		});

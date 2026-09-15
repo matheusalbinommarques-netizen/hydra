@@ -2350,9 +2350,17 @@ export function captureScheduleBaseline(
 // Uma entry null/null cujo WorkItem CONTINUA sem schedule não aparece em
 // nenhum estado: não há fato novo para reportar.
 export type ScheduleBaselineComparisonEntry =
-	| { kind: 'compared'; workItemId: string; startVarianceDays: number; finishVarianceDays: number; durationVarianceDays: number }
+	| {
+			kind: 'compared';
+			workItemId: string;
+			startVarianceDays: number;
+			finishVarianceDays: number;
+			durationVarianceDays: number;
+			baselinePlannedStart: string;
+			baselineDurationDays: number;
+	  }
 	| { kind: 'compared_unrepresentable'; workItemId: string }
-	| { kind: 'removed'; workItemId: string }
+	| { kind: 'removed'; workItemId: string; baselinePlannedStart: string; baselineDurationDays: number }
 	| { kind: 'scheduled_after'; workItemId: string }
 	| { kind: 'added_after'; workItemId: string };
 
@@ -2392,13 +2400,20 @@ export function computeScheduleBaselineComparison(
 					workItemId: item.id,
 					startVarianceDays: civilDaysBetween(entry.plannedStart as string, item.plannedStart as string),
 					finishVarianceDays: civilDaysBetween(baselineFinish, currentFinish),
-					durationVarianceDays: (item.durationDays as number) - (entry.durationDays as number)
+					durationVarianceDays: (item.durationDays as number) - (entry.durationDays as number),
+					baselinePlannedStart: entry.plannedStart as string,
+					baselineDurationDays: entry.durationDays as number
 				});
 			} catch {
 				results.push({ kind: 'compared_unrepresentable', workItemId: item.id });
 			}
 		} else if (baselineScheduled && !currentScheduled) {
-			results.push({ kind: 'removed', workItemId: item.id });
+			results.push({
+				kind: 'removed',
+				workItemId: item.id,
+				baselinePlannedStart: entry.plannedStart as string,
+				baselineDurationDays: entry.durationDays as number
+			});
 		} else if (!baselineScheduled && currentScheduled) {
 			results.push({ kind: 'scheduled_after', workItemId: item.id });
 		}

@@ -12,26 +12,52 @@
 
 import { addCivilDays, civilDaysBetween } from '$lib/domain';
 import type { MilestoneStatus, WorkItemStatus } from '$lib/domain';
-import type { DeliverableView, MilestoneView, WorkItemView } from '$lib/server/application/types';
+import type { DeliverableView, MilestoneView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
+
+// Ghost da referência (ETAPA 12 do rework, §42, sétimo microcorte — Design
+// Gate aprovado, opção A do Scout) — geometria e rótulos da baseline ATIVA
+// para um WorkItem `compared` ou `removed`. `null` só quando a aritmética
+// civil do PRÓPRIO ponto histórico (fim = início + duração - 1) excede a
+// faixa representável — falha isolada dessa referência, nunca derruba a
+// surface (mesmo espírito de CronogramaWorkItemRow.geometry).
+export interface CronogramaGhost {
+	offsetDays: number;
+	widthDays: number;
+	plannedStartLabel: string;
+	semanticEndLabel: string;
+	durationLabel: string;
+}
 
 export interface CronogramaWorkItemRow {
 	id: string;
 	title: string;
 	status: WorkItemStatus;
 	statusLabel: string;
-	plannedStartLabel: string;
-	durationLabel: string;
+	// `null` só para uma linha `removed` (ghost-only): o WorkItem continua
+	// existindo, mas não tem schedule atual — nunca um valor fabricado.
+	plannedStartLabel: string | null;
+	durationLabel: string | null;
 	// Fim SEMÂNTICO, sempre derivado aqui — nunca persistido (mesmo
 	// contrato de D058: fim = plannedStart + (durationDays - 1) dias).
-	semanticEndLabel: string;
+	semanticEndLabel: string | null;
 	hasConflict: boolean;
 	conflictLabel: string | null;
-	// Geometria da barra, em DIAS a partir de axis.startLabel — a interface
-	// multiplica por uma largura de dia própria (detalhe de apresentação,
-	// não desta projeção). `null` só no caso defensivo em que a aritmética
-	// de data civil deste item específico excede a faixa representável
-	// (nunca fabricar geometria inventada — ver domain/civil-date.ts).
+	// Geometria da barra ATUAL, em DIAS a partir de axis.startLabel — a
+	// interface multiplica por uma largura de dia própria (detalhe de
+	// apresentação, não desta projeção). `null` quando a aritmética de data
+	// civil deste item específico excede a faixa representável, OU quando a
+	// linha é `removed` (nenhuma barra atual — ver removedFromBaseline).
 	geometry: { offsetDays: number; widthDays: number } | null;
+	// Referência da baseline ativa para esta linha — só populada para
+	// `compared` (junto da barra atual) e `removed` (sozinho). `scheduled_after`,
+	// `added_after` e `compared_unrepresentable` nunca recebem ghost (nenhuma
+	// referência histórica inventada).
+	ghost: CronogramaGhost | null;
+	// `true` só quando esta linha existe na projeção exclusivamente por ter
+	// sido `removed` na baseline ativa (WorkItem sem schedule atual). Uma
+	// linha `removed` nunca tem `geometry`.
+	removedFromBaseline: boolean;
+	removedNote: string | null;
 }
 
 export interface CronogramaGroup {
@@ -121,11 +147,33 @@ function isScheduled(item: WorkItemView): item is ScheduledWorkItem {
 // mesmo caso extremo já tratado por findWorkItemPrecedenceConflict/
 // findWorkItemKnownFreeSlack no domínio).
 function trySemanticEnd(item: ScheduledWorkItem): string | null {
+	return tryAddSemanticEnd(item.plannedStart, item.durationDays);
+}
+
+function tryAddSemanticEnd(plannedStart: string, durationDays: number): string | null {
 	try {
-		return addCivilDays(item.plannedStart, item.durationDays - 1);
+		return addCivilDays(plannedStart, durationDays - 1);
 	} catch {
 		return null;
 	}
+}
+
+const REMOVED_NOTE = 'Removido do cronograma atual — permanece na referência.';
+
+// Ghost da referência ativa (compared/removed) — `null` só quando o FIM
+// histórico (início + duração - 1) excede a faixa civil representável;
+// falha isolada dessa referência específica, nunca fabrica geometria.
+function buildGhost(baselinePlannedStart: string, baselineDurationDays: number, axisStart: string | null): CronogramaGhost | null {
+	if (axisStart === null) return null;
+	const baselineEnd = tryAddSemanticEnd(baselinePlannedStart, baselineDurationDays);
+	if (baselineEnd === null) return null;
+	return {
+		offsetDays: civilDaysBetween(axisStart, baselinePlannedStart),
+		widthDays: baselineDurationDays,
+		plannedStartLabel: formatCivilDate(baselinePlannedStart),
+		semanticEndLabel: formatCivilDate(baselineEnd),
+		durationLabel: durationLabel(baselineDurationDays)
+	};
 }
 
 function compareChronologically(
@@ -142,7 +190,12 @@ function groupTitle(deliverableId: string | null, deliverables: readonly Deliver
 	return deliverables.find((deliverable) => deliverable.id === deliverableId)?.title ?? 'Entrega';
 }
 
-function buildRow(item: ScheduledWorkItem, axisStart: string | null, semanticEnd: string | null): CronogramaWorkItemRow {
+function buildRow(
+	item: ScheduledWorkItem,
+	axisStart: string | null,
+	semanticEnd: string | null,
+	baselineGhostEntry: { baselinePlannedStart: string; baselineDurationDays: number } | undefined
+): CronogramaWorkItemRow {
 	const geometry =
 		axisStart !== null && semanticEnd !== null
 			? { offsetDays: civilDaysBetween(axisStart, item.plannedStart), widthDays: item.durationDays }
@@ -163,22 +216,61 @@ function buildRow(item: ScheduledWorkItem, axisStart: string | null, semanticEnd
 				: item.precedenceConflict.kind === 'conflict'
 					? `Conflito de precedência com "${item.precedenceConflict.dependsOnWorkItemTitle}".`
 					: `Precedência com "${item.precedenceConflict.dependsOnWorkItemTitle}" fora do intervalo suportado.`,
-		geometry
+		geometry,
+		ghost: baselineGhostEntry
+			? buildGhost(baselineGhostEntry.baselinePlannedStart, baselineGhostEntry.baselineDurationDays, axisStart)
+			: null,
+		removedFromBaseline: false,
+		removedNote: null
 	};
 }
 
-function buildGroups(
-	scheduledItems: readonly ScheduledWorkItem[],
-	deliverables: readonly DeliverableView[],
-	axisStart: string | null,
-	semanticEndByWorkItemId: ReadonlyMap<string, string | null>
-): CronogramaGroup[] {
-	const byGroup = new Map<string, ScheduledWorkItem[]>();
-	for (const item of scheduledItems) {
-		const key = item.deliverable?.deliverableId ?? NO_DELIVERABLE_KEY;
+// Linha `removed` (ETAPA 12 do rework, §42, sétimo microcorte) — identidade
+// do WorkItem ATUAL (título/status/agrupamento), geometria exclusivamente da
+// baseline. Nunca uma barra atual inventada.
+function buildRemovedRow(
+	item: WorkItemView,
+	baselinePlannedStart: string,
+	baselineDurationDays: number,
+	axisStart: string | null
+): CronogramaWorkItemRow {
+	return {
+		id: item.id,
+		title: item.title,
+		status: item.status,
+		statusLabel: WORK_STATUS_LABEL[item.status],
+		plannedStartLabel: null,
+		durationLabel: null,
+		semanticEndLabel: null,
+		hasConflict: false,
+		conflictLabel: null,
+		geometry: null,
+		ghost: buildGhost(baselinePlannedStart, baselineDurationDays, axisStart),
+		removedFromBaseline: true,
+		removedNote: REMOVED_NOTE
+	};
+}
+
+// Uma linha agrupável — ou um WorkItem com schedule atual (`compared` e
+// demais variantes sem ghost), ou uma linha `removed` ghost-only. A data
+// usada para ordenação cronológica é a atual quando existe, senão a da
+// própria referência histórica (única data honesta disponível para a
+// linha).
+interface GroupableRow {
+	deliverableId: string | null;
+	sortDate: string;
+	createdAt: string;
+	id: string;
+	row: CronogramaWorkItemRow;
+}
+
+function buildGroups(rows: readonly GroupableRow[], deliverables: readonly DeliverableView[]): CronogramaGroup[] {
+	const byGroup = new Map<string, GroupableRow[]>();
+	for (const entry of rows) {
+		const key = entry.deliverableId ?? NO_DELIVERABLE_KEY;
 		const bucket = byGroup.get(key);
-		if (bucket) bucket.push(item);
-		else byGroup.set(key, [item]);
+		if (bucket) bucket.push(entry);
+		else byGroup.set(key, [entry]);
 	}
 
 	const deliverableGroupKeys = [...byGroup.keys()].filter((key) => key !== NO_DELIVERABLE_KEY);
@@ -195,16 +287,16 @@ function buildGroups(
 		: orderedDeliverableKeys;
 
 	return orderedKeys.map((key) => {
-		const items = [...(byGroup.get(key) ?? [])].sort((a, b) =>
+		const entries = [...(byGroup.get(key) ?? [])].sort((a, b) =>
 			compareChronologically(
-				{ plannedDate: a.plannedStart, createdAt: a.createdAt, id: a.id },
-				{ plannedDate: b.plannedStart, createdAt: b.createdAt, id: b.id }
+				{ plannedDate: a.sortDate, createdAt: a.createdAt, id: a.id },
+				{ plannedDate: b.sortDate, createdAt: b.createdAt, id: b.id }
 			)
 		);
 		return {
 			key,
 			title: groupTitle(key === NO_DELIVERABLE_KEY ? null : key, deliverables),
-			items: items.map((item) => buildRow(item, axisStart, semanticEndByWorkItemId.get(item.id) ?? null))
+			items: entries.map((entry) => entry.row)
 		};
 	});
 }
@@ -256,8 +348,33 @@ export function buildCronogramaView(input: {
 	workItems: readonly WorkItemView[];
 	deliverables: readonly DeliverableView[];
 	milestones: readonly MilestoneView[];
+	// Baseline ATIVA (ETAPA 12 do rework, §42, sétimo microcorte) — `null`/
+	// ausente reproduz exatamente o comportamento anterior a este microcorte
+	// (falsificador A: sem baseline, o Cronograma não muda).
+	scheduleBaseline?: ScheduleBaselineView | null;
 }): CronogramaView {
 	const scheduledItems = input.workItems.filter(isScheduled);
+	const workItemById = new Map(input.workItems.map((item) => [item.id, item]));
+
+	// Só `compared` e `removed` carregam referência histórica (D062/D063) —
+	// `scheduled_after`, `added_after` e `compared_unrepresentable` nunca
+	// recebem ghost (ver ScheduleBaselineComparisonEntryView).
+	const comparedByWorkItemId = new Map<string, { baselinePlannedStart: string; baselineDurationDays: number }>();
+	const removedEntries: { workItemId: string; baselinePlannedStart: string; baselineDurationDays: number }[] = [];
+	for (const entry of input.scheduleBaseline?.entries ?? []) {
+		if (entry.kind === 'compared') {
+			comparedByWorkItemId.set(entry.workItemId, {
+				baselinePlannedStart: entry.baselinePlannedStart,
+				baselineDurationDays: entry.baselineDurationDays
+			});
+		} else if (entry.kind === 'removed') {
+			removedEntries.push({
+				workItemId: entry.workItemId,
+				baselinePlannedStart: entry.baselinePlannedStart,
+				baselineDurationDays: entry.baselineDurationDays
+			});
+		}
+	}
 
 	const semanticEndByWorkItemId = new Map<string, string | null>();
 	for (const item of scheduledItems) {
@@ -269,16 +386,25 @@ export function buildCronogramaView(input: {
 	);
 
 	// Menor intervalo que enquadra honestamente o que será exibido: início
-	// dos WorkItems agendados + Milestones planejados; fim dos mesmos
-	// WorkItems (fim semântico, quando calculável) + Milestones. Comparação
-	// lexicográfica de YYYY-MM-DD já é ordem cronológica — sem Date.
+	// dos WorkItems agendados + Milestones planejados + referências
+	// históricas representáveis de `compared`/`removed`; fim dos mesmos
+	// WorkItems (fim semântico, quando calculável) + Milestones + fins
+	// históricos representáveis. Comparação lexicográfica de YYYY-MM-DD já é
+	// ordem cronológica — sem Date. Início histórico sempre entra (é um dado
+	// já persistido, válido por construção); fim histórico só entra quando a
+	// aritmética civil não estourar (mesmo tratamento do fim atual).
+	const baselineHistoricalEntries = [...comparedByWorkItemId.values(), ...removedEntries];
 	const candidateStarts: string[] = [
 		...scheduledItems.map((item) => item.plannedStart),
-		...datedMilestones.map((milestone) => milestone.plannedDate)
+		...datedMilestones.map((milestone) => milestone.plannedDate),
+		...baselineHistoricalEntries.map((entry) => entry.baselinePlannedStart)
 	];
 	const candidateEnds: string[] = [
 		...[...semanticEndByWorkItemId.values()].filter((value): value is string => value !== null),
-		...datedMilestones.map((milestone) => milestone.plannedDate)
+		...datedMilestones.map((milestone) => milestone.plannedDate),
+		...baselineHistoricalEntries
+			.map((entry) => tryAddSemanticEnd(entry.baselinePlannedStart, entry.baselineDurationDays))
+			.filter((value): value is string => value !== null)
 	];
 
 	let axis: CronogramaAxis | null = null;
@@ -295,8 +421,32 @@ export function buildCronogramaView(input: {
 		};
 	}
 
+	const scheduledRows: GroupableRow[] = scheduledItems.map((item) => ({
+		deliverableId: item.deliverable?.deliverableId ?? null,
+		sortDate: item.plannedStart,
+		createdAt: item.createdAt,
+		id: item.id,
+		row: buildRow(item, axisStart, semanticEndByWorkItemId.get(item.id) ?? null, comparedByWorkItemId.get(item.id))
+	}));
+
+	// `removed`: identidade/agrupamento vêm do WorkItem ATUAL (continua
+	// existindo); WorkItem ausente seria estado corrompido — filtrado, nunca
+	// quebra a surface (mesmo tratamento de buildScheduleBaselineComparisonEntryView).
+	const removedRows: GroupableRow[] = [];
+	for (const entry of removedEntries) {
+		const item = workItemById.get(entry.workItemId);
+		if (!item) continue;
+		removedRows.push({
+			deliverableId: item.deliverable?.deliverableId ?? null,
+			sortDate: entry.baselinePlannedStart,
+			createdAt: item.createdAt,
+			id: item.id,
+			row: buildRemovedRow(item, entry.baselinePlannedStart, entry.baselineDurationDays, axisStart)
+		});
+	}
+
 	return {
-		groups: buildGroups(scheduledItems, input.deliverables, axisStart, semanticEndByWorkItemId),
+		groups: buildGroups([...scheduledRows, ...removedRows], input.deliverables),
 		milestones: buildMilestones(input.milestones, axisStart),
 		dependencies: buildDependencies(scheduledItems),
 		axis

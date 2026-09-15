@@ -19,7 +19,8 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 		cronograma: buildCronogramaView({
 			workItems: view.workItems,
 			deliverables: view.deliverables,
-			milestones: view.milestones
+			milestones: view.milestones,
+			scheduleBaseline: view.scheduleBaseline
 		})
 	};
 };

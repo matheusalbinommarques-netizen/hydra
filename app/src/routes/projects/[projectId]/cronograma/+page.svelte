@@ -133,8 +133,16 @@
 						href="/projects/{projectId}/work?item={entry.item.id}"
 					>
 						<span class="item-title">{entry.item.title}</span>
-						<span class="item-meta">{entry.item.statusLabel} · {entry.item.durationLabel}</span>
-						{#if entry.item.conflictLabel}
+						<span class="item-meta">
+							{#if entry.item.removedFromBaseline}
+								{entry.item.statusLabel}
+							{:else}
+								{entry.item.statusLabel} · {entry.item.durationLabel}
+							{/if}
+						</span>
+						{#if entry.item.removedNote}
+							<span class="item-removed-note">{entry.item.removedNote}</span>
+						{:else if entry.item.conflictLabel}
 							<span class="item-conflict-note">{entry.item.conflictLabel}</span>
 						{:else if entry.item.geometry === null}
 							<span class="item-conflict-note">Barra não calculável: datas fora do intervalo suportado.</span>
@@ -187,20 +195,31 @@
 						{#each laneEntries as entry (entry.key)}
 							{#if entry.type === 'header'}
 								<div class="group-header-row" style="height:{GROUP_HEADER_HEIGHT}px"></div>
-							{:else if entry.item.geometry}
-								<div class="item-row" style="height:{ROW_HEIGHT}px">
-									<a
-										class="item-bar"
-										class:conflict={entry.item.hasConflict}
-										href="/projects/{projectId}/work?item={entry.item.id}"
-										style="left:{entry.item.geometry.offsetDays * DAY_WIDTH}px; width:{entry.item.geometry.widthDays *
-											DAY_WIDTH}px"
-										title="{entry.item.plannedStartLabel} – {entry.item.semanticEndLabel} · {entry.item.durationLabel}"
-										aria-label="{entry.item.title}: {entry.item.plannedStartLabel} a {entry.item.semanticEndLabel}"
-									></a>
-								</div>
 							{:else}
-								<div class="item-row" style="height:{ROW_HEIGHT}px"></div>
+								<div class="item-row" style="height:{ROW_HEIGHT}px">
+									{#if entry.item.ghost}
+										<div
+											class="item-ghost"
+											class:standalone={entry.item.removedFromBaseline}
+											style="left:{entry.item.ghost.offsetDays * DAY_WIDTH}px; width:{entry.item.ghost.widthDays *
+												DAY_WIDTH}px"
+											title="Referência: {entry.item.ghost.plannedStartLabel} – {entry.item.ghost.semanticEndLabel} · {entry
+												.item.ghost.durationLabel}"
+											aria-hidden="true"
+										></div>
+									{/if}
+									{#if entry.item.geometry}
+										<a
+											class="item-bar"
+											class:conflict={entry.item.hasConflict}
+											href="/projects/{projectId}/work?item={entry.item.id}"
+											style="left:{entry.item.geometry.offsetDays * DAY_WIDTH}px; width:{entry.item.geometry.widthDays *
+												DAY_WIDTH}px"
+											title="{entry.item.plannedStartLabel} – {entry.item.semanticEndLabel} · {entry.item.durationLabel}"
+											aria-label="{entry.item.title}: {entry.item.plannedStartLabel} a {entry.item.semanticEndLabel}"
+										></a>
+									{/if}
+								</div>
 							{/if}
 						{/each}
 					</div>
@@ -230,6 +249,9 @@
 		<span class="legend-item"><span class="legend-swatch bar"></span>trabalho agendado</span>
 		<span class="legend-item"><span class="legend-swatch bar conflict"></span>conflito de precedência</span>
 		<span class="legend-item"><span class="legend-swatch diamond"></span>marco do projeto</span>
+		{#if cronograma.groups.some((group) => group.items.some((item) => item.ghost !== null))}
+			<span class="legend-item"><span class="legend-swatch ghost"></span>referência (baseline)</span>
+		{/if}
 	</div>
 {/if}
 
@@ -337,6 +359,12 @@
 		color: var(--hydra-warning);
 	}
 
+	.item-removed-note {
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+		font-style: italic;
+	}
+
 	.item-identity-cell.conflict .item-title {
 		color: var(--hydra-warning);
 	}
@@ -433,6 +461,23 @@
 		border: 1.5px dashed var(--hydra-warning);
 	}
 
+	.item-ghost {
+		position: absolute;
+		top: 34px;
+		height: 6px;
+		border-radius: 3px;
+		background: rgba(101, 104, 108, 0.35);
+		pointer-events: none;
+	}
+
+	.item-ghost.standalone {
+		top: 10px;
+		height: 22px;
+		border-radius: var(--hydra-radius);
+		background: transparent;
+		border: 1.5px dashed rgba(101, 104, 108, 0.55);
+	}
+
 	.milestone-lane-header-spacer {
 		border-top: 1px solid rgba(101, 104, 108, 0.2);
 	}
@@ -487,6 +532,14 @@
 		height: 9px;
 		background: var(--hydra-accent);
 		transform: rotate(45deg);
+	}
+
+	.legend-swatch.ghost {
+		width: 16px;
+		height: 8px;
+		border-radius: 3px;
+		background: transparent;
+		border: 1.5px dashed rgba(101, 104, 108, 0.55);
 	}
 
 	.section-link {

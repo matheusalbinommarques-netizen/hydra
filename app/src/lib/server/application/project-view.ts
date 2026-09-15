@@ -388,12 +388,20 @@ function buildScheduleBaselineComparisonEntryView(
 				workItemTitle,
 				startVarianceDays: entry.startVarianceDays,
 				finishVarianceDays: entry.finishVarianceDays,
-				durationVarianceDays: entry.durationVarianceDays
+				durationVarianceDays: entry.durationVarianceDays,
+				baselinePlannedStart: entry.baselinePlannedStart,
+				baselineDurationDays: entry.baselineDurationDays
 			};
 		case 'compared_unrepresentable':
 			return { kind: 'compared_unrepresentable', workItemId: workItem.id, workItemTitle };
 		case 'removed':
-			return { kind: 'removed', workItemId: workItem.id, workItemTitle };
+			return {
+				kind: 'removed',
+				workItemId: workItem.id,
+				workItemTitle,
+				baselinePlannedStart: entry.baselinePlannedStart,
+				baselineDurationDays: entry.baselineDurationDays
+			};
 		case 'scheduled_after':
 			return { kind: 'scheduled_after', workItemId: workItem.id, workItemTitle };
 		case 'added_after':

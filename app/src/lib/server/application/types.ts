@@ -399,9 +399,11 @@ export type ScheduleBaselineComparisonEntryView =
 			startVarianceDays: number;
 			finishVarianceDays: number;
 			durationVarianceDays: number;
+			baselinePlannedStart: string;
+			baselineDurationDays: number;
 	  }
 	| { kind: 'compared_unrepresentable'; workItemId: string; workItemTitle: string }
-	| { kind: 'removed'; workItemId: string; workItemTitle: string }
+	| { kind: 'removed'; workItemId: string; workItemTitle: string; baselinePlannedStart: string; baselineDurationDays: number }
 	| { kind: 'scheduled_after'; workItemId: string; workItemTitle: string }
 	| { kind: 'added_after'; workItemId: string; workItemTitle: string };
 

@@ -2111,20 +2111,44 @@ describe('computeScheduleBaselineComparison (ETAPA 12 do rework, §42, quinto mi
 
 		// Sem alteração: variâncias todas zero.
 		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
-			{ kind: 'compared', workItemId: 'wi-a', startVarianceDays: 0, finishVarianceDays: 0, durationVarianceDays: 0 }
+			{
+				kind: 'compared',
+				workItemId: 'wi-a',
+				startVarianceDays: 0,
+				finishVarianceDays: 0,
+				durationVarianceDays: 0,
+				baselinePlannedStart: '2026-09-12',
+				baselineDurationDays: 3
+			}
 		]);
 
 		// Atraso de 2 dias, duração cresce 1 dia: início e fim mais tarde, positivo.
 		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-14', 4, T4));
 		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
-			{ kind: 'compared', workItemId: 'wi-a', startVarianceDays: 2, finishVarianceDays: 3, durationVarianceDays: 1 }
+			{
+				kind: 'compared',
+				workItemId: 'wi-a',
+				startVarianceDays: 2,
+				finishVarianceDays: 3,
+				durationVarianceDays: 1,
+				baselinePlannedStart: '2026-09-12',
+				baselineDurationDays: 3
+			}
 		]);
 
 		// Adiantamento de 2 dias, duração encolhe 1 dia: negativo. Baseline
 		// finish 2026-09-14 (12 + 2 dias); novo finish 2026-09-11 (10 + 1 dia).
 		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', '2026-09-10', 2, T4));
 		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
-			{ kind: 'compared', workItemId: 'wi-a', startVarianceDays: -2, finishVarianceDays: -3, durationVarianceDays: -1 }
+			{
+				kind: 'compared',
+				workItemId: 'wi-a',
+				startVarianceDays: -2,
+				finishVarianceDays: -3,
+				durationVarianceDays: -1,
+				baselinePlannedStart: '2026-09-12',
+				baselineDurationDays: 3
+			}
 		]);
 	});
 
@@ -2134,7 +2158,9 @@ describe('computeScheduleBaselineComparison (ETAPA 12 do rework, §42, quinto mi
 		state = captureWithFreshPreview(state, 'baseline-1', T3);
 		state = unwrap(setWorkItemSchedule(catalog, state, 'wi-a', null, null, T4));
 
-		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([{ kind: 'removed', workItemId: 'wi-a' }]);
+		expect(computeScheduleBaselineComparison(state, 'baseline-1')).toEqual([
+			{ kind: 'removed', workItemId: 'wi-a', baselinePlannedStart: '2026-09-12', baselineDurationDays: 3 }
+		]);
 	});
 
 	// Falsificador F — WorkItem existente sem schedule NA CAPTURA (ganha uma

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DeliverableView, MilestoneView, WorkItemView } from '$lib/server/application/types';
+import type { DeliverableView, MilestoneView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
 import { buildCronogramaView } from './cronograma-view';
 
 function makeWorkItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): WorkItemView {
@@ -270,5 +270,233 @@ describe('buildCronogramaView — data civil e geometria (hardening)', () => {
 		expect(overflowRow?.geometry).toBeNull();
 		const validRow = result.groups[0].items.find((item) => item.id === 'wi-valid');
 		expect(validRow?.geometry).toEqual({ offsetDays: 0, widthDays: 2 });
+	});
+});
+
+// Ghost da baseline ativa (ETAPA 12 do rework, §42, sétimo microcorte —
+// Design Gate aprovado, opção A do Scout). Falsificadores A-N do briefing.
+describe('buildCronogramaView — referência da baseline ativa (ghost)', () => {
+	function makeBaseline(entries: ScheduleBaselineView['entries']): ScheduleBaselineView {
+		return { createdAt: '2026-01-01T00:00:00.000Z', partial: false, entries };
+	}
+
+	it('A — baseline inexistente: Cronograma permanece igual (sem ghost)', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [] });
+		expect(result.groups[0].items[0].ghost).toBeNull();
+	});
+
+	it('B — compared idêntico: current e ghost coincidem, sem geometria alegando divergência', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'compared',
+				workItemId: 'wi-1',
+				workItemTitle: 'wi-1',
+				startVarianceDays: 0,
+				finishVarianceDays: 0,
+				durationVarianceDays: 0,
+				baselinePlannedStart: '2026-09-01',
+				baselineDurationDays: 2
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const row = result.groups[0].items[0];
+		expect(row.geometry).toEqual({ offsetDays: 0, widthDays: 2 });
+		expect(row.ghost).toEqual({
+			offsetDays: 0,
+			widthDays: 2,
+			plannedStartLabel: '01/09/2026',
+			semanticEndLabel: '02/09/2026',
+			durationLabel: '2 dias'
+		});
+	});
+
+	it('C/D — compared deslocado e com duração diferente: offsets e larguras diferentes', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-05', durationDays: 4 })];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'compared',
+				workItemId: 'wi-1',
+				workItemTitle: 'wi-1',
+				startVarianceDays: 4,
+				finishVarianceDays: 4,
+				durationVarianceDays: 2,
+				baselinePlannedStart: '2026-09-01',
+				baselineDurationDays: 2
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const row = result.groups[0].items[0];
+		// eixo começa na referência (01/09), current offset = 4 dias depois.
+		expect(row.geometry).toEqual({ offsetDays: 4, widthDays: 4 });
+		expect(row.ghost).toEqual({
+			offsetDays: 0,
+			widthDays: 2,
+			plannedStartLabel: '01/09/2026',
+			semanticEndLabel: '02/09/2026',
+			durationLabel: '2 dias'
+		});
+	});
+
+	it('E — removed: linha ghost-only, identidade presente, nenhuma barra atual', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', title: 'Removido', plannedStart: null, durationDays: null })];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'removed',
+				workItemId: 'wi-1',
+				workItemTitle: 'Removido',
+				baselinePlannedStart: '2026-09-01',
+				baselineDurationDays: 3
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const row = result.groups[0].items[0];
+		expect(row.id).toBe('wi-1');
+		expect(row.geometry).toBeNull();
+		expect(row.removedFromBaseline).toBe(true);
+		expect(row.removedNote).not.toBeNull();
+		expect(row.ghost).toEqual({
+			offsetDays: 0,
+			widthDays: 3,
+			plannedStartLabel: '01/09/2026',
+			semanticEndLabel: '03/09/2026',
+			durationLabel: '3 dias'
+		});
+	});
+
+	it('F/G — scheduled_after e added_after nunca recebem ghost', () => {
+		const workItems = [
+			makeWorkItem({ id: 'wi-after', plannedStart: '2026-09-10', durationDays: 1 }),
+			makeWorkItem({ id: 'wi-new', plannedStart: '2026-09-11', durationDays: 1 })
+		];
+		const scheduleBaseline = makeBaseline([
+			{ kind: 'scheduled_after', workItemId: 'wi-after', workItemTitle: 'wi-after' },
+			{ kind: 'added_after', workItemId: 'wi-new', workItemTitle: 'wi-new' }
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const rows = result.groups[0].items;
+		expect(rows.find((item) => item.id === 'wi-after')?.ghost).toBeNull();
+		expect(rows.find((item) => item.id === 'wi-new')?.ghost).toBeNull();
+	});
+
+	it('H — compared_unrepresentable: barra atual normal, nenhuma referência inventada', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const scheduleBaseline = makeBaseline([
+			{ kind: 'compared_unrepresentable', workItemId: 'wi-1', workItemTitle: 'wi-1' }
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const row = result.groups[0].items[0];
+		expect(row.geometry).toEqual({ offsetDays: 0, widthDays: 2 });
+		expect(row.ghost).toBeNull();
+	});
+
+	it('I/J — baseline antes ou depois do plano atual expande o eixo', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'compared',
+				workItemId: 'wi-1',
+				workItemTitle: 'wi-1',
+				startVarianceDays: 9,
+				finishVarianceDays: -5,
+				durationVarianceDays: -10,
+				baselinePlannedStart: '2026-09-01',
+				baselineDurationDays: 20
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		// referência: 01/09 a 20/09 (01 + 19 dias); atual: 10/09 a 11/09 — eixo
+		// deve cobrir a união inteira.
+		expect(result.axis?.startDate).toBe('2026-09-01');
+		expect(result.axis?.endDate).toBe('2026-09-20');
+	});
+
+	it('K — ano 0099 na referência: sem remapeamento', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '0099-01-05', durationDays: 2 })];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'compared',
+				workItemId: 'wi-1',
+				workItemTitle: 'wi-1',
+				startVarianceDays: 4,
+				finishVarianceDays: 4,
+				durationVarianceDays: 0,
+				baselinePlannedStart: '0099-01-01',
+				baselineDurationDays: 2
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		expect(result.axis?.startDate).toBe('0099-01-01');
+		expect(result.groups[0].items[0].ghost?.plannedStartLabel).toBe('01/01/0099');
+	});
+
+	it('L — fim histórico irrepresentável: ghost null, sem quebrar a surface', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'compared',
+				workItemId: 'wi-1',
+				workItemTitle: 'wi-1',
+				startVarianceDays: 0,
+				finishVarianceDays: 0,
+				durationVarianceDays: 0,
+				baselinePlannedStart: '9999-12-30',
+				baselineDurationDays: 5
+			}
+		]);
+		expect(() => buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline })).not.toThrow();
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		const row = result.groups[0].items[0];
+		expect(row.ghost).toBeNull();
+		expect(row.geometry).toEqual({ offsetDays: 0, widthDays: 2 });
+	});
+
+	it('M — removed não cria Dependency com posição inventada', () => {
+		const workItems = [
+			makeWorkItem({ id: 'wi-removed', title: 'Removido', plannedStart: null, durationDays: null }),
+			makeWorkItem({
+				id: 'wi-b',
+				plannedStart: '2026-09-05',
+				durationDays: 1,
+				dependsOn: [{ dependencyId: 'dep-1', dependsOnWorkItemId: 'wi-removed', title: 'Removido', satisfied: true }]
+			})
+		];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'removed',
+				workItemId: 'wi-removed',
+				workItemTitle: 'Removido',
+				baselinePlannedStart: '2026-09-01',
+				baselineDurationDays: 1
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		expect(result.dependencies).toEqual([]);
+	});
+
+	it('removed agrupa pela Deliverable atual do WorkItem', () => {
+		const deliverables = [makeDeliverable({ id: 'd-1', title: 'Portal', order: 1 })];
+		const workItems = [
+			makeWorkItem({
+				id: 'wi-removed',
+				title: 'Removido',
+				plannedStart: null,
+				durationDays: null,
+				deliverable: { deliverableId: 'd-1', title: 'Portal' }
+			})
+		];
+		const scheduleBaseline = makeBaseline([
+			{
+				kind: 'removed',
+				workItemId: 'wi-removed',
+				workItemTitle: 'Removido',
+				baselinePlannedStart: '2026-09-01',
+				baselineDurationDays: 1
+			}
+		]);
+		const result = buildCronogramaView({ workItems, deliverables, milestones: [], scheduleBaseline });
+		expect(result.groups.map((group) => group.key)).toEqual(['d-1']);
+		expect(result.groups[0].items[0].id).toBe('wi-removed');
 	});
 });

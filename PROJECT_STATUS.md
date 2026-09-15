@@ -411,11 +411,25 @@ entrega", conectores de Dependency FS lag-zero, precedenceConflict
 perceptível, marcos em lane própria, e deep-link `?item=` de Cronograma
 até o WorkItem exato em Trabalho. Escopo Nível 2 (só rotas/projeções/UI,
 sem tocar `domain/`, schema ou persistência) — sem decisão de arquitetura
-nova, por isso sem entrada própria em decision-log. Conscientemente DEFER
-nesta fatia: referência (baseline) visual no Gantt, folga conhecida no
-Gantt, filtro por Deliverable na toolbar, zoom, e tudo que já era DEFER de
-item 4/5. S12 permanece `in_progress` — o próximo microcorte de item 6
-(elasticidade B do Gate) ainda não foi decidido.
+nova, por isso sem entrada própria em decision-log.
+
+Sétimo microcorte de item 6 entregue: referência (baseline) visual no
+Gantt — `compared`/`removed` passam a expor `baselinePlannedStart`/
+`baselineDurationDays` (dado já persistido, sem escrita nova), e o
+Cronograma renderiza um "ghost" da baseline ativa (linha fina sob a barra
+atual quando há divergência; retângulo tracejado standalone quando o
+WorkItem foi `removed`, sem barra atual, com nota textual). Um WorkItem
+`removed` passa a existir na projeção mesmo sem schedule atual, mas
+readiness continua exclusivamente sobre WorkItems com schedule ATUAL
+(`isCronogramaReady` não recebe baseline) — falsificador coberto em
+`tracking-view.spec.ts`. Nenhuma geometria fabricada para
+`scheduled_after`/`added_after`/`compared_unrepresentable`; eixo expande
+para cobrir referência histórica antes/depois do plano atual. Escopo
+Nível 2 (domínio só expõe campos derivados já lidos, sem nova regra/
+persistência). Conscientemente DEFER: folga conhecida no Gantt, filtro
+por Deliverable na toolbar, zoom, seletor de baseline histórica,
+drag/resize, e tudo que já era DEFER de item 4/5. S12 permanece
+`in_progress` — o próximo microcorte de item 6 ainda não foi decidido.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
