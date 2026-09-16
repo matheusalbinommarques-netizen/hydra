@@ -1,20 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import { catalog } from '$lib/catalog';
-import type { ImpedimentType, RiskImpact, RiskLikelihood } from '$lib/domain';
+import type { RiskImpact, RiskLikelihood } from '$lib/domain';
 import { buildPhaseProgress } from '$lib/phase-progress';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
 import { buildJourneyContext } from '../now/journey-context';
 import { buildTrackingView } from './tracking-view';
 import type { Actions, PageServerLoad } from './$types';
-
-const IMPEDIMENT_TYPES: readonly ImpedimentType[] = [
-	'dependencia_externa',
-	'decisao_pendente',
-	'falta_de_recurso',
-	'bloqueio_tecnico',
-	'outro'
-];
 
 const RISK_LIKELIHOODS: readonly RiskLikelihood[] = ['baixa', 'media', 'alta'];
 const RISK_IMPACTS: readonly RiskImpact[] = ['baixo', 'medio', 'alto'];
@@ -65,11 +57,6 @@ function readExpectedBaselineCandidate(formData: FormData): { entries: ExpectedB
 	return { entries: validated };
 }
 
-function readTipo(formData: FormData, key: string): ImpedimentType | null {
-	const value = readString(formData, key);
-	return value && (IMPEDIMENT_TYPES as readonly string[]).includes(value) ? (value as ImpedimentType) : null;
-}
-
 // Select vazio é o caminho de "limpar avaliação" (par null/null), não erro —
 // distinto de um valor presente fora da lista aprovada, que é entrada
 // inválida.
@@ -98,10 +85,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		workItems: view.workItems,
 		milestones: view.milestones,
 		scheduleBaseline: view.scheduleBaseline,
-		impediments: view.impediments,
-		risks: view.risks,
-		decisions: view.decisions,
-		openPendingItems: view.openPendingItems
+		risks: view.risks
 	});
 
 	return { tracking };
@@ -134,87 +118,6 @@ export const actions: Actions = {
 		}
 
 		const result = await getProjectUseCases().captureScheduleBaseline({ projectId: params.projectId, expected });
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
-	addImpediment: async ({ request, params }) => {
-		const formData = await request.formData();
-		const text = readString(formData, 'text');
-		const tipo = readTipo(formData, 'tipo');
-		if (!text || !tipo) {
-			return fail(400, { message: 'Descreva o impedimento e selecione um tipo.' });
-		}
-
-		const result = await getProjectUseCases().addImpediment({ projectId: params.projectId, text, tipo });
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
-	setType: async ({ request, params }) => {
-		const formData = await request.formData();
-		const impedimentId = readString(formData, 'impedimentId');
-		const tipo = readTipo(formData, 'tipo');
-		if (!impedimentId || !tipo) return fail(400, { message: 'Impedimento ou tipo inválido.' });
-
-		const result = await getProjectUseCases().setImpedimentType({
-			projectId: params.projectId,
-			impedimentId,
-			tipo
-		});
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
-	// setDecision (ETAPA 11 do rework, segundo microcorte, §41/§13.4) — associa,
-	// troca ou desassocia (select vazio) a Decision relacionada a um Impediment
-	// `decisao_pendente`. Mesmo padrão de setType acima.
-	setDecision: async ({ request, params }) => {
-		const formData = await request.formData();
-		const impedimentId = readString(formData, 'impedimentId');
-		if (!impedimentId) return fail(400, { message: 'Impedimento inválido.' });
-		const decisionId = readString(formData, 'decisionId');
-
-		const result = await getProjectUseCases().setImpedimentDecision({
-			projectId: params.projectId,
-			impedimentId,
-			decisionId
-		});
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
-	setNextAction: async ({ request, params }) => {
-		const formData = await request.formData();
-		const impedimentId = readString(formData, 'impedimentId');
-		if (!impedimentId) return fail(400, { message: 'Impedimento inválido.' });
-		const nextAction = readString(formData, 'nextAction');
-
-		const result = await getProjectUseCases().setImpedimentNextAction({
-			projectId: params.projectId,
-			impedimentId,
-			nextAction
-		});
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
-	resolve: async ({ request, params }) => {
-		const formData = await request.formData();
-		const impedimentId = readString(formData, 'impedimentId');
-		if (!impedimentId) return fail(400, { message: 'Impedimento inválido.' });
-
-		const result = await getProjectUseCases().resolveImpediment({ projectId: params.projectId, impedimentId });
-		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
-		return { success: true };
-	},
-
-	reopen: async ({ request, params }) => {
-		const formData = await request.formData();
-		const impedimentId = readString(formData, 'impedimentId');
-		if (!impedimentId) return fail(400, { message: 'Impedimento inválido.' });
-
-		const result = await getProjectUseCases().reopenImpediment({ projectId: params.projectId, impedimentId });
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
 		return { success: true };
 	},

@@ -9,17 +9,9 @@
 
 import { isCronogramaReady } from '$lib/schedule-readiness';
 import { buildRisks, type RisksView } from '$lib/risk-view';
-import { buildDecisions, type DecisionsView } from '$lib/decision-view';
-import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
-import type {
-	DecisionView,
-	ImpedimentView,
-	MilestoneView,
-	RiskView,
-	ScheduleBaselineView,
-	WorkItemView
-} from '$lib/server/application/types';
-import type { NextActivityResult, PendingItemView } from '$lib/orientation-engine';
+import type { MilestoneStatus, WorkItemStatus } from '$lib/domain';
+import type { MilestoneView, RiskView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
+import type { NextActivityResult } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
 import { buildWorkView, type WorkItemBoardCounts } from '../work/work-view';
@@ -38,56 +30,6 @@ export interface TrackingWorkView {
 	counts: WorkItemBoardCounts;
 	inProgress: WorkItemView[];
 	state: TrackingWorkState;
-}
-
-export interface TrackingAttentionPendingItem {
-	id: string;
-	label: string;
-	detail: string;
-	activityDefinitionId: string;
-}
-
-export interface TrackingImpedimentsView {
-	open: ImpedimentView[];
-	resolved: ImpedimentView[];
-}
-
-// Bloqueios (ETAPA 6 do rework) — sinal estreito, derivado, explicável e
-// acionável (contrato de Signal, ver HYDRA_PRODUCT_REWORK.md §15): um
-// WorkItem por card, só quando bloqueado por um Impediment aberto. `why` é
-// texto simples (mesmo espírito de TrackingContinuityView.label), não um
-// health score nem semáforo — a explicação é sempre "este impedimento está
-// bloqueando trabalho no estado X", nunca um cálculo de severidade.
-export interface TrackingBlockedWorkItem {
-	workItemId: string;
-	title: string;
-	// Estado operacional atual do WorkItem — exposto para a interface poder
-	// explicar, antes da ação de "marcar como resolvido", que esse estado NÃO
-	// muda automaticamente (só o bloqueio é removido). Achado de dogfooding:
-	// "Resolver impedimento" parecia resolver o problema sozinho; a interface
-	// precisa desta informação para dar contexto antes da mutação.
-	status: WorkItemStatus;
-	impedimentId: string;
-	impedimentText: string;
-	impedimentTipo: ImpedimentType;
-	why: string;
-	// Impacto downstream (ETAPA 8 do rework, terceiro microcorte) — WorkItems
-	// ainda abertos que declararam depender deste item bloqueado. Derivado
-	// aqui, nunca persistido, e composto só a partir de fatos que a projeção
-	// já recebe: A.dependsOn -> B.id -> B.blockedBy. Os itens afetados reais
-	// ficam expostos (não só uma contagem) para a derivação continuar
-	// explicável e testável. Não é um sinal novo nem um card novo: enriquece
-	// o card do impedimento que já existe, para não oferecer duas ações
-	// concorrentes sobre o mesmo Impediment.
-	waitingWorkItems: TrackingBlockedWaitingWorkItem[];
-	waitingLabel: string | null;
-}
-
-// Um WorkItem afetado, visto a partir do item bloqueado (mesmo espírito de
-// WorkItemDependencyView: título junto, para a interface não cruzar listas).
-export interface TrackingBlockedWaitingWorkItem {
-	workItemId: string;
-	title: string;
 }
 
 // Linha do tempo (ETAPA 8 do rework, microcorte de Timeline;
@@ -199,16 +141,7 @@ export interface TrackingView {
 	// títulos denormalizados por project-view.ts); `null` é o caso normal
 	// (nenhuma baseline capturada ainda).
 	scheduleBaseline: ScheduleBaselineView | null;
-	blockedWorkItems: TrackingBlockedWorkItem[];
-	attentionPendingItems: TrackingAttentionPendingItem[];
-	impediments: TrackingImpedimentsView;
 	risks: RisksView;
-	// Só a divisão pendente/tomada (mesma projeção compartilhada de
-	// `/decisions`, ver decision-view.ts) — usada aqui apenas como dado de
-	// apoio para o seletor "Decisão relacionada" de um Impediment
-	// `decisao_pendente`; a gestão do lifecycle de Decision vive em
-	// `/decisions` (ETAPA 13, D065/D066).
-	decisions: DecisionsView;
 	continuity: TrackingContinuityView;
 }
 
@@ -219,10 +152,7 @@ export interface TrackingViewInput {
 	workItems: WorkItemView[];
 	milestones: MilestoneView[];
 	scheduleBaseline: ScheduleBaselineView | null;
-	impediments: ImpedimentView[];
 	risks: RiskView[];
-	decisions: DecisionView[];
-	openPendingItems: PendingItemView[];
 }
 
 const WORK_STATUS_LABEL: Record<WorkItemView['status'], string> = {
@@ -282,54 +212,6 @@ function buildWork(workItems: WorkItemView[]): TrackingWorkView {
 	}
 
 	return { counts: board.counts, inProgress: board.groups.em_andamento, state };
-}
-
-function buildBlockedWorkItems(workItems: WorkItemView[]): TrackingBlockedWorkItem[] {
-	return workItems
-		.filter((item) => item.blockedBy !== null)
-		.map((item) => {
-			const waitingWorkItems = buildWaitingWorkItems(workItems, item.id);
-			return {
-				workItemId: item.id,
-				title: item.title,
-				status: item.status,
-				// filter acima já garante blockedBy !== null.
-				impedimentId: item.blockedBy!.impedimentId,
-				impedimentText: item.blockedBy!.text,
-				impedimentTipo: item.blockedBy!.tipo,
-				why: `Este impedimento está bloqueando trabalho atualmente em "${WORK_STATUS_LABEL[item.status]}".`,
-				waitingWorkItems,
-				waitingLabel: buildWaitingLabel(waitingWorkItems)
-			};
-		});
-}
-
-// Quem depende deste item bloqueado e ainda está aberto. `status !==
-// 'concluido'` não é detalhe: um WorkItem já concluído não aguarda ninguém —
-// Dependency deliberadamente não impede a conclusão (D039), e afirmar que ele
-// aguarda seria falso, o mesmo defeito que produziu a apresentação 'pendente'
-// em Trabalho. Nenhuma condição extra sobre a aresta é necessária: um item
-// bloqueado por Impediment aberto nunca está 'concluido' (moveWorkItem recusa
-// a transição), logo a precedência é sempre insatisfeita aqui.
-function buildWaitingWorkItems(workItems: WorkItemView[], blockedWorkItemId: string): TrackingBlockedWaitingWorkItem[] {
-	return workItems
-		.filter(
-			(candidate) =>
-				candidate.status !== 'concluido' &&
-				candidate.dependsOn.some((dependency) => dependency.dependsOnWorkItemId === blockedWorkItemId)
-		)
-		.map((candidate) => ({ workItemId: candidate.id, title: candidate.title }));
-}
-
-// "Mantém aguardando", nunca "destrava"/"libera": resolver o impedimento não
-// satisfaz a Dependency — os afetados continuam aguardando até o predecessor
-// ser CONCLUÍDO. Escolha pura e testável (mesmo padrão de
-// allMilestonesLinkedHint em work-view.ts); `null` quando não há afetados, e a
-// interface simplesmente não desenha a linha.
-function buildWaitingLabel(waitingWorkItems: TrackingBlockedWaitingWorkItem[]): string | null {
-	if (waitingWorkItems.length === 0) return null;
-	if (waitingWorkItems.length === 1) return `Também mantém ${waitingWorkItems[0].title} aguardando.`;
-	return `Também mantém ${waitingWorkItems.length} trabalhos aguardando.`;
 }
 
 const MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
@@ -448,32 +330,6 @@ function buildCronogramaCard(
 	return { conflictCount, divergingFromBaselineCount, unrepresentableFromBaselineCount };
 }
 
-function buildAttentionPendingItems(openPendingItems: PendingItemView[]): TrackingAttentionPendingItem[] {
-	return openPendingItems.map((item) => ({
-		id: item.id,
-		label: item.label,
-		detail: item.detail,
-		activityDefinitionId: item.activityDefinitionId
-	}));
-}
-
-// Impedimentos vinculados a um WorkItem (workItemId !== null) já têm sua
-// própria projeção acionável e explicável em "Precisa de você"
-// (buildBlockedWorkItems, acima) — mantê-los também aqui duplicaria o mesmo
-// fato operacional em "Atenções" e ofereceria uma segunda superfície
-// administrativa concorrente ("Gestão de impedimentos") para o mesmo
-// bloqueio (achado real de dogfooding, não hipotético). Impedimentos sem
-// WorkItem (o caso normal de impedimento no nível do projeto) continuam
-// aparecendo aqui exatamente como antes — este filtro não muda o
-// comportamento deles. Resolvidos continuam todos juntos: histórico passivo,
-// não é uma segunda superfície de ação sobre um bloqueio ainda aberto.
-function buildImpediments(impediments: ImpedimentView[]): TrackingImpedimentsView {
-	return {
-		open: impediments.filter((impediment) => impediment.status === 'aberto' && impediment.workItemId === null),
-		resolved: impediments.filter((impediment) => impediment.status === 'resolvido')
-	};
-}
-
 function buildContinuity(
 	nextActivity: NextActivityResult,
 	situation: TrackingSituationView | undefined
@@ -497,11 +353,7 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		// assim que o Cronograma atinge readiness, mesmo com marcos datados.
 		timeline: cronogramaReady ? [] : buildTimeline(input.milestones, input.workItems),
 		scheduleBaseline: input.scheduleBaseline,
-		blockedWorkItems: buildBlockedWorkItems(input.workItems),
-		attentionPendingItems: buildAttentionPendingItems(input.openPendingItems),
-		impediments: buildImpediments(input.impediments),
 		risks: buildRisks(input.risks),
-		decisions: buildDecisions(input.decisions),
 		continuity: buildContinuity(input.nextActivity, situation)
 	};
 }

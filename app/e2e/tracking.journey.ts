@@ -1,9 +1,10 @@
-// Teste Playwright dedicado de Acompanhamento — vertical 2, fatia "Gestão
-// de impedimentos". Impediment não é gated por nenhuma
-// atividade do catálogo, então este journey não precisa percorrer a
-// Descoberta: cria o projeto e vai direto a /tracking. Roda via
-// playwright.journey.config.ts (servidor efêmero + banco temporário
-// isolados) — ver e2e/helpers/ephemeral-server.ts.
+// Teste Playwright dedicado de Atenções — vertical 2, fatia "Gestão de
+// impedimentos" (migrada de Acompanhamento na ETAPA 13, S13, terceiro
+// microcorte, D065/D066). Impediment não é gated por nenhuma atividade do
+// catálogo, então este journey não precisa percorrer a Descoberta: cria o
+// projeto e vai direto a /attentions. Roda via playwright.journey.config.ts
+// (servidor efêmero + banco temporário isolados) — ver
+// e2e/helpers/ephemeral-server.ts.
 
 import { expect, test } from '@playwright/test';
 import { createProject } from './helpers/create-project';
@@ -11,19 +12,19 @@ import { useEphemeralServer } from './helpers/journey-server';
 
 const server = useEphemeralServer('tracking');
 
-test('Acompanhamento: adicionar, classificar tipo, definir próxima ação, resolver e reabrir um impedimento', async ({
+test('Atenções: adicionar, classificar tipo, definir próxima ação, resolver e reabrir um impedimento', async ({
 	page
 }) => {
 	let projectId = '';
 
-	await test.step('criar projeto e ir para /tracking', async () => {
+	await test.step('criar projeto e ir para /attentions', async () => {
 		projectId = await createProject(page, server.baseUrl);
 
-		await page.getByRole('link', { name: 'Acompanhamento' }).click();
-		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/tracking`);
-		await expect(page.getByRole('heading', { name: 'Acompanhamento do projeto' })).toBeVisible();
+		await page.getByRole('link', { name: 'Atenções' }).click();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/attentions`);
+		await expect(page.getByRole('heading', { name: 'Atenções', exact: true })).toBeVisible();
 		await expect(page.getByText('Nenhum impedimento aberto.')).toBeVisible();
-		await expect(page.getByText('Nenhum impedimento ou pendência em aberto.')).toBeVisible();
+		await expect(page.getByText('Nenhuma pendência metodológica em aberto.')).toBeVisible();
 	});
 
 	await test.step('adicionar um impedimento com tipo', async () => {
@@ -38,7 +39,6 @@ test('Acompanhamento: adicionar, classificar tipo, definir próxima ação, reso
 		await expect(
 			page.locator('.impediment-row', { hasText: 'Falta acesso ao ambiente de testes' })
 		).toBeVisible();
-		await expect(page.getByLabel('Atenções').getByText('Falta acesso ao ambiente de testes')).toBeVisible();
 	});
 
 	await test.step('editar tipo e próxima ação a partir do estado de leitura', async () => {
@@ -79,11 +79,11 @@ test('Acompanhamento: adicionar, classificar tipo, definir próxima ação, reso
 		await expect(page.locator('.impediment-row', { hasText: 'Falta acesso ao ambiente de testes' })).toBeVisible();
 	});
 
-	await test.step('/now mostra a contagem neutra de impedimentos abertos, com link para Acompanhamento', async () => {
+	await test.step('/now mostra a contagem neutra de impedimentos abertos, com link para Atenções', async () => {
 		await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
 		await expect(page.getByText('1 impedimento aberto')).toBeVisible();
-		await page.getByRole('link', { name: 'ver em Acompanhamento' }).click();
-		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/tracking`);
+		await page.getByRole('link', { name: 'ver em Atenções' }).click();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/attentions`);
 	});
 
 	await test.step('sem impedimentos abertos, /now não mostra a contagem', async () => {

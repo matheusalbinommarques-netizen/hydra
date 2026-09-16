@@ -244,7 +244,7 @@ function buildEventText(event: ProjectEvent, workItemTitleById: Map<string, stri
 
 // Design Gate S7 — o chip do estado filtrado nomeia o objeto observado, não
 // os ids técnicos da URL: WorkItem tem prioridade sobre Impediment quando o
-// filtro cobre os dois (caso de "Ver mudanças relacionadas" em /tracking —
+// filtro cobre os dois (caso de "Ver mudanças relacionadas" em /attentions —
 // o chip nomeia o WorkItem mesmo que os eventos exibidos sejam só do
 // Impediment vinculado, ver Design Gate "Estado filtrado"). Sem rótulo
 // resolvível (id não corresponde a nenhum WorkItem/Impediment conhecido),

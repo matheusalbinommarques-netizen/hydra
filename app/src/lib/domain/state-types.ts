@@ -91,7 +91,7 @@ export interface ScopeVersion {
 // Acompanhamento — vertical 2, fatia "Impedimentos". Coleção
 // independente do catálogo metodológico: não referencia nenhuma
 // ActivityDefinition, não nasce de uma atividade guiada, não gera
-// PendingItem — é manipulada diretamente na tela própria (/tracking). Mesmo
+// PendingItem — é manipulada diretamente na tela própria (/attentions). Mesmo
 // molde de ScopeItem (id
 // próprio, projectId, texto livre, createdAt/updatedAt), mas sem
 // bucket/order/effort/sourceSuggestionId: não se aplicam aqui (não há

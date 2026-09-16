@@ -553,7 +553,7 @@
 					<span class="impediment-tipo">{tipoLabel[selectedItem.blockedBy.tipo]}</span>
 					<p class="impediment-text">{selectedItem.blockedBy.text}</p>
 				</div>
-				<a class="section-link" href="/projects/{projectId}/tracking">Atualizar no Acompanhamento →</a>
+				<a class="section-link" href="/projects/{projectId}/attentions">Atualizar em Atenções →</a>
 			{:else if blockFormOpen}
 				<p class="panel-hint">O que está bloqueando esse trabalho?</p>
 				<form

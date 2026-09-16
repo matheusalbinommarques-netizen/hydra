@@ -594,7 +594,7 @@ export interface ProjectView {
 	// Sempre computado, nunca persistido.
 	criteriaScopeConflict: CriteriaScopeConflict;
 	// Acompanhamento (vertical 2, "Impedimentos") — todos os impedimentos
-	// (abertos e resolvidos); a tela /tracking e a contagem em /now filtram por status
+	// (abertos e resolvidos); a tela /attentions e a contagem em /now filtram por status
 	// diretamente, sem campo derivado extra aqui (mesmo padrão de
 	// openPendingItems.length usado direto no template).
 	impediments: ImpedimentView[];

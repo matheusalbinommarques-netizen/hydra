@@ -110,7 +110,7 @@
 		<p class="impediments-indicator">
 			{openImpedimentsCount}
 			{openImpedimentsCount === 1 ? 'impedimento aberto' : 'impedimentos abertos'} —
-			<a href="/projects/{view.projectId}/tracking">ver em Acompanhamento</a>
+			<a href="/projects/{view.projectId}/attentions">ver em Atenções</a>
 		</p>
 	{/if}
 

@@ -87,14 +87,15 @@ test('Pular etapa: modal, retomada e pendências', async ({ page }) => {
 
 	// Pendências abertas não aparecem mais em Registros (D028,
 	// docs/07-management/decision-log.md) — já cobertas por Agora (verificado
-	// no passo anterior) e por Acompanhamento, que é onde esta checagem
+	// no passo anterior) e por Atenções (ETAPA 13, S13, terceiro microcorte,
+	// D065/D066 — migrado de Acompanhamento), que é onde esta checagem
 	// cruzada de superfície passa a viver.
-	await test.step('Acompanhamento reflete a pendência aberta', async () => {
-		await page.getByRole('link', { name: 'Acompanhamento' }).click();
-		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/tracking`);
+	await test.step('Atenções reflete a pendência aberta', async () => {
+		await page.getByRole('link', { name: 'Atenções' }).click();
+		await page.waitForURL(`${server.baseUrl}/projects/${projectId}/attentions`);
 
-		const attentions = page.getByRole('region', { name: 'Atenções' });
-		const pendingItem = attentions.getByRole('listitem').filter({ hasText: 'Situação não foi detalhada' });
+		const pendingSection = page.getByRole('region', { name: 'Pendências' });
+		const pendingItem = pendingSection.getByRole('listitem').filter({ hasText: 'Situação não foi detalhada' });
 		await expect(pendingItem).toHaveCount(1);
 		await expect(pendingItem.getByText('Pendência', { exact: true })).toBeVisible();
 	});
