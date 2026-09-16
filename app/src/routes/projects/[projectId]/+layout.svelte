@@ -104,6 +104,7 @@
 		{ key: 'deliverables', label: 'Entregas' },
 		{ key: 'tracking', label: 'Acompanhamento' },
 		{ key: 'risks', label: 'Riscos' },
+		{ key: 'decisions', label: 'Decisões' },
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
 		{ key: 'work', label: 'Trabalho' },
@@ -200,6 +201,12 @@
 					aria-current={isCurrentRoute(`/projects/${projectId}/risks`) ? 'page' : undefined}
 				>
 					Riscos
+				</a>
+				<a
+					href="/projects/{projectId}/decisions"
+					aria-current={isCurrentRoute(`/projects/${projectId}/decisions`) ? 'page' : undefined}
+				>
+					Decisões
 				</a>
 				{#if cronogramaReady}
 					<a

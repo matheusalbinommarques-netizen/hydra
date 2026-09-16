@@ -9,9 +9,9 @@
 
 import { isCronogramaReady } from '$lib/schedule-readiness';
 import { buildRisks, type RisksView } from '$lib/risk-view';
+import { buildDecisions, type DecisionsView } from '$lib/decision-view';
 import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
 import type {
-	ChangeView,
 	DecisionView,
 	ImpedimentView,
 	MilestoneView,
@@ -50,15 +50,6 @@ export interface TrackingAttentionPendingItem {
 export interface TrackingImpedimentsView {
 	open: ImpedimentView[];
 	resolved: ImpedimentView[];
-}
-
-// Decisões/mudanças (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo
-// molde de TrackingRisksView: pendentes/tomadas separadas, sem promoção
-// automática a "Precisa de você" nem a "Atenções" — ter prazo declarado não
-// implica nenhuma regra de urgência automática nesta fatia.
-export interface TrackingDecisionsView {
-	pending: DecisionView[];
-	decided: DecisionView[];
 }
 
 // Bloqueios (ETAPA 6 do rework) — sinal estreito, derivado, explicável e
@@ -160,16 +151,6 @@ export interface TrackingContinuityView {
 	label: string;
 }
 
-// Opção enxuta para o seletor "Trabalhos afetados" de uma Decision (ETAPA 11
-// do rework, terceiro microcorte, §41) — mesmo espírito de allDecisions em
-// +page.svelte (todos os WorkItems do projeto, sem filtrar por status: um
-// WorkItem concluído continua podendo ser marcado como afetado por uma
-// decisão registrada depois).
-export interface TrackingWorkItemOption {
-	id: string;
-	title: string;
-}
-
 // Card temporal enxuto (ETAPA 12 do rework, §42, sexto microcorte —
 // primeiro corte do Gantt, Design Gate "Corredor") — substitui a Timeline
 // completa quando o Cronograma atinge readiness (isCronogramaReady); as
@@ -222,11 +203,12 @@ export interface TrackingView {
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
 	risks: RisksView;
-	decisions: TrackingDecisionsView;
-	// Opções para o seletor "Trabalhos afetados" dentro de cada Decision —
-	// todos os WorkItems do projeto (ver TrackingWorkItemOption acima).
-	workItemOptions: TrackingWorkItemOption[];
-	changes: ChangeView[];
+	// Só a divisão pendente/tomada (mesma projeção compartilhada de
+	// `/decisions`, ver decision-view.ts) — usada aqui apenas como dado de
+	// apoio para o seletor "Decisão relacionada" de um Impediment
+	// `decisao_pendente`; a gestão do lifecycle de Decision vive em
+	// `/decisions` (ETAPA 13, D065/D066).
+	decisions: DecisionsView;
 	continuity: TrackingContinuityView;
 }
 
@@ -240,7 +222,6 @@ export interface TrackingViewInput {
 	impediments: ImpedimentView[];
 	risks: RiskView[];
 	decisions: DecisionView[];
-	changes: ChangeView[];
 	openPendingItems: PendingItemView[];
 }
 
@@ -493,13 +474,6 @@ function buildImpediments(impediments: ImpedimentView[]): TrackingImpedimentsVie
 	};
 }
 
-function buildDecisions(decisions: DecisionView[]): TrackingDecisionsView {
-	return {
-		pending: decisions.filter((decision) => decision.status === 'pendente'),
-		decided: decisions.filter((decision) => decision.status === 'tomada')
-	};
-}
-
 function buildContinuity(
 	nextActivity: NextActivityResult,
 	situation: TrackingSituationView | undefined
@@ -508,10 +482,6 @@ function buildContinuity(
 		return { completed: true, label: 'Não há próxima atividade — o projeto foi concluído.' };
 	}
 	return { completed: false, label: `Próxima atividade: ${situation?.activityLabel ?? '—'}` };
-}
-
-function buildWorkItemOptions(workItems: WorkItemView[]): TrackingWorkItemOption[] {
-	return workItems.map((item) => ({ id: item.id, title: item.title }));
 }
 
 export function buildTrackingView(input: TrackingViewInput): TrackingView {
@@ -532,8 +502,6 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		impediments: buildImpediments(input.impediments),
 		risks: buildRisks(input.risks),
 		decisions: buildDecisions(input.decisions),
-		workItemOptions: buildWorkItemOptions(input.workItems),
-		changes: input.changes,
 		continuity: buildContinuity(input.nextActivity, situation)
 	};
 }
