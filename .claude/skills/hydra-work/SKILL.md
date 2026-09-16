@@ -1,6 +1,6 @@
 ---
 name: hydra-work
-description: Implementa um item do backlog vigente do Hydra (ex. C3-03) até o ponto dogfoodável, e depois de aprovação humana, faz hardening/full/documentação/selo, deixando o pacote pronto para /hydra-ship. Uso explícito apenas via /hydra-work.
+description: Implementa um item do backlog vigente do Hydra (ex. C3-03) numa única passagem — planeja, implementa, executa QA de runtime própria e, sem blockers, segue até selar o pacote para /hydra-ship (D067: sem dogfood humano por microcorte durante o período pré-IA). Uso explícito apenas via /hydra-work.
 disable-model-invocation: true
 argument-hint: <item-id> [continue]
 arguments:
@@ -10,11 +10,14 @@ allowed-tools: Read, Grep, Glob, Edit, Write, Bash(node .claude/scripts/hydra-st
 ---
 
 Implementa um único item do backlog vigente, identificado por `$item` (ex.:
-`C5-01`), do plano até o ponto dogfoodável numa única passagem — sem pausas
-intermediárias antes disso, exceto quando este documento pedir
-explicitamente para parar. Depois do dogfood, hardening/full/selo só
-acontecem numa passagem seguinte, depois de aprovação humana explícita. Se
-`$item` não for informado, pare e peça o identificador.
+`C5-01`), numa única passagem: planeja, implementa o menor corte coerente,
+executa QA de runtime própria (§3.5) e, na ausência de blockers, segue
+direto até verificação final, documentação e selo — sem pausa para
+dogfood humano por microcorte (D067, `docs/07-management/decision-log.md`,
+vigente enquanto durar o período pré-IA do Hydra). Continua parando
+imediatamente diante de qualquer blocker listado em §3.5, inclusive
+Nível 3 antes de editar. Se `$item` não for informado, pare e peça o
+identificador.
 
 Uso:
 
@@ -25,8 +28,8 @@ Uso:
 
 `$mode` é opcional. Se informado, precisa ser exatamente `continue` — usado
 tanto para retomar depois de corrigir um defeito quanto para retomar depois
-de aprovação humana pós-dogfood, sem descartar o trabalho já feito. Qualquer
-outro valor: pare e peça o correto.
+de um blocker (§3.5) resolvido pelo Product Owner, sem descartar o trabalho
+já feito. Qualquer outro valor: pare e peça o correto.
 
 Este comando não comita nem publica — isso é `/hydra-ship`.
 
@@ -50,8 +53,8 @@ partir do JSON, confirme:
 - em modo `continue`, o stage precisa estar vazio
   (`git diff --cached --name-only` sem saída — não use a primeira coluna
   de `git status --short`, que não distingue stage vazio de arquivo `??`);
-  a árvore pode estar suja, isso é esperado (é o trabalho já dogfoodado ou
-  o defeito em correção).
+  a árvore pode estar suja, isso é esperado (é o trabalho interrompido por
+  um blocker, ou o defeito em correção).
 
 ## 2. Plano curto (inline, não bloqueante)
 
@@ -73,7 +76,7 @@ só, Nível 3. Em dúvida real, use o nível mais alto.
   explícita antes de editar qualquer coisa, a menos que essa autorização
   já esteja registrada no próprio item do backlog ou em decisão associada
   em `docs/07-management/decision-log.md`. Autorização para editar não é
-  autorização para pular o dogfood do §3.5 — ela só libera a edição.
+  autorização para pular a QA de runtime do §3.5 — ela só libera a edição.
 
 ## 3. Implementação
 
@@ -96,38 +99,63 @@ só, Nível 3. Em dúvida real, use o nível mais alto.
   trabalho, sem esperar terminar tudo para descobrir um erro. `full` não é
   o verificador desta fase.
 
-## 3.5. Runtime, dogfood e parada
+## 3.5. Runtime QA do agente e blockers
 
 Quando a mudança for observável (UI, rota, comportamento em runtime),
-suba/atualize o preview e observe-a rodando antes de considerar o corte
-pronto. Mudança puramente não observável (script interno, doc, tipo) pode
-pular a observação em runtime.
+suba/atualize o preview e rode o fluxo afetado de verdade antes de
+considerar o corte pronto. Mudança puramente não observável (script
+interno, doc, tipo) pode pular a observação em runtime.
 
-Ao chegar num estado que o usuário já consegue avaliar de verdade (dogfood):
+QA de runtime é responsabilidade do próprio agente que implementou o
+corte, não mais um ponto de pausa para dogfood humano por microcorte —
+mudança de cadência registrada em D067
+(`docs/07-management/decision-log.md`), vigente enquanto durar o período
+pré-IA do Hydra:
 
-- **PARE** e devolva o controle ao humano. Não prossiga para §4 em diante
-  na mesma passagem.
-- `hydra-verify full`, QA extensa, documentação de acompanhamento e
-  stage/selo **não são requisito** para chegar aqui. O rótulo Nível 3 do
-  item, por si só, também não exige `full` antes deste ponto.
-- Relate: o que foi implementado, como observar/testar, nível provisório
-  (Nível 1/2/3) e se algo ficou consciente e deliberadamente pendente para
-  o pós-dogfood.
+- rodar a aplicação real (preview);
+- executar como QA o fluxo afetado (caminho principal e as bordas
+  relevantes do que mudou);
+- verificar console sem erros relevantes;
+- verificar responsividade relevante (ex.: ~1280px/~390px quando a
+  mudança afeta layout);
+- testar as principais microinterações do fluxo afetado;
+- corrigir qualquer defeito encontrado antes de prosseguir.
 
-**Exceção — risco concreto antes do dogfood:** só amplie o verificador
-antes deste ponto quando houver risco concreto e específico que o
-dogfood sozinho não detecta — por exemplo, uma mudança de persistência
-que precisa provar compatibilidade de upgrade de dados existentes antes
-que valha a pena o humano avaliar o resultado. Nesse caso, rode o
-verificador específico daquele risco (ex.: o teste de upgrade em questão),
-não `hydra-verify full` inteiro, a menos que não exista um verificador mais
-estreito para esse risco.
+**Exceção — risco concreto que a QA de runtime sozinha não detecta:** só
+amplie o verificador além do §3 antes de seguir para §4 quando houver
+risco concreto e específico — por exemplo, uma mudança de persistência
+que precisa provar compatibilidade de upgrade de dados existentes. Nesse
+caso, rode o verificador específico daquele risco (ex.: o teste de
+upgrade em questão), não `hydra-verify full` inteiro, a menos que não
+exista um verificador mais estreito para esse risco.
 
-O restante deste documento (§4 em diante) só roda **depois** que o humano
-aprovar explicitamente seguir adiante a partir do dogfood. Retome com
-`/hydra-work $item continue`.
+Sem blockers, `/hydra-work` segue direto desta QA para §4 na mesma
+passagem — dogfood humano por microcorte não é requisito durante o
+período pré-IA (D067). Ao concluir a QA, relate o que foi implementado e
+como foi verificado antes de prosseguir.
 
-## 4. Nível final e verificação (pós-dogfood)
+**Blockers — param aqui e devolvem ao Product Owner, mesmo durante o
+período pré-IA (D067). Nunca "corrija" silenciosamente uma decisão de
+produto:**
+
+- conflito real entre o Design Gate e o repo;
+- decisão de domínio/semântica ainda não congelada;
+- necessidade de inventar lifecycle, estado, persistência ou regra;
+- mudança que contradiga D065/D066 ou outra decisão durável;
+- comportamento subjetivo cuja aceitação não possa ser objetivamente
+  inferida pelo próprio agente;
+- ação destrutiva/remota fora da autorização vigente;
+- evidência de que o Design Gate foi falsificado;
+- início de implementação material de IA no Hydra — exige o boundary de
+  dogfood humano completo do produto integrado (D067) antes de começar,
+  ainda não liberado por padrão.
+
+Ao parar por um blocker, relate exatamente qual item da lista acima se
+aplica, o que foi implementado até então, e o que precisa da decisão do
+Product Owner para continuar. Retome com `/hydra-work $item continue`
+depois que o blocker for resolvido.
+
+## 4. Nível final e verificação (pós-QA de runtime)
 
 Reavalie o nível a partir do diff real (`git diff --stat`,
 `git diff --name-status`):
@@ -238,17 +266,22 @@ reler tudo que o subagente leu.
 
 Não roda `git commit` nem `git push` — isso é `/hydra-ship`. Não inicia
 outro item do backlog. Não toca área sensível sem autorização já
-registrada. Não reproduz diff completo na resposta. Não roda `full`,
-hardening, QA extensa ou stage/selo antes do dogfood (§3.5) sem risco
-concreto que justifique a exceção ali descrita.
+registrada. Não reproduz diff completo na resposta. Não pula a QA de
+runtime do §3.5. Não prossegue além de um blocker listado em §3.5 sem
+decisão do Product Owner. Não roda `hydra-verify full` fora do boundary
+de §4 sem o risco concreto descrito na exceção de §3.5. Não decide
+produto ou semântica sozinho — isso sempre é blocker (§3.5).
 
 ## 10. Relatório final
 
-Depois de §3.5 (parada para dogfood): item; nível provisório; arquivos
-criados/alterados; como observar/testar; o que ficou pendente para
-pós-dogfood.
+Se parar por um blocker (§3.5): qual item da lista de blockers se aplica;
+o que foi implementado até então; o que precisa da decisão do Product
+Owner para continuar. Retome com `/hydra-work $item continue` depois que
+o blocker for resolvido.
 
-Depois de §7 (pacote selado, pós-aprovação): nível final e justificativa;
-resultado da verificação (`fast`/`full`) e de eventuais falhas tratadas
-via §4.1; resultado de QA quando aplicável; documentos tocados; resultado
-do `seal`/`check`; riscos ou limitações.
+Se seguir sem blocker até o selo (§7, fluxo normal desta cadência): nível
+final e justificativa; resultado da verificação (`fast`/`full`) e de
+eventuais falhas tratadas via §4.1; resultado da QA de runtime (§3.5) e
+da QA manual (§5) quando aplicável; documentos tocados; resultado do
+`seal`/`check`; riscos ou limitações. PARE aqui pedindo autorização para
+`/hydra-ship` — não para dogfood manual do Product Owner por microcorte.

@@ -134,11 +134,16 @@ Três skills cobrem o ciclo inteiro de um item:
 
 - `/hydra-resume`: retomar o estado (branch, ciclo, itens, gate);
 - `/hydra-work <item>` (ou `... <item> continue` para retomar depois de um
-  defeito, ou depois de aprovação humana pós-dogfood): planeja e implementa
-  o menor corte coerente até o ponto dogfoodável, então para e devolve o
-  controle ao humano — sem parar antes disso, exceto Nível 3 antes de
-  editar ou defeito real. Só depois de aprovação explícita, numa passagem
-  seguinte, faz hardening, verificação final, documenta e sela o item;
+  defeito, ou depois de um blocker resolvido pelo Product Owner): planeja e
+  implementa o menor corte coerente, executa QA de runtime própria e, sem
+  blockers, segue na mesma passagem até verificação final, documentação e
+  selo — sem pausa para dogfood humano por microcorte enquanto durar o
+  período pré-IA do Hydra (D067). Continua parando imediatamente diante de
+  Nível 3 antes de editar, defeito real, ou qualquer blocker semântico
+  listado na skill (conflito com o Design Gate, decisão de domínio não
+  congelada, necessidade de inventar lifecycle/estado/regra, contradição a
+  D065/D066, início de implementação de IA sem o boundary de dogfood
+  completo liberado, entre outros);
 - `/hydra-ship "<mensagem>"`: publica o stage selado — código e
   documentação de acompanhamento em um único commit.
 
@@ -167,13 +172,13 @@ manualmente leituras ou verificações que um script já realizou.
   nesses diretórios classifica pelo risco real (Nível 1/2). Em dúvida
   real, use o nível mais alto. Nível 3 exige autorização explícita
   registrada no item ou decisão associada antes de editar; verificação
-  `full` e QA manual quando aplicável, no boundary pós-dogfood
-  (seal/delivery) — o rótulo Nível 3 sozinho não exige `full` antes do
-  dogfood, só quando houver risco concreto que o justifique.
+  `full` e QA manual quando aplicável, no boundary pós-QA de runtime
+  (seal/delivery) — o rótulo Nível 3 sozinho não exige `full` antes desse
+  boundary, só quando houver risco concreto que o justifique.
 
 `/hydra-work` classifica o nível a partir do que o item pede e do diff
 real, e pede autorização assim que detectar Nível 3 — não é preciso
-decidir o nível antes. `full` roda no boundary pós-dogfood
+decidir o nível antes. `full` roda no boundary pós-QA de runtime
 (seal/delivery), inclusive antes de `/hydra-ship` quando várias entregas
 Nível 1/2 forem publicadas juntas, como checagem final de lote. O stage só
 é publicável depois de selado por `hydra-delivery-guard.mjs` dentro de
