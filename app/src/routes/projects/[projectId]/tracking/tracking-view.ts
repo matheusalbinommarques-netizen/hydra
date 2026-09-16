@@ -8,6 +8,7 @@
 // e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
 import { isCronogramaReady } from '$lib/schedule-readiness';
+import { buildRisks, type RisksView } from '$lib/risk-view';
 import type { ImpedimentType, MilestoneStatus, WorkItemStatus } from '$lib/domain';
 import type {
 	ChangeView,
@@ -49,15 +50,6 @@ export interface TrackingAttentionPendingItem {
 export interface TrackingImpedimentsView {
 	open: ImpedimentView[];
 	resolved: ImpedimentView[];
-}
-
-// Riscos (ETAPA 10 do rework, primeiro microcorte, D049) — mesmo molde de
-// TrackingImpedimentsView: abertos/encerrados separados, sem promoção
-// automática a "Precisa de você" nem a "Atenções" — sem avaliação/urgência
-// estruturada, isso fingiria acionabilidade que o modelo ainda não conhece.
-export interface TrackingRisksView {
-	open: RiskView[];
-	closed: RiskView[];
 }
 
 // Decisões/mudanças (ETAPA 11 do rework, primeiro microcorte, §41) — mesmo
@@ -229,7 +221,7 @@ export interface TrackingView {
 	blockedWorkItems: TrackingBlockedWorkItem[];
 	attentionPendingItems: TrackingAttentionPendingItem[];
 	impediments: TrackingImpedimentsView;
-	risks: TrackingRisksView;
+	risks: RisksView;
 	decisions: TrackingDecisionsView;
 	// Opções para o seletor "Trabalhos afetados" dentro de cada Decision —
 	// todos os WorkItems do projeto (ver TrackingWorkItemOption acima).
@@ -498,13 +490,6 @@ function buildImpediments(impediments: ImpedimentView[]): TrackingImpedimentsVie
 	return {
 		open: impediments.filter((impediment) => impediment.status === 'aberto' && impediment.workItemId === null),
 		resolved: impediments.filter((impediment) => impediment.status === 'resolvido')
-	};
-}
-
-function buildRisks(risks: RiskView[]): TrackingRisksView {
-	return {
-		open: risks.filter((risk) => risk.status === 'aberto'),
-		closed: risks.filter((risk) => risk.status === 'encerrado')
 	};
 }
 

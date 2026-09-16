@@ -103,6 +103,7 @@
 		{ key: 'now', label: 'Agora' },
 		{ key: 'deliverables', label: 'Entregas' },
 		{ key: 'tracking', label: 'Acompanhamento' },
+		{ key: 'risks', label: 'Riscos' },
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
 		{ key: 'work', label: 'Trabalho' },
@@ -193,6 +194,12 @@
 					aria-current={isCurrentRoute(`/projects/${projectId}/work`) ? 'page' : undefined}
 				>
 					Trabalho
+				</a>
+				<a
+					href="/projects/{projectId}/risks"
+					aria-current={isCurrentRoute(`/projects/${projectId}/risks`) ? 'page' : undefined}
+				>
+					Riscos
 				</a>
 				{#if cronogramaReady}
 					<a
