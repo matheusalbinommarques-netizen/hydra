@@ -89,6 +89,52 @@
 {#snippet mainContent()}
 	<h1>Agora</h1>
 
+	{#if data.nowOrientation && !data.nowOrientation.isEmpty}
+		<section class="now-orientation" aria-label="Orientação operacional">
+			<ul class="now-orientation-list">
+				{#if data.nowOrientation.blocking}
+					<li class="now-orientation-item">
+						<span class="now-orientation-fact">{data.nowOrientation.blocking.label}</span>
+						<a href="/projects/{view.projectId}/attentions">Ver em Atenções</a>
+					</li>
+				{/if}
+				{#if data.nowOrientation.decision}
+					<li class="now-orientation-item">
+						<span class="now-orientation-fact">
+							Decisão pendente: {data.nowOrientation.decision.subject}
+							{#if data.nowOrientation.decision.otherCount > 0}
+								(+{data.nowOrientation.decision.otherCount}
+								{data.nowOrientation.decision.otherCount === 1 ? 'outra' : 'outras'})
+							{/if}
+						</span>
+						<a href="/projects/{view.projectId}/decisions">Ver em Decisões</a>
+					</li>
+				{/if}
+				{#if data.nowOrientation.work}
+					<li class="now-orientation-item">
+						<span class="now-orientation-fact">
+							Em andamento: {data.nowOrientation.work.title}
+							{#if data.nowOrientation.work.otherCount > 0}
+								(+{data.nowOrientation.work.otherCount}
+								{data.nowOrientation.work.otherCount === 1 ? 'outro' : 'outros'})
+							{/if}
+						</span>
+						<a href="/projects/{view.projectId}/work">Ver no Quadro</a>
+					</li>
+				{/if}
+				{#if data.nowOrientation.milestone}
+					<li class="now-orientation-item">
+						<span class="now-orientation-fact">
+							Marco planejado: {data.nowOrientation.milestone.title} — {data.nowOrientation.milestone
+								.plannedDateLabel}
+						</span>
+						<a href="/projects/{view.projectId}/cronograma">Ver no Cronograma</a>
+					</li>
+				{/if}
+			</ul>
+		</section>
+	{/if}
+
 	{#if view.openPendingItems.length > 0}
 		<section class="pendencias" aria-label="Pendências">
 			<h2>Pendências</h2>
@@ -595,6 +641,36 @@
 </div>
 
 <style>
+	.now-orientation {
+		border: 1px solid var(--hydra-border);
+		border-radius: 10px;
+		padding: 1rem 1.25rem;
+		background: var(--hydra-surface);
+		margin-bottom: 1.5rem;
+	}
+
+	.now-orientation-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+
+	.now-orientation-item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+	}
+
+	.now-orientation-fact {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
 	.pendencias {
 		border: 1px solid var(--hydra-warning);
 		border-radius: 10px;

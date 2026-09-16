@@ -8,6 +8,7 @@ import { mapUseCaseError } from '$lib/server/error-messages';
 import type { ProjectView } from '$lib/server/application/types';
 import { buildBancadaOverviewView } from './bancada-overview-view';
 import { buildJourneyContext } from './journey-context';
+import { buildNowOrientationView } from './now-orientation-view';
 import type { Actions, PageServerLoad } from './$types';
 
 const DESCOBERTA_PHASE_ID = 'descoberta';
@@ -191,6 +192,13 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	);
 	const journeyContext = buildJourneyContext(catalog, view.nextActivity);
 	const phaseProgress = buildPhaseProgress(catalog, view);
+	const nowOrientation = buildNowOrientationView({
+		workItems: view.workItems,
+		impediments: view.impediments,
+		openPendingItems: view.openPendingItems,
+		decisions: view.decisions,
+		milestones: view.milestones
+	});
 
 	// Retomada de atividade pulada: só aceita um id que já corresponda a uma
 	// pendência aberta do próprio projeto (view.openPendingItems), nunca um
@@ -226,7 +234,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 			stepKind: 'full' as const,
 			bancadaOverview,
 			journeyContext,
-			phaseProgress
+			phaseProgress,
+			nowOrientation
 		};
 	}
 
@@ -256,7 +265,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 					reviewOrigin: null,
 					stepKind: 'optional' as const,
 					bancadaOverview,
-					journeyContext
+					journeyContext,
+					nowOrientation
 				};
 			}
 		}
@@ -297,7 +307,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 				stepKind: 'required' as const,
 				bancadaOverview,
 				journeyContext,
-				phaseProgress
+				phaseProgress,
+				nowOrientation
 			};
 		}
 		// Todos os campos obrigatórios já respondidos mas chegamos aqui sem
@@ -342,6 +353,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		bancadaOverview,
 		journeyContext,
 		phaseProgress,
+		nowOrientation,
 		planningItems,
 		dependenciasTrabalho,
 		marcosPrincipais,
