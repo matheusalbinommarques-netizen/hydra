@@ -7,8 +7,10 @@
 
 	let { data, form } = $props();
 	let projectId = $derived(data.projectId);
+	let ready = $derived(data.ready);
 	let cronograma = $derived(data.cronograma);
-	let axis = $derived(cronograma.axis);
+	let timeline = $derived(data.timeline);
+	let axis = $derived(cronograma?.axis ?? null);
 
 	// Referência do cronograma (ETAPA 13 do rework, §43 — D068) — preview
 	// NUNCA grava; guarda o candidato completo localmente a partir do
@@ -111,7 +113,7 @@
 
 	let laneEntries = $derived.by<LaneEntry[]>(() => {
 		const entries: LaneEntry[] = [];
-		for (const group of cronograma.groups) {
+		for (const group of cronograma?.groups ?? []) {
 			entries.push({ type: 'header', key: `h-${group.key}`, title: group.title });
 			for (const item of group.items) {
 				entries.push({ type: 'item', key: item.id, item });
@@ -122,7 +124,7 @@
 
 	let itemsById = $derived.by(() => {
 		const map = new Map<string, CronogramaWorkItemRow>();
-		for (const group of cronograma.groups) {
+		for (const group of cronograma?.groups ?? []) {
 			for (const item of group.items) map.set(item.id, item);
 		}
 		return map;
@@ -154,7 +156,7 @@
 	// defesa extra (nunca alcançada na prática) contra posição inventada.
 	let connectors = $derived.by(() => {
 		const result: { id: string; path: string; conflict: boolean }[] = [];
-		for (const edge of cronograma.dependencies) {
+		for (const edge of cronograma?.dependencies ?? []) {
 			const from = itemsById.get(edge.fromWorkItemId);
 			const to = itemsById.get(edge.toWorkItemId);
 			const fromTop = rowTopById.get(edge.fromWorkItemId);
@@ -171,7 +173,7 @@
 	});
 
 	let timelineWidth = $derived(axis ? axis.totalDays * DAY_WIDTH : 0);
-	let milestoneLaneHeight = $derived(cronograma.milestones.length * MILESTONE_ROW_HEIGHT);
+	let milestoneLaneHeight = $derived((cronograma?.milestones.length ?? 0) * MILESTONE_ROW_HEIGHT);
 </script>
 
 <svelte:head>
@@ -190,7 +192,37 @@
 	<p role="alert">{form.message}</p>
 {/if}
 
-{#if cronograma.groups.length === 0 && cronograma.milestones.length === 0}
+{#if !ready || !cronograma}
+	<!-- Linha do tempo pré-readiness (ETAPA 13 do rework, §43 — D066) —
+	     fallback de baixa fidelidade: lista cronológica de marcos datados,
+	     sem barra, sem escala, sem "hoje". Substitui o Gantt até existir ao
+	     menos um WorkItem com schedule completo (isCronogramaReady); as duas
+	     apresentações nunca coexistem. -->
+	{#if timeline.length === 0}
+		<p class="empty">Nenhum marco datado nem trabalho agendado para exibir ainda.</p>
+	{:else}
+		<ul class="timeline-list">
+			{#each timeline as entry (entry.id)}
+				<li class="timeline-row">
+					<span class="timeline-date">{entry.plannedDateLabel}</span>
+					<span class="timeline-kind">{entry.kind === 'milestone' ? 'Marco' : 'Trabalho'}</span>
+					<span class="timeline-title">{entry.title}</span>
+					{#if entry.kind === 'milestone'}
+						{#if entry.reachedAt === null}
+							<span class="timeline-state">{entry.statusLabel}</span>
+						{:else}
+							<span class="timeline-state">
+								{entry.statusLabel} em {timestampFormatter.format(new Date(entry.reachedAt))}
+							</span>
+						{/if}
+					{:else}
+						<span class="timeline-state">{entry.statusLabel} · {entry.durationLabel}</span>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	{/if}
+{:else if cronograma.groups.length === 0 && cronograma.milestones.length === 0}
 	<p class="empty">Nenhum trabalho agendado nem marco datado para exibir.</p>
 {:else}
 	<div class="cronograma-board">
@@ -341,6 +373,7 @@
      antes de congelar qualquer coisa. Capturar/rebaselinear é gestão da
      referência, não edição do plano — Cronograma permanece read-only
      quanto a scheduling. -->
+{#if ready && cronograma}
 <section class="card schedule-baseline" aria-labelledby="schedule-baseline-heading">
 	<h2 id="schedule-baseline-heading">Referência do cronograma</h2>
 	<p class="subtitle-inline">
@@ -423,8 +456,7 @@
 		{/if}
 	{/if}
 </section>
-
-<a class="section-link" href="/projects/{projectId}/tracking">← Voltar a Acompanhamento</a>
+{/if}
 
 <style>
 	.cronograma-header {
@@ -452,6 +484,58 @@
 		padding: var(--space-4);
 		margin: 0;
 		white-space: nowrap;
+	}
+
+	/* Linha do tempo pré-readiness (ETAPA 13 do rework, §43 — D066) — mesmo
+	   tratamento visual que vivia em Acompanhamento antes desta absorção. */
+	.timeline-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.timeline-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		padding: var(--space-2) 0;
+		border-bottom: 1px solid rgba(101, 104, 108, 0.18);
+	}
+
+	.timeline-row:last-child {
+		border-bottom: none;
+	}
+
+	.timeline-date {
+		flex: none;
+		font-variant-numeric: tabular-nums;
+		font-weight: 700;
+	}
+
+	.timeline-kind {
+		flex: none;
+		font-size: var(--font-size-caption);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--hydra-muted);
+		border: 1px solid rgba(101, 104, 108, 0.3);
+		border-radius: var(--hydra-radius-pill);
+		padding: 0 var(--space-2);
+	}
+
+	.timeline-title {
+		flex: 1;
+		min-width: 10rem;
+	}
+
+	.timeline-state {
+		flex: none;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
 	}
 
 	.cronograma-board {
@@ -709,13 +793,6 @@
 		border-radius: 3px;
 		background: transparent;
 		border: 1.5px dashed rgba(101, 104, 108, 0.55);
-	}
-
-	.section-link {
-		display: inline-block;
-		margin-top: var(--space-5);
-		color: var(--hydra-accent);
-		font-weight: 600;
 	}
 
 	/* Referência do cronograma (ETAPA 13 do rework, §43 — D068) — mesmo

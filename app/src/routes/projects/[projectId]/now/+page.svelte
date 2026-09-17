@@ -316,8 +316,7 @@
 			<p class="eyebrow">Estruturação</p>
 			<h2>{data.activity.title}</h2>
 			<p>
-				Os riscos reais são geridos em <a href="/projects/{view.projectId}/tracking">Acompanhamento</a>, como
-				riscos do projeto.
+				Os riscos reais são geridos em <a href="/projects/{view.projectId}/risks">Riscos</a>.
 			</p>
 			{#if data.riscosIdentificados}
 				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
@@ -352,8 +351,7 @@
 			<p class="eyebrow">Execução</p>
 			<h2>{data.activity.title}</h2>
 			<p>
-				Os riscos reais são geridos em <a href="/projects/{view.projectId}/tracking">Acompanhamento</a>, como
-				riscos do projeto.
+				Os riscos reais são geridos em <a href="/projects/{view.projectId}/risks">Riscos</a>.
 			</p>
 			{#if data.riscosAtualizados}
 				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>
@@ -385,8 +383,7 @@
 			<p class="eyebrow">Execução</p>
 			<h2>{data.activity.title}</h2>
 			<p>
-				Decisões e mudanças reais são geridas em <a href="/projects/{view.projectId}/tracking">Acompanhamento</a
-				>, como Decisões e Mudanças.
+				Decisões e mudanças reais são geridas em <a href="/projects/{view.projectId}/decisions">Decisões</a>.
 			</p>
 			{#if data.decisoesMudancasRecentes}
 				<p>O texto registrado aqui antes dessa mudança continua preservado, somente leitura:</p>

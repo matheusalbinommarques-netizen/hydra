@@ -2,7 +2,6 @@
 	import { setContext } from 'svelte';
 	import { page } from '$app/state';
 	import { enhance } from '$app/forms';
-	import { isCronogramaReady } from '$lib/schedule-readiness';
 	import { projectStatusLabel } from '$lib/project-status-label';
 	import { EVIDENCE_OUTCOME_OPTIONS } from '$lib/catalog/external-action';
 	import {
@@ -102,7 +101,6 @@
 	const NAV_ITEMS = [
 		{ key: 'now', label: 'Agora' },
 		{ key: 'deliverables', label: 'Entregas' },
-		{ key: 'tracking', label: 'Acompanhamento' },
 		{ key: 'risks', label: 'Riscos' },
 		{ key: 'attentions', label: 'Atenções' },
 		{ key: 'decisions', label: 'Decisões' },
@@ -118,12 +116,12 @@
 	] as const;
 
 	// Cronograma (ETAPA 12 do rework, §42, sexto microcorte, Design Gate
-	// "Corredor") — mesmo critério de readiness de tracking-view.ts/rota
-	// /cronograma: só aparece na navegação quando ao menos um WorkItem tem
-	// schedule completo. Nunca uma aba/link morto apontando para uma rota
-	// que redireciona de volta.
-	let cronogramaReady = $derived(isCronogramaReady(data.view.workItems));
-	let visibleNavItems = $derived(NAV_ITEMS.filter((item) => item.key !== 'cronograma' || cronogramaReady));
+	// "Corredor"; reachability resolvida na ETAPA 13, §43, absorção de
+	// Acompanhamento) — sempre visível na navegação, mesmo antes da
+	// readiness: a própria rota mostra a Linha do tempo de baixa fidelidade
+	// nesse caso, nunca redireciona para fora nem depende de outra surface
+	// para ser alcançada.
+	let visibleNavItems = NAV_ITEMS;
 
 	let currentAreaLabel = $derived(
 		NAV_ITEMS.find((item) => isCurrentRoute(`/projects/${projectId}/${item.key}`))?.label ?? ''
@@ -170,12 +168,6 @@
 				>
 					Entregas
 				</a>
-				<a
-					href="/projects/{projectId}/tracking"
-					aria-current={isCurrentRoute(`/projects/${projectId}/tracking`) ? 'page' : undefined}
-				>
-					Acompanhamento
-				</a>
 			</div>
 			<span class="nav-divider" aria-hidden="true"></span>
 			<div class="nav-secondary" aria-label="Consulta">
@@ -215,14 +207,12 @@
 				>
 					Decisões
 				</a>
-				{#if cronogramaReady}
-					<a
-						href="/projects/{projectId}/cronograma"
-						aria-current={isCurrentRoute(`/projects/${projectId}/cronograma`) ? 'page' : undefined}
-					>
-						Cronograma
-					</a>
-				{/if}
+				<a
+					href="/projects/{projectId}/cronograma"
+					aria-current={isCurrentRoute(`/projects/${projectId}/cronograma`) ? 'page' : undefined}
+				>
+					Cronograma
+				</a>
 				<a
 					href="/projects/{projectId}/summary"
 					aria-current={isCurrentRoute(`/projects/${projectId}/summary`) ? 'page' : undefined}

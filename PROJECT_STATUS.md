@@ -433,10 +433,17 @@ o `WorkItem`. Um microcorte Nível 2 já materializou D068: visualização de
 baseline/variância e as actions `previewScheduleBaselineCapture`/
 `captureScheduleBaseline` saíram de `/tracking` e passaram para
 `/cronograma`, que agora é o destino único da Referência do cronograma;
-nenhuma semântica de scheduling mudou. `docs/core/CURRENT_WORK.json`
-continua apontando para `S13`, `in_progress` — o segundo conflito (peso
-de Mudanças dentro de Decisões) e a escolha do próximo microcorte
-permanecem a próxima decisão relevante.
+nenhuma semântica de scheduling mudou. Um segundo microcorte Nível 2
+fechou a absorção completa de Acompanhamento prevista em D066:
+`/tracking` deixou de existir como rota — Situação já vivia em `/now`,
+Trabalho já era `/work`, Continuidade não tinha herdeiro; a Linha do
+tempo pré-readiness virou fallback de baixa fidelidade dentro do próprio
+`/cronograma` (`buildCronogramaTimeline`), que agora é sempre alcançável
+pela navegação, mesmo antes de `isCronogramaReady` — nunca mais
+redireciona para fora. `docs/core/CURRENT_WORK.json` continua apontando
+para `S13`, `in_progress` — o segundo conflito sinalizado por D066 (peso
+de Mudanças dentro de Decisões), o corredor final e a renomeação
+Trabalho → Quadro permanecem a próxima decisão relevante.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

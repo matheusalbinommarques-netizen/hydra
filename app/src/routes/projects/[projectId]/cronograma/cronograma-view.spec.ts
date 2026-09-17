@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DeliverableView, MilestoneView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
-import { buildCronogramaView } from './cronograma-view';
+import { buildCronogramaTimeline, buildCronogramaView } from './cronograma-view';
 
 function makeWorkItem(overrides: Partial<WorkItemView> & Pick<WorkItemView, 'id'>): WorkItemView {
 	return {
@@ -625,5 +625,105 @@ describe('buildCronogramaView — referência do cronograma (passthrough D068)',
 		};
 		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
 		expect(result.scheduleBaseline).toEqual(scheduleBaseline);
+	});
+});
+
+// Linha do tempo pré-readiness (ETAPA 13 do rework, §43 — D066: absorção de
+// Acompanhamento) — mesmos falsificadores que viviam em
+// tracking/tracking-view.spec.ts antes desta absorção: se algum deles
+// passar a afirmar atraso, proximidade ou progresso, o fallback deixou de
+// ser Timeline e virou scheduling.
+describe('buildCronogramaTimeline — Linha do tempo pré-readiness', () => {
+	it('omite marco sem data planejada', () => {
+		const milestones = [
+			makeMilestone({ id: 'm1', plannedDate: '2026-09-10' }),
+			makeMilestone({ id: 'm2', plannedDate: null })
+		];
+		const result = buildCronogramaTimeline(milestones, []);
+		expect(result.map((entry) => entry.id)).toEqual(['m1']);
+	});
+
+	it('ordena por data civil ascendente, independente da ordem de criação', () => {
+		const milestones = [
+			makeMilestone({ id: 'm1', plannedDate: '2026-12-01' }),
+			makeMilestone({ id: 'm2', plannedDate: '2026-02-28' }),
+			makeMilestone({ id: 'm3', plannedDate: '2026-09-30' })
+		];
+		const result = buildCronogramaTimeline(milestones, []);
+		expect(result.map((entry) => entry.id)).toEqual(['m2', 'm3', 'm1']);
+	});
+
+	// Desempate por FATO, não por acaso: a ordem em que a projeção recebe os
+	// marcos é deliberadamente invertida em relação à ordem de criação, para
+	// o teste falhar se a ordenação voltar a depender da estabilidade do
+	// sort.
+	it('desempata data igual pela ordem de criação, independente da ordem recebida', () => {
+		const milestones = [
+			makeMilestone({ id: 'zz', plannedDate: '2026-09-01', createdAt: '2026-03-01T00:00:00.000Z' }),
+			makeMilestone({ id: 'aa', plannedDate: '2026-09-01', createdAt: '2026-01-01T00:00:00.000Z' }),
+			makeMilestone({ id: 'mm', plannedDate: '2026-09-01', createdAt: '2026-02-01T00:00:00.000Z' }),
+			makeMilestone({ id: 'anterior', plannedDate: '2026-08-31', createdAt: '2026-12-01T00:00:00.000Z' })
+		];
+		const result = buildCronogramaTimeline(milestones, []);
+		expect(result.map((entry) => entry.id)).toEqual(['anterior', 'aa', 'mm', 'zz']);
+	});
+
+	it('formata a data como dia civil pt-BR, sem deslocamento de dia', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-01-01' })];
+		const [entry] = buildCronogramaTimeline(milestones, []);
+		expect(entry.plannedDate).toBe('2026-01-01');
+		expect(entry.plannedDateLabel).toBe('01/01/2026');
+	});
+
+	it('mostra status declarado e reachedAt como fatos, sem afirmar atraso nem adiantamento', () => {
+		const milestones = [
+			makeMilestone({
+				id: 'atrasado',
+				plannedDate: '2026-01-10',
+				status: 'alcancado',
+				reachedAt: '2026-03-02T10:00:00.000Z'
+			}),
+			makeMilestone({
+				id: 'adiantado',
+				plannedDate: '2026-06-10',
+				status: 'alcancado',
+				reachedAt: '2026-02-01T10:00:00.000Z'
+			})
+		];
+		const result = buildCronogramaTimeline(milestones, []);
+		expect(result.map((entry) => entry.id)).toEqual(['atrasado', 'adiantado']);
+		for (const entry of result) {
+			expect(entry.statusLabel).toBe('Alcançado');
+			expect(Object.keys(entry).sort()).toEqual(
+				['createdAt', 'id', 'kind', 'plannedDate', 'plannedDateLabel', 'reachedAt', 'status', 'statusLabel', 'title'].sort()
+			);
+		}
+	});
+
+	it('marco aberto aparece com reachedAt null e status declarado', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-01' })];
+		const [entry] = buildCronogramaTimeline(milestones, []);
+		expect(entry.status).toBe('aberto');
+		expect(entry.statusLabel).toBe('Em aberto');
+		expect(entry.kind).toBe('milestone');
+		if (entry.kind !== 'milestone') throw new Error('esperado marco');
+		expect(entry.reachedAt).toBeNull();
+	});
+
+	it('nenhum marco datado produz Linha do tempo vazia', () => {
+		const milestones = [makeMilestone({ id: 'm1' }), makeMilestone({ id: 'm2' })];
+		expect(buildCronogramaTimeline(milestones, [])).toEqual([]);
+		expect(buildCronogramaTimeline([], [])).toEqual([]);
+	});
+
+	// Por definição de isCronogramaReady, o fallback só é usado quando NENHUM
+	// WorkItem tem schedule completo — mas a função preserva a mesma regra
+	// exata da Linha do tempo original: se um WorkItem chegar com schedule
+	// completo, ele ainda aparece na lista, ordenado junto dos marcos.
+	it('inclui WorkItem com schedule completo, ordenado junto dos marcos', () => {
+		const milestones = [makeMilestone({ id: 'm1', plannedDate: '2026-09-20' })];
+		const workItems = [makeWorkItem({ id: 'w1', plannedStart: '2026-09-10', durationDays: 2 })];
+		const result = buildCronogramaTimeline(milestones, workItems);
+		expect(result.map((entry) => entry.id)).toEqual(['w1', 'm1']);
 	});
 });

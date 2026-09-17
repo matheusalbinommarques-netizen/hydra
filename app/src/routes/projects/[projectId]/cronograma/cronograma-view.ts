@@ -17,6 +17,45 @@ import { addCivilDays, civilDaysBetween } from '$lib/domain';
 import type { MilestoneStatus, WorkItemStatus } from '$lib/domain';
 import type { DeliverableView, MilestoneView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
 
+// Linha do tempo pré-readiness (ETAPA 13 do rework, §43 — D066: a Timeline
+// de baixa fidelidade que vivia em Acompanhamento vira fallback do próprio
+// Cronograma antes de `isCronogramaReady`, para o usuário sempre ter um
+// caminho real até esta rota, mesmo sem nenhum WorkItem com schedule
+// completo). Mesma semântica exata de `buildTimeline`/`isCronogramaReady`
+// que vivia em tracking-view.ts antes desta absorção — nenhum scheduling
+// novo, só o fato cronológico já existente (data planejada + estado
+// declarado). Por definição de `isCronogramaReady`, o estado pré-readiness
+// nunca tem WorkItem com schedule completo, então
+// `CronogramaTimelineWorkItemEntry` nunca aparece de fato aqui — o tipo é
+// preservado por simetria com a Linha do tempo original, não uma promessa
+// nova.
+export interface CronogramaTimelineMilestoneEntry {
+	kind: 'milestone';
+	id: string;
+	title: string;
+	plannedDate: string;
+	plannedDateLabel: string;
+	status: MilestoneStatus;
+	statusLabel: string;
+	reachedAt: string | null;
+	createdAt: string;
+}
+
+export interface CronogramaTimelineWorkItemEntry {
+	kind: 'workItem';
+	id: string;
+	title: string;
+	plannedDate: string;
+	plannedDateLabel: string;
+	durationDays: number;
+	durationLabel: string;
+	status: WorkItemStatus;
+	statusLabel: string;
+	createdAt: string;
+}
+
+export type CronogramaTimelineEntry = CronogramaTimelineMilestoneEntry | CronogramaTimelineWorkItemEntry;
+
 // Ghost da referência (ETAPA 12 do rework, §42, sétimo microcorte — Design
 // Gate aprovado, opção A do Scout) — geometria e rótulos da baseline ATIVA
 // para um WorkItem `compared` ou `removed`. `null` só quando a aritmética
@@ -134,6 +173,83 @@ const MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
 };
 
 const NO_DELIVERABLE_KEY = '__sem_entrega__';
+
+const TIMELINE_MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
+	aberto: 'Em aberto',
+	alcancado: 'Alcançado'
+};
+
+const TIMELINE_WORK_STATUS_LABEL: Record<WorkItemStatus, string> = {
+	a_fazer: 'A fazer',
+	em_andamento: 'Em andamento',
+	concluido: 'Concluído'
+};
+
+function timelineDurationLabel(durationDays: number): string {
+	return durationDays === 1 ? '1 dia' : `${durationDays} dias`;
+}
+
+// Ordenação totalmente determinística (mesmo contrato de tracking-view.ts
+// antes desta absorção): plannedDate ASC, depois createdAt ASC, depois id
+// ASC — nunca depende da estabilidade do `sort` nem da ordem incidental em
+// que a projeção recebeu marcos/WorkItems. Nenhum dos três é ordenação de
+// PRODUTO.
+function compareTimelineEntries(a: CronogramaTimelineEntry, b: CronogramaTimelineEntry): number {
+	if (a.plannedDate !== b.plannedDate) return a.plannedDate < b.plannedDate ? -1 : 1;
+	if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function buildTimelineMilestoneEntries(milestones: readonly MilestoneView[]): CronogramaTimelineMilestoneEntry[] {
+	return milestones
+		.filter((milestone) => milestone.plannedDate !== null)
+		.map((milestone) => ({
+			kind: 'milestone',
+			id: milestone.id,
+			plannedDate: milestone.plannedDate!,
+			plannedDateLabel: formatCivilDate(milestone.plannedDate!),
+			title: milestone.title,
+			status: milestone.status,
+			statusLabel: TIMELINE_MILESTONE_STATUS_LABEL[milestone.status],
+			reachedAt: milestone.reachedAt,
+			createdAt: milestone.createdAt
+		}));
+}
+
+// Só WorkItems com schedule COMPLETO — por definição de `isCronogramaReady`,
+// nunca existe nenhum no estado pré-readiness (ver comentário do tipo
+// acima), mas a função preserva a mesma regra exata da Linha do tempo
+// original, sem acoplar-se à premissa de estar sempre vazia.
+function buildTimelineWorkItemEntries(workItems: readonly WorkItemView[]): CronogramaTimelineWorkItemEntry[] {
+	return workItems
+		.filter((item): item is WorkItemView & { plannedStart: string; durationDays: number } =>
+			item.plannedStart !== null && item.durationDays !== null
+		)
+		.map((item) => ({
+			kind: 'workItem',
+			id: item.id,
+			plannedDate: item.plannedStart,
+			plannedDateLabel: formatCivilDate(item.plannedStart),
+			durationDays: item.durationDays,
+			durationLabel: timelineDurationLabel(item.durationDays),
+			title: item.title,
+			status: item.status,
+			statusLabel: TIMELINE_WORK_STATUS_LABEL[item.status],
+			createdAt: item.createdAt
+		}));
+}
+
+// Fallback de baixa fidelidade do Cronograma antes da readiness (D066) —
+// lista cronológica simples, sem barra, sem escala e sem "hoje". Chamada
+// só quando `!isCronogramaReady`.
+export function buildCronogramaTimeline(
+	milestones: readonly MilestoneView[],
+	workItems: readonly WorkItemView[]
+): CronogramaTimelineEntry[] {
+	return [...buildTimelineMilestoneEntries(milestones), ...buildTimelineWorkItemEntries(workItems)].sort(
+		compareTimelineEntries
+	);
+}
 
 // dd/mm/aaaa a partir das partes da própria string — mesmo tratamento de
 // tracking-view.ts/work-view.ts: deliberadamente sem Date/Intl (a semântica

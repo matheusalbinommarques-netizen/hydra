@@ -1,29 +1,33 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { isCronogramaReady } from '$lib/schedule-readiness';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
-import { buildCronogramaView } from './cronograma-view';
+import { buildCronogramaTimeline, buildCronogramaView } from './cronograma-view';
 import type { Actions, PageServerLoad } from './$types';
 
-// Readiness (ETAPA 12 do rework, §42, sexto microcorte) — a rota só existe
-// no runtime com ≥1 WorkItem de schedule completo (mesmo critério do shell
-// e de Acompanhamento, ver $lib/schedule-readiness). Navegar direto para
-// esta URL antes da readiness nunca renderiza uma surface vazia — volta
-// para Acompanhamento, o corredor aprovado.
-export const load: PageServerLoad = async ({ parent, params }) => {
+// Readiness (ETAPA 12 do rework, §42, sexto microcorte; reachability
+// resolvida na ETAPA 13, §43, absorção de Acompanhamento) — a rota é sempre
+// alcançável, mesmo antes de existir ≥1 WorkItem com schedule completo
+// (mesmo critério de `$lib/schedule-readiness`). Antes da readiness, a
+// página mostra a Linha do tempo de baixa fidelidade (`buildCronogramaTimeline`)
+// em vez do Gantt completo — nunca redireciona para fora, e nunca as duas
+// apresentações juntas.
+export const load: PageServerLoad = async ({ parent }) => {
 	const { view } = await parent();
-	if (!isCronogramaReady(view.workItems)) {
-		redirect(303, `/projects/${params.projectId}/tracking`);
-	}
+	const ready = isCronogramaReady(view.workItems);
 
 	return {
 		projectId: view.projectId,
-		cronograma: buildCronogramaView({
-			workItems: view.workItems,
-			deliverables: view.deliverables,
-			milestones: view.milestones,
-			scheduleBaseline: view.scheduleBaseline
-		})
+		ready,
+		cronograma: ready
+			? buildCronogramaView({
+					workItems: view.workItems,
+					deliverables: view.deliverables,
+					milestones: view.milestones,
+					scheduleBaseline: view.scheduleBaseline
+				})
+			: null,
+		timeline: ready ? [] : buildCronogramaTimeline(view.milestones, view.workItems)
 	};
 };
 
