@@ -2111,6 +2111,19 @@ sinalizados, não resolvidos: gestão de referência (baseline) dentro de
 um Cronograma nominalmente somente-leitura; peso de Mudanças dentro de
 Decisões.
 
+D068 (`docs/07-management/decision-log.md`) resolve o primeiro desses
+conflitos: a capability de capturar/rebaselinear a referência do
+cronograma pertence à surface Cronograma. Cronograma permanece
+somente leitura quanto ao plano/scheduling — capturar ou rebaselinear a
+referência é ação explícita de gestão sobre a referência, distinta de
+editar o `WorkItem` ou a geometria do plano, por isso pode existir
+dentro de Cronograma sem invalidar seu caráter read-only quanto ao
+plano. Não autoriza editar `WorkItem`, datas/dependências pela
+geometria, drag/resize, baseline como constraint, CPM, caminho
+crítico, folga, calendário de trabalho ou scheduling novo. Não cria
+surface própria de baseline. O segundo conflito (peso de Mudanças
+dentro de Decisões) segue sinalizado, não resolvido.
+
 ---
 
 # 44. ETAPA 14 — Ações externas maduras
