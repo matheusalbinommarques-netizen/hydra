@@ -590,3 +590,40 @@ describe('buildCronogramaView — referência da baseline ativa (ghost)', () => 
 		expect(result.groups[0].items[0].id).toBe('wi-removed');
 	});
 });
+
+// Referência do cronograma como capability do próprio Cronograma (ETAPA 13
+// do rework, §43 — D068: a gestão da referência deixa de viver numa surface
+// própria e passa a pertencer ao Cronograma). `scheduleBaseline` na saída é
+// passthrough puro de ProjectView.scheduleBaseline — mesmo contrato exato
+// que TrackingView expunha antes desta absorção — para a apresentação
+// textual (createdAt/partial/entries) que a página usa junto da geometria
+// de ghost já coberta acima.
+describe('buildCronogramaView — referência do cronograma (passthrough D068)', () => {
+	it('sem baseline: scheduleBaseline é null (projeto honesto, nenhuma referência inventada)', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [] });
+		expect(result.scheduleBaseline).toBeNull();
+	});
+
+	it('com baseline ativa: scheduleBaseline repassa createdAt/partial/entries sem transformação', () => {
+		const workItems = [makeWorkItem({ id: 'wi-1', plannedStart: '2026-09-01', durationDays: 2 })];
+		const scheduleBaseline: ScheduleBaselineView = {
+			createdAt: '2026-09-01T00:00:00.000Z',
+			partial: true,
+			entries: [
+				{
+					kind: 'compared',
+					workItemId: 'wi-1',
+					workItemTitle: 'wi-1',
+					startVarianceDays: 1,
+					finishVarianceDays: 0,
+					durationVarianceDays: 0,
+					baselinePlannedStart: '2026-08-31',
+					baselineDurationDays: 2
+				}
+			]
+		};
+		const result = buildCronogramaView({ workItems, deliverables: [], milestones: [], scheduleBaseline });
+		expect(result.scheduleBaseline).toEqual(scheduleBaseline);
+	});
+});

@@ -135,11 +135,6 @@ export interface TrackingView {
 	// simplesmente não existe na página (§17: surface só aparece quando há
 	// dados suficientes; nada de aba/placeholder vazio).
 	timeline: TrackingTimelineEntry[];
-	// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
-	// passthrough direto de ProjectView.scheduleBaseline (já projetado com
-	// títulos denormalizados por project-view.ts); `null` é o caso normal
-	// (nenhuma baseline capturada ainda).
-	scheduleBaseline: ScheduleBaselineView | null;
 	continuity: TrackingContinuityView;
 }
 
@@ -349,7 +344,6 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		// Nunca as duas juntas (Design Gate "Corredor"): Timeline completa some
 		// assim que o Cronograma atinge readiness, mesmo com marcos datados.
 		timeline: cronogramaReady ? [] : buildTimeline(input.milestones, input.workItems),
-		scheduleBaseline: input.scheduleBaseline,
 		continuity: buildContinuity(input.nextActivity, situation)
 	};
 }

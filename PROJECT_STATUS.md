@@ -423,12 +423,20 @@ prosseguiu sobre essas bases e foi **aprovado pelo Product Owner e
 congelado em D066** (`docs/07-management/decision-log.md`) — intenção
 visual/interacional e mapa de ownership entre surfaces, incluindo a
 absorção de Acompanhamento (`/tracking`) na navegação. Dois conflitos
-seguem sinalizados, não resolvidos: gestão de referência (baseline)
+seguiam sinalizados, não resolvidos: gestão de referência (baseline)
 dentro de um Cronograma nominalmente somente-leitura; peso de Mudanças
-dentro de Decisões. `docs/core/CURRENT_WORK.json` continua apontando
-para `S13`, `in_progress` — D066 não altera `app/`, não cria/renomeia
-rota, não toca domain/schema/persistence e não escolhe o primeiro
-microcorte de implementação, que permanece a próxima decisão relevante.
+dentro de Decisões. D068 resolveu o primeiro: a capability de
+captura/rebaseline da referência do cronograma pertence ao Cronograma,
+não a uma surface própria — Cronograma permanece read-only quanto ao
+plano/scheduling, gerir a referência é ação explícita distinta de editar
+o `WorkItem`. Um microcorte Nível 2 já materializou D068: visualização de
+baseline/variância e as actions `previewScheduleBaselineCapture`/
+`captureScheduleBaseline` saíram de `/tracking` e passaram para
+`/cronograma`, que agora é o destino único da Referência do cronograma;
+nenhuma semântica de scheduling mudou. `docs/core/CURRENT_WORK.json`
+continua apontando para `S13`, `in_progress` — o segundo conflito (peso
+de Mudanças dentro de Decisões) e a escolha do próximo microcorte
+permanecem a próxima decisão relevante.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

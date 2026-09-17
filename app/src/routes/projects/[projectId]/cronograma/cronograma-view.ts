@@ -114,6 +114,12 @@ export interface CronogramaView {
 	milestones: CronogramaMilestoneEntry[];
 	dependencies: CronogramaDependencyEdge[];
 	axis: CronogramaAxis | null;
+	// Referência do cronograma (ETAPA 13 do rework, §43 — D068: a gestão da
+	// referência pertence ao Cronograma) — passthrough direto de
+	// ProjectView.scheduleBaseline, mesmo contrato que já existia em
+	// TrackingView antes desta absorção; `null` é o caso normal (nenhuma
+	// referência capturada ainda).
+	scheduleBaseline: ScheduleBaselineView | null;
 }
 
 const WORK_STATUS_LABEL: Record<WorkItemStatus, string> = {
@@ -510,6 +516,7 @@ export function buildCronogramaView(input: {
 		groups: buildGroups([...scheduledRows, ...removedRows, ...unscheduledRows], input.deliverables),
 		milestones: buildMilestones(input.milestones, axisStart),
 		dependencies: buildDependencies(scheduledItems),
-		axis
+		axis,
+		scheduleBaseline: input.scheduleBaseline ?? null
 	};
 }

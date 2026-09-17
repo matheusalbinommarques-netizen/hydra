@@ -1,11 +1,81 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import type { ActionResult } from '@sveltejs/kit';
 	import { addCivilDays } from '$lib/domain';
+	import type { ScheduleBaselineCapturePreviewView } from '$lib/server/application/types';
 	import type { CronogramaWorkItemRow } from './cronograma-view';
 
-	let { data } = $props();
+	let { data, form } = $props();
 	let projectId = $derived(data.projectId);
 	let cronograma = $derived(data.cronograma);
 	let axis = $derived(cronograma.axis);
+
+	// Referência do cronograma (ETAPA 13 do rework, §43 — D068) — preview
+	// NUNCA grava; guarda o candidato completo localmente a partir do
+	// retorno da própria action, mesmo espírito de propagationPreview
+	// (work/+page.svelte). A captura pode ser recusada por inteiro (sem
+	// WorkItem elegível, conflito de precedência conhecido, ou preview
+	// obsoleto — ver expectedBaselineCandidateJson abaixo) — `update()`
+	// sempre roda, mesmo em falha, para `form?.message` refletir a recusa em
+	// vez de falhar silenciosamente.
+	let baselinePreview = $state<ScheduleBaselineCapturePreviewView | null>(null);
+
+	function handleBaselinePreviewSubmit() {
+		return async ({
+			result,
+			update
+		}: {
+			result: ActionResult;
+			update: (opts?: { reset?: boolean }) => Promise<void>;
+		}) => {
+			if (result.type === 'success' && result.data && 'baselinePreview' in result.data) {
+				baselinePreview = result.data.baselinePreview as ScheduleBaselineCapturePreviewView;
+			}
+			await update({ reset: false });
+		};
+	}
+
+	function cancelBaselinePreview() {
+		baselinePreview = null;
+	}
+
+	// Candidato canônico que a interface efetivamente mostrou (hardening
+	// pós-dogfood) — devolvido sem alteração como `expected` na confirmação;
+	// o servidor recalcula e compara, nunca confia neste JSON como fonte de
+	// verdade (mesmo espírito de expectedPropagationPlanJson, work/+page.svelte).
+	function expectedBaselineCandidateJson(preview: ScheduleBaselineCapturePreviewView): string {
+		return JSON.stringify({
+			entries: preview.entries.map((entry) => ({
+				workItemId: entry.workItemId,
+				plannedStart: entry.plannedStart,
+				durationDays: entry.durationDays
+			}))
+		});
+	}
+
+	function handleBaselineCaptureSubmit() {
+		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			baselinePreview = null;
+			await update({ reset: false });
+		};
+	}
+
+	// reachedAt/reviewedAt são INSTANTE (timestamp gravado pelo Clock), então
+	// aqui Date/Intl é o tratamento correto — ao contrário de plannedDate, que
+	// é dia civil e chega da projeção já formatado como string, sem nunca
+	// virar Date.
+	const timestampFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+
+	// Baseline do cronograma (ETAPA 12 do rework, §42, quinto microcorte) —
+	// positivo = atual mais tarde/mais longo, negativo = atual mais
+	// cedo/mais curto, zero = sem alteração (convenção congelada em
+	// domain/transitions.ts, computeScheduleBaselineComparison). Nunca
+	// percentual, health score, atraso ou impacto crítico.
+	function formatVarianceDays(days: number): string {
+		if (days === 0) return 'sem alteração';
+		const label = Math.abs(days) === 1 ? '1 dia' : `${Math.abs(days)} dias`;
+		return days > 0 ? `+${label}` : `-${label}`;
+	}
 
 	const ROW_HEIGHT = 44;
 	const GROUP_HEADER_HEIGHT = 28;
@@ -115,6 +185,10 @@
 		Trabalho.
 	</p>
 </header>
+
+{#if form?.message}
+	<p role="alert">{form.message}</p>
+{/if}
 
 {#if cronograma.groups.length === 0 && cronograma.milestones.length === 0}
 	<p class="empty">Nenhum trabalho agendado nem marco datado para exibir.</p>
@@ -256,6 +330,99 @@
 		{/if}
 	</div>
 {/if}
+
+<!-- Referência do cronograma (ETAPA 13 do rework, §43 — D068: a gestão da
+     referência pertence ao Cronograma, não a uma surface própria; a
+     geometria/ghost da baseline já aparece na régua acima — esta seção é a
+     apresentação textual e a gestão explícita, mesmo contrato exato que
+     vivia em Acompanhamento antes desta absorção). REFERÊNCIA
+     explicitamente aprovada pelo usuário, nunca criada automaticamente: o
+     primeiro clique sempre mostra um preview com confirmação explícita
+     antes de congelar qualquer coisa. Capturar/rebaselinear é gestão da
+     referência, não edição do plano — Cronograma permanece read-only
+     quanto a scheduling. -->
+<section class="card schedule-baseline" aria-labelledby="schedule-baseline-heading">
+	<h2 id="schedule-baseline-heading">Referência do cronograma</h2>
+	<p class="subtitle-inline">
+		Uma referência congela o início e a duração de cada trabalho com cronograma completo, para comparar
+		depois contra o cronograma atual. Nunca é criada automaticamente.
+	</p>
+
+	{#if cronograma.scheduleBaseline !== null}
+		<p class="subtitle-inline">
+			Referência ativa criada em {timestampFormatter.format(new Date(cronograma.scheduleBaseline.createdAt))}.
+			{#if cronograma.scheduleBaseline.partial}
+				Parcial: nem todo trabalho tinha cronograma completo no momento da captura.
+			{/if}
+		</p>
+
+		{#if cronograma.scheduleBaseline.entries.length === 0}
+			<p class="empty">Sem variação desde a referência.</p>
+		{:else}
+			<ul class="baseline-comparison-list">
+				{#each cronograma.scheduleBaseline.entries as entry (entry.workItemId)}
+					<li class="baseline-comparison-row">
+						<span class="baseline-comparison-title">{entry.workItemTitle}</span>
+						{#if entry.kind === 'compared'}
+							{#if entry.startVarianceDays === 0 && entry.finishVarianceDays === 0 && entry.durationVarianceDays === 0}
+								<span class="baseline-comparison-state">Sem variação desde a referência.</span>
+							{:else}
+								<span class="baseline-comparison-state">
+									Início {formatVarianceDays(entry.startVarianceDays)} · Término {formatVarianceDays(
+										entry.finishVarianceDays
+									)} · Duração {formatVarianceDays(entry.durationVarianceDays)}
+								</span>
+							{/if}
+						{:else if entry.kind === 'compared_unrepresentable'}
+							<span class="baseline-comparison-state">Variação não pôde ser calculada.</span>
+						{:else if entry.kind === 'removed'}
+							<span class="baseline-comparison-state">Cronograma removido após a referência.</span>
+						{:else if entry.kind === 'scheduled_after'}
+							<span class="baseline-comparison-state">Agendado após a referência.</span>
+						{:else if entry.kind === 'added_after'}
+							<span class="baseline-comparison-state">Adicionado após a referência.</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+
+	{#if baselinePreview !== null}
+		<div class="baseline-preview">
+			<p class="subtitle-inline"><strong>Prévia da referência</strong></p>
+			<p class="subtitle-inline">
+				{baselinePreview.scheduledCount}
+				{baselinePreview.scheduledCount === 1 ? 'trabalho será capturado' : 'trabalhos serão capturados'}.
+				{#if baselinePreview.uncoveredCount > 0}
+					{baselinePreview.uncoveredCount}
+					{baselinePreview.uncoveredCount === 1
+						? 'trabalho ficará de fora, por não ter cronograma.'
+						: 'trabalhos ficarão de fora, por não terem cronograma.'}
+				{/if}
+			</p>
+			{#if baselinePreview.partial}
+				<p class="subtitle-inline">Esta referência será parcial: nem todo trabalho tem cronograma completo ainda.</p>
+			{/if}
+			<form method="POST" action="?/captureScheduleBaseline" use:enhance={handleBaselineCaptureSubmit}>
+				<input type="hidden" name="expectedCandidate" value={expectedBaselineCandidateJson(baselinePreview)} />
+				<button type="submit" class="button-secondary">Confirmar referência</button>
+			</form>
+			<button type="button" class="link-button" onclick={cancelBaselinePreview}>Cancelar</button>
+		</div>
+	{:else}
+		<form method="POST" action="?/previewScheduleBaselineCapture" use:enhance={handleBaselinePreviewSubmit}>
+			<button type="submit" class="button-secondary">
+				{cronograma.scheduleBaseline === null
+					? 'Congelar cronograma atual como referência'
+					: 'Criar nova referência do cronograma'}
+			</button>
+		</form>
+		{#if cronograma.scheduleBaseline !== null}
+			<p class="subtitle-inline">A referência atual será preservada — nenhuma sobrescrita.</p>
+		{/if}
+	{/if}
+</section>
 
 <a class="section-link" href="/projects/{projectId}/tracking">← Voltar a Acompanhamento</a>
 
@@ -549,6 +716,84 @@
 		margin-top: var(--space-5);
 		color: var(--hydra-accent);
 		font-weight: 600;
+	}
+
+	/* Referência do cronograma (ETAPA 13 do rework, §43 — D068) — mesmo
+	   molde de card/lista já usado em Acompanhamento antes desta absorção,
+	   trazido junto para preservar a apresentação existente. */
+	.card {
+		border: 1px solid rgba(101, 104, 108, 0.25);
+		border-radius: var(--hydra-radius);
+		background: var(--hydra-surface-raised);
+		padding: var(--space-5);
+		margin-top: var(--space-5);
+	}
+
+	.card h2 {
+		margin: 0 0 var(--space-4);
+		font-size: var(--font-size-subtitle);
+	}
+
+	.subtitle-inline {
+		margin: 0 0 var(--space-4);
+		font-size: var(--font-size-meta);
+		color: var(--hydra-muted);
+	}
+
+	.baseline-comparison-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.baseline-comparison-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		padding: var(--space-2) 0;
+		border-bottom: 1px solid rgba(101, 104, 108, 0.18);
+	}
+
+	.baseline-comparison-row:last-child {
+		border-bottom: none;
+	}
+
+	.baseline-comparison-title {
+		flex: 1;
+		min-width: 10rem;
+		font-weight: 700;
+	}
+
+	.baseline-comparison-state {
+		flex: none;
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.baseline-preview {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-2);
+		margin-top: var(--space-3);
+		padding: var(--space-3);
+		border: 1px solid rgba(101, 104, 108, 0.3);
+		border-radius: var(--hydra-radius);
+	}
+
+	.link-button {
+		background: none;
+		border: none;
+		padding: var(--space-1);
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+		text-decoration: underline;
+		cursor: pointer;
+		color: var(--hydra-text);
 	}
 
 	@media (max-width: 640px) {
