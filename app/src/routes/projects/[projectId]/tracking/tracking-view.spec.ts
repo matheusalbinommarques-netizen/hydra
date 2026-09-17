@@ -30,7 +30,6 @@ function baseInput(overrides: Partial<TrackingViewInput> = {}): TrackingViewInpu
 		workItems: [],
 		milestones: [],
 		scheduleBaseline: null,
-		risks: [],
 		...overrides
 	};
 }

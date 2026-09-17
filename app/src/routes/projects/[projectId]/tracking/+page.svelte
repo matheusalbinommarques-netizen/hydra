@@ -2,7 +2,6 @@
 	import { enhance } from '$app/forms';
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { ScheduleBaselineCapturePreviewView } from '$lib/server/application/types';
-	import RiskManagement from '$lib/components/RiskManagement.svelte';
 
 	let { data, form } = $props();
 	let projectId = $derived(data.view.projectId);
@@ -322,8 +321,6 @@
 		{/if}
 	{/if}
 </section>
-
-<RiskManagement risks={tracking.risks} />
 
 <section class="card continuity" aria-labelledby="continuity-heading">
 	<div>

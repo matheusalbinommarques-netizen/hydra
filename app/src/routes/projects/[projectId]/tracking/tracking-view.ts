@@ -8,9 +8,8 @@
 // e pelas projeções reaproveitadas), não introduz estado de domínio novo.
 
 import { isCronogramaReady } from '$lib/schedule-readiness';
-import { buildRisks, type RisksView } from '$lib/risk-view';
 import type { MilestoneStatus, WorkItemStatus } from '$lib/domain';
-import type { MilestoneView, RiskView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
+import type { MilestoneView, ScheduleBaselineView, WorkItemView } from '$lib/server/application/types';
 import type { NextActivityResult } from '$lib/orientation-engine';
 import type { PhaseProgressView } from '$lib/phase-progress';
 import type { JourneyContextView } from '../now/journey-context';
@@ -141,7 +140,6 @@ export interface TrackingView {
 	// títulos denormalizados por project-view.ts); `null` é o caso normal
 	// (nenhuma baseline capturada ainda).
 	scheduleBaseline: ScheduleBaselineView | null;
-	risks: RisksView;
 	continuity: TrackingContinuityView;
 }
 
@@ -152,7 +150,6 @@ export interface TrackingViewInput {
 	workItems: WorkItemView[];
 	milestones: MilestoneView[];
 	scheduleBaseline: ScheduleBaselineView | null;
-	risks: RiskView[];
 }
 
 const WORK_STATUS_LABEL: Record<WorkItemView['status'], string> = {
@@ -353,7 +350,6 @@ export function buildTrackingView(input: TrackingViewInput): TrackingView {
 		// assim que o Cronograma atinge readiness, mesmo com marcos datados.
 		timeline: cronogramaReady ? [] : buildTimeline(input.milestones, input.workItems),
 		scheduleBaseline: input.scheduleBaseline,
-		risks: buildRisks(input.risks),
 		continuity: buildContinuity(input.nextActivity, situation)
 	};
 }
