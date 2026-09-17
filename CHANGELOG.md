@@ -4,6 +4,17 @@
 
 ### Adicionado
 
+- Rework, ETAPA 13 ("Execução como workspace completo") — Execução deixa
+  de ser dirigida por sequência obrigatória de atividades e passa a
+  workspace sobre objetos vivos; o corredor Agora → Quadro → Cronograma →
+  Entregas → Riscos → Atenções → Decisões vira navegação primária, com
+  Riscos e Decisões promovidos a surfaces operacionais próprias, Atenções
+  reconciliando bloqueio operacional e pendência metodológica, e
+  Acompanhamento (`/tracking`) absorvido pelo corredor. Ver D065–D069
+  (`docs/07-management/decision-log.md`); D069 fecha a etapa e registra o
+  que permanece adiado (peso de Mudanças dentro de Decisões, completion
+  semantics, `CheckIn`).
+
 - Rework, ETAPA 12 ("Scheduling e Gantt") — `WorkItem` ganha schedule
   manual real (data civil + duração), com precedência finish-to-start
   lag-zero derivada, propagação explícita preview→confirmação, folga

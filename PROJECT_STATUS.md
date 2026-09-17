@@ -374,76 +374,36 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 12 do rework ("Scheduling e Gantt",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §42) está concluída. O resultado
-macro entregue — `WorkItem` com schedule manual real (`plannedStart`/
-`durationDays`, par atômico, data civil e duração inclusiva com fórmula
-de fim congelada), precedência temporal finish-to-start lag-zero
-inteiramente derivada, propagação explícita e atômica sempre
-preview → confirmação (nunca auto-scheduling implícito), folga conhecida
-local do cronograma atual (explicitamente distinta de total float/CPM),
-baseline histórica real (captura por gesto humano, append-only,
-imutável, com comparação derivada em quatro estados) e readiness do
-Gantt reconciliada como a de `§17` — está registrado em D058–D063
-(`docs/07-management/decision-log.md`). Sobre essa fundação, o Gantt
-(`/cronograma`) teve seis microcortes Nível 2 entregues: rota somente
-leitura com readiness compartilhada, agrupamento por Deliverable + "Sem
-entrega", conectores de Dependency e precedenceConflict sem geometria
-inventada, marcos em lane própria, deep-link até o WorkItem em Trabalho,
-baseline visual honesta (ghost de `compared`/`removed`, nunca geometria
-fabricada para `scheduled_after`/`added_after`/`compared_unrepresentable`)
-e identidade "Sem cronograma" para todo WorkItem CURRENT sem schedule
-completo.
-
-D064 fecha a etapa e reclassifica, sem resolver, os residuais que
-permaneciam abertos — caminho crítico/CPM/total float, SS/FF/SF e lag
-não-zero, calendário de trabalho/dias úteis, drag/resize e
-auto-scheduling, baseline como constraint/deadline, zoom Day/Week,
-seletor de múltiplas baselines, filtros/grouping adicionais (incluindo
-filtro de Deliverable na toolbar do Cronograma) e folga conhecida visível
-diretamente no Gantt —, cada um com a condição semântica que o reabre,
-sem congelar arquitetura ainda não decidida.
+A ETAPA 13 do rework ("Execução como workspace completo",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §43) está concluída — fechamento
+registrado em D069 (`docs/07-management/decision-log.md`), mesmo padrão
+de boundary já aplicado ao fechar S8-S12. O corredor operacional
+Agora → Quadro → Cronograma → Entregas → Riscos → Atenções → Decisões,
+congelado pelo Design Gate em D066 sobre as bases de D065, existe como
+navegação primária real: os sete destinos são rotas vivas (`/now`,
+`/work` rotulado "Quadro", `/cronograma`, `/deliverables`, `/risks`,
+`/attentions`, `/decisions`). Riscos e Decisões foram promovidos a
+surfaces operacionais próprias com ações de primeira classe; Atenções
+reconcilia bloqueio operacional e pendência metodológica sob um nome só;
+Agora orienta sobre fatos reais em vez de renderizar
+`ActivityDefinition` obrigatória. D068 resolveu o primeiro conflito
+sinalizado pelo Gate (ownership da referência do cronograma, centralizada
+em `/cronograma`). Acompanhamento (`/tracking`) foi integralmente
+absorvido e a rota deixou de existir. O segundo conflito sinalizado por
+D066 — peso de Mudanças dentro de Decisões — permanece DEFER, sem
+resolução; completion semantics (`ProjectStatus`/`PhaseStatus` após a
+retirada do checklist de Execução), `CheckIn`, health score e ranking
+global também permanecem DEFER, exatamente como já registrado por
+D065/D066.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S13` (ETAPA 13, "Execução como workspace completo", §43) com status
-`in_progress`. D065 (`docs/07-management/decision-log.md`) registra a
-decisão de boundary que desbloqueia o Design Gate de S13, sem implementar
-comportamento de app: Execução deixa de ser dirigida por sequência
-obrigatória de atividades e passa a workspace sobre objetos vivos
-(WorkItem, Impediment, Decision, PendingItem); `registrar_andamento`
-deixa de ser obrigatório, sem apagar Answers históricas nem criar
-`CheckIn`; "Atenções" congela como projeção factual (WorkItem
-bloqueado/Impediment aberto e PendingItem aberto, sem promoção automática
-de Risk/Decision); a tensão entre a conclusão literal do catálogo de
-Execução e `computeProjectStatus`/`computePhaseStatus` fica registrada e
-DEFER — completion semantics exige decisão própria antes do microcorte
-que alterar o gating. O Design Gate do corredor
-Agora → Quadro → Cronograma → Entregas → Riscos → Atenções → Decisões
-prosseguiu sobre essas bases e foi **aprovado pelo Product Owner e
-congelado em D066** (`docs/07-management/decision-log.md`) — intenção
-visual/interacional e mapa de ownership entre surfaces, incluindo a
-absorção de Acompanhamento (`/tracking`) na navegação. Dois conflitos
-seguiam sinalizados, não resolvidos: gestão de referência (baseline)
-dentro de um Cronograma nominalmente somente-leitura; peso de Mudanças
-dentro de Decisões. D068 resolveu o primeiro: a capability de
-captura/rebaseline da referência do cronograma pertence ao Cronograma,
-não a uma surface própria — Cronograma permanece read-only quanto ao
-plano/scheduling, gerir a referência é ação explícita distinta de editar
-o `WorkItem`. Um microcorte Nível 2 já materializou D068: visualização de
-baseline/variância e as actions `previewScheduleBaselineCapture`/
-`captureScheduleBaseline` saíram de `/tracking` e passaram para
-`/cronograma`, que agora é o destino único da Referência do cronograma;
-nenhuma semântica de scheduling mudou. Um segundo microcorte Nível 2
-fechou a absorção completa de Acompanhamento prevista em D066:
-`/tracking` deixou de existir como rota — Situação já vivia em `/now`,
-Trabalho já era `/work`, Continuidade não tinha herdeiro; a Linha do
-tempo pré-readiness virou fallback de baixa fidelidade dentro do próprio
-`/cronograma` (`buildCronogramaTimeline`), que agora é sempre alcançável
-pela navegação, mesmo antes de `isCronogramaReady` — nunca mais
-redireciona para fora. `docs/core/CURRENT_WORK.json` continua apontando
-para `S13`, `in_progress` — o segundo conflito sinalizado por D066 (peso
-de Mudanças dentro de Decisões), o corredor final e a renomeação
-Trabalho → Quadro permanecem a próxima decisão relevante.
+`S14` (ETAPA 14, "Ações externas maduras", §44) com status
+`in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou
+corte de S14 — isso é trabalho de uma passagem futura. S14, S15 e S16
+continuam não-IA; a primeira etapa materialmente IA é S17, que segue
+exigindo o boundary de dogfood humano completo do produto integrado
+antes de começar (D067). A próxima decisão relevante é o primeiro corte
+de S14.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
