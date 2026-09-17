@@ -32,6 +32,17 @@ export interface PhaseActivitiesView {
 	activities: PhaseActivityView[];
 }
 
+// Fase atual do projeto: a fase da atividade recomendada (Trilha A); quando
+// o catálogo já foi esgotado (catalog_limit_reached), a última fase com
+// atividades aplicáveis — normalmente a fase final, já totalmente resolvida.
+// Extraído de phase-progress.ts (S13) para ser reaproveitado também pela
+// projeção `currentPhase` de ProjectView, sem duplicar a regra de fallback.
+export function findCurrentPhase(phases: PhaseActivitiesView[]): PhaseActivitiesView | undefined {
+	const current = phases.find((phase) => phase.isCurrent);
+	if (current) return current;
+	return [...phases].reverse().find((phase) => phase.catalogStatus !== 'unavailable');
+}
+
 export function buildPhaseActivities(catalog: Catalog, input: PhaseActivitiesInput): PhaseActivitiesView[] {
 	const currentActivityId =
 		input.nextActivity.kind === 'recommendation' ? input.nextActivity.activityDefinitionId : undefined;

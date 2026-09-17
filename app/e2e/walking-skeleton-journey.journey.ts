@@ -269,8 +269,8 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		await expect(page.getByText('O trabalho do projeto não foi decomposto aqui')).toBeVisible();
 	});
 
-	await test.step('Trabalho — cria os WorkItems reais (fonte canônica de decomposição, S9)', async () => {
-		await page.getByRole('link', { name: 'Trabalho' }).click();
+	await test.step('Quadro — cria os WorkItems reais (fonte canônica de decomposição, S9)', async () => {
+		await page.getByRole('link', { name: 'Quadro' }).click();
 		await page.waitForURL(`${serverA.baseUrl}/projects/${projectId}/work`);
 
 		for (const title of workItemTitles) {

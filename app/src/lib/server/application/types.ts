@@ -564,6 +564,13 @@ export interface ProjectView {
 	// campo existe só para a interface (`/map`) saber o que exibir selecionado.
 	routeStartPhaseId: string | null;
 	projectStatus: ProjectStatus;
+	// Fase canônica atual (S13, §43, corredor do shell) — mesma regra de
+	// findCurrentPhase (phase-activities.ts) já usada por Agora/Mapa; nunca
+	// redefine ProjectStatus/PhaseStatus, só projeta qual fase do catálogo
+	// está ativa agora, para o shell mostrar "Fase: {currentPhase.phaseLabel}"
+	// em toda rota. `undefined` só pode ocorrer se o catálogo não tiver
+	// nenhuma fase aplicável (caso hoje inexistente).
+	currentPhase: { phaseId: string; phaseLabel: string } | undefined;
 	phaseStatuses: Record<string, PhaseStatus>;
 	activityStatuses: Record<string, ActivityStatus>;
 	answers: Record<string, string>;

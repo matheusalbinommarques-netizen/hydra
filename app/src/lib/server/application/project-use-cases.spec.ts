@@ -1333,6 +1333,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'createdAt',
 				'routeStartPhaseId',
 				'projectStatus',
+				'currentPhase',
 				'phaseStatuses',
 				'activityStatuses',
 				'answers',

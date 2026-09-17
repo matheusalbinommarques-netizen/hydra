@@ -8,7 +8,7 @@
 // pertence a orientation-engine/.
 
 import type { Catalog } from '$lib/domain';
-import { buildPhaseActivities } from './phase-activities';
+import { buildPhaseActivities, findCurrentPhase } from './phase-activities';
 import type { PhaseActivitiesInput, PhaseActivityView } from './phase-activities';
 
 export type PhaseProgressGroupKey = 'concluidas' | 'atual' | 'pendentes' | 'puladas';
@@ -28,19 +28,9 @@ export interface PhaseProgressView {
 	groups: PhaseProgressGroup[];
 }
 
-// Fase alvo do painel: a fase da atividade recomendada (Trilha A), igual ao
-// "Onde estamos" de journey-context.ts; quando o catálogo já foi esgotado
-// (catalog_limit_reached), usa a última fase com atividades aplicáveis —
-// normalmente a fase final, já totalmente resolvida.
-function findTargetPhase(phases: ReturnType<typeof buildPhaseActivities>) {
-	const current = phases.find((phase) => phase.isCurrent);
-	if (current) return current;
-	return [...phases].reverse().find((phase) => phase.catalogStatus !== 'unavailable');
-}
-
 export function buildPhaseProgress(catalog: Catalog, input: PhaseActivitiesInput): PhaseProgressView | undefined {
 	const phases = buildPhaseActivities(catalog, input);
-	const targetPhase = findTargetPhase(phases);
+	const targetPhase = findCurrentPhase(phases);
 	if (!targetPhase) return undefined;
 
 	const resolvedActivities = targetPhase.activities.filter(

@@ -2,6 +2,7 @@
 // interno; nunca expõe ProjectState bruto (ver contracts.md §10).
 
 import type { ActivityDefinition, ActivityStatus, Catalog, ProjectState } from '$lib/domain';
+import { buildPhaseActivities, findCurrentPhase } from '$lib/phase-activities';
 import {
 	getAffectedGroupConfirmationIssues,
 	getCauseHypothesesConfirmationIssues,
@@ -511,12 +512,23 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		answers[answer.fieldDefinitionId] = answer.value;
 	}
 
+	const currentPhaseSource = findCurrentPhase(
+		buildPhaseActivities(catalog, {
+			activityStatuses,
+			phaseStatuses: snapshot.phaseStatuses,
+			nextActivity: snapshot.nextActivity
+		})
+	);
+
 	return {
 		projectId: state.project.id,
 		projectName: state.project.name,
 		createdAt: state.project.createdAt,
 		routeStartPhaseId: state.project.routeStartPhaseId ?? null,
 		projectStatus: snapshot.projectStatus,
+		currentPhase: currentPhaseSource
+			? { phaseId: currentPhaseSource.id, phaseLabel: currentPhaseSource.label }
+			: undefined,
 		phaseStatuses: snapshot.phaseStatuses,
 		activityStatuses,
 		answers,

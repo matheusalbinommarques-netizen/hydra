@@ -93,21 +93,29 @@
 		return pathname === target || pathname.startsWith(`${target}/`);
 	}
 
-	// Lista única dos destinos reais do workspace — reaproveitada pelo
-	// menu mobile e pelo rótulo "área atual" do cabeçalho compacto. A
-	// navegação desktop abaixo continua com sua própria marcação (dois
-	// grupos com pesos visuais diferentes) e não usa esta lista, para não
-	// mudar nada do que já está aprovado nela.
-	const NAV_ITEMS = [
+	// Corredor operacional (D066, decision-log.md) — os sete destinos primários
+	// do produto, nesta ordem fixa; navegação primária tanto em desktop quanto
+	// em mobile. `/work` mantém a rota real, só o rótulo de produto vira
+	// "Quadro" (D066: "Quadro = apresentação madura da capacidade atual de
+	// Trabalho"). Cronograma (ETAPA 12 do rework, §42, sexto microcorte;
+	// reachability resolvida na ETAPA 13, §43, absorção de Acompanhamento) —
+	// sempre visível, mesmo antes da readiness: a própria rota mostra a Linha
+	// do tempo de baixa fidelidade nesse caso, nunca redireciona para fora.
+	const PRIMARY_NAV_ITEMS = [
 		{ key: 'now', label: 'Agora' },
+		{ key: 'work', label: 'Quadro' },
+		{ key: 'cronograma', label: 'Cronograma' },
 		{ key: 'deliverables', label: 'Entregas' },
 		{ key: 'risks', label: 'Riscos' },
 		{ key: 'attentions', label: 'Atenções' },
-		{ key: 'decisions', label: 'Decisões' },
+		{ key: 'decisions', label: 'Decisões' }
+	] as const;
+
+	// Destinos auxiliares (D066) — subordinados visualmente ao corredor,
+	// sem competir com ele; continuam alcançáveis em toda rota.
+	const SECONDARY_NAV_ITEMS = [
 		{ key: 'map', label: 'Mapa' },
 		{ key: 'records', label: 'Registros' },
-		{ key: 'work', label: 'Trabalho' },
-		{ key: 'cronograma', label: 'Cronograma' },
 		{ key: 'summary', label: 'Resumo' },
 		{ key: 'document', label: 'Documento' },
 		{ key: 'closure', label: 'Encerramento' },
@@ -115,13 +123,9 @@
 		{ key: 'settings', label: 'Configurações' }
 	] as const;
 
-	// Cronograma (ETAPA 12 do rework, §42, sexto microcorte, Design Gate
-	// "Corredor"; reachability resolvida na ETAPA 13, §43, absorção de
-	// Acompanhamento) — sempre visível na navegação, mesmo antes da
-	// readiness: a própria rota mostra a Linha do tempo de baixa fidelidade
-	// nesse caso, nunca redireciona para fora nem depende de outra surface
-	// para ser alcançada.
-	let visibleNavItems = NAV_ITEMS;
+	// União só para lookup (rótulo da área atual, menu mobile) — a ordem e o
+	// agrupamento visual real vêm sempre de PRIMARY_NAV_ITEMS/SECONDARY_NAV_ITEMS.
+	const NAV_ITEMS = [...PRIMARY_NAV_ITEMS, ...SECONDARY_NAV_ITEMS] as const;
 
 	let currentAreaLabel = $derived(
 		NAV_ITEMS.find((item) => isCurrentRoute(`/projects/${projectId}/${item.key}`))?.label ?? ''
@@ -152,97 +156,32 @@
 			<div>
 				<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
 				<p class="status">Status: {projectStatusLabel[data.view.projectStatus]}</p>
+				{#if data.view.currentPhase}
+					<p class="phase">Fase: {data.view.currentPhase.phaseLabel}</p>
+				{/if}
 			</div>
 		</div>
 		<nav>
-			<div class="nav-primary" aria-label="Modos de trabalho">
-				<a
-					href="/projects/{projectId}/now"
-					aria-current={isCurrentRoute(`/projects/${projectId}/now`) ? 'page' : undefined}
-				>
-					Agora
-				</a>
-				<a
-					href="/projects/{projectId}/deliverables"
-					aria-current={isCurrentRoute(`/projects/${projectId}/deliverables`) ? 'page' : undefined}
-				>
-					Entregas
-				</a>
+			<div class="nav-primary" aria-label="Corredor operacional">
+				{#each PRIMARY_NAV_ITEMS as item (item.key)}
+					<a
+						href="/projects/{projectId}/{item.key}"
+						aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}
+					>
+						{item.label}
+					</a>
+				{/each}
 			</div>
 			<span class="nav-divider" aria-hidden="true"></span>
-			<div class="nav-secondary" aria-label="Consulta">
-				<a
-					href="/projects/{projectId}/map"
-					aria-current={isCurrentRoute(`/projects/${projectId}/map`) ? 'page' : undefined}
-				>
-					Mapa
-				</a>
-				<a
-					href="/projects/{projectId}/records"
-					aria-current={isCurrentRoute(`/projects/${projectId}/records`) ? 'page' : undefined}
-				>
-					Registros
-				</a>
-				<a
-					href="/projects/{projectId}/work"
-					aria-current={isCurrentRoute(`/projects/${projectId}/work`) ? 'page' : undefined}
-				>
-					Trabalho
-				</a>
-				<a
-					href="/projects/{projectId}/risks"
-					aria-current={isCurrentRoute(`/projects/${projectId}/risks`) ? 'page' : undefined}
-				>
-					Riscos
-				</a>
-				<a
-					href="/projects/{projectId}/attentions"
-					aria-current={isCurrentRoute(`/projects/${projectId}/attentions`) ? 'page' : undefined}
-				>
-					Atenções
-				</a>
-				<a
-					href="/projects/{projectId}/decisions"
-					aria-current={isCurrentRoute(`/projects/${projectId}/decisions`) ? 'page' : undefined}
-				>
-					Decisões
-				</a>
-				<a
-					href="/projects/{projectId}/cronograma"
-					aria-current={isCurrentRoute(`/projects/${projectId}/cronograma`) ? 'page' : undefined}
-				>
-					Cronograma
-				</a>
-				<a
-					href="/projects/{projectId}/summary"
-					aria-current={isCurrentRoute(`/projects/${projectId}/summary`) ? 'page' : undefined}
-				>
-					Resumo
-				</a>
-				<a
-					href="/projects/{projectId}/document"
-					aria-current={isCurrentRoute(`/projects/${projectId}/document`) ? 'page' : undefined}
-				>
-					Documento
-				</a>
-				<a
-					href="/projects/{projectId}/closure"
-					aria-current={isCurrentRoute(`/projects/${projectId}/closure`) ? 'page' : undefined}
-				>
-					Encerramento
-				</a>
-				<a
-					href="/projects/{projectId}/export"
-					aria-current={isCurrentRoute(`/projects/${projectId}/export`) ? 'page' : undefined}
-				>
-					Exportar
-				</a>
-				<a
-					href="/projects/{projectId}/settings"
-					aria-current={isCurrentRoute(`/projects/${projectId}/settings`) ? 'page' : undefined}
-				>
-					Configurações
-				</a>
+			<div class="nav-secondary" aria-label="Destinos auxiliares">
+				{#each SECONDARY_NAV_ITEMS as item (item.key)}
+					<a
+						href="/projects/{projectId}/{item.key}"
+						aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}
+					>
+						{item.label}
+					</a>
+				{/each}
 			</div>
 		</nav>
 	</header>
@@ -258,6 +197,9 @@
 		<div class="mobile-header-identity">
 			<p class="eyebrow">{data.view.projectName ?? 'Projeto sem nome'}</p>
 			<p class="status">Status: {projectStatusLabel[data.view.projectStatus]}</p>
+			{#if data.view.currentPhase}
+				<p class="phase">Fase: {data.view.currentPhase.phaseLabel}</p>
+			{/if}
 		</div>
 		<div class="mobile-header-area">
 			<span class="mobile-area-badge">{currentAreaLabel}</span>
@@ -273,14 +215,26 @@
 		</div>
 		{#if mobileMenuOpen}
 			<nav id="mobile-nav-menu" class="mobile-nav-menu" aria-label="Navegação do projeto">
-				{#each visibleNavItems as item (item.key)}
-					<a
-						href="/projects/{projectId}/{item.key}"
-						aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}
-					>
-						{item.label}
-					</a>
-				{/each}
+				<div class="mobile-nav-group mobile-nav-primary" aria-label="Corredor operacional">
+					{#each PRIMARY_NAV_ITEMS as item (item.key)}
+						<a
+							href="/projects/{projectId}/{item.key}"
+							aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}
+						>
+							{item.label}
+						</a>
+					{/each}
+				</div>
+				<div class="mobile-nav-group mobile-nav-secondary" aria-label="Destinos auxiliares">
+					{#each SECONDARY_NAV_ITEMS as item (item.key)}
+						<a
+							href="/projects/{projectId}/{item.key}"
+							aria-current={isCurrentRoute(`/projects/${projectId}/${item.key}`) ? 'page' : undefined}
+						>
+							{item.label}
+						</a>
+					{/each}
+				</div>
 			</nav>
 		{/if}
 	</header>
@@ -540,16 +494,27 @@
 		color: var(--hydra-muted);
 	}
 
+	/* Fase (D066) — semântica factual, distinta de Status (ProjectStatus);
+	   mesmo peso visual discreto de .status, para não competir com ele. */
+	.phase {
+		margin: var(--space-1) 0 0;
+		font-size: var(--font-size-meta);
+		color: var(--hydra-muted);
+	}
+
 	nav {
 		display: flex;
 		align-items: center;
+		flex-wrap: wrap;
+		row-gap: var(--space-2);
 		gap: var(--space-4);
 	}
 
-	/* Destaque: os dois modos de trabalho (Agora/Acompanhamento) — estilo de aba,
-	   mais peso visual, com o ativo marcado por fundo + sublinhado forte. */
+	/* Corredor operacional (D066) — os sete destinos primários do produto,
+	   estilo de aba, com o ativo marcado por fundo + sublinhado forte. */
 	.nav-primary {
 		display: flex;
+		flex-wrap: wrap;
 		gap: var(--space-1);
 	}
 
@@ -579,10 +544,11 @@
 		flex-shrink: 0;
 	}
 
-	/* Utilitário: telas de consulta (Mapa/Registros/Resumo/Exportar) —
-	   deliberadamente mais discreto, sem competir com Agora/Acompanhamento. */
+	/* Destinos auxiliares (D066) — deliberadamente mais discretos, sem
+	   competir visualmente com o corredor operacional. */
 	.nav-secondary {
 		display: flex;
+		flex-wrap: wrap;
 		gap: var(--space-3);
 	}
 
@@ -654,6 +620,17 @@
 		border-top: 1px solid var(--hydra-border);
 	}
 
+	.mobile-nav-group {
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* Corredor operacional em peso maior; auxiliares (D066) deliberadamente
+	   mais discretos, separados por uma segunda borda de grupo. */
+	.mobile-nav-secondary {
+		border-top: 1px solid var(--hydra-border);
+	}
+
 	.mobile-nav-menu a {
 		padding: var(--space-3) var(--space-2);
 		font-size: var(--font-size-body);
@@ -666,12 +643,22 @@
 		align-items: center;
 	}
 
-	.mobile-nav-menu a:last-child {
+	.mobile-nav-primary a {
+		font-weight: 700;
+	}
+
+	.mobile-nav-secondary a {
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.mobile-nav-group:last-child a:last-child {
 		border-bottom: none;
 	}
 
 	.mobile-nav-menu a[aria-current='page'] {
 		font-weight: 700;
+		color: var(--hydra-text);
 	}
 
 	/* Faixa contextual de ações em campo (correção de UX pós-dogfooding) —
