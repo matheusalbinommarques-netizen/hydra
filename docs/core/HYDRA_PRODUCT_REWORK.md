@@ -2168,6 +2168,19 @@ prioridade, integrações externas ou automação de IA, e não autoriza
 implementação big-bang: o primeiro `kind` a implementar permanece
 escolha futura.
 
+D072 (`docs/07-management/decision-log.md`) escolhe `approval` como
+primeiro `ExternalAction.kind` a implementar e congela seu contrato
+semântico mínimo: subject único é uma `Decision` existente `pendente`;
+resultado canônico é a própria `Decision` (`status`/`outcome`/
+`decidedAt`), sem `approvalOutcome` nem reuso de `EvidenceOutcome`;
+retorno com a `Decision` ainda pendente reconcilia `decidir Decision +
+concluir ExternalAction` num único gesto; `Decision` já tomada por outro
+caminho nunca é sobrescrita pela `ExternalAction`. D073
+(`docs/07-management/decision-log.md`) congela documentalmente o
+amendment localizado do Design Gate de S14 que incorpora esse contrato
+para `approval` — sem redesenhar o Gate além do necessário, sem escolher
+o microcorte de implementação e sem avançar `CURRENT_WORK`.
+
 ---
 
 # 45. ETAPA 15 — Artefatos e snapshots

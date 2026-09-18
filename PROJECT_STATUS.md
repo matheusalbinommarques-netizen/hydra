@@ -413,14 +413,17 @@ nem reuso de `EvidenceOutcome`; retorno com a `Decision` ainda pendente
 reconcilia `decidir Decision + concluir ExternalAction` como um único
 gesto; `Decision` já tomada por outro caminho nunca é sobrescrita pela
 `ExternalAction`. D072 não altera `app/`, não toca domain/schema/persistence
-e não escolhe nenhum outro kind — a próxima decisão relevante passa a ser
-uma **revisão localizada do Design Gate de S14** para incorporar a
-semântica de `approval` agora congelada por D072, especificamente os
-estados de retorno/conclusão que D071 deixava em C para esse kind; não é
-redesenhar o Gate inteiro. Só depois dessa revisão localizada e aprovação
-humana o repo será reavaliado para escolher o primeiro microcorte de
-implementação. S14, S15 e S16 continuam não-IA; a primeira etapa
-materialmente IA é S17,
+e não escolhe nenhum outro kind. **`D073` congela documentalmente o
+amendment localizado do Design Gate de S14** que incorpora, para
+`approval`, exatamente o contrato de D072 — retorno com `Decision`
+pendente reconcilia `decidir Decision + concluir ExternalAction` num
+único gesto, sem enum `approved`/`rejected`, sem `approvalOutcome`, sem
+`EvidenceOutcome`, `Decision` como única fonte canônica do resultado;
+`approval` passa de C (D071) para A quanto à semântica, ainda não
+implementada. A próxima decisão relevante passa a ser a reavaliação do
+repo real para escolher o menor microcorte de implementação de
+`approval` — ainda não decidida. S14, S15 e S16 continuam não-IA; a
+primeira etapa materialmente IA é S17,
 que segue exigindo o boundary de dogfood humano completo do produto
 integrado antes de começar (D067).
 
