@@ -398,12 +398,20 @@ D065/D066.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 `S14` (ETAPA 14, "Ações externas maduras", §44) com status
-`in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou
-corte de S14 — isso é trabalho de uma passagem futura. S14, S15 e S16
-continuam não-IA; a primeira etapa materialmente IA é S17, que segue
-exigindo o boundary de dogfood humano completo do produto integrado
-antes de começar (D067). A próxima decisão relevante é o primeiro corte
-de S14.
+`in_progress`. D070 congelou a semântica mínima de `ExternalAction`/
+`Evidence` que o Design Gate não podia decidir sozinho; o Design Gate de
+`ExternalAction` madura **foi aprovado pelo Product Owner e congelado em
+D071** (`docs/07-management/decision-log.md`) sobre essas bases — padrão
+`contexto de origem → preparação → ExternalAction aberta →
+orientação/projeção → retorno ao Hydra → conclusão` e mapa de ownership,
+sem decidir subject/outcome por kind nem autorizar implementação
+big-bang. `docs/core/CURRENT_WORK.json` continua apontando para `S14`,
+`in_progress` — D071 não altera `app/`, não cria/renomeia rota, não toca
+domain/schema/persistence e não escolhe o primeiro `kind` a implementar,
+que permanece a próxima decisão relevante. S14, S15 e S16 continuam
+não-IA; a primeira etapa materialmente IA é S17, que segue exigindo o
+boundary de dogfood humano completo do produto integrado antes de
+começar (D067).
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

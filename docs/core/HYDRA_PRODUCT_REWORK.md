@@ -2148,6 +2148,26 @@ Somente depois considerar integrações com:
 
 A funcionalidade central não deve depender delas.
 
+D070 (`docs/07-management/decision-log.md`) congela, antes do Design
+Gate, a semântica mínima de `ExternalAction`/`Evidence`: objeto vivo
+próprio (nunca alias de outro objeto); subject tipado por `kind`, sem
+mega-union antecipada; `EvidenceOutcome` atual é epistemologia própria da
+validação, não resultado universal futuro; resultado pode ter contrato
+específico por kind, nenhum desenhado ainda; nenhuma surface top-level
+"Ações externas" por padrão. D071 (`docs/07-management/decision-log.md`)
+registra a aprovação humana do Product Owner sobre o Design Gate final
+de `ExternalAction` madura, sobre essas bases: congela o padrão
+`contexto de origem → preparação → ExternalAction aberta →
+orientação/projeção → retorno ao Hydra → conclusão quando a semântica
+daquele kind permitir` e o mapa de ownership (contexto de origem como
+owner operacional; faixa global + drawer existentes para retomada
+transversal; Agora pode futuramente projetar sem virar owner) — e a
+classificação A/B/C do próprio Gate. Não decide subject/outcome por
+kind, contrato de retorno, persistência genérica, assignee, prazo,
+prioridade, integrações externas ou automação de IA, e não autoriza
+implementação big-bang: o primeiro `kind` a implementar permanece
+escolha futura.
+
 ---
 
 # 45. ETAPA 15 — Artefatos e snapshots
