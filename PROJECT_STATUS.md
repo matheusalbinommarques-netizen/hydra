@@ -405,13 +405,24 @@ D071** (`docs/07-management/decision-log.md`) sobre essas bases — padrão
 `contexto de origem → preparação → ExternalAction aberta →
 orientação/projeção → retorno ao Hydra → conclusão` e mapa de ownership,
 sem decidir subject/outcome por kind nem autorizar implementação
-big-bang. `docs/core/CURRENT_WORK.json` continua apontando para `S14`,
-`in_progress` — D071 não altera `app/`, não cria/renomeia rota, não toca
-domain/schema/persistence e não escolhe o primeiro `kind` a implementar,
-que permanece a próxima decisão relevante. S14, S15 e S16 continuam
-não-IA; a primeira etapa materialmente IA é S17, que segue exigindo o
-boundary de dogfood humano completo do produto integrado antes de
-começar (D067).
+big-bang. **`D072` escolheu `approval` como primeiro novo
+`ExternalAction.kind` a implementar** (`docs/07-management/decision-log.md`):
+subject único é uma `Decision` existente `pendente`; resultado canônico é a
+própria `Decision` (`status`/`outcome`/`decidedAt`), sem `approvalOutcome`
+nem reuso de `EvidenceOutcome`; retorno com a `Decision` ainda pendente
+reconcilia `decidir Decision + concluir ExternalAction` como um único
+gesto; `Decision` já tomada por outro caminho nunca é sobrescrita pela
+`ExternalAction`. D072 não altera `app/`, não toca domain/schema/persistence
+e não escolhe nenhum outro kind — a próxima decisão relevante passa a ser
+uma **revisão localizada do Design Gate de S14** para incorporar a
+semântica de `approval` agora congelada por D072, especificamente os
+estados de retorno/conclusão que D071 deixava em C para esse kind; não é
+redesenhar o Gate inteiro. Só depois dessa revisão localizada e aprovação
+humana o repo será reavaliado para escolher o primeiro microcorte de
+implementação. S14, S15 e S16 continuam não-IA; a primeira etapa
+materialmente IA é S17,
+que segue exigindo o boundary de dogfood humano completo do produto
+integrado antes de começar (D067).
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
