@@ -2208,6 +2208,38 @@ Gerar artefatos a partir do modelo vivo.
 
 Tailoring decide quais aparecem.
 
+## Contrato semântico congelado (D076)
+
+D076 (`docs/07-management/decision-log.md`) congela a semântica de §21
+para esta etapa; não escolhe microcorte nem faz Design Gate.
+
+- **Artefato vivo**: projeção derivada do `ProjectState`; muda quando o
+  projeto muda; sem cópia persistida própria; nunca segunda fonte de
+  verdade.
+- **Snapshot formal faz parte de S15**. A etapa não precisa snapshotar
+  todos os artefatos, mas deve provar pelo menos um caso real ponta a
+  ponta antes de fechar.
+- Um snapshot é persistido, imutável, específico a um artefato num
+  momento, e preserva representação semântica tipada do estado relevante.
+  Não persiste HTML/markdown/renderização como verdade, não copia o
+  `ProjectState` inteiro, não substitui o estado vivo, não é
+  backup/export e não depende de replay de `project_event`.
+- Metadados mínimos conceituais: identidade, projeto, tipo de artefato,
+  versão, `capturedAt`, payload semântico congelado. A versão é
+  monotônica por `project + artifact kind`, não global. O formato
+  técnico do payload fica para Design/implementação.
+- **Snapshot não é aprovação.** Não há `approved`/`rejected`, lifecycle
+  genérico de aprovação nem status genérico de snapshot; aprovação de um
+  artefato concreto é modelada à parte (podendo reutilizar `Decision`) e
+  não é obrigatória no primeiro microcorte.
+- **Primeiro corredor candidato**: `/document` — artefato vivo atual →
+  captura explícita → snapshot vN → projeto vivo muda → snapshot anterior
+  permanece semanticamente idêntico.
+- Seguem abertos: entidade universal para os nove artefatos, schemas por
+  kind, Tailoring automático, export PDF, attachments, storage externo,
+  workflow genérico de review/approval, snapshots automáticos, restore,
+  snapshot do `ProjectState` inteiro e event sourcing.
+
 ---
 
 # 46. ETAPA 16 — Validação, transição e encerramento

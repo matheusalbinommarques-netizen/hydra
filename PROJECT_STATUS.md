@@ -394,8 +394,11 @@ Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 corte de S15 — isso é trabalho de uma passagem futura. S15 e S16
 continuam não-IA; a primeira etapa materialmente IA é S17, que segue
 exigindo o boundary de dogfood humano completo do produto integrado
-antes de começar (D067). A próxima decisão relevante é o primeiro corte
-de S15.
+antes de começar (D067). D076 congela a semântica de artefato vivo
+versus snapshot formal (snapshot faz parte de S15; versão por
+projeto + kind; snapshot não é aprovação; `/document` é o primeiro
+corredor candidato). A próxima decisão relevante é o Design Gate/primeiro
+corte de S15.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
