@@ -95,7 +95,6 @@
 				{#if data.nowOrientation.blocking}
 					<li class="now-orientation-item">
 						<span class="now-orientation-fact">{data.nowOrientation.blocking.label}</span>
-						<a href="/projects/{view.projectId}/attentions">Ver em Atenções</a>
 					</li>
 				{/if}
 				{#if data.nowOrientation.decision}
