@@ -100,6 +100,7 @@ export type DomainTransitionError =
 	| { kind: 'external_action_not_found' }
 	| { kind: 'external_action_duplicate_open' }
 	| { kind: 'external_action_not_open' }
+	| { kind: 'external_action_wrong_kind' }
 	| { kind: 'evidence_learning_required' }
 	| { kind: 'treatment_step_not_found' }
 	| { kind: 'treatment_confirmation_invalid'; issues: TreatmentConfirmationIssue[] }
@@ -2895,6 +2896,28 @@ export function editDecision(
 	};
 }
 
+// Regra canônica única de "decidir uma Decision pendente" — extraída para
+// ser reutilizada por decideDecision (abaixo) e por
+// completeApprovalExternalAction (ETAPA 14, §44, D072/D073), que precisa da
+// MESMA invariante (só a partir de 'pendente', outcome não vazio) ao
+// concluir uma ExternalAction(kind=approval) na mesma reconciliação. Nunca
+// duplicar esta regra em outro lugar — qualquer transição que decida uma
+// Decision passa por aqui.
+function applyDecisionOutcome(
+	decision: Decision,
+	outcome: string,
+	occurredAt: string
+): Result<Decision, DomainTransitionError> {
+	if (decision.status === 'tomada') {
+		return { ok: false, error: { kind: 'decision_already_decided' } };
+	}
+	if (outcome.trim().length === 0) {
+		return { ok: false, error: { kind: 'decision_outcome_required' } };
+	}
+
+	return { ok: true, value: { ...decision, status: 'tomada', outcome, decidedAt: occurredAt, updatedAt: occurredAt } };
+}
+
 // Marca a decisão como tomada — só a partir de 'pendente' (ao contrário de
 // closeRisk/reachMilestone, não é idempotente: chamar de novo sobre uma
 // decisão já tomada reescreveria decidedAt silenciosamente, então é recusado
@@ -2909,22 +2932,15 @@ export function decideDecision(
 ): Result<ProjectState, DomainTransitionError> {
 	const decision = findDecision(state, decisionId);
 	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
-	if (decision.status === 'tomada') {
-		return { ok: false, error: { kind: 'decision_already_decided' } };
-	}
-	if (outcome.trim().length === 0) {
-		return { ok: false, error: { kind: 'decision_outcome_required' } };
-	}
+
+	const result = applyDecisionOutcome(decision, outcome, occurredAt);
+	if (!result.ok) return result;
 
 	return {
 		ok: true,
 		value: {
 			...state,
-			decisions: state.decisions.map((item) =>
-				item.id === decisionId
-					? { ...item, status: 'tomada', outcome, decidedAt: occurredAt, updatedAt: occurredAt }
-					: item
-			)
+			decisions: state.decisions.map((item) => (item.id === decisionId ? result.value : item))
 		}
 	};
 }
@@ -3225,7 +3241,7 @@ export function setAffectedGroupFrequency(
 // duas coleções guarda uma contagem própria de referências.
 function isAffectedGroupReferenced(state: ProjectState, groupId: string): boolean {
 	return (
-		state.externalActions.some((action) => action.affectedGroupId === groupId) ||
+		state.externalActions.some((action) => action.kind === 'validate_affected_group' && action.affectedGroupId === groupId) ||
 		state.evidences.some((evidence) => evidence.affectedGroupId === groupId)
 	);
 }
@@ -3321,8 +3337,8 @@ export function prepareExternalAction(
 
 	const hasOpenAction = state.externalActions.some(
 		(action) =>
-			action.affectedGroupId === affectedGroupId &&
 			action.kind === 'validate_affected_group' &&
+			action.affectedGroupId === affectedGroupId &&
 			action.status === 'aberta'
 	);
 	if (hasOpenAction) return { ok: false, error: { kind: 'external_action_duplicate_open' } };
@@ -3365,6 +3381,7 @@ export function completeExternalAction(
 ): Result<ProjectState, DomainTransitionError> {
 	const action = findExternalAction(state, actionId);
 	if (!action) return { ok: false, error: { kind: 'external_action_not_found' } };
+	if (action.kind !== 'validate_affected_group') return { ok: false, error: { kind: 'external_action_wrong_kind' } };
 	if (action.status !== 'aberta') return { ok: false, error: { kind: 'external_action_not_open' } };
 	if (learning.trim().length === 0) return { ok: false, error: { kind: 'evidence_learning_required' } };
 
@@ -3384,6 +3401,125 @@ export function completeExternalAction(
 		value: {
 			...state,
 			evidences: [...state.evidences, evidence],
+			externalActions: state.externalActions.map((item) =>
+				item.id === actionId
+					? { ...item, status: 'concluida', updatedAt: occurredAt, completedAt: occurredAt }
+					: item
+			)
+		}
+	};
+}
+
+/**
+ * Prepara uma ExternalAction(kind='approval') sobre uma Decision existente
+ * (ETAPA 14 do rework, §44, D072/D073) — só quando a Decision está
+ * 'pendente' (mesma precondição que D072 congelou); bloqueia duplicata: no
+ * máximo uma approval aberta por Decision, mesmo espírito de
+ * prepareExternalAction acima. Sem preparação de conteúdo (objective/
+ * questions/informationToTake/expectedResult não existem nesta variante,
+ * ver state-types.ts) — approval não é uma entrevista com roteiro.
+ */
+export function prepareApprovalExternalAction(
+	catalog: Catalog,
+	state: ProjectState,
+	actionId: string,
+	decisionId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const decision = findDecision(state, decisionId);
+	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
+	if (decision.status !== 'pendente') return { ok: false, error: { kind: 'decision_already_decided' } };
+
+	const hasOpenAction = state.externalActions.some(
+		(action) => action.kind === 'approval' && action.decisionId === decisionId && action.status === 'aberta'
+	);
+	if (hasOpenAction) return { ok: false, error: { kind: 'external_action_duplicate_open' } };
+
+	const action: ExternalAction = {
+		id: actionId,
+		projectId: state.project.id,
+		kind: 'approval',
+		decisionId,
+		status: 'aberta',
+		createdAt: occurredAt,
+		updatedAt: occurredAt,
+		completedAt: null
+	};
+
+	return { ok: true, value: { ...state, externalActions: [...state.externalActions, action] } };
+}
+
+/**
+ * Retorno de uma approval com a Decision ainda 'pendente' (D072/D073): uma
+ * única reconciliação que decide a Decision (via applyDecisionOutcome —
+ * mesma regra canônica de decideDecision, nunca duplicada) e conclui a
+ * ExternalAction. Só é aceita quando a Decision ainda está pendente — se já
+ * foi tomada por outro caminho enquanto a ação estava aberta, esta função
+ * recusa (decision_already_decided) e o caller deve usar
+ * reconcileApprovalExternalAction, que nunca escreve outcome/decidedAt. Um
+ * único ponto de escrita de Decision.outcome nesta transição — sem
+ * dual-write possível.
+ */
+export function completeApprovalExternalAction(
+	catalog: Catalog,
+	state: ProjectState,
+	actionId: string,
+	outcome: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const action = findExternalAction(state, actionId);
+	if (!action) return { ok: false, error: { kind: 'external_action_not_found' } };
+	if (action.kind !== 'approval') return { ok: false, error: { kind: 'external_action_wrong_kind' } };
+	if (action.status !== 'aberta') return { ok: false, error: { kind: 'external_action_not_open' } };
+
+	const decision = findDecision(state, action.decisionId);
+	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
+
+	const decided = applyDecisionOutcome(decision, outcome, occurredAt);
+	if (!decided.ok) return decided;
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			decisions: state.decisions.map((item) => (item.id === decision.id ? decided.value : item)),
+			externalActions: state.externalActions.map((item) =>
+				item.id === actionId
+					? { ...item, status: 'concluida', updatedAt: occurredAt, completedAt: occurredAt }
+					: item
+			)
+		}
+	};
+}
+
+/**
+ * Retorno de uma approval quando a Decision JÁ foi tomada por outro
+ * caminho (o form direto ?/decideDecision, por exemplo) enquanto a ação
+ * ainda estava aberta (D072: "a ExternalAction nunca pode sobrescrever a
+ * Decision"). Só aceita quando a Decision já está 'tomada' — o caso
+ * pendente usa completeApprovalExternalAction acima. Escreve exclusivamente
+ * em ExternalAction; nunca toca Decision.outcome/decidedAt, garantindo que
+ * não existe overwrite possível.
+ */
+export function reconcileApprovalExternalAction(
+	catalog: Catalog,
+	state: ProjectState,
+	actionId: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const action = findExternalAction(state, actionId);
+	if (!action) return { ok: false, error: { kind: 'external_action_not_found' } };
+	if (action.kind !== 'approval') return { ok: false, error: { kind: 'external_action_wrong_kind' } };
+	if (action.status !== 'aberta') return { ok: false, error: { kind: 'external_action_not_open' } };
+
+	const decision = findDecision(state, action.decisionId);
+	if (!decision) return { ok: false, error: { kind: 'decision_not_found' } };
+	if (decision.status !== 'tomada') return { ok: false, error: { kind: 'decision_not_decided' } };
+
+	return {
+		ok: true,
+		value: {
+			...state,
 			externalActions: state.externalActions.map((item) =>
 				item.id === actionId
 					? { ...item, status: 'concluida', updatedAt: occurredAt, completedAt: occurredAt }

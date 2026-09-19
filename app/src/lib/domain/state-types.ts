@@ -611,36 +611,63 @@ export interface AffectedGroup {
 }
 
 // ExternalAction / Evidence — ETAPA 3 do rework ("Evidence + primeira
-// External Action", docs/core/HYDRA_PRODUCT_REWORK.md §33). Primeiro corte
-// suporta só um tipo de ação: validar um AffectedGroup fora do Hydra.
-// Lifecycle mínimo (aberta/concluída, mesmo vocabulário de status de
-// Impediment) — sem scheduled/overdue/cancelled/paused/assigned/blocked
-// nesta rodada.
+// External Action", docs/core/HYDRA_PRODUCT_REWORK.md §33) e ETAPA 14
+// ("Ações externas maduras", §44, D070-D073). Lifecycle mínimo
+// (aberta/concluída, mesmo vocabulário de status de Impediment) — sem
+// scheduled/overdue/cancelled/paused/assigned/blocked nesta rodada.
 //
-// A preparação (objective/questions/informationToTake/expectedResult) é
-// capturada no momento em que o usuário confirma "Pronto para conversar" e
-// nunca recalculada depois — o projeto vivo pode mudar (o AffectedGroup pode
-// ser reclassificado), mas o que o Hydra preparou para ESTA ação permanece
+// União discriminada por `kind` (D070 ponto 3: "cada kind define quais
+// subjects são semanticamente válidos" — sem mega-union antecipada), mesmo
+// padrão já usado para taxonomia extensível em ProjectEvent
+// (domain/events.ts): cada variante carrega só os campos que seu subject
+// realmente precisa, o compilador fecha os casos.
+//
+// `validate_affected_group`: a preparação
+// (objective/questions/informationToTake/expectedResult) é capturada no
+// momento em que o usuário confirma "Pronto para conversar" e nunca
+// recalculada depois — o projeto vivo pode mudar (o AffectedGroup pode ser
+// reclassificado), mas o que o Hydra preparou para ESTA ação permanece
 // identificável (ver catalog/external-action.ts, buildExternalActionPreparation).
+//
+// `approval` (D072/D073): subject é uma `Decision` existente, `pendente` no
+// momento da preparação. Deliberadamente SEM objective/questions/
+// informationToTake/expectedResult — não é uma entrevista com roteiro,
+// então não herda os campos de preparação de `validate_affected_group`;
+// qualquer texto de orientação é derivado de `Decision.subject` na
+// view/UI, nunca duplicado aqui. `ExternalAction` nunca tem outcome
+// próprio: o resultado canônico é sempre `Decision.status/outcome/
+// decidedAt` (ver completeApprovalExternalAction/
+// reconcileApprovalExternalAction em domain/transitions.ts).
+//
 // Independente do catálogo/jornada guiada: não gera ActivityProgress nem
 // PendingItem, não bloqueia nenhuma atividade.
-export type ExternalActionKind = 'validate_affected_group';
+export type ExternalActionKind = 'validate_affected_group' | 'approval';
 export type ExternalActionStatus = 'aberta' | 'concluida';
 
-export interface ExternalAction {
+interface ExternalActionBase {
 	id: string;
 	projectId: string;
-	kind: ExternalActionKind;
-	affectedGroupId: string;
 	status: ExternalActionStatus;
-	objective: string;
-	questions: string[];
-	informationToTake: string[];
-	expectedResult: string;
 	createdAt: string;
 	updatedAt: string;
 	completedAt: string | null;
 }
+
+export interface ValidateAffectedGroupExternalAction extends ExternalActionBase {
+	kind: 'validate_affected_group';
+	affectedGroupId: string;
+	objective: string;
+	questions: string[];
+	informationToTake: string[];
+	expectedResult: string;
+}
+
+export interface ApprovalExternalAction extends ExternalActionBase {
+	kind: 'approval';
+	decisionId: string;
+}
+
+export type ExternalAction = ValidateAffectedGroupExternalAction | ApprovalExternalAction;
 
 // Quatro outcomes fixos (ver catalog/external-action.ts,
 // EVIDENCE_OUTCOME_OPTIONS). "Tem evidência" nunca significa "está

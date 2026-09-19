@@ -443,8 +443,18 @@ function buildAffectedGroupView(group: ProjectState['affectedGroups'][number]): 
 }
 
 function buildExternalActionView(action: ProjectState['externalActions'][number]): ExternalActionView {
+	if (action.kind === 'approval') {
+		return {
+			id: action.id,
+			kind: 'approval',
+			decisionId: action.decisionId,
+			status: action.status
+		};
+	}
+
 	return {
 		id: action.id,
+		kind: 'validate_affected_group',
 		affectedGroupId: action.affectedGroupId,
 		status: action.status,
 		objective: action.objective,

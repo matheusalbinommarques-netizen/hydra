@@ -35,7 +35,12 @@
 		AffectedGroupFrequency,
 		AffectedGroupImpact
 	} from '$lib/domain';
-	import type { AffectedGroupView, EvidenceView, ExternalActionView } from '$lib/server/application/types';
+	import type {
+		AffectedGroupView,
+		EvidenceView,
+		ExternalActionValidateAffectedGroupView,
+		ExternalActionView
+	} from '$lib/server/application/types';
 	import type { PhaseProgressView } from '$lib/phase-progress';
 	import SkipActivityConfirm from './SkipActivityConfirm.svelte';
 
@@ -109,8 +114,14 @@
 	// persistido: o conteúdo é derivado localmente pela mesma função pura
 	// usada pela persistência real (buildExternalActionPreparation), para as
 	// duas nunca divergirem. Só "Pronto para conversar" cria a ExternalAction.
+	function isOpenValidateAffectedGroupAction(
+		action: ExternalActionView
+	): action is ExternalActionValidateAffectedGroupView {
+		return action.kind === 'validate_affected_group' && action.status === 'aberta';
+	}
+
 	let openActionsByGroup = $derived(
-		new Map(externalActions.filter((action) => action.status === 'aberta').map((action) => [action.affectedGroupId, action]))
+		new Map(externalActions.filter(isOpenValidateAffectedGroupAction).map((action) => [action.affectedGroupId, action]))
 	);
 	let evidenceCountByGroup = $derived.by(() => {
 		const counts = new Map<string, number>();

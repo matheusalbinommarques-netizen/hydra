@@ -96,9 +96,11 @@ export function mapUseCaseError(error: UseCaseError): string {
 		case 'external_action_not_found':
 			return 'Ação externa não encontrada.';
 		case 'external_action_duplicate_open':
-			return 'Já existe uma validação em campo para este grupo.';
+			return 'Já existe uma ação externa aberta para este item.';
 		case 'external_action_not_open':
 			return 'Esta ação já foi concluída.';
+		case 'external_action_wrong_kind':
+			return 'Esta operação não se aplica a este tipo de ação externa.';
 		case 'evidence_learning_required':
 			return 'Descreva o que você aprendeu antes de salvar a evidência.';
 		case 'treatment_step_not_found':

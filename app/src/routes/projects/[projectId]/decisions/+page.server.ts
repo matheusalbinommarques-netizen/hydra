@@ -101,6 +101,55 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	// prepareApprovalExternalAction (ETAPA 14 do rework, §44, D070/D072/D073)
+	// — abre uma ExternalAction(kind='approval') sobre esta Decision, ainda
+	// pendente. Retomada/conclusão vivem na faixa/drawer transversal em
+	// +layout.svelte (?/completeApprovalExternalAction,
+	// ?/reconcileApprovalExternalAction), não nesta rota.
+	prepareApprovalExternalAction: async ({ request, params }) => {
+		const formData = await request.formData();
+		const decisionId = readString(formData, 'decisionId');
+		if (!decisionId) return fail(400, { message: 'Decisão inválida.' });
+
+		const result = await getProjectUseCases().prepareApprovalExternalAction({ projectId: params.projectId, decisionId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	// Retorno de approval com a Decision ainda pendente — decide a Decision e
+	// conclui a ExternalAction na mesma reconciliação (D072/D073). Chamada
+	// pelo drawer transversal em +layout.svelte, de qualquer rota do
+	// projeto (mesmo padrão de now?/completeExternalAction).
+	completeApprovalExternalAction: async ({ request, params }) => {
+		const formData = await request.formData();
+		const actionId = readString(formData, 'actionId');
+		const outcome = readString(formData, 'outcome');
+		if (!actionId || !outcome) return fail(400, { message: 'Ação ou resultado inválido.' });
+
+		const result = await getProjectUseCases().completeApprovalExternalAction({
+			projectId: params.projectId,
+			actionId,
+			outcome
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
+	// Retorno de approval com a Decision já tomada por outro caminho — só
+	// conclui a ExternalAction, nunca escreve em Decision (D072).
+	reconcileApprovalExternalAction: async ({ request, params }) => {
+		const formData = await request.formData();
+		const actionId = readString(formData, 'actionId');
+		if (!actionId) return fail(400, { message: 'Ação inválida.' });
+
+		const result = await getProjectUseCases().reconcileApprovalExternalAction({
+			projectId: params.projectId,
+			actionId
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true };
+	},
+
 	unlinkWorkItem: async ({ request, params }) => {
 		const formData = await request.formData();
 		const decisionAffectedWorkItemId = readString(formData, 'decisionAffectedWorkItemId');

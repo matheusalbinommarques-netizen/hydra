@@ -893,7 +893,7 @@ function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
-const EXTERNAL_ACTION_KINDS: readonly string[] = ['validate_affected_group'];
+const EXTERNAL_ACTION_KINDS: readonly string[] = ['validate_affected_group', 'approval'];
 function isExternalActionKind(value: unknown): value is ExternalActionKind {
 	return typeof value === 'string' && EXTERNAL_ACTION_KINDS.includes(value);
 }
@@ -908,6 +908,11 @@ function isEvidenceOutcome(value: unknown): value is EvidenceOutcome {
 	return typeof value === 'string' && EVIDENCE_OUTCOMES.includes(value);
 }
 
+// União discriminada por `kind` (ETAPA 14, §44, D070/D072/D073) — cada
+// variante parseia só os campos que seu subject exige, mesmo espírito de
+// state-types.ts. `approval` não tem preparação (objective/questions/
+// informationToTake/expectedResult) nem affectedGroupId; carrega só
+// decisionId.
 function parseExternalActionList(value: unknown): Result<ExternalAction[], ProjectStateParseError> {
 	if (value === undefined) return { ok: true, value: [] };
 	if (!Array.isArray(value)) return shapeError('externalActions deve ser um array');
@@ -917,8 +922,29 @@ function parseExternalActionList(value: unknown): Result<ExternalAction[], Proje
 		if (!isString(item.id)) return shapeError('ExternalAction.id deve ser uma string');
 		if (!isString(item.projectId)) return shapeError('ExternalAction.projectId deve ser uma string');
 		if (!isExternalActionKind(item.kind)) return shapeError('ExternalAction.kind deve ser um dos literais aprovados');
-		if (!isString(item.affectedGroupId)) return shapeError('ExternalAction.affectedGroupId deve ser uma string');
 		if (!isExternalActionStatus(item.status)) return shapeError('ExternalAction.status deve ser "aberta" ou "concluida"');
+		if (!isIsoDateString(item.createdAt)) return shapeError('ExternalAction.createdAt deve ser uma data ISO 8601 válida');
+		if (!isIsoDateString(item.updatedAt)) return shapeError('ExternalAction.updatedAt deve ser uma data ISO 8601 válida');
+		if (item.completedAt !== null && !isIsoDateString(item.completedAt)) {
+			return shapeError('ExternalAction.completedAt deve ser uma data ISO 8601 válida ou null');
+		}
+
+		if (item.kind === 'approval') {
+			if (!isString(item.decisionId)) return shapeError('ExternalAction.decisionId deve ser uma string');
+			result.push({
+				id: item.id,
+				projectId: item.projectId,
+				kind: 'approval',
+				decisionId: item.decisionId,
+				status: item.status,
+				createdAt: item.createdAt,
+				updatedAt: item.updatedAt,
+				completedAt: item.completedAt as string | null
+			});
+			continue;
+		}
+
+		if (!isString(item.affectedGroupId)) return shapeError('ExternalAction.affectedGroupId deve ser uma string');
 		if (!isString(item.objective) || item.objective.trim().length === 0) {
 			return shapeError('ExternalAction.objective deve ser uma string não vazia');
 		}
@@ -929,15 +955,10 @@ function parseExternalActionList(value: unknown): Result<ExternalAction[], Proje
 		if (!isString(item.expectedResult) || item.expectedResult.trim().length === 0) {
 			return shapeError('ExternalAction.expectedResult deve ser uma string não vazia');
 		}
-		if (!isIsoDateString(item.createdAt)) return shapeError('ExternalAction.createdAt deve ser uma data ISO 8601 válida');
-		if (!isIsoDateString(item.updatedAt)) return shapeError('ExternalAction.updatedAt deve ser uma data ISO 8601 válida');
-		if (item.completedAt !== null && !isIsoDateString(item.completedAt)) {
-			return shapeError('ExternalAction.completedAt deve ser uma data ISO 8601 válida ou null');
-		}
 		result.push({
 			id: item.id,
 			projectId: item.projectId,
-			kind: item.kind,
+			kind: 'validate_affected_group',
 			affectedGroupId: item.affectedGroupId,
 			status: item.status,
 			objective: item.objective,
@@ -1863,15 +1884,17 @@ function assembleProjectState({
 		}
 	}
 
-	// referências + invariantes: ExternalAction (ETAPA 3 do rework) —
-	// affectedGroupId precisa referenciar um AffectedGroup existente; no
-	// máximo uma ExternalAction aberta de `validate_affected_group` por
-	// grupo (mesma regra de domain/transitions.ts, prepareExternalAction);
-	// lifecycle coerente: 'aberta' nunca tem completedAt, 'concluida' sempre
-	// tem.
+	// referências + invariantes: ExternalAction (ETAPA 3 e ETAPA 14 do
+	// rework) — o subject de cada `kind` precisa referenciar um objeto
+	// existente (AffectedGroup para `validate_affected_group`, Decision para
+	// `approval` — D072); no máximo uma ExternalAction aberta por
+	// kind+subject (mesma regra de domain/transitions.ts,
+	// prepareExternalAction/prepareApprovalExternalAction); lifecycle
+	// coerente: 'aberta' nunca tem completedAt, 'concluida' sempre tem.
 	const affectedGroupIds = new Set(affectedGroups.map((group) => group.id));
+	const externalActionDecisionIds = new Set(decisions.map((decision) => decision.id));
 	const seenExternalActionIds = new Set<string>();
-	const openActionAffectedGroupIds = new Set<string>();
+	const openActionSubjectKeys = new Set<string>();
 	for (const action of externalActions) {
 		if (action.projectId !== project.id) {
 			return invariantError(`ExternalAction "${action.id}" usa projectId diferente do Project`);
@@ -1880,33 +1903,42 @@ function assembleProjectState({
 			return invariantError(`ExternalAction.id duplicado: "${action.id}"`);
 		}
 		seenExternalActionIds.add(action.id);
-		if (!affectedGroupIds.has(action.affectedGroupId)) {
+
+		const subjectId = action.kind === 'approval' ? action.decisionId : action.affectedGroupId;
+		if (action.kind === 'approval') {
+			if (!externalActionDecisionIds.has(action.decisionId)) {
+				return referenceError(`ExternalAction "${action.id}" referencia decisionId "${action.decisionId}", que não existe`);
+			}
+		} else if (!affectedGroupIds.has(action.affectedGroupId)) {
 			return referenceError(
 				`ExternalAction "${action.id}" referencia affectedGroupId "${action.affectedGroupId}", que não existe`
 			);
 		}
+
 		if (action.status === 'aberta') {
 			if (action.completedAt !== null) {
 				return invariantError(`ExternalAction "${action.id}" está aberta mas possui completedAt`);
 			}
-			const key = `${action.kind}::${action.affectedGroupId}`;
-			if (openActionAffectedGroupIds.has(key)) {
-				return invariantError(
-					`Mais de uma ExternalAction aberta de "${action.kind}" para o grupo "${action.affectedGroupId}"`
-				);
+			const key = `${action.kind}::${subjectId}`;
+			if (openActionSubjectKeys.has(key)) {
+				return invariantError(`Mais de uma ExternalAction aberta de "${action.kind}" para o subject "${subjectId}"`);
 			}
-			openActionAffectedGroupIds.add(key);
+			openActionSubjectKeys.add(key);
 		} else if (action.completedAt === null) {
 			return invariantError(`ExternalAction "${action.id}" está concluída mas não possui completedAt`);
 		}
 	}
 
 	// referências + invariantes: Evidence — externalActionId precisa
-	// referenciar uma ExternalAction concluída (nunca aberta: Evidence só
-	// nasce junto da conclusão, ver completeExternalAction), affectedGroupId
-	// precisa bater com o da própria ExternalAction (nunca divergir), e cada
-	// ExternalAction concluída precisa ter exatamente uma Evidence — nunca
-	// zero (ação concluída sem Evidence) nem duas (mesmo clique/retry).
+	// referenciar uma ExternalAction `validate_affected_group` concluída
+	// (nunca aberta: Evidence só nasce junto da conclusão, ver
+	// completeExternalAction; Evidence não se aplica a `approval` — D070
+	// ponto 5/7, D072), affectedGroupId precisa bater com o da própria
+	// ExternalAction (nunca divergir), e cada ExternalAction
+	// `validate_affected_group` concluída precisa ter exatamente uma
+	// Evidence — nunca zero (ação concluída sem Evidence) nem duas (mesmo
+	// clique/retry). `approval` concluída nunca exige Evidence (D072:
+	// Evidence não é obrigatória para esse kind).
 	const seenEvidenceIds = new Set<string>();
 	const evidenceByExternalActionId = new Map<string, Evidence>();
 	for (const evidence of evidences) {
@@ -1918,7 +1950,7 @@ function assembleProjectState({
 		}
 		seenEvidenceIds.add(evidence.id);
 		const action = externalActions.find((item) => item.id === evidence.externalActionId);
-		if (!action) {
+		if (!action || action.kind !== 'validate_affected_group') {
 			return referenceError(
 				`Evidence "${evidence.id}" referencia externalActionId "${evidence.externalActionId}", que não existe`
 			);
@@ -1935,7 +1967,7 @@ function assembleProjectState({
 		evidenceByExternalActionId.set(evidence.externalActionId, evidence);
 	}
 	for (const action of externalActions) {
-		if (action.status === 'concluida' && !evidenceByExternalActionId.has(action.id)) {
+		if (action.kind === 'validate_affected_group' && action.status === 'concluida' && !evidenceByExternalActionId.has(action.id)) {
 			return invariantError(`ExternalAction "${action.id}" está concluída mas não possui Evidence correspondente`);
 		}
 	}

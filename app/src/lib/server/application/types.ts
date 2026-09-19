@@ -489,12 +489,18 @@ export interface AffectedGroupView {
 	frequency: AffectedGroupFrequency | null;
 }
 
-// Validação Externa (ETAPA 3 do rework) — view leve de ExternalAction, sem
-// projectId/kind (só um kind existe nesta versão — a interface não precisa
-// distingui-lo). questions/informationToTake chegam já decodificados (a
-// interface nunca precisa conhecer o encoding JSON usado na persistência).
-export interface ExternalActionView {
+// Validação Externa (ETAPA 3 do rework) + Ações externas maduras (ETAPA 14,
+// §44, D070/D072/D073) — view leve de ExternalAction, sem projectId. União
+// discriminada por `kind`, mesmo shape do domínio (domain/state-types.ts):
+// a interface precisa distinguir os dois kinds para saber o que renderizar
+// na faixa/drawer transversal. questions/informationToTake chegam já
+// decodificados (a interface nunca precisa conhecer o encoding JSON usado
+// na persistência). `approval` não tem preparação própria — o texto de
+// orientação é derivado de `Decision.subject` na UI, a partir de
+// `decisionId`.
+export interface ExternalActionValidateAffectedGroupView {
 	id: string;
+	kind: 'validate_affected_group';
 	affectedGroupId: string;
 	status: ExternalActionStatus;
 	objective: string;
@@ -502,6 +508,15 @@ export interface ExternalActionView {
 	informationToTake: string[];
 	expectedResult: string;
 }
+
+export interface ExternalActionApprovalView {
+	id: string;
+	kind: 'approval';
+	decisionId: string;
+	status: ExternalActionStatus;
+}
+
+export type ExternalActionView = ExternalActionValidateAffectedGroupView | ExternalActionApprovalView;
 
 // View leve de Evidence, sem projectId (a interface não precisa).
 export interface EvidenceView {
@@ -1217,6 +1232,34 @@ export interface CompleteExternalActionInput {
 	learning: string;
 }
 
+// Ações externas maduras (ETAPA 14 do rework, §44, D070/D072/D073) — mesmo
+// padrão acima: id gerado pelo caso de uso. `approval` não tem preparação
+// própria (sem objective/questions/informationToTake/expectedResult, ver
+// domain/state-types.ts), então PrepareApprovalExternalActionInput só
+// recebe o subject.
+export interface PrepareApprovalExternalActionInput {
+	projectId: string;
+	decisionId: string;
+}
+
+// `outcome` aqui é o MESMO texto livre de Decision.outcome (decideDecision)
+// — nunca um approvalOutcome/enum approved-rejected (D072). Só válido
+// quando a Decision referenciada ainda está 'pendente'; caso já 'tomada',
+// o caller usa ReconcileApprovalExternalActionInput abaixo.
+export interface CompleteApprovalExternalActionInput {
+	projectId: string;
+	actionId: string;
+	outcome: string;
+}
+
+// Reconciliação: a Decision já foi decidida por outro caminho enquanto a
+// approval estava aberta — só conclui a ExternalAction, nunca escreve em
+// Decision (D072: "a ExternalAction nunca pode sobrescrever a Decision").
+export interface ReconcileApprovalExternalActionInput {
+	projectId: string;
+	actionId: string;
+}
+
 // "Como é tratado hoje" (Stage 4A do rework) — mesmo padrão dos inputs de
 // AffectedGroup: id gerado pelo caso de uso (idGenerator), nunca recebido do
 // cliente.
@@ -1436,6 +1479,9 @@ export interface ProjectUseCases {
 	confirmAffectedGroups(input: ConfirmAffectedGroupsInput): Promise<UseCaseOutcome<ProjectView>>;
 	prepareExternalAction(input: PrepareExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	completeExternalAction(input: CompleteExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
+	prepareApprovalExternalAction(input: PrepareApprovalExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
+	completeApprovalExternalAction(input: CompleteApprovalExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
+	reconcileApprovalExternalAction(input: ReconcileApprovalExternalActionInput): Promise<UseCaseOutcome<ProjectView>>;
 	addTreatmentStep(input: AddTreatmentStepInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeTreatmentStep(input: RemoveTreatmentStepInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveTreatmentStep(input: MoveTreatmentStepInput): Promise<UseCaseOutcome<ProjectView>>;

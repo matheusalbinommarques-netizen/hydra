@@ -466,27 +466,38 @@ CREATE TABLE IF NOT EXISTS affected_group (
 );
 
 -- ExternalAction / Evidence (ETAPA 3 do rework, "Evidence + primeira
--- External Action") — ver app/src/lib/domain/state-types.ts. affected_group_id
--- não usa ON DELETE CASCADE/SET NULL: a referência bloqueia a remoção do
--- grupo (aplicado em domain/transitions.ts, removeAffectedGroup, antes de
--- qualquer SQL rodar) — o padrão NO ACTION do SQLite aqui é só defesa em
--- profundidade, nunca o mecanismo primário. questions/information_to_take
--- guardam um array JSON em TEXT (mesmo espírito de PlanningItem dentro de
--- Answer.value, aqui decodificado no mapper em vez de domain/).
+-- External Action"; kind `approval` somado na ETAPA 14, "Ações externas
+-- maduras", §44, D070/D072/D073) — ver app/src/lib/domain/state-types.ts,
+-- união discriminada por `kind`. affected_group_id/decision_id não usam ON
+-- DELETE CASCADE/SET NULL: a referência bloqueia a remoção do subject
+-- (affected_group_id: domain/transitions.ts, removeAffectedGroup, antes de
+-- qualquer SQL rodar; decision não tem remoção hoje) — o padrão NO ACTION
+-- do SQLite aqui é só defesa em profundidade, nunca o mecanismo primário.
+-- `kind` sem CHECK fechado (mesma regra já registrada acima para
+-- project_event: discriminante extensível, fechado pela união TS, não pelo
+-- banco) — cada kind usa só o subconjunto de colunas da sua variante:
+-- affected_group_id + objective/questions/information_to_take/
+-- expected_result para `validate_affected_group` (questions/
+-- information_to_take guardam um array JSON em TEXT, mesmo espírito de
+-- PlanningItem dentro de Answer.value); decision_id, sozinho, para
+-- `approval`. Bancos criados antes da ETAPA 14 recebem decision_id e as
+-- colunas relaxadas para NULL via ALTER TABLE idempotente (rebuild) em
+-- ensureExternalActionApprovalSupport, sqlite-project-repository.ts.
 CREATE TABLE IF NOT EXISTS external_action (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-	kind TEXT NOT NULL CHECK (kind IN ('validate_affected_group')),
-	affected_group_id TEXT NOT NULL REFERENCES affected_group (id),
+	kind TEXT NOT NULL,
+	affected_group_id TEXT REFERENCES affected_group (id),
+	decision_id TEXT REFERENCES decision (id),
 	status TEXT NOT NULL CHECK (status IN ('aberta', 'concluida')),
-	objective TEXT NOT NULL,
-	questions TEXT NOT NULL,
-	information_to_take TEXT NOT NULL,
-	expected_result TEXT NOT NULL,
+	objective TEXT,
+	questions TEXT,
+	information_to_take TEXT,
+	expected_result TEXT,
 	created_at TEXT NOT NULL,
 	updated_at TEXT NOT NULL,
 	completed_at TEXT,
-	CHECK (
+	CONSTRAINT external_action_completed_matches_status CHECK (
 		(status = 'aberta' AND completed_at IS NULL) OR
 		(status = 'concluida' AND completed_at IS NOT NULL)
 	)

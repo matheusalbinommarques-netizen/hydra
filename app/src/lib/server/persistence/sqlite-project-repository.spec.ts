@@ -28,6 +28,7 @@ import {
 	captureScheduleBaseline,
 	previewScheduleBaselineCapture,
 	answerActivity,
+	completeApprovalExternalAction,
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
@@ -40,6 +41,7 @@ import {
 	moveScopeItem,
 	reachMilestone,
 	moveWorkItem,
+	prepareApprovalExternalAction,
 	prepareExternalAction,
 	promoteScopeItemToDeliverable,
 	removeDeliverable,
@@ -392,6 +394,154 @@ describe('createSqliteProjectRepository — schema', () => {
 		);
 		await repo2.insert(state);
 		await expect(repo2.findById('proj-novo')).resolves.toEqual(state);
+	});
+
+	// ETAPA 14 do rework ("Ações externas maduras", §44, D070/D072/D073) —
+	// bancos criados antes desta etapa têm external_action com CHECK fechado
+	// (kind IN ('validate_affected_group')) e affected_group_id NOT NULL,
+	// incompatíveis com o kind novo `approval` (subject Decision). Prova as
+	// três garantias exigidas pelo upgrade idempotente
+	// (ensureExternalActionApprovalSupport, rebuild de tabela): o banco
+	// antigo abre, a ExternalAction legada permanece íntegra, e uma
+	// `approval` nova pode ser persistida depois da conversão.
+	it('abre um banco pré-ETAPA-14 (external_action com CHECK fechado e affected_group_id NOT NULL), preserva a ExternalAction legada e aceita uma approval nova após o upgrade', async () => {
+		const filePath = tempFilePath();
+
+		const legacyDb = new Database(filePath);
+		legacyDb.exec(
+			'CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, created_at TEXT NOT NULL, route_start_phase_id TEXT)'
+		);
+		legacyDb.exec(
+			'CREATE TABLE scope_version (project_id TEXT PRIMARY KEY, hypothesis TEXT NOT NULL, confirmed_at TEXT)'
+		);
+		legacyDb.exec(
+			`CREATE TABLE affected_group (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL,
+				label TEXT NOT NULL,
+				impact TEXT,
+				frequency TEXT,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`
+		);
+		// Shape físico pré-ETAPA-14, idêntico ao 0001_init.sql anterior a este
+		// corte: CHECK fechado + affected_group_id NOT NULL, sem decision_id.
+		legacyDb.exec(
+			`CREATE TABLE external_action (
+				id TEXT PRIMARY KEY,
+				project_id TEXT NOT NULL,
+				kind TEXT NOT NULL CHECK (kind IN ('validate_affected_group')),
+				affected_group_id TEXT NOT NULL,
+				status TEXT NOT NULL CHECK (status IN ('aberta', 'concluida')),
+				objective TEXT NOT NULL,
+				questions TEXT NOT NULL,
+				information_to_take TEXT NOT NULL,
+				expected_result TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL,
+				completed_at TEXT
+			)`
+		);
+		legacyDb
+			.prepare('INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (?, ?, ?, NULL)')
+			.run('legacy-1', 'Projeto pré-ETAPA-14', T1);
+		legacyDb.prepare("INSERT INTO scope_version (project_id, hypothesis, confirmed_at) VALUES ('legacy-1', '', NULL)").run();
+		legacyDb
+			.prepare(
+				`INSERT INTO affected_group (id, project_id, label, impact, frequency, created_at, updated_at)
+				 VALUES ('ag-1', 'legacy-1', 'Clientes', 'alto', 'constante', ?, ?)`
+			)
+			.run(T1, T1);
+		legacyDb
+			.prepare(
+				`INSERT INTO external_action
+					(id, project_id, kind, affected_group_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at)
+				 VALUES ('ea-legacy', 'legacy-1', 'validate_affected_group', 'ag-1', 'aberta', 'Confirmar com Clientes.', '["Pergunta 1"]', '["Clientes"]', 'Voltar com a resposta.', ?, ?, NULL)`
+			)
+			.run(T1, T1);
+		legacyDb.close();
+
+		// Abrir com o repositório atual aplica 0001_init.sql (cria decision e
+		// as demais tabelas novas, vazias) e ensureExternalActionApprovalSupport
+		// deve reconstruir external_action preservando a linha legada.
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+
+		const found = await repo.findById('legacy-1');
+		expect(found).not.toBeNull();
+		if (!found) return;
+
+		expect(found.externalActions).toEqual([
+			{
+				id: 'ea-legacy',
+				projectId: 'legacy-1',
+				kind: 'validate_affected_group',
+				affectedGroupId: 'ag-1',
+				status: 'aberta',
+				objective: 'Confirmar com Clientes.',
+				questions: ['Pergunta 1'],
+				informationToTake: ['Clientes'],
+				expectedResult: 'Voltar com a resposta.',
+				createdAt: T1,
+				updatedAt: T1,
+				completedAt: null
+			}
+		]);
+
+		// Reabrir não duplica nem falha (idempotência do rebuild).
+		repo.close();
+		openRepos.length = 0;
+		const repo2 = createSqliteProjectRepository(filePath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('legacy-1')).resolves.toEqual(found);
+
+		// Uma `approval` nova — kind que não existia fisicamente no schema
+		// antigo — pode ser preparada e persistida depois do upgrade, sem
+		// perder a ExternalAction legada.
+		let state = unwrap(addDecision(catalog, found, 'dec-1', 'Aprovar o orçamento do trimestre?', T2));
+		state = unwrap(prepareApprovalExternalAction(catalog, state, 'ea-approval-1', 'dec-1', T2));
+		await repo2.save(state);
+
+		const afterApproval = await repo2.findById('legacy-1');
+		expect(afterApproval).not.toBeNull();
+		if (!afterApproval) return;
+		expect(afterApproval.externalActions).toContainEqual({
+			id: 'ea-legacy',
+			projectId: 'legacy-1',
+			kind: 'validate_affected_group',
+			affectedGroupId: 'ag-1',
+			status: 'aberta',
+			objective: 'Confirmar com Clientes.',
+			questions: ['Pergunta 1'],
+			informationToTake: ['Clientes'],
+			expectedResult: 'Voltar com a resposta.',
+			createdAt: T1,
+			updatedAt: T1,
+			completedAt: null
+		});
+		expect(afterApproval.externalActions).toContainEqual({
+			id: 'ea-approval-1',
+			projectId: 'legacy-1',
+			kind: 'approval',
+			decisionId: 'dec-1',
+			status: 'aberta',
+			createdAt: T2,
+			updatedAt: T2,
+			completedAt: null
+		});
+
+		// Fluxo completo: retorno com a Decision ainda pendente decide a
+		// Decision e conclui a ExternalAction na mesma reconciliação.
+		state = unwrap(completeApprovalExternalAction(catalog, state, 'ea-approval-1', 'Aprovado com ressalvas.', T2));
+		await repo2.save(state);
+		const afterComplete = await repo2.findById('legacy-1');
+		expect(afterComplete?.decisions).toContainEqual(
+			expect.objectContaining({ id: 'dec-1', status: 'tomada', outcome: 'Aprovado com ressalvas.', decidedAt: T2 })
+		);
+		expect(afterComplete?.externalActions).toContainEqual(
+			expect.objectContaining({ id: 'ea-approval-1', kind: 'approval', status: 'concluida', completedAt: T2 })
+		);
 	});
 });
 

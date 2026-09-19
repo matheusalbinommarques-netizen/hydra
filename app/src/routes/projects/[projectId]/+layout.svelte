@@ -14,25 +14,54 @@
 	let projectId = $derived(page.params.projectId);
 	let pathname = $derived(page.url.pathname);
 
-	// Validação Externa (ETAPA 3 do rework, correção de UX pós-dogfooding) —
-	// faixa contextual "N ações em campo" visível em qualquer página interna
-	// do projeto (não só /now, onde a ExternalAction nasce), sem duplicar a
-	// lógica em cada rota: ProjectView já carrega externalActions/
-	// affectedGroups por inteiro (ver server/application/project-view.ts),
-	// então o shell só filtra e cruza os dois. A action do formulário de
-	// captura aponta explicitamente para
-	// `/projects/{id}/now?/completeExternalAction` — SvelteKit resolve
-	// actions pela URL do <form>, não pela rota atualmente renderizada, então
-	// isso funciona a partir de qualquer página sem precisar de uma action
-	// própria por rota (ver now/+page.server.ts).
-	let openExternalActions = $derived(
+	// Validação Externa (ETAPA 3 do rework, correção de UX pós-dogfooding) +
+	// Ações externas maduras (ETAPA 14, §44, D070/D072/D073) — faixa
+	// contextual "N ações em campo" visível em qualquer página interna do
+	// projeto (não só /now ou /decisions, onde cada kind nasce), sem duplicar
+	// a lógica em cada rota: ProjectView já carrega externalActions/
+	// affectedGroups/decisions por inteiro (ver
+	// server/application/project-view.ts), então o shell só filtra e cruza os
+	// três. Cada `kind` deriva seu próprio rótulo — `approval` não tem
+	// objective/groupLabel (a ExternalAction não carrega esse texto, D073: só
+	// a Decision é fonte), então o rótulo vem de `Decision.subject`. As
+	// actions dos formulários de captura apontam explicitamente para a rota
+	// que as define (`/projects/{id}/now?/completeExternalAction`,
+	// `/projects/{id}/decisions?/completeApprovalExternalAction`,
+	// `/projects/{id}/decisions?/reconcileApprovalExternalAction`) —
+	// SvelteKit resolve actions pela URL do <form>, não pela rota atualmente
+	// renderizada, então isso funciona a partir de qualquer página sem
+	// precisar de uma action própria por rota.
+	type OpenExternalAction =
+		| { id: string; kind: 'validate_affected_group'; label: string; objective: string }
+		| {
+				id: string;
+				kind: 'approval';
+				label: string;
+				decisionStatus: 'pendente' | 'tomada';
+				decisionOutcome: string | null;
+		  };
+
+	let openExternalActions = $derived<OpenExternalAction[]>(
 		data.view.externalActions
 			.filter((action) => action.status === 'aberta')
-			.map((action) => ({
-				id: action.id,
-				objective: action.objective,
-				groupLabel: data.view.affectedGroups.find((group) => group.id === action.affectedGroupId)?.label ?? 'Grupo'
-			}))
+			.map((action) => {
+				if (action.kind === 'approval') {
+					const decision = data.view.decisions.find((item) => item.id === action.decisionId);
+					return {
+						id: action.id,
+						kind: 'approval',
+						label: decision?.subject ?? 'Decisão',
+						decisionStatus: decision?.status ?? 'pendente',
+						decisionOutcome: decision?.outcome ?? null
+					};
+				}
+				return {
+					id: action.id,
+					kind: 'validate_affected_group',
+					label: data.view.affectedGroups.find((group) => group.id === action.affectedGroupId)?.label ?? 'Grupo',
+					objective: action.objective
+				};
+			})
 	);
 	let singleOpenAction = $derived(openExternalActions.length === 1 ? openExternalActions[0] : undefined);
 	let stripExpanded = $state(false);
@@ -40,13 +69,16 @@
 	let captureActionId = $state<string | null>(null);
 	let captureOutcome = $state<EvidenceOutcome | null>(null);
 	let captureLearning = $state('');
+	let captureApprovalOutcome = $state('');
 	let captureAction = $derived(openExternalActions.find((action) => action.id === captureActionId));
 	let cannotSaveEvidence = $derived(!captureOutcome || captureLearning.trim().length === 0);
+	let cannotSaveApprovalOutcome = $derived(captureApprovalOutcome.trim().length === 0);
 
 	function openCapture(actionId: string) {
 		captureActionId = actionId;
 		captureOutcome = null;
 		captureLearning = '';
+		captureApprovalOutcome = '';
 		stripExpanded = false;
 	}
 
@@ -245,7 +277,7 @@
 				<div class="strip-row">
 					<div class="strip-status">
 						<span class="strip-dot" aria-hidden="true"></span>
-						<span>Ação em campo — {singleOpenAction.groupLabel}</span>
+						<span>Ação em campo — {singleOpenAction.label}</span>
 					</div>
 					<button type="button" class="strip-action" onclick={() => openCapture(singleOpenAction.id)}>
 						Registrar retorno
@@ -257,7 +289,7 @@
 						<span class="strip-dot" aria-hidden="true"></span>
 						<span>
 							{openExternalActions.length} ações em campo · {openExternalActions
-								.map((action) => action.groupLabel)
+								.map((action) => action.label)
 								.join(' · ')}
 						</span>
 					</div>
@@ -275,7 +307,7 @@
 					<ul id="strip-action-list" class="strip-list">
 						{#each openExternalActions as action (action.id)}
 							<li class="strip-list-item">
-								<span>{action.groupLabel}</span>
+								<span>{action.label}</span>
 								<button type="button" class="strip-action strip-action-text" onclick={() => openCapture(action.id)}>
 									Registrar retorno
 								</button>
@@ -289,54 +321,120 @@
 
 	{#if captureActionId && captureAction}
 		<div class="capture-overlay" onclick={closeCapture} aria-hidden="true"></div>
-		<div class="capture-drawer" role="dialog" aria-label="Retorno da validação">
-			<div class="capture-header">
-				<p class="capture-eyebrow">Retorno da validação</p>
-				<p class="capture-group">{captureAction.groupLabel}</p>
-				<p class="capture-objective">{captureAction.objective}</p>
-			</div>
-			<div class="capture-choices">
-				{#each EVIDENCE_OUTCOME_OPTIONS as option (option.id)}
-					<button
-						type="button"
-						class="capture-choice"
-						class:selected={captureOutcome === option.id}
-						aria-pressed={captureOutcome === option.id}
-						onclick={() => (captureOutcome = option.id)}
-					>
-						{option.label}
-					</button>
-				{/each}
-			</div>
-			<form
-				method="POST"
-				action="/projects/{projectId}/now?/completeExternalAction"
-				use:enhance={() => {
-					return async ({ result, update }) => {
-						if (result.type === 'failure' || result.type === 'error') {
-							await update();
-							return;
-						}
-						await update();
-						closeCapture();
-					};
-				}}
-			>
-				<input type="hidden" name="actionId" value={captureActionId} />
-				<input type="hidden" name="outcome" value={captureOutcome ?? ''} />
-				<label class="capture-label" for="capture-learning">O que você aprendeu?</label>
-				<textarea
-					id="capture-learning"
-					name="learning"
-					bind:value={captureLearning}
-					placeholder="Uma frase curta já basta."
-				></textarea>
-				<div class="capture-actions">
-					<button type="button" class="capture-close" onclick={closeCapture}>Fechar</button>
-					<button type="submit" class="capture-save" disabled={cannotSaveEvidence}>Salvar evidência</button>
+		{#if captureAction.kind === 'validate_affected_group'}
+			<div class="capture-drawer" role="dialog" aria-label="Retorno da validação">
+				<div class="capture-header">
+					<p class="capture-eyebrow">Retorno da validação</p>
+					<p class="capture-group">{captureAction.label}</p>
+					<p class="capture-objective">{captureAction.objective}</p>
 				</div>
-			</form>
-		</div>
+				<div class="capture-choices">
+					{#each EVIDENCE_OUTCOME_OPTIONS as option (option.id)}
+						<button
+							type="button"
+							class="capture-choice"
+							class:selected={captureOutcome === option.id}
+							aria-pressed={captureOutcome === option.id}
+							onclick={() => (captureOutcome = option.id)}
+						>
+							{option.label}
+						</button>
+					{/each}
+				</div>
+				<form
+					method="POST"
+					action="/projects/{projectId}/now?/completeExternalAction"
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type === 'failure' || result.type === 'error') {
+								await update();
+								return;
+							}
+							await update();
+							closeCapture();
+						};
+					}}
+				>
+					<input type="hidden" name="actionId" value={captureActionId} />
+					<input type="hidden" name="outcome" value={captureOutcome ?? ''} />
+					<label class="capture-label" for="capture-learning">O que você aprendeu?</label>
+					<textarea
+						id="capture-learning"
+						name="learning"
+						bind:value={captureLearning}
+						placeholder="Uma frase curta já basta."
+					></textarea>
+					<div class="capture-actions">
+						<button type="button" class="capture-close" onclick={closeCapture}>Fechar</button>
+						<button type="submit" class="capture-save" disabled={cannotSaveEvidence}>Salvar evidência</button>
+					</div>
+				</form>
+			</div>
+		{:else if captureAction.decisionStatus === 'pendente'}
+			<div class="capture-drawer" role="dialog" aria-label="Retorno da aprovação">
+				<div class="capture-header">
+					<p class="capture-eyebrow">Retorno da aprovação</p>
+					<p class="capture-group">{captureAction.label}</p>
+				</div>
+				<form
+					method="POST"
+					action="/projects/{projectId}/decisions?/completeApprovalExternalAction"
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type === 'failure' || result.type === 'error') {
+								await update();
+								return;
+							}
+							await update();
+							closeCapture();
+						};
+					}}
+				>
+					<input type="hidden" name="actionId" value={captureActionId} />
+					<label class="capture-label" for="capture-approval-outcome">Resultado da decisão</label>
+					<textarea
+						id="capture-approval-outcome"
+						name="outcome"
+						bind:value={captureApprovalOutcome}
+						placeholder="O que foi decidido?"
+					></textarea>
+					<div class="capture-actions">
+						<button type="button" class="capture-close" onclick={closeCapture}>Fechar</button>
+						<button type="submit" class="capture-save" disabled={cannotSaveApprovalOutcome}>Registrar decisão</button>
+					</div>
+				</form>
+			</div>
+		{:else}
+			<div class="capture-drawer" role="dialog" aria-label="Retorno da aprovação">
+				<div class="capture-header">
+					<p class="capture-eyebrow">Retorno da aprovação</p>
+					<p class="capture-group">{captureAction.label}</p>
+					<p class="capture-objective">
+						Esta decisão já foi tomada: {captureAction.decisionOutcome}
+					</p>
+				</div>
+				<form
+					method="POST"
+					action="/projects/{projectId}/decisions?/reconcileApprovalExternalAction"
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type === 'failure' || result.type === 'error') {
+								await update();
+								return;
+							}
+							await update();
+							closeCapture();
+						};
+					}}
+				>
+					<input type="hidden" name="actionId" value={captureActionId} />
+					<div class="capture-actions">
+						<button type="button" class="capture-close" onclick={closeCapture}>Fechar</button>
+						<button type="submit" class="capture-save">Reconciliar</button>
+					</div>
+				</form>
+			</div>
+		{/if}
 	{/if}
 
 	<main class="container">

@@ -1789,6 +1789,7 @@ describe('createProjectUseCases — Validação Externa (ETAPA 3, ExternalAction
 
 		expect(result.value.externalActions).toHaveLength(1);
 		const action = result.value.externalActions[0];
+		if (action.kind !== 'validate_affected_group') throw new Error('esperado validate_affected_group');
 		expect(action.affectedGroupId).toBe(groupId);
 		expect(action.status).toBe('aberta');
 		expect(action.objective).toContain('Operação');
@@ -1901,6 +1902,95 @@ describe('createProjectUseCases — Validação Externa (ETAPA 3, ExternalAction
 		expect(await useCases.removeAffectedGroup({ projectId, groupId })).toEqual({
 			ok: false,
 			error: { kind: 'affected_group_has_references' }
+		});
+	});
+});
+
+describe('createProjectUseCases — ExternalAction(kind=approval) (ETAPA 14, §44, D070/D072/D073)', () => {
+	async function projectWithPendingDecision(clock = '2026-01-01T00:00:00.000Z') {
+		const ctx = setup(clock);
+		const created = await ctx.useCases.createProject();
+		if (!created.ok) throw new Error('esperado ok');
+		const projectId = created.value.projectId;
+		const withDecision = await ctx.useCases.addDecision({ projectId, subject: 'Aprovar o orçamento?' });
+		if (!withDecision.ok) throw new Error('esperado ok');
+		return { ...ctx, projectId, decisionId: withDecision.value.decisions[0].id };
+	}
+
+	it('prepareApprovalExternalAction cria a ExternalAction sem preparação de conteúdo (só decisionId)', async () => {
+		const { useCases, projectId, decisionId } = await projectWithPendingDecision();
+
+		const result = await useCases.prepareApprovalExternalAction({ projectId, decisionId });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.externalActions).toHaveLength(1);
+		const action = result.value.externalActions[0];
+		if (action.kind !== 'approval') throw new Error('esperado approval');
+		expect(action.decisionId).toBe(decisionId);
+		expect(action.status).toBe('aberta');
+	});
+
+	it('prepareApprovalExternalAction: decision_not_found para Decision inexistente', async () => {
+		const { useCases, projectId } = await projectWithPendingDecision();
+		expect(await useCases.prepareApprovalExternalAction({ projectId, decisionId: 'nao-existe' })).toEqual({
+			ok: false,
+			error: { kind: 'decision_not_found' }
+		});
+	});
+
+	it('completeApprovalExternalAction, com a Decision ainda pendente: decide a Decision e conclui a ExternalAction na mesma reconciliação', async () => {
+		const { useCases, projectId, decisionId } = await projectWithPendingDecision();
+		const prepared = await useCases.prepareApprovalExternalAction({ projectId, decisionId });
+		if (!prepared.ok) throw new Error('esperado ok');
+		const actionId = prepared.value.externalActions[0].id;
+
+		const result = await useCases.completeApprovalExternalAction({ projectId, actionId, outcome: 'Aprovado.' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const decision = result.value.decisions.find((d) => d.id === decisionId);
+		expect(decision?.status).toBe('tomada');
+		expect(decision?.outcome).toBe('Aprovado.');
+		const action = result.value.externalActions.find((a) => a.id === actionId);
+		expect(action?.status).toBe('concluida');
+	});
+
+	it('cenário completo: Decision decidida pelo caminho direto (decideDecision) enquanto a approval está aberta — completeApprovalExternalAction recusa, reconcileApprovalExternalAction conclui sem sobrescrever', async () => {
+		const { useCases, projectId, decisionId } = await projectWithPendingDecision();
+		const prepared = await useCases.prepareApprovalExternalAction({ projectId, decisionId });
+		if (!prepared.ok) throw new Error('esperado ok');
+		const actionId = prepared.value.externalActions[0].id;
+
+		// A Decision é decidida pelo formulário direto de /decisions, não pela
+		// approval — mesmo cenário que D072 exige nunca ser sobrescrito.
+		const decided = await useCases.decideDecision({ projectId, decisionId, outcome: 'Aprovado direto pelo form.' });
+		if (!decided.ok) throw new Error('esperado ok');
+
+		expect(await useCases.completeApprovalExternalAction({ projectId, actionId, outcome: 'Tentativa indevida.' })).toEqual(
+			{ ok: false, error: { kind: 'decision_already_decided' } }
+		);
+
+		const reconciled = await useCases.reconcileApprovalExternalAction({ projectId, actionId });
+		expect(reconciled.ok).toBe(true);
+		if (!reconciled.ok) return;
+
+		const decision = reconciled.value.decisions.find((d) => d.id === decisionId);
+		// Outcome permanece exatamente o do caminho direto — nunca sobrescrito.
+		expect(decision?.outcome).toBe('Aprovado direto pelo form.');
+		const action = reconciled.value.externalActions.find((a) => a.id === actionId);
+		expect(action?.status).toBe('concluida');
+	});
+
+	it('reconcileApprovalExternalAction: decision_not_decided quando a Decision ainda está pendente', async () => {
+		const { useCases, projectId, decisionId } = await projectWithPendingDecision();
+		const prepared = await useCases.prepareApprovalExternalAction({ projectId, decisionId });
+		if (!prepared.ok) throw new Error('esperado ok');
+		const actionId = prepared.value.externalActions[0].id;
+
+		expect(await useCases.reconcileApprovalExternalAction({ projectId, actionId })).toEqual({
+			ok: false,
+			error: { kind: 'decision_not_decided' }
 		});
 	});
 });

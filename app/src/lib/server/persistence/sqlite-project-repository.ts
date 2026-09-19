@@ -390,6 +390,84 @@ function ensureWorkItemScheduleColumns(db: Database.Database): void {
 	}
 }
 
+// Décima quarta evolução do schema desde 0001_init.sql (ETAPA 14 do
+// rework, "Ações externas maduras", §44, D070/D072/D073) — primeiro `kind`
+// novo de ExternalAction (`approval`, subject Decision) desde a criação da
+// tabela. Mesmo problema estrutural de ensureProjectEventTaxonomyOpen:
+// `kind` tem CHECK fechado (`IN ('validate_affected_group')`) e
+// `affected_group_id`/`objective`/`questions`/`information_to_take`/
+// `expected_result` são NOT NULL — nada disso existe numa linha `approval`
+// (que só tem decision_id). SQLite não altera CHECK nem remove NOT NULL
+// via ALTER TABLE, então exige o mesmo procedimento oficial de rebuild
+// (CREATE / INSERT SELECT / DROP / RENAME) — seguindo a regra já registrada
+// em 0001_init.sql ("CHECK de banco para invariante realmente fechado; sem
+// CHECK para discriminante extensível"): `kind` deixa de ter CHECK fechado
+// (a união TS fecha os casos, mesmo tratamento de `project_event.type`), e
+// a única CHECK que permanece (coerência status/completed_at) é a mesma
+// invariante fechada de sempre, agora NOMEADA.
+//
+// Detecção de idempotência: ausência da coluna decision_id — um banco já
+// convertido (ou recém-criado a partir de 0001_init.sql, que já nasce sem
+// o CHECK fechado e com decision_id) simplesmente não entra.
+function ensureExternalActionApprovalSupport(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(external_action)').all() as TableInfoRow[];
+	const hasDecisionId = columns.some((column) => column.name === 'decision_id');
+	if (hasDecisionId) return;
+
+	// foreign_keys precisa ser desligado FORA de qualquer transação (dentro
+	// de uma, o PRAGMA é silenciosamente ignorado) — procedimento oficial de
+	// alteração de schema do SQLite, mesmo passo de ensureProjectEventTaxonomyOpen.
+	db.pragma('foreign_keys = OFF');
+	try {
+		db.transaction(() => {
+			db.exec(
+				`CREATE TABLE external_action_new (
+					id TEXT PRIMARY KEY,
+					project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+					kind TEXT NOT NULL,
+					affected_group_id TEXT REFERENCES affected_group (id),
+					decision_id TEXT REFERENCES decision (id),
+					status TEXT NOT NULL CHECK (status IN ('aberta', 'concluida')),
+					objective TEXT,
+					questions TEXT,
+					information_to_take TEXT,
+					expected_result TEXT,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL,
+					completed_at TEXT,
+					CONSTRAINT external_action_completed_matches_status CHECK (
+						(status = 'aberta' AND completed_at IS NULL) OR
+						(status = 'concluida' AND completed_at IS NOT NULL)
+					)
+				)`
+			);
+			db.exec(
+				`INSERT INTO external_action_new
+					(id, project_id, kind, affected_group_id, decision_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at)
+				 SELECT id, project_id, kind, affected_group_id, NULL, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at
+				 FROM external_action`
+			);
+			db.exec('DROP TABLE external_action');
+			db.exec('ALTER TABLE external_action_new RENAME TO external_action');
+			// Índice vive com a tabela: DROP TABLE levou o antigo junto (R5 da
+			// remediação, mesmo cuidado de ensureProjectEventTaxonomyOpen).
+			db.exec('CREATE INDEX IF NOT EXISTS idx_external_action_project_id ON external_action (project_id)');
+
+			// Passo 10 do procedimento oficial: confere integridade referencial
+			// antes do commit. Lançar aqui desfaz a transação inteira — um banco
+			// que falhe a conversão continua com a tabela original intacta.
+			const violations = db.pragma('foreign_key_check') as unknown[];
+			if (violations.length > 0) {
+				throw new Error(
+					`Conversão de external_action abortada: ${violations.length} violação(ões) de foreign key detectada(s).`
+				);
+			}
+		})();
+	} finally {
+		db.pragma('foreign_keys = ON');
+	}
+}
+
 export function createSqliteProjectRepository(databasePath: string): SqliteProjectRepository {
 	const db = new Database(databasePath);
 	db.pragma('foreign_keys = ON');
@@ -407,6 +485,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureDecisionResponsibleColumn(db);
 	ensureWorkItemScheduleColumns(db);
 	ensureProjectEventTaxonomyOpen(db);
+	ensureExternalActionApprovalSupport(db);
 
 	function insertChildren(state: ProjectState): void {
 		const insertActivityProgress = db.prepare(
@@ -600,19 +679,53 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 			insertAffectedGroup.run(group);
 		}
 
-		// external_action depende de affected_group (FK), evidence depende de
-		// external_action e affected_group — ordem de insert importa com
-		// foreign_keys = ON (checagem imediata, não deferida).
+		// external_action depende de affected_group e decision (FK, ETAPA 14),
+		// evidence depende de external_action e affected_group — ordem de
+		// insert importa com foreign_keys = ON (checagem imediata, não
+		// deferida); decision já foi inserida acima.
+		// União discriminada (ETAPA 14, §44, D070/D072/D073): cada variante só
+		// preenche as colunas do seu subject, as demais gravam NULL — nunca
+		// `objective`/roteiro para `approval`, nunca `decision_id` para
+		// `validate_affected_group` (ver domain/state-types.ts).
 		const insertExternalAction = db.prepare(
 			`INSERT INTO external_action
-			   (id, project_id, kind, affected_group_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at)
-			 VALUES (@id, @projectId, @kind, @affectedGroupId, @status, @objective, @questions, @informationToTake, @expectedResult, @createdAt, @updatedAt, @completedAt)`
+			   (id, project_id, kind, affected_group_id, decision_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at)
+			 VALUES (@id, @projectId, @kind, @affectedGroupId, @decisionId, @status, @objective, @questions, @informationToTake, @expectedResult, @createdAt, @updatedAt, @completedAt)`
 		);
 		for (const action of state.externalActions) {
+			if (action.kind === 'approval') {
+				insertExternalAction.run({
+					id: action.id,
+					projectId: action.projectId,
+					kind: action.kind,
+					affectedGroupId: null,
+					decisionId: action.decisionId,
+					status: action.status,
+					objective: null,
+					questions: null,
+					informationToTake: null,
+					expectedResult: null,
+					createdAt: action.createdAt,
+					updatedAt: action.updatedAt,
+					completedAt: action.completedAt
+				});
+				continue;
+			}
+
 			insertExternalAction.run({
-				...action,
+				id: action.id,
+				projectId: action.projectId,
+				kind: action.kind,
+				affectedGroupId: action.affectedGroupId,
+				decisionId: null,
+				status: action.status,
+				objective: action.objective,
 				questions: JSON.stringify(action.questions),
-				informationToTake: JSON.stringify(action.informationToTake)
+				informationToTake: JSON.stringify(action.informationToTake),
+				expectedResult: action.expectedResult,
+				createdAt: action.createdAt,
+				updatedAt: action.updatedAt,
+				completedAt: action.completedAt
 			});
 		}
 
@@ -735,6 +848,12 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		db.prepare('DELETE FROM milestone_work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM milestone WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM risk WHERE project_id = ?').run(state.project.id);
+		// evidence/external_action apagados antes de affected_group E de
+		// decision — external_action referencia affected_group sempre e
+		// decision quando kind='approval' (ETAPA 14, §44); ambas as FKs são
+		// sem ON DELETE, checagem imediata.
+		db.prepare('DELETE FROM evidence WHERE project_id = ?').run(state.project.id);
+		db.prepare('DELETE FROM external_action WHERE project_id = ?').run(state.project.id);
 		// decision_affected_work_item antes de decision e de work_item (FKs para
 		// ambos, ETAPA 11 do rework, terceiro microcorte, §41) — mesmo raciocínio
 		// de milestone_work_item acima.
@@ -745,10 +864,6 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		// work_item.deliverable_id referencia deliverable.id.
 		db.prepare('DELETE FROM work_item WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM deliverable WHERE project_id = ?').run(state.project.id);
-		// evidence/external_action apagados antes de affected_group — ambos
-		// referenciam affected_group (FK sem ON DELETE, checagem imediata).
-		db.prepare('DELETE FROM evidence WHERE project_id = ?').run(state.project.id);
-		db.prepare('DELETE FROM external_action WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM affected_group WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM treatment_step WHERE project_id = ?').run(state.project.id);
 		db.prepare('DELETE FROM current_treatment WHERE project_id = ?').run(state.project.id);
@@ -903,7 +1018,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const externalActionRows = db
 				.prepare(
-					`SELECT id, project_id, kind, affected_group_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at
+					`SELECT id, project_id, kind, affected_group_id, decision_id, status, objective, questions, information_to_take, expected_result, created_at, updated_at, completed_at
 					 FROM external_action WHERE project_id = ? ORDER BY rowid`
 				)
 				.all(projectId) as ExternalActionRow[];

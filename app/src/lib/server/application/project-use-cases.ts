@@ -32,6 +32,7 @@ import {
 	setWorkItemDeliverable as setWorkItemDeliverableInDomain,
 	setWorkItemSchedule as setWorkItemScheduleInDomain,
 	answerActivity as answerActivityInDomain,
+	completeApprovalExternalAction as completeApprovalExternalActionInDomain,
 	completeExternalAction as completeExternalActionInDomain,
 	confirmAffectedGroups as confirmAffectedGroupsInDomain,
 	confirmCauseHypotheses as confirmCauseHypothesesInDomain,
@@ -60,7 +61,9 @@ import {
 	moveScopeItem as moveScopeItemInDomain,
 	moveTreatmentStep as moveTreatmentStepInDomain,
 	moveWorkItem as moveWorkItemInDomain,
+	prepareApprovalExternalAction as prepareApprovalExternalActionInDomain,
 	prepareExternalAction as prepareExternalActionInDomain,
+	reconcileApprovalExternalAction as reconcileApprovalExternalActionInDomain,
 	removeAffectedGroup as removeAffectedGroupInDomain,
 	removeCauseHypothesis as removeCauseHypothesisInDomain,
 	linkWorkItemToDecision as linkWorkItemToDecisionInDomain,
@@ -144,6 +147,7 @@ import type {
 	SetWorkItemScheduleInput,
 	AnswerActivityInput,
 	CloseRiskInput,
+	CompleteApprovalExternalActionInput,
 	CompleteExternalActionInput,
 	ConfirmAffectedGroupsInput,
 	ConfirmCauseHypothesesInput,
@@ -172,9 +176,11 @@ import type {
 	MoveTreatmentStepInput,
 	MoveWorkItemInput,
 	RemoveDependencyInput,
+	PrepareApprovalExternalActionInput,
 	PrepareExternalActionInput,
 	ProjectListItem,
 	ProjectUseCases,
+	ReconcileApprovalExternalActionInput,
 	RemoveAffectedGroupInput,
 	RemoveCauseHypothesisInput,
 	RemoveDesiredOutcomeInput,
@@ -1616,6 +1622,57 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				input.learning,
 				clock.now()
 			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Ações externas maduras (ETAPA 14 do rework, §44, D070/D072/D073) —
+		// mesmo padrão de prepareExternalAction: id gerado aqui, nunca recebido
+		// do cliente. Sem preparação derivada de catálogo (approval não tem
+		// roteiro de entrevista).
+		async prepareApprovalExternalAction(input: PrepareApprovalExternalActionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = prepareApprovalExternalActionInDomain(
+				catalog,
+				state,
+				idGenerator.generate(),
+				input.decisionId,
+				clock.now()
+			);
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Retorno de approval com a Decision ainda pendente: decide a Decision
+		// e conclui a ExternalAction na mesma reconciliação (ver
+		// completeApprovalExternalAction, domain/transitions.ts — reusa
+		// exatamente a regra de decideDecision via applyDecisionOutcome, nunca
+		// duplicada).
+		async completeApprovalExternalAction(input: CompleteApprovalExternalActionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = completeApprovalExternalActionInDomain(catalog, state, input.actionId, input.outcome, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Retorno de approval com a Decision já tomada por outro caminho: só
+		// conclui a ExternalAction, nunca escreve em Decision.outcome/decidedAt
+		// (D072 — sem overwrite possível).
+		async reconcileApprovalExternalAction(input: ReconcileApprovalExternalActionInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = reconcileApprovalExternalActionInDomain(catalog, state, input.actionId, clock.now());
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

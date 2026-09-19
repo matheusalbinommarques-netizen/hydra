@@ -38,12 +38,14 @@ import {
 	captureScheduleBaseline,
 	previewScheduleBaselineCapture,
 	answerActivity,
+	completeApprovalExternalAction,
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmScopeVersion,
 	confirmSummary,
 	confirmTreatment,
 	markCauseExplorationUnknown,
+	prepareApprovalExternalAction,
 	prepareExternalAction,
 	resolveImpediment,
 	setAffectedGroupFrequency,
@@ -1079,6 +1081,56 @@ describe('deserializeProjectState — ExternalAction / Evidence (ETAPA 3, "Valid
 		};
 		withWrongEvidence.state.evidences[0].projectId = 'outro-projeto';
 		expectError(JSON.stringify(withWrongEvidence), 'invariant_violation');
+	});
+});
+
+describe('deserializeProjectState — ExternalAction(kind=approval) (ETAPA 14, §44, D070/D072/D073)', () => {
+	function openApprovalState(): ProjectState {
+		let state = unwrap(addDecision(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'dec-1', 'Aprovar?', T1));
+		state = unwrap(prepareApprovalExternalAction(catalog, state, 'ea-1', 'dec-1', T1));
+		return state;
+	}
+
+	function completedApprovalState(): ProjectState {
+		return unwrap(completeApprovalExternalAction(catalog, openApprovalState(), 'ea-1', 'Aprovado.', T2));
+	}
+
+	it('roundtrip de uma ExternalAction(kind=approval) aberta — sem objective/questions/informationToTake/expectedResult', () => {
+		const state = openApprovalState();
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('roundtrip de uma ExternalAction(kind=approval) concluída — sem Evidence (Evidence não se aplica a approval, D072)', () => {
+		const state = completedApprovalState();
+		expect(state.evidences).toEqual([]);
+		const result = deserializeProjectState(serializeProjectState(state), catalog);
+		expect(result).toEqual({ ok: true, value: state });
+	});
+
+	it('rejeita ExternalAction(kind=approval).decisionId referenciando Decision inexistente', () => {
+		const envelope = JSON.parse(serializeProjectState(openApprovalState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		envelope.state.externalActions[0].decisionId = 'inexistente';
+		expectError(JSON.stringify(envelope), 'invalid_reference');
+	});
+
+	it('rejeita duas ExternalActions(kind=approval) abertas para a mesma Decision', () => {
+		const envelope = JSON.parse(serializeProjectState(openApprovalState())) as {
+			state: { externalActions: Array<Record<string, unknown>> };
+		};
+		envelope.state.externalActions.push({ ...envelope.state.externalActions[0], id: 'ea-2' });
+		expectError(JSON.stringify(envelope), 'invariant_violation');
+	});
+
+	it('uma ExternalAction(kind=approval) concluída NUNCA exige Evidence correspondente (diferente de validate_affected_group)', () => {
+		const envelope = JSON.parse(serializeProjectState(completedApprovalState())) as {
+			state: { evidences: unknown[] };
+		};
+		expect(envelope.state.evidences).toEqual([]);
+		const result = deserializeProjectState(JSON.stringify(envelope), catalog);
+		expect(result.ok).toBe(true);
 	});
 });
 

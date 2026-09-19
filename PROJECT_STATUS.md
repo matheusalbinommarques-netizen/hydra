@@ -420,12 +420,22 @@ pendente reconcilia `decidir Decision + concluir ExternalAction` num
 único gesto, sem enum `approved`/`rejected`, sem `approvalOutcome`, sem
 `EvidenceOutcome`, `Decision` como única fonte canônica do resultado;
 `approval` passa de C (D071) para A quanto à semântica, ainda não
-implementada. A próxima decisão relevante passa a ser a reavaliação do
-repo real para escolher o menor microcorte de implementação de
-`approval` — ainda não decidida. S14, S15 e S16 continuam não-IA; a
-primeira etapa materialmente IA é S17,
-que segue exigindo o boundary de dogfood humano completo do produto
-integrado antes de começar (D067).
+implementada. **`D074` implementa o primeiro vertical slice de
+`approval`** (domínio → persistência → aplicação → UI): `ExternalAction`
+vira união discriminada por `kind`, `approval` sem preparação própria
+(só `decisionId`); `decideDecision` e a conclusão de `approval` reusam a
+mesma regra canônica (`applyDecisionOutcome`), nunca duplicada; bancos
+existentes recebem upgrade idempotente de schema (mesmo padrão de
+`ensureProjectEventTaxonomyOpen`); a affordance de preparo entra no card
+de Decision pendente em `/decisions`, e a faixa/drawer transversais já
+existentes passam a discriminar por `kind`, sem nova surface top-level.
+`validate_affected_group` sem regressão. A próxima decisão relevante
+passa a ser escolher, por inspeção do repo real, qual dos seis kinds
+restantes de §44 (entrevista, kickoff, revisão, aceite, fornecedor,
+sponsor) materializar em seguida — ainda não decidida. S14, S15 e S16
+continuam não-IA; a primeira etapa materialmente IA é S17, que segue
+exigindo o boundary de dogfood humano completo do produto integrado
+antes de começar (D067).
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

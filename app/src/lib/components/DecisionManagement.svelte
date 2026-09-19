@@ -157,6 +157,10 @@
 						</div>
 						<div class="decision-actions">
 							<button type="button" class="link-button" onclick={() => toggleEditDecision(decision.id)}>Editar</button>
+							<form method="POST" action="?/prepareApprovalExternalAction" use:enhance>
+								<input type="hidden" name="decisionId" value={decision.id} />
+								<button type="submit" class="link-button">Preparar aprovação externa</button>
+							</form>
 						</div>
 					</li>
 				{/if}

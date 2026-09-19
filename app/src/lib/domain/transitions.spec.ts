@@ -32,6 +32,7 @@ import {
 	addScopeItem,
 	addTreatmentStep,
 	answerActivity,
+	completeApprovalExternalAction,
 	completeExternalAction,
 	confirmAffectedGroups,
 	confirmCauseHypotheses,
@@ -59,7 +60,9 @@ import {
 	moveDesiredOutcome,
 	moveScopeItem,
 	moveTreatmentStep,
+	prepareApprovalExternalAction,
 	prepareExternalAction,
+	reconcileApprovalExternalAction,
 	removeAffectedGroup,
 	removeCauseHypothesis,
 	removeDesiredOutcome,
@@ -754,6 +757,160 @@ describe('ExternalAction / Evidence (ETAPA 3 — "Evidence + primeira External A
 		expect(removeAffectedGroup(catalog, completed, 'ag-1')).toEqual({
 			ok: false,
 			error: { kind: 'affected_group_has_references' }
+		});
+	});
+});
+
+describe('ExternalAction(kind=approval) — ETAPA 14, "Ações externas maduras" (§44, D070/D072/D073)', () => {
+	function stateWithPendingDecision(): ProjectState {
+		return unwrap(addDecision(catalog, freshState(), 'dec-1', 'Aprovar o orçamento do trimestre?', T1));
+	}
+
+	it('prepareApprovalExternalAction cria a ação aberta, só com decisionId — sem objective/questions/informationToTake/expectedResult', () => {
+		const state = unwrap(prepareApprovalExternalAction(catalog, stateWithPendingDecision(), 'ea-1', 'dec-1', T1));
+		expect(state.externalActions).toEqual([
+			{
+				id: 'ea-1',
+				projectId: 'proj-1',
+				kind: 'approval',
+				decisionId: 'dec-1',
+				status: 'aberta',
+				createdAt: T1,
+				updatedAt: T1,
+				completedAt: null
+			}
+		]);
+	});
+
+	it('prepareApprovalExternalAction erro decision_not_found para Decision inexistente', () => {
+		expect(prepareApprovalExternalAction(catalog, freshState(), 'ea-1', 'inexistente', T1)).toEqual({
+			ok: false,
+			error: { kind: 'decision_not_found' }
+		});
+	});
+
+	it('prepareApprovalExternalAction erro decision_already_decided quando a Decision já está tomada', () => {
+		const decided = unwrap(decideDecision(catalog, stateWithPendingDecision(), 'dec-1', 'Aprovado', T1));
+		expect(prepareApprovalExternalAction(catalog, decided, 'ea-1', 'dec-1', T1)).toEqual({
+			ok: false,
+			error: { kind: 'decision_already_decided' }
+		});
+	});
+
+	it('prepareApprovalExternalAction erro external_action_duplicate_open para a mesma Decision, mas permite Decision diferente', () => {
+		let state = stateWithPendingDecision();
+		state = unwrap(addDecision(catalog, state, 'dec-2', 'Trocar de fornecedor?', T1));
+		state = unwrap(prepareApprovalExternalAction(catalog, state, 'ea-1', 'dec-1', T1));
+
+		expect(prepareApprovalExternalAction(catalog, state, 'ea-2', 'dec-1', T1)).toEqual({
+			ok: false,
+			error: { kind: 'external_action_duplicate_open' }
+		});
+
+		const withSecondDecision = unwrap(prepareApprovalExternalAction(catalog, state, 'ea-2', 'dec-2', T1));
+		expect(withSecondDecision.externalActions.map((a) => a.id)).toEqual(['ea-1', 'ea-2']);
+	});
+
+	function stateWithOpenApproval(): ProjectState {
+		return unwrap(prepareApprovalExternalAction(catalog, stateWithPendingDecision(), 'ea-1', 'dec-1', T1));
+	}
+
+	it('completeApprovalExternalAction decide a Decision (status/outcome/decidedAt) e conclui a ExternalAction na mesma reconciliação', () => {
+		const state = unwrap(completeApprovalExternalAction(catalog, stateWithOpenApproval(), 'ea-1', 'Aprovado com ressalvas.', T2));
+
+		expect(state.decisions).toEqual([
+			expect.objectContaining({
+				id: 'dec-1',
+				status: 'tomada',
+				outcome: 'Aprovado com ressalvas.',
+				decidedAt: T2
+			})
+		]);
+		expect(state.externalActions).toEqual([
+			{
+				id: 'ea-1',
+				projectId: 'proj-1',
+				kind: 'approval',
+				decisionId: 'dec-1',
+				status: 'concluida',
+				createdAt: T1,
+				updatedAt: T2,
+				completedAt: T2
+			}
+		]);
+	});
+
+	it('completeApprovalExternalAction usa exatamente a invariante de decideDecision — outcome vazio é recusado, nada muda', () => {
+		const result = completeApprovalExternalAction(catalog, stateWithOpenApproval(), 'ea-1', '   ', T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_outcome_required' } });
+	});
+
+	it('completeApprovalExternalAction erro decision_already_decided quando a Decision já foi tomada por outro caminho — nunca sobrescreve o outcome existente', () => {
+		let state = stateWithOpenApproval();
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Aprovado direto pelo form.', T2));
+
+		const result = completeApprovalExternalAction(catalog, state, 'ea-1', 'Tentativa de sobrescrever.', T2);
+		expect(result).toEqual({ ok: false, error: { kind: 'decision_already_decided' } });
+
+		// A Decision permanece exatamente como decidida pelo outro caminho — a
+		// chamada recusada não deixou nenhum rastro.
+		expect(state.decisions[0].outcome).toBe('Aprovado direto pelo form.');
+	});
+
+	it('completeApprovalExternalAction erro external_action_wrong_kind para uma ExternalAction de validate_affected_group', () => {
+		const withGroup = unwrap(addAffectedGroup(catalog, stateWithPendingDecision(), 'ag-1', 'Operação', T1));
+		const withValidateAction = unwrap(
+			prepareExternalAction(
+				catalog,
+				withGroup,
+				'ea-validate',
+				'ag-1',
+				{ objective: 'x', questions: [], informationToTake: [], expectedResult: 'y' },
+				T1
+			)
+		);
+		expect(completeApprovalExternalAction(catalog, withValidateAction, 'ea-validate', 'Aprovado', T2)).toEqual({
+			ok: false,
+			error: { kind: 'external_action_wrong_kind' }
+		});
+	});
+
+	it('reconcileApprovalExternalAction conclui a ExternalAction sem tocar Decision.outcome/decidedAt quando a Decision já foi tomada por outro caminho', () => {
+		let state = stateWithOpenApproval();
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Aprovado direto pelo form.', T2));
+
+		const reconciled = unwrap(reconcileApprovalExternalAction(catalog, state, 'ea-1', T2));
+
+		expect(reconciled.decisions).toEqual(state.decisions);
+		expect(reconciled.externalActions).toEqual([
+			{
+				id: 'ea-1',
+				projectId: 'proj-1',
+				kind: 'approval',
+				decisionId: 'dec-1',
+				status: 'concluida',
+				createdAt: T1,
+				updatedAt: T2,
+				completedAt: T2
+			}
+		]);
+	});
+
+	it('reconcileApprovalExternalAction erro decision_not_decided quando a Decision ainda está pendente — usar completeApprovalExternalAction nesse caso', () => {
+		expect(reconcileApprovalExternalAction(catalog, stateWithOpenApproval(), 'ea-1', T2)).toEqual({
+			ok: false,
+			error: { kind: 'decision_not_decided' }
+		});
+	});
+
+	it('reconcileApprovalExternalAction erro external_action_not_open ao tentar reconciliar duas vezes', () => {
+		let state = stateWithOpenApproval();
+		state = unwrap(decideDecision(catalog, state, 'dec-1', 'Aprovado.', T2));
+		state = unwrap(reconcileApprovalExternalAction(catalog, state, 'ea-1', T2));
+
+		expect(reconcileApprovalExternalAction(catalog, state, 'ea-1', T2)).toEqual({
+			ok: false,
+			error: { kind: 'external_action_not_open' }
 		});
 	});
 });

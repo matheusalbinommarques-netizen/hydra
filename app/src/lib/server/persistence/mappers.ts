@@ -436,36 +436,56 @@ export function mapAffectedGroupRow(row: AffectedGroupRow): AffectedGroup {
 	};
 }
 
+// ETAPA 14 (§44, D072/D073): affected_group_id e os quatro campos de
+// preparação só existem para `validate_affected_group`; decision_id só
+// existe para `approval`. Todos NULL-áveis na tabela (ver
+// ensureExternalActionApprovalSupport, sqlite-project-repository.ts) — o
+// mapper reconstrói a variante certa da união a partir de `kind`, nunca lê
+// um campo fora da variante correspondente.
 export interface ExternalActionRow {
 	id: string;
 	project_id: string;
 	kind: ExternalActionKind;
-	affected_group_id: string;
+	affected_group_id: string | null;
+	decision_id: string | null;
 	status: ExternalActionStatus;
-	objective: string;
+	objective: string | null;
 	// questions/information_to_take: JSON array em TEXT — mesmo padrão de
 	// codificação de PlanningItem (domain/planning-items.ts), aqui aplicado
 	// diretamente no mapper por não haver formulário que precise conhecer o
 	// encoding (a UI recebe/envia arrays já decodificados via ProjectView).
-	questions: string;
-	information_to_take: string;
-	expected_result: string;
+	questions: string | null;
+	information_to_take: string | null;
+	expected_result: string | null;
 	created_at: string;
 	updated_at: string;
 	completed_at: string | null;
 }
 
 export function mapExternalActionRow(row: ExternalActionRow): ExternalAction {
+	if (row.kind === 'approval') {
+		return {
+			id: row.id,
+			projectId: row.project_id,
+			kind: 'approval',
+			decisionId: row.decision_id as string,
+			status: row.status,
+			createdAt: row.created_at,
+			updatedAt: row.updated_at,
+			completedAt: row.completed_at
+		};
+	}
+
 	return {
 		id: row.id,
 		projectId: row.project_id,
-		kind: row.kind,
-		affectedGroupId: row.affected_group_id,
+		kind: 'validate_affected_group',
+		affectedGroupId: row.affected_group_id as string,
 		status: row.status,
-		objective: row.objective,
-		questions: JSON.parse(row.questions) as string[],
-		informationToTake: JSON.parse(row.information_to_take) as string[],
-		expectedResult: row.expected_result,
+		objective: row.objective as string,
+		questions: JSON.parse(row.questions as string) as string[],
+		informationToTake: JSON.parse(row.information_to_take as string) as string[],
+		expectedResult: row.expected_result as string,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 		completedAt: row.completed_at
