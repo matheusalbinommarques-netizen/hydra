@@ -2181,6 +2181,13 @@ amendment localizado do Design Gate de S14 que incorpora esse contrato
 para `approval` — sem redesenhar o Gate além do necessário, sem escolher
 o microcorte de implementação e sem avançar `CURRENT_WORK`.
 
+D074 implementa o vertical slice de `approval`. D075
+(`docs/07-management/decision-log.md`) **fecha a ETAPA 14**: o padrão
+está provado em dois kinds com contratos distintos (Evidence para
+`validate_affected_group`; `Decision` como fonte canônica para
+`approval`). Os demais kinds, a projeção em Agora, integrações e IA
+ficam fora da etapa, sem promoção automática.
+
 ---
 
 # 45. ETAPA 15 — Artefatos e snapshots

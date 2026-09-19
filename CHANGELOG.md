@@ -4,6 +4,14 @@
 
 ### Adicionado
 
+- Rework, ETAPA 14 ("Ações externas maduras") — `ExternalAction` passa a
+  suportar `approval` além de `validate_affected_group`: preparada a partir
+  de uma Decision pendente, retorna pela faixa/drawer existentes e decide a
+  Decision e conclui a ação num único gesto, sem nova surface top-level.
+  Ver D070–D075 (`docs/07-management/decision-log.md`); D075 fecha a etapa
+  e registra o que fica fora (demais kinds, projeção em Agora, integrações,
+  IA).
+
 - Rework, ETAPA 13 ("Execução como workspace completo") — Execução deixa
   de ser dirigida por sequência obrigatória de atividades e passa a
   workspace sobre objetos vivos; o corredor Agora → Quadro → Cronograma →

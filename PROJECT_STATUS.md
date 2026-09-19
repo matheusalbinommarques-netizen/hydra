@@ -374,68 +374,28 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 13 do rework ("Execução como workspace completo",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §43) está concluída — fechamento
-registrado em D069 (`docs/07-management/decision-log.md`), mesmo padrão
-de boundary já aplicado ao fechar S8-S12. O corredor operacional
-Agora → Quadro → Cronograma → Entregas → Riscos → Atenções → Decisões,
-congelado pelo Design Gate em D066 sobre as bases de D065, existe como
-navegação primária real: os sete destinos são rotas vivas (`/now`,
-`/work` rotulado "Quadro", `/cronograma`, `/deliverables`, `/risks`,
-`/attentions`, `/decisions`). Riscos e Decisões foram promovidos a
-surfaces operacionais próprias com ações de primeira classe; Atenções
-reconcilia bloqueio operacional e pendência metodológica sob um nome só;
-Agora orienta sobre fatos reais em vez de renderizar
-`ActivityDefinition` obrigatória. D068 resolveu o primeiro conflito
-sinalizado pelo Gate (ownership da referência do cronograma, centralizada
-em `/cronograma`). Acompanhamento (`/tracking`) foi integralmente
-absorvido e a rota deixou de existir. O segundo conflito sinalizado por
-D066 — peso de Mudanças dentro de Decisões — permanece DEFER, sem
-resolução; completion semantics (`ProjectStatus`/`PhaseStatus` após a
-retirada do checklist de Execução), `CheckIn`, health score e ranking
-global também permanecem DEFER, exatamente como já registrado por
-D065/D066.
+A ETAPA 14 do rework ("Ações externas maduras",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §44) está concluída — fechamento
+registrado em D075 (`docs/07-management/decision-log.md`), mesmo padrão
+de boundary de D069. `validate_affected_group` segue como primeiro kind
+operacional e `approval` foi materializado ponta a ponta (D074, sobre
+D070–D073): `ExternalAction` suporta dois contratos distintos sem virar
+outcome genérico, `approval` usa a `Decision` como única fonte canônica
+do resultado, e não existe surface top-level de ações externas — a
+faixa/drawer transversal continua sendo o mecanismo de retomada. Ficam
+fora da etapa: projeção em Agora e demais elasticidades B; entrevista,
+kickoff, revisão, aceite, fornecedor e sponsor (C); outcome/retorno
+genérico, assignee, prazo, prioridade, integrações, IA; Evidence/anexo
+opcional para `approval` (DEFER).
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S14` (ETAPA 14, "Ações externas maduras", §44) com status
-`in_progress`. D070 congelou a semântica mínima de `ExternalAction`/
-`Evidence` que o Design Gate não podia decidir sozinho; o Design Gate de
-`ExternalAction` madura **foi aprovado pelo Product Owner e congelado em
-D071** (`docs/07-management/decision-log.md`) sobre essas bases — padrão
-`contexto de origem → preparação → ExternalAction aberta →
-orientação/projeção → retorno ao Hydra → conclusão` e mapa de ownership,
-sem decidir subject/outcome por kind nem autorizar implementação
-big-bang. **`D072` escolheu `approval` como primeiro novo
-`ExternalAction.kind` a implementar** (`docs/07-management/decision-log.md`):
-subject único é uma `Decision` existente `pendente`; resultado canônico é a
-própria `Decision` (`status`/`outcome`/`decidedAt`), sem `approvalOutcome`
-nem reuso de `EvidenceOutcome`; retorno com a `Decision` ainda pendente
-reconcilia `decidir Decision + concluir ExternalAction` como um único
-gesto; `Decision` já tomada por outro caminho nunca é sobrescrita pela
-`ExternalAction`. D072 não altera `app/`, não toca domain/schema/persistence
-e não escolhe nenhum outro kind. **`D073` congela documentalmente o
-amendment localizado do Design Gate de S14** que incorpora, para
-`approval`, exatamente o contrato de D072 — retorno com `Decision`
-pendente reconcilia `decidir Decision + concluir ExternalAction` num
-único gesto, sem enum `approved`/`rejected`, sem `approvalOutcome`, sem
-`EvidenceOutcome`, `Decision` como única fonte canônica do resultado;
-`approval` passa de C (D071) para A quanto à semântica, ainda não
-implementada. **`D074` implementa o primeiro vertical slice de
-`approval`** (domínio → persistência → aplicação → UI): `ExternalAction`
-vira união discriminada por `kind`, `approval` sem preparação própria
-(só `decisionId`); `decideDecision` e a conclusão de `approval` reusam a
-mesma regra canônica (`applyDecisionOutcome`), nunca duplicada; bancos
-existentes recebem upgrade idempotente de schema (mesmo padrão de
-`ensureProjectEventTaxonomyOpen`); a affordance de preparo entra no card
-de Decision pendente em `/decisions`, e a faixa/drawer transversais já
-existentes passam a discriminar por `kind`, sem nova surface top-level.
-`validate_affected_group` sem regressão. A próxima decisão relevante
-passa a ser escolher, por inspeção do repo real, qual dos seis kinds
-restantes de §44 (entrevista, kickoff, revisão, aceite, fornecedor,
-sponsor) materializar em seguida — ainda não decidida. S14, S15 e S16
+`S15` (ETAPA 15, "Artefatos e snapshots", §45) com status
+`in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou
+corte de S15 — isso é trabalho de uma passagem futura. S15 e S16
 continuam não-IA; a primeira etapa materialmente IA é S17, que segue
 exigindo o boundary de dogfood humano completo do produto integrado
-antes de começar (D067).
+antes de começar (D067). A próxima decisão relevante é o primeiro corte
+de S15.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico
