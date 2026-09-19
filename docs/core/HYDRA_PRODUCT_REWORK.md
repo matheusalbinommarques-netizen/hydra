@@ -2240,6 +2240,18 @@ para esta etapa; não escolhe microcorte nem faz Design Gate.
   workflow genérico de review/approval, snapshots automáticos, restore,
   snapshot do `ProjectState` inteiro e event sourcing.
 
+D077 (`docs/07-management/decision-log.md`) congela o Design Gate do
+primeiro corredor: `/document` vivo → captura explícita (com confirmação)
+→ `Snapshot vN` → leitura histórica read-only (versão e `capturedAt`,
+sem edição, sem diff) → `Voltar para o Atual`. Desktop: região `Versões`
+ao lado da leitura; mobile: `Versões (N)` abre sheet dedicada; abrir um
+snapshot substitui a área de leitura, sem modal. Sem snapshots há empty
+state centrado no artefato. Elasticidade para outros kinds e Tailoring é
+B, sem regra decidida; approval, restore, diff, export, attachments,
+sharing, snapshots automáticos, entidade universal, retenção e shape
+técnico ficam fora (C). Não avança `CURRENT_WORK` nem escolhe o
+microcorte.
+
 ---
 
 # 46. ETAPA 16 — Validação, transição e encerramento
