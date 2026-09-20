@@ -31,6 +31,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			nextActivityPhaseId
 		}),
 		outcomes: buildClosureOutcomes(view.desiredOutcomes),
+		closure: view.closure,
+		unassessedCount: view.desiredOutcomes.filter((outcome) => outcome.assessment === null).length,
 		outcomeStateOptions: CLOSURE_OUTCOME_STATE_OPTIONS
 	};
 };
@@ -55,5 +57,19 @@ export const actions: Actions = {
 		});
 		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error), outcomeId });
 		return { success: true };
+	},
+
+	closeProject: async ({ request, params }) => {
+		const formData = await request.formData();
+		if (formData.get('confirm') !== 'on') {
+			return fail(400, { closeMessage: 'Confirme o encerramento para continuar.' });
+		}
+		const note = formData.get('note');
+		const result = await getProjectUseCases().closeProject({
+			projectId: params.projectId,
+			note: typeof note === 'string' ? note : null
+		});
+		if (!result.ok) return fail(400, { closeMessage: mapUseCaseError(result.error) });
+		return { closed: true };
 	}
 };

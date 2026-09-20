@@ -367,7 +367,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		// catalog_limit_reached (heading abaixo), qualquer que seja a
 		// quantidade real de atividades restantes hoje.
 		await answerActivitiesGenericallyUntil(page, () =>
-			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' }).isVisible()
+			page.getByRole('heading', { name: 'Você percorreu todas as atividades da jornada' }).isVisible()
 		);
 	});
 
@@ -376,7 +376,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 	await test.step('catalog_limit_reached e exportação', async () => {
 		await expect(
-			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })
+			page.getByRole('heading', { name: 'Você percorreu todas as atividades da jornada' })
 		).toBeVisible();
 
 		// Exportar (D031) virou página própria com ação explícita — o clique no
@@ -439,13 +439,12 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 		);
 		expect(partesTrabalhoAnswer).toBeUndefined();
 
-		// prova que a última atividade da última fase (Validação e
-		// encerramento) foi de fato alcançada e respondida — o encerramento
-		// exige decisão explícita (allowsSkip: false).
-		const resumoEncerramentoAnswer = exportedJson.state.answers.find(
-			(answer) => answer.fieldDefinitionId === 'resumo_encerramento'
-		);
-		expect(resumoEncerramentoAnswer?.value).toBeTruthy();
+		// Catálogo percorrido de ponta a ponta NÃO encerra o projeto: o
+		// encerramento é o fato explícito Project.closedAt (D083), ausente aqui.
+		expect(exportedJson.state.project.closedAt ?? null).toBeNull();
+		expect(
+			exportedJson.state.answers.find((answer) => answer.fieldDefinitionId === 'resumo_encerramento')
+		).toBeUndefined();
 	});
 
 	await test.step('importar em banco limpo', async () => {
@@ -458,7 +457,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 		await page.waitForURL(`${serverB.baseUrl}/projects/${projectId}/now`);
 		await expect(
-			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })
+			page.getByRole('heading', { name: 'Você percorreu todas as atividades da jornada' })
 		).toBeVisible();
 	});
 
@@ -477,7 +476,7 @@ test('jornada completa: criar, responder, resumo, exportar, importar', async ({ 
 
 		await page.goto(`${serverB.baseUrl}/projects/${projectId}/now`);
 		await expect(
-			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' })
+			page.getByRole('heading', { name: 'Você percorreu todas as atividades da jornada' })
 		).toBeVisible();
 	});
 

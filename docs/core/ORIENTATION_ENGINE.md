@@ -46,7 +46,7 @@ Descoberta concluída e "Definir usuário principal" também concluída)
       (nunca interpretar isso como projeto ou fase concluídos)
 ```
 
-Única fonte da "Próxima ação recomendada" em Agora. Nunca retorna uma atividade `pulada` ou `concluída`. Nesta versão as seis fases são `complete`, então a Trilha A percorre o catálogo inteiro — de "Origem do projeto" (Descoberta) até "Confirmar encerramento do projeto" (Validação e encerramento) — e só retorna "limite do catálogo alcançado" depois que a última atividade da última fase estiver `concluída` ou `pulada`.
+Única fonte da "Próxima ação recomendada" em Agora. Nunca retorna uma atividade `pulada` ou `concluída`. Nesta versão as seis fases são `complete`, então a Trilha A percorre o catálogo inteiro — de "Origem do projeto" (Descoberta) até "Definir transição e próximos passos" (Validação e encerramento) — e só retorna "limite do catálogo alcançado" depois que a última atividade da última fase estiver `concluída` ou `pulada` (catálogo esgotado, projeto ainda aberto). Com `Project.closedAt`, `computeSnapshot` devolve `project_closed` e nenhuma recomendação normal (D083).
 
 ## 4. Trilha B — pendências a resolver
 

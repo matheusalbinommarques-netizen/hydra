@@ -60,6 +60,8 @@ export interface ProjectRow {
 	name: string | null;
 	created_at: string;
 	route_start_phase_id: string | null;
+	closed_at: string | null;
+	closure_note: string | null;
 }
 
 export interface ActivityProgressRow {
@@ -87,7 +89,14 @@ export interface PendingItemRow {
 }
 
 export function mapProjectRow(row: ProjectRow): Project {
-	return { id: row.id, name: row.name, createdAt: row.created_at, routeStartPhaseId: row.route_start_phase_id };
+	return {
+		id: row.id,
+		name: row.name,
+		createdAt: row.created_at,
+		routeStartPhaseId: row.route_start_phase_id,
+		closedAt: row.closed_at ?? null,
+		closureNote: row.closure_note ?? null
+	};
 }
 
 export function mapActivityProgressRow(row: ActivityProgressRow): ActivityProgress {

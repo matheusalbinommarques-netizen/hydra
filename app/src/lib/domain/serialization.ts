@@ -55,7 +55,7 @@ import type {
 	WorkItemStatus
 } from './state-types';
 import type { Result } from './result';
-import { isDeprecatedAnswerField } from './legacy-answers';
+import { isDeprecatedAnswerField, isRetiredActivityId } from './legacy-answers';
 import {
 	getAffectedGroupConfirmationIssues,
 	getDesiredOutcomeConfirmationIssues,
@@ -195,6 +195,18 @@ function parseProject(value: unknown): Result<Project, ProjectStateParseError> {
 	) {
 		return shapeError('project.routeStartPhaseId deve ser string, null ou ausente');
 	}
+	// closedAt/closureNote ausentes (export pré-S16) equivalem a null — sem backfill.
+	if (value.closedAt !== undefined && value.closedAt !== null && !isIsoDateString(value.closedAt)) {
+		return shapeError('project.closedAt deve ser uma data ISO 8601 válida, null ou ausente');
+	}
+	if (value.closureNote !== undefined && value.closureNote !== null && !isString(value.closureNote)) {
+		return shapeError('project.closureNote deve ser string, null ou ausente');
+	}
+	const closedAt = (value.closedAt as string | null | undefined) ?? null;
+	const closureNote = (value.closureNote as string | null | undefined) ?? null;
+	if (closureNote !== null && closedAt === null) {
+		return invariantError('project.closureNote só pode existir quando project.closedAt existe');
+	}
 	return {
 		ok: true,
 		value: {
@@ -203,7 +215,9 @@ function parseProject(value: unknown): Result<Project, ProjectStateParseError> {
 			createdAt: value.createdAt,
 			// ausente (JSON exportado antes de D023) equivale a null — mesma
 			// semântica de "percurso completo", sem exigir backfill.
-			routeStartPhaseId: (value.routeStartPhaseId as string | null | undefined) ?? null
+			routeStartPhaseId: (value.routeStartPhaseId as string | null | undefined) ?? null,
+			closedAt,
+			closureNote
 		}
 	};
 }
@@ -1248,6 +1262,11 @@ function assembleProjectState({
 	causeHypotheses,
 	desiredOutcomes
 }: AssembleProjectStateInput): Result<ProjectState, ProjectStateParseError> {
+	// invariante: closureNote só existe com closedAt (ETAPA 16)
+	if ((project.closureNote ?? null) !== null && (project.closedAt ?? null) === null) {
+		return invariantError('Project.closureNote só pode existir quando Project.closedAt existe');
+	}
+
 	// referência: Project.routeStartPhaseId (D023)
 	if (project.routeStartPhaseId !== null && project.routeStartPhaseId !== undefined) {
 		if (!catalog.phases.some((phase) => phase.id === project.routeStartPhaseId)) {
@@ -1264,7 +1283,10 @@ function assembleProjectState({
 				`ActivityProgress "${progress.activityDefinitionId}" usa projectId diferente do Project`
 			);
 		}
-		if (!findActivityDefinition(catalog, progress.activityDefinitionId)) {
+		if (
+			!findActivityDefinition(catalog, progress.activityDefinitionId) &&
+			!isRetiredActivityId(progress.activityDefinitionId)
+		) {
 			return referenceError(
 				`ActivityProgress referencia activityDefinitionId "${progress.activityDefinitionId}", que não existe no catálogo`
 			);
@@ -1285,7 +1307,15 @@ function assembleProjectState({
 		if (count === 0) return invariantError(`Falta ActivityProgress para a atividade "${activityId}"`);
 		if (count > 1) return invariantError(`ActivityProgress duplicado para a atividade "${activityId}"`);
 	}
-	if (progressByActivity.size !== catalogActivityIds.length) {
+	// atividade aposentada (READ-LEGACY): a linha, se existir, é preservada
+	// e nunca exigida — não conta como "fora do catálogo".
+	const retiredProgressCount = [...progressByActivity.keys()].filter(isRetiredActivityId).length;
+	for (const [activityId, count] of progressByActivity) {
+		if (isRetiredActivityId(activityId) && count > 1) {
+			return invariantError(`ActivityProgress duplicado para a atividade "${activityId}"`);
+		}
+	}
+	if (progressByActivity.size - retiredProgressCount !== catalogActivityIds.length) {
 		return invariantError('Existe ActivityProgress para atividade fora do catálogo');
 	}
 

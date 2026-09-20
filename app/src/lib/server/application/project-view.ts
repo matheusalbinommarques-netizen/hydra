@@ -6,6 +6,7 @@ import { buildPhaseActivities, findCurrentPhase } from '$lib/phase-activities';
 import {
 	getAffectedGroupConfirmationIssues,
 	getCauseHypothesesConfirmationIssues,
+	isReadyToClose,
 	getDesiredOutcomeConfirmationIssues,
 	getScopeConfirmationIssues,
 	getTreatmentConfirmationIssues
@@ -578,6 +579,11 @@ export function buildProjectView(catalog: Catalog, state: ProjectState): Project
 		causeHypotheses: state.causeHypotheses.map(buildCauseHypothesisView),
 		causeHypothesisConfirmationIssues: getCauseHypothesesConfirmationIssues(),
 		desiredOutcomes: state.desiredOutcomes.map(buildDesiredOutcomeView).sort((a, b) => a.order - b.order),
-		desiredOutcomeConfirmationIssues: getDesiredOutcomeConfirmationIssues(state.desiredOutcomes)
+		desiredOutcomeConfirmationIssues: getDesiredOutcomeConfirmationIssues(state.desiredOutcomes),
+		closure: {
+			closedAt: state.project.closedAt ?? null,
+			note: state.project.closureNote ?? null,
+			ready: isReadyToClose(state)
+		}
 	};
 }

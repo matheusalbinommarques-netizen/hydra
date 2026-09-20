@@ -9,7 +9,9 @@ describe('createInitialProjectState', () => {
 			id: 'proj-1',
 			name: null,
 			createdAt: '2026-01-01T00:00:00.000Z',
-			routeStartPhaseId: null
+			routeStartPhaseId: null,
+			closedAt: null,
+			closureNote: null
 		});
 	});
 

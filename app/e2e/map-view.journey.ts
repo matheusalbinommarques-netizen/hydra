@@ -140,7 +140,7 @@ test('Mapa da jornada: navegação e estados do catálogo', async ({ page }) => 
 		// full-catalog-journey.spec.ts; sem contagem fixa, avança até o
 		// catálogo sinalizar catalog_limit_reached.
 		await answerActivitiesGenericallyUntil(page, () =>
-			page.getByRole('heading', { name: 'Você concluiu todas as atividades disponíveis' }).isVisible()
+			page.getByRole('heading', { name: 'Você percorreu todas as atividades da jornada' }).isVisible()
 		);
 	});
 

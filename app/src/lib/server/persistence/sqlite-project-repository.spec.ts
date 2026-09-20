@@ -1052,8 +1052,8 @@ describe('createSqliteProjectRepository — listRecent', () => {
 		await repo.insert(createInitialProjectState(catalog, 'proj-2', T2));
 
 		await expect(repo.listRecent()).resolves.toEqual([
-			{ id: 'proj-2', name: null, createdAt: T2, routeStartPhaseId: null },
-			{ id: 'proj-1', name: null, createdAt: T1, routeStartPhaseId: null }
+			{ id: 'proj-2', name: null, createdAt: T2, routeStartPhaseId: null, closedAt: null, closureNote: null },
+			{ id: 'proj-1', name: null, createdAt: T1, routeStartPhaseId: null, closedAt: null, closureNote: null }
 		]);
 	});
 
@@ -1063,17 +1063,17 @@ describe('createSqliteProjectRepository — listRecent', () => {
 		await repo.insert(createInitialProjectState(catalog, 'proj-b', T1));
 
 		await expect(repo.listRecent()).resolves.toEqual([
-			{ id: 'proj-b', name: null, createdAt: T1, routeStartPhaseId: null },
-			{ id: 'proj-a', name: null, createdAt: T1, routeStartPhaseId: null }
+			{ id: 'proj-b', name: null, createdAt: T1, routeStartPhaseId: null, closedAt: null, closureNote: null },
+			{ id: 'proj-a', name: null, createdAt: T1, routeStartPhaseId: null, closedAt: null, closureNote: null }
 		]);
 	});
 
-	it('retorna somente id/name/createdAt/routeStartPhaseId — nunca activityProgress, answers ou pendingItems', async () => {
+	it('retorna somente id/name/createdAt/routeStartPhaseId/closedAt/closureNote — nunca activityProgress, answers ou pendingItems', async () => {
 		const repo = memoryRepo();
 		await repo.insert(nonTrivialState());
 
 		const [project] = await repo.listRecent();
-		expect(Object.keys(project).sort()).toEqual(['id', 'name', 'createdAt', 'routeStartPhaseId'].sort());
+		expect(Object.keys(project).sort()).toEqual(['id', 'name', 'createdAt', 'routeStartPhaseId', 'closedAt', 'closureNote'].sort());
 	});
 
 	it('listRecent não modifica nenhum projeto existente', async () => {
@@ -2444,5 +2444,75 @@ describe('createSqliteProjectRepository — DesiredOutcome.assessment (ETAPA 16,
 		const next = unwrap(setDesiredOutcomeAssessment(catalog, state, 'do-1', 'nao_alcancado', 'r', T2));
 		await repo2.save(next);
 		await expect(repo2.findById('proj-1')).resolves.toEqual(next);
+	});
+});
+
+describe('createSqliteProjectRepository — encerramento formal (ETAPA 16, D083)', () => {
+	it('round-trip de closedAt/closureNote; nota sem closedAt é recusada pelo CHECK', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		openRepos.push(repo);
+		const state = nonTrivialState();
+		await repo.insert(state);
+		const closed = { ...state, project: { ...state.project, closedAt: '2026-03-01T00:00:00.000Z', closureNote: 'fim' } };
+		await repo.save(closed);
+		await expect(repo.findById(state.project.id)).resolves.toEqual(closed);
+		const [listed] = await repo.listRecent();
+		expect(listed.closedAt).toBe('2026-03-01T00:00:00.000Z');
+
+		repo.close();
+		const db = new Database(filePath);
+		expect(() => db.exec('UPDATE project SET closed_at = NULL')).toThrow(/CHECK/);
+		db.close();
+	});
+
+	it('banco REALMENTE pré-S16 abre com closedAt/closureNote null, sem backfill, upgrade idempotente e CHECK ativo', async () => {
+		const oldSql = fs.readFileSync(path.join(__dirname, 'fixtures', 'pre-s16-schema.sql'), 'utf8');
+		expect(oldSql).not.toContain('closure_note');
+		const legacyPath = tempFilePath();
+		const legacy = new Database(legacyPath);
+		legacy.exec(oldSql);
+		legacy.exec("INSERT INTO project (id, name, created_at) VALUES ('old-1', 'Antigo', '2026-01-01T00:00:00.000Z')");
+		legacy.close();
+
+		for (let i = 0; i < 2; i++) {
+			const repo = createSqliteProjectRepository(legacyPath);
+			const [item] = await repo.listRecent();
+			expect(item).toMatchObject({ id: 'old-1', closedAt: null, closureNote: null });
+			repo.close();
+		}
+		const db = new Database(legacyPath);
+		const cols = (db.prepare('PRAGMA table_info(project)').all() as { name: string }[]).map((c) => c.name);
+		expect(cols.filter((c) => c === 'closed_at' || c === 'closure_note')).toEqual(['closed_at', 'closure_note']);
+		expect(() => db.exec("UPDATE project SET closure_note = 'x' WHERE id = 'old-1'")).toThrow(/CHECK/);
+		db.close();
+	});
+
+	it('Answers/progress legados de confirmar_encerramento sobrevivem ao round-trip, sem inferir closedAt', async () => {
+		const repo = memoryRepo();
+		const state = nonTrivialState();
+		const legacy = {
+			...state,
+			activityProgress: [
+				...state.activityProgress,
+				{ projectId: state.project.id, activityDefinitionId: 'confirmar_encerramento', status: 'concluída' as const }
+			],
+			answers: [
+				...state.answers,
+				{
+					projectId: state.project.id,
+					activityDefinitionId: 'confirmar_encerramento',
+					fieldDefinitionId: 'resumo_encerramento',
+					value: 'Texto legado',
+					createdAt: '2026-01-01T00:00:00.000Z',
+					updatedAt: '2026-01-01T00:00:00.000Z'
+				}
+			]
+		};
+		await repo.insert(legacy);
+		const restored = await repo.findById(state.project.id);
+		expect(restored?.project.closedAt).toBeNull();
+		expect(restored?.activityProgress.some((p) => p.activityDefinitionId === 'confirmar_encerramento')).toBe(true);
+		expect(restored?.answers.find((a) => a.fieldDefinitionId === 'resumo_encerramento')?.value).toBe('Texto legado');
 	});
 });

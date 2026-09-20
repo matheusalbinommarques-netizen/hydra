@@ -111,6 +111,7 @@ export type DomainTransitionError =
 	| { kind: 'desired_outcome_not_found' }
 	| { kind: 'desired_outcome_assessment_state_invalid' }
 	| { kind: 'desired_outcome_assessment_rationale_required' }
+	| { kind: 'project_close_outcomes_unassessed' }
 	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] }
 	| { kind: 'risk_not_found' }
 	| { kind: 'risk_statement_required' }
@@ -4228,6 +4229,35 @@ export function setDesiredOutcomeAssessment(
 						}
 					: item
 			)
+		}
+	};
+}
+
+/** Readiness de encerramento (D080/D081): o único blocker conhecido é um DesiredOutcome sem avaliação. */
+export function isReadyToClose(state: ProjectState): boolean {
+	return state.desiredOutcomes.every((outcome) => outcome.assessment !== null);
+}
+
+/**
+ * Encerra formalmente o projeto — ETAPA 16, D083. `closedAt` é o único fato de
+ * encerramento; a nota (trim; vazia vira null) é escrita atomicamente com ele.
+ * Fechar de novo é no-op (mesma referência: preserva primeiro closedAt e nota).
+ * Não gera ProjectEvent, não lê Evidence/Deliverables/pendências e não trava
+ * edição posterior (sem read-only global nem reabertura).
+ */
+export function closeProject(
+	state: ProjectState,
+	note: string | null,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	if ((state.project.closedAt ?? null) !== null) return { ok: true, value: state };
+	if (!isReadyToClose(state)) return { ok: false, error: { kind: 'project_close_outcomes_unassessed' } };
+	const trimmed = note?.trim() ?? '';
+	return {
+		ok: true,
+		value: {
+			...state,
+			project: { ...state.project, closedAt: occurredAt, closureNote: trimmed.length > 0 ? trimmed : null }
 		}
 	};
 }

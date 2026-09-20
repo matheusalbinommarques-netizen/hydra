@@ -14,6 +14,11 @@ export interface DeprecatedAnswerField {
 }
 
 export const DEPRECATED_ANSWER_FIELDS: readonly DeprecatedAnswerField[] = [
+	// "Confirmar encerramento do projeto" (ETAPA 16, D083) — a atividade
+	// `confirmar_encerramento` saiu do catálogo (ver RETIRED_ACTIVITY_IDS);
+	// `resumo_encerramento` é só registro legado: nunca vira closedAt nem
+	// closureNote (Project.closedAt/closureNote são a fonte de verdade).
+	{ activityDefinitionId: 'confirmar_encerramento', fieldDefinitionId: 'resumo_encerramento' },
 	// "Quem é afetado" (ETAPA 2 do rework, ver catalog/discovery.ts) — a
 	// atividade `publico` deixou de ser required_fields; `publico_detail`
 	// não é mais fonte de verdade (AffectedGroup é, ver
@@ -91,4 +96,13 @@ export function isDeprecatedAnswerField(activityDefinitionId: string, fieldDefin
 		(field) =>
 			field.activityDefinitionId === activityDefinitionId && field.fieldDefinitionId === fieldDefinitionId
 	);
+}
+
+// Atividades removidas do catálogo (não participam de próxima atividade, fase
+// nem status), cujo ActivityProgress persistido continua aceito e preservado.
+// Mínimo para o contrato de S16 — sem framework de migração.
+export const RETIRED_ACTIVITY_IDS: readonly string[] = ['confirmar_encerramento'];
+
+export function isRetiredActivityId(activityDefinitionId: string): boolean {
+	return RETIRED_ACTIVITY_IDS.includes(activityDefinitionId);
 }

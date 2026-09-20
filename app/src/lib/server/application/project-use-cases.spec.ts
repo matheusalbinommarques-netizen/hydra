@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createInitialProjectState, encodeMultiSelectValue, encodePlanningItems } from '$lib/domain';
+import { closeProject, createInitialProjectState, setDesiredOutcomeAssessment, encodeMultiSelectValue, encodePlanningItems } from '$lib/domain';
 import { completePhase } from '$lib/domain/test-support';
 import { catalog } from '../../catalog';
 import { createSqliteProjectRepository, type ProjectRepository, type SqliteProjectRepository } from '../persistence';
@@ -874,17 +874,25 @@ describe('createProjectUseCases — listRecentProjects', () => {
 		expect(byId.get(started.value.projectId)).toBe('em_andamento');
 	});
 
-	it('nextAction é completed quando o catálogo inteiro já foi percorrido', async () => {
+	async function listAfterCatalogWalk(close: boolean) {
 		const { repo } = setup();
 		let state = createInitialProjectState(catalog, 'proj-concluido', '2026-01-01T00:00:00.000Z');
-		// Nome definido diretamente — desde a remoção de "Contexto inicial",
-		// nenhuma atividade do catálogo define Project.name (agora vem de
-		// /projects/new na criação real); sem nome, computeProjectStatus nunca
-		// sai de 'rascunho', mesmo com o catálogo inteiro percorrido.
+		// Nome definido diretamente — nenhuma atividade do catálogo define
+		// Project.name; sem nome, o status nunca sai de 'rascunho'.
 		state = { ...state, project: { ...state.project, name: 'Projeto concluído' } };
 		await repo.insert(state);
 		for (const phase of catalog.phases) {
 			state = completePhase(catalog, state, phase.id, '2026-01-01T00:00:00.000Z');
+		}
+		if (close) {
+			for (const outcome of state.desiredOutcomes) {
+				const assessed = setDesiredOutcomeAssessment(catalog, state, outcome.id, 'alcancado', 'ok', '2026-01-15T00:00:00.000Z');
+				if (!assessed.ok) throw new Error('esperado ok');
+				state = assessed.value;
+			}
+			const closed = closeProject(state, 'Nota final', '2026-02-01T00:00:00.000Z');
+			if (!closed.ok) throw new Error('esperado ok');
+			state = closed.value;
 		}
 		await repo.save(state);
 
@@ -895,9 +903,22 @@ describe('createProjectUseCases — listRecentProjects', () => {
 			idGenerator: fakeIdGenerator('id')
 		});
 		const result = await useCases.listRecentProjects();
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-		expect(result.value).toEqual([
+		if (!result.ok) throw new Error('esperado ok');
+		return result.value;
+	}
+
+	it('catálogo inteiro percorrido SEM closedAt: projeto segue aberto e nextAction é closure (D083)', async () => {
+		expect(await listAfterCatalogWalk(false)).toEqual([
+			expect.objectContaining({
+				projectId: 'proj-concluido',
+				projectStatus: 'em_andamento',
+				nextAction: { kind: 'closure' }
+			})
+		]);
+	});
+
+	it('com closedAt: status concluído e nextAction completed', async () => {
+		expect(await listAfterCatalogWalk(true)).toEqual([
 			expect.objectContaining({
 				projectId: 'proj-concluido',
 				projectStatus: 'concluído',
@@ -1327,7 +1348,7 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 		);
 	});
 
-	it('ProjectView contém só os 35 campos do contrato, nunca ProjectState bruto', async () => {
+	it('ProjectView contém só os 36 campos do contrato, nunca ProjectState bruto', async () => {
 		const { useCases } = setup();
 		const created = await useCases.createProject();
 		if (!created.ok) throw new Error('esperado ok');
@@ -1373,7 +1394,8 @@ describe('createProjectUseCases — nenhuma projeção do motor é persistida; P
 				'causeHypotheses',
 				'causeHypothesisConfirmationIssues',
 				'desiredOutcomes',
-				'desiredOutcomeConfirmationIssues'
+				'desiredOutcomeConfirmationIssues',
+				'closure'
 			].sort()
 		);
 		expect(created.value).not.toHaveProperty('project');

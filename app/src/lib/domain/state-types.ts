@@ -12,6 +12,14 @@ export interface Project {
 	// estados antigos (já persistidos ou exportados antes de D023) continuem
 	// válidos com a mesma semântica de null, sem exigir backfill.
 	routeStartPhaseId?: string | null;
+	// Encerramento formal do projeto (ETAPA 16, D080/D081) — único fato que
+	// significa "este projeto foi formalmente encerrado". null/ausente = aberto
+	// (fresh, pré-S16 e exports antigos, sem backfill). Nunca inferido de texto
+	// legado nem do catálogo completo. Encerrado ≠ sucesso.
+	closedAt?: string | null;
+	// Nota opcional escrita atomicamente com closedAt; só existe quando
+	// closedAt existe (invariante em serialização e CHECK no schema).
+	closureNote?: string | null;
 }
 
 export interface ActivityProgress {

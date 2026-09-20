@@ -63,6 +63,9 @@ export interface ClosureView {
 	hasPendingClosureWork: boolean;
 	continuity: ClosureContinuityView;
 	recordsHref: string;
+	// Texto legado de `resumo_encerramento` (atividade aposentada, D083): só
+	// registro histórico — nunca é closedAt nem closureNote.
+	legacyClosureSummary: string | null;
 }
 
 const VALIDACAO_PHASE_ID = 'validacao';
@@ -73,7 +76,7 @@ const SECTIONS_DEF: { id: string; title: string; activityIds: string[] }[] = [
 	{
 		id: 'encerramento',
 		title: 'Encerramento e aprendizado',
-		activityIds: ['resolver_pendencias_finais', 'licoes_aprendidas', 'confirmar_encerramento']
+		activityIds: ['resolver_pendencias_finais', 'licoes_aprendidas']
 	}
 ];
 
@@ -122,7 +125,7 @@ function buildContinuity(
 	const href = `/projects/${projectId}/now`;
 
 	if (!hasPendingClosureWork) {
-		return { kind: 'completed', message: 'Etapa de encerramento concluída.' };
+		return { kind: 'completed', message: 'Atividades da etapa de validação concluídas.' };
 	}
 
 	if (nextActivityPhaseId === VALIDACAO_PHASE_ID) {
@@ -160,7 +163,8 @@ export function buildClosureView(catalog: Catalog, input: ClosureViewInput): Clo
 		sections,
 		hasPendingClosureWork,
 		continuity: buildContinuity(input.projectId, hasPendingClosureWork, input.nextActivityPhaseId),
-		recordsHref: `/projects/${input.projectId}/records`
+		recordsHref: `/projects/${input.projectId}/records`,
+		legacyClosureSummary: input.answers['resumo_encerramento'] || null
 	};
 }
 

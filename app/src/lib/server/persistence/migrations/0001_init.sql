@@ -11,7 +11,12 @@ CREATE TABLE IF NOT EXISTS project (
 	id TEXT PRIMARY KEY,
 	name TEXT,
 	created_at TEXT NOT NULL,
-	route_start_phase_id TEXT
+	route_start_phase_id TEXT,
+	-- Encerramento formal (ETAPA 16, D083): NULL = aberto. closure_note só
+	-- existe com closed_at. Bancos anteriores recebem via ALTER idempotente.
+	closed_at TEXT,
+	closure_note TEXT CONSTRAINT project_closure_note_requires_closed_at
+		CHECK (closure_note IS NULL OR closed_at IS NOT NULL)
 );
 
 CREATE TABLE IF NOT EXISTS activity_progress (

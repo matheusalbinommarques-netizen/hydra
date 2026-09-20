@@ -43,7 +43,7 @@ describe('jornada completa do catálogo (fases 1–6)', () => {
 			expect(computePhaseStatus(phase, state.activityProgress, state.pendingItems)).toBe('concluída');
 		}
 
-		// última atividade concluída (Confirmar encerramento do projeto) → catálogo esgotado
+		// última atividade concluída → catálogo esgotado, projeto ainda aberto
 		expect(computeNextActivity(catalog, state.activityProgress)).toEqual({ kind: 'catalog_limit_reached' });
 
 		// nenhuma fase permanece indisponível ou parcial — todas concluídas
@@ -51,8 +51,8 @@ describe('jornada completa do catálogo (fases 1–6)', () => {
 			expect(computePhaseStatus(phase, state.activityProgress, state.pendingItems)).toBe('concluída');
 		}
 
-		// estado final do projeto: concluído é alcançável de ponta a ponta
-		expect(computeProjectStatus(state.project, catalog, state.activityProgress)).toBe('concluído');
+		// catálogo completo sem encerramento formal: o projeto continua aberto
+		expect(computeProjectStatus(state.project)).toBe('em_andamento');
 
 		// nenhuma atividade ficou para trás
 		const allActivityIds = catalog.phases.flatMap((phase) => phase.activities.map((activity) => activity.id));

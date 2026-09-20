@@ -15,12 +15,16 @@ describe('buildJourneyContext', () => {
 
 	it('total de fases reflete o tamanho do catálogo', () => {
 		const result = buildJourneyContext(catalog, { kind: 'recommendation', activityDefinitionId: 'origem' });
-		expect(result?.total).toBe(catalog.phases.length);
+		expect(result && 'total' in result ? result.total : undefined).toBe(catalog.phases.length);
 	});
 
-	it('jornada concluída', () => {
+	it('catálogo esgotado com projeto aberto aguarda o encerramento', () => {
 		const result = buildJourneyContext(catalog, { kind: 'catalog_limit_reached' });
-		expect(result).toEqual({ kind: 'completed', total: 6 });
+		expect(result).toEqual({ kind: 'awaiting_closure', total: 6 });
+	});
+
+	it('projeto encerrado', () => {
+		expect(buildJourneyContext(catalog, { kind: 'project_closed' })).toEqual({ kind: 'closed' });
 	});
 
 	it('ausência segura de contexto quando a atividade não existe no catálogo', () => {

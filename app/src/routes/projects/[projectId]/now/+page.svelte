@@ -165,9 +165,11 @@
 			{#if data.journeyContext.kind === 'in_progress'}
 				<p class="journey-phase">{data.journeyContext.phaseLabel}</p>
 				<p class="journey-position">Fase {data.journeyContext.position} de {data.journeyContext.total}</p>
+			{:else if data.journeyContext.kind === 'awaiting_closure'}
+				<p class="journey-phase">Jornada percorrida</p>
+				<p class="journey-position">{data.journeyContext.total} de {data.journeyContext.total} fases percorridas · encerramento pendente</p>
 			{:else}
-				<p class="journey-phase">Jornada concluída</p>
-				<p class="journey-position">{data.journeyContext.total} de {data.journeyContext.total} fases percorridas</p>
+				<p class="journey-phase">Encerramento formal registrado</p>
 			{/if}
 		</section>
 	{/if}
@@ -565,10 +567,21 @@
 		</section>
 	{:else if view.nextActivity.kind === 'catalog_limit_reached'}
 		<section class="next-action">
-			<h2>Você concluiu todas as atividades disponíveis</h2>
+			<h2>Você percorreu todas as atividades da jornada</h2>
 			<p>
-				Você percorreu a jornada guiada completa, da Descoberta ao encerramento do projeto. Pendências
-				abertas, se houver, continuam visíveis aqui e no Mapa — revise e retome quando quiser.
+				O projeto ainda está aberto: falta encerrá-lo formalmente. Avalie os resultados desejados e
+				confirme o encerramento em Resultados e encerramento. Pendências abertas, se houver, continuam
+				visíveis aqui e no Mapa.
+			</p>
+			<p><a class="button" href="/projects/{view.projectId}/closure">Ir para o encerramento</a></p>
+		</section>
+	{:else if view.nextActivity.kind === 'project_closed'}
+		<section class="next-action">
+			<h2>Projeto encerrado</h2>
+			<p>
+				Este projeto foi formalmente encerrado. Não há próxima atividade da jornada. O registro do
+				encerramento e a avaliação dos resultados estão em
+				<a href="/projects/{view.projectId}/closure">Resultados e encerramento</a>.
 			</p>
 		</section>
 	{/if}

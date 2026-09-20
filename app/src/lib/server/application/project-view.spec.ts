@@ -264,7 +264,8 @@ describe('buildProjectView — pendingItemHistory', () => {
 				'causeHypotheses',
 				'causeHypothesisConfirmationIssues',
 				'desiredOutcomes',
-				'desiredOutcomeConfirmationIssues'
+				'desiredOutcomeConfirmationIssues',
+				'closure'
 			].sort()
 		);
 	});

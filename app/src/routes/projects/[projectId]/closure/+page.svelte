@@ -21,7 +21,53 @@
 	encerramento.
 </p>
 
-{#if data.continuity.kind !== 'completed'}
+<section class="card closure-card" aria-label="Encerramento do projeto" data-testid="closure-card">
+	{#if data.closure.closedAt}
+		<p class="eyebrow">Encerramento</p>
+		<h2 class="closure-title" data-testid="closure-closed">Projeto encerrado</h2>
+		<p class="closure-meta">Encerrado em {formatDate(data.closure.closedAt)}. Encerrar não significa que os resultados foram alcançados — a avaliação de cada resultado desejado está abaixo e pode ser revista.</p>
+		{#if data.closure.note}
+			<div class="field">
+				<p class="field-label">Nota de encerramento</p>
+				<p class="field-value" data-testid="closure-note">{data.closure.note}</p>
+			</div>
+		{/if}
+	{:else}
+		<p class="eyebrow">Encerramento</p>
+		<h2 class="closure-title">Encerrar projeto</h2>
+		{#if data.closure.ready}
+			<p class="closure-meta">
+				{data.outcomes.length === 0
+					? 'Nenhum resultado desejado foi registrado; o projeto pode ser encerrado.'
+					: 'Todos os resultados desejados têm avaliação. O projeto pode ser encerrado, seja qual for o estado de cada um.'}
+			</p>
+			<form method="POST" action="?/closeProject" use:enhance class="close-form">
+				<label>
+					<span class="field-label">Nota de encerramento (opcional)</span>
+					<textarea name="note" rows="3"></textarea>
+				</label>
+				<label class="close-confirm">
+					<input type="checkbox" name="confirm" required />
+					<span>Confirmo o encerramento formal deste projeto.</span>
+				</label>
+				{#if form?.closeMessage}
+					<p role="alert" class="assess-error">{form.closeMessage}</p>
+				{/if}
+				<button type="submit" class="assess-submit" data-testid="close-project">Encerrar projeto</button>
+			</form>
+		{:else}
+			<p class="closure-meta" data-testid="closure-blocked">
+				Ainda não é possível encerrar: {data.unassessedCount === 1
+					? '1 resultado desejado está sem avaliação'
+					: `${data.unassessedCount} resultados desejados estão sem avaliação`}. Avalie cada um abaixo — qualquer estado serve, inclusive "Ainda não verificável".
+			</p>
+		{/if}
+	{/if}
+</section>
+
+{#if data.closure.closedAt}
+	<!-- projeto encerrado: as atividades legadas de encerramento não orientam mais -->
+{:else if data.continuity.kind !== 'completed'}
 	<section class="card continuity" aria-label="Continuidade">
 		<div>
 			<p class="eyebrow">Continuidade</p>
@@ -138,6 +184,16 @@
 			</section>
 		{/each}
 
+		{#if data.legacyClosureSummary}
+			<section class="card section-card" aria-label="Registro legado do resumo de encerramento">
+				<h2>Registro legado</h2>
+				<div class="field">
+					<p class="field-label">Resumo do encerramento (atividade anterior)</p>
+					<p class="field-value" data-testid="closure-legacy-summary">{data.legacyClosureSummary}</p>
+				</div>
+			</section>
+		{/if}
+
 		<p class="records-link">
 			<a href={data.recordsHref}>Ver registros completos em Registros →</a>
 		</p>
@@ -145,6 +201,34 @@
 </div>
 
 <style>
+	.closure-title {
+		margin: 0 0 var(--space-2);
+	}
+
+	.closure-meta {
+		color: var(--hydra-muted);
+		line-height: 1.55;
+		margin: 0 0 var(--space-4);
+	}
+
+	.close-form {
+		display: grid;
+		gap: var(--space-3);
+		max-width: 40rem;
+	}
+
+	.close-form textarea {
+		width: 100%;
+		font: inherit;
+		box-sizing: border-box;
+	}
+
+	.close-confirm {
+		display: flex;
+		gap: var(--space-2);
+		align-items: center;
+	}
+
 	.subtitle {
 		color: var(--hydra-muted);
 		max-width: 44rem;

@@ -46,7 +46,7 @@ describe('computeSnapshot', () => {
 		expect(snapshot).not.toHaveProperty('answers');
 		expect(snapshot).not.toHaveProperty('pendingItems');
 
-		expect(snapshot.projectStatus).toBe(computeProjectStatus(state.project, catalog, state.activityProgress));
+		expect(snapshot.projectStatus).toBe(computeProjectStatus(state.project));
 		expect(snapshot.nextActivity).toEqual(computeNextActivity(catalog, state.activityProgress));
 		expect(snapshot.openPendingItems).toEqual(computeOpenPendingItems(catalog, state.pendingItems));
 		expect(snapshot.hypotheses).toEqual(computeHypotheses(catalog, state.answers));

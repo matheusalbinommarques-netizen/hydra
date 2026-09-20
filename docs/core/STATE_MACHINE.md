@@ -84,7 +84,7 @@ Invariantes:
 
 Nesta versão, as seis fases do catálogo são `complete` (usam as regras normais) — a jornada guiada cobre da Descoberta ao encerramento do projeto de ponta a ponta. Os estados `partial` e `unavailable` continuam fazendo parte do modelo geral (ex.: para uma futura fase cujo catálogo ainda não esteja completo) e são exercitados por testes com fixtures fabricadas, mesmo sem nenhuma fase real nesse estado nesta versão.
 
-Quando o Motor de Orientação esgota as atividades catalogadas de uma fase `partial` (comportamento do modelo geral, sem exemplo real nesta versão), isso não é interpretado como a fase ou o projeto estarem concluídos — ver `ORIENTATION_ENGINE.md` §3 para a condição explícita de "limite do catálogo alcançado", que nesta versão só é alcançada depois da última atividade da última fase (Confirmar encerramento do projeto).
+Quando o Motor de Orientação esgota as atividades catalogadas de uma fase `partial` (comportamento do modelo geral, sem exemplo real nesta versão), isso não é interpretado como a fase ou o projeto estarem concluídos — ver `ORIENTATION_ENGINE.md` §3 para a condição explícita de "limite do catálogo alcançado", que nesta versão só é alcançada depois da última atividade da última fase — e significa catálogo esgotado com o projeto ainda aberto (D083).
 
 ## 3. Invalidação do Resumo da descoberta
 
@@ -115,13 +115,13 @@ Confirmar exige que `getScopeConfirmationIssues` retorne uma lista vazia: pelo m
 ```text
 SE Project.name não definido (campo "Nome provisório" ainda não preenchido)
     → rascunho
-SENÃO SE todas as fases estão concluídas
+SENÃO SE Project.closedAt não é nulo (encerramento formal explícito, D083)
     → concluído
 SENÃO
     → em_andamento
 ```
 
-Nesta versão, com as seis fases `complete`, o estado `concluído` é **alcançável de ponta a ponta**: exige que toda atividade de toda fase esteja `concluída` (nenhuma `pulada` ou `em_andamento`) — mais rígido que `concluída_com_pendências`, que já é suficiente no nível de fase. A última atividade do catálogo, "Confirmar encerramento do projeto" (`allowsSkip: false`), é o gate final — sem ela, o projeto nunca atinge `concluído`.
+`concluído` significa **formalmente encerrado** (D083): depende só do fato explícito `Project.closedAt`, gravado por `closeProject` em `/closure` (readiness: todo DesiredOutcome com avaliação; sem DesiredOutcomes, pode fechar). Completar o catálogo inteiro sem `closedAt` mantém o projeto `em_andamento`. Encerrado ≠ resultado alcançado. `computePhaseStatus` segue genérico e independente do encerramento; a atividade legada "Confirmar encerramento do projeto" saiu do catálogo.
 
 ## 5. Estado da Pendência
 

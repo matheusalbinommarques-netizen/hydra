@@ -31,9 +31,9 @@ test('Encerramento: projeto antes da validação — continuidade aponta para as
 	await expect(cta).toBeVisible();
 	await expect(cta).toHaveAttribute('href', `/projects/${projectId}/now`);
 
-	// as seis atividades aparecem como "Ainda não iniciada", sem campos
+	// as cinco atividades aparecem como "Ainda não iniciada", sem campos
 	await expect(page.getByText('Validar entregas e critérios de aceitação')).toBeVisible();
-	await expect(page.getByText('Confirmar encerramento do projeto')).toBeVisible();
+	await expect(page.getByText('Confirmar encerramento do projeto')).toHaveCount(0);
 	await expect(page.getByText('Ainda não iniciada').first()).toBeVisible();
 });
 
@@ -64,7 +64,6 @@ test('Encerramento: validação parcial — concluída, em andamento com campo v
 		setActivityStatus(db, projectId, 'transicao_proximos_passos', 'não_iniciada');
 		setActivityStatus(db, projectId, 'resolver_pendencias_finais', 'pulada');
 		setActivityStatus(db, projectId, 'licoes_aprendidas', 'não_iniciada');
-		setActivityStatus(db, projectId, 'confirmar_encerramento', 'não_iniciada');
 	} finally {
 		db.close();
 	}
@@ -113,15 +112,13 @@ test('Encerramento: estado terminal — sem CTA, mensagem de conclusão, link pa
 		setActivityStatus(db, projectId, 'transicao_proximos_passos', 'concluída');
 		setActivityStatus(db, projectId, 'resolver_pendencias_finais', 'pulada');
 		setActivityStatus(db, projectId, 'licoes_aprendidas', 'pulada');
-		setActivityStatus(db, projectId, 'confirmar_encerramento', 'concluída');
-		insertAnswer(db, projectId, 'confirmar_encerramento', 'resumo_encerramento', 'Projeto encerrado.');
 	} finally {
 		db.close();
 	}
 
 	await page.goto(`${server.baseUrl}/projects/${projectId}/closure`);
 
-	await expect(page.getByText('Etapa de encerramento concluída.')).toBeVisible();
+	await expect(page.getByText('Atividades da etapa de validação concluídas.')).toBeVisible();
 	await expect(page.getByRole('link', { name: /Continuar (encerramento|projeto) em Agora/ })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Ver registros completos em Registros →' })).toBeVisible();
 
@@ -133,7 +130,7 @@ test('Encerramento: estado terminal — sem CTA, mensagem de conclusão, link pa
 	expect(hasHorizontalOverflow).toBe(false);
 });
 
-test('Encerramento: avaliação explícita dos resultados desejados (S16) — avaliar, reavaliar, null ≠ ainda não verificável, sem CTA de encerramento', async ({
+test('Encerramento: avaliação explícita dos resultados desejados (S16) — avaliar, reavaliar, readiness, encerrar com nota, reavaliar depois de fechar', async ({
 	page
 }) => {
 	const projectId = await createProject(page, server.baseUrl);
@@ -184,9 +181,49 @@ test('Encerramento: avaliação explícita dos resultados desejados (S16) — av
 	await expect(outcomes.first().locator('[data-state="parcialmente_alcancado"]')).toHaveText('Parcialmente alcançado');
 	await expect(outcomes.first()).toContainText('Metade do fluxo já centralizado.');
 
-	// nenhum CTA/readiness de encerramento neste corte
-	await expect(page.getByRole('button', { name: /Encerrar projeto/i })).toHaveCount(0);
-	await expect(page.getByText(/pronto para encerrar|readiness/i)).toHaveCount(0);
+	// segundo outcome ainda sem avaliação: encerramento bloqueado, com motivo e sem CTA
+	await expect(page.getByTestId('closure-blocked')).toContainText('1 resultado desejado está sem avaliação');
+	await expect(page.getByRole('button', { name: 'Encerrar projeto' })).toHaveCount(0);
+
+	// qualquer estado, inclusive "Ainda não verificável", libera o encerramento
+	await outcomes.nth(1).getByLabel('Estado').selectOption('ainda_nao_verificavel');
+	await outcomes.nth(1).getByLabel('Racional').fill('Sem dados ainda.');
+	await outcomes.nth(1).getByRole('button', { name: 'Registrar avaliação' }).click();
+	await expect(page.getByTestId('closure-blocked')).toHaveCount(0);
+
+	// confirmação consciente: sem marcar, o navegador não envia
+	const closeButton = page.getByTestId('close-project');
+	await expect(closeButton).toBeVisible();
+	await page.getByLabel('Nota de encerramento (opcional)').fill('Encerrado com um resultado em aberto.');
+	await page.getByLabel('Confirmo o encerramento formal deste projeto.').check();
+	await closeButton.click();
+
+	await expect(page.getByTestId('closure-closed')).toHaveText('Projeto encerrado');
+	await expect(page.getByTestId('closure-note')).toHaveText('Encerrado com um resultado em aberto.');
+	await expect(page.getByTestId('close-project')).toHaveCount(0);
+	await expect(page.getByText(/parab[eé]ns|sucesso/i)).toHaveCount(0);
+
+	// closedAt persistido; reavaliar o "ainda não verificável" depois de fechar não o altera
+	const readClosedAt = () => {
+		const conn = openDb(server.dbPath);
+		try {
+			return (conn.prepare('SELECT closed_at FROM project WHERE id = ?').get(projectId) as { closed_at: string | null }).closed_at;
+		} finally {
+			conn.close();
+		}
+	};
+	const closedAt = readClosedAt();
+	expect(closedAt).not.toBeNull();
+	await outcomes.nth(1).getByLabel('Estado').selectOption('alcancado');
+	await outcomes.nth(1).getByLabel('Racional').fill('Medido depois do encerramento.');
+	await outcomes.nth(1).getByRole('button', { name: 'Atualizar avaliação' }).click();
+	await expect(outcomes.nth(1).locator('[data-state="alcancado"]')).toHaveText('Alcançado');
+	await expect(page.getByTestId('closure-closed')).toBeVisible();
+	expect(readClosedAt()).toBe(closedAt);
+
+	// Agora e Home não orientam mais execução normal
+	await page.goto(`${server.baseUrl}/projects/${projectId}/now`);
+	await expect(page.getByRole('heading', { name: 'Projeto encerrado' }).first()).toBeVisible();
 
 	await page.setViewportSize({ width: 390, height: 844 });
 	const hasHorizontalOverflow = await page.evaluate(

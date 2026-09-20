@@ -8,7 +8,10 @@ import type { NextActivityResult } from '$lib/orientation-engine';
 
 export type JourneyContextView =
 	| { kind: 'in_progress'; phaseLabel: string; position: number; total: number }
-	| { kind: 'completed'; total: number };
+	// catálogo percorrido, projeto ainda aberto (falta encerrar em /closure)
+	| { kind: 'awaiting_closure'; total: number }
+	// Project.closedAt existe
+	| { kind: 'closed' };
 
 export function buildJourneyContext(
 	catalog: Catalog,
@@ -17,7 +20,10 @@ export function buildJourneyContext(
 	const total = catalog.phases.length;
 
 	if (nextActivity.kind === 'catalog_limit_reached') {
-		return { kind: 'completed', total };
+		return { kind: 'awaiting_closure', total };
+	}
+	if (nextActivity.kind === 'project_closed') {
+		return { kind: 'closed' };
 	}
 
 	const phase = catalog.phases.find((p) =>

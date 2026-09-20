@@ -91,6 +91,7 @@ import {
 	setCauseHypothesisWhatWeakensIt as setCauseHypothesisWhatWeakensItInDomain,
 	setDesiredOutcomeChange as setDesiredOutcomeChangeInDomain,
 	setDesiredOutcomeAssessment as setDesiredOutcomeAssessmentInDomain,
+	closeProject as closeProjectInDomain,
 	setDesiredOutcomeTarget as setDesiredOutcomeTargetInDomain,
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentDecision as setImpedimentDecisionInDomain,
@@ -207,6 +208,7 @@ import type {
 	SetCauseHypothesisWhatWeakensItInput,
 	SetDesiredOutcomeChangeInput,
 	SetDesiredOutcomeAssessmentInput,
+	CloseProjectInput,
 	SetDesiredOutcomeTargetInput,
 	SetHypothesisInput,
 	SetChangeImpactInput,
@@ -424,7 +426,7 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				// usada por buildProjectView), sem nenhum cálculo novo.
 				const state = await repository.findById(project.id);
 				const activityProgress = state?.activityProgress ?? [];
-				const projectStatus = state ? computeProjectStatus(state.project, catalog, activityProgress) : 'rascunho';
+				const projectStatus = state ? computeProjectStatus(state.project) : 'rascunho';
 				// nextActivity precisa respeitar routeStartPhaseId (D023) como em
 				// /now e /map — computeSnapshot já aplica computeRecommendedRoute
 				// antes de computeNextActivity (ver orientation-engine/snapshot.ts).
@@ -441,7 +443,9 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 								label: requireActivityDefinition(catalog, nextActivityResult.activityDefinitionId).title,
 								why: requireActivityDefinition(catalog, nextActivityResult.activityDefinitionId).why
 							}
-						: { kind: 'completed' };
+						: nextActivityResult.kind === 'project_closed'
+							? { kind: 'completed' }
+							: { kind: 'closure' };
 				const currentPhase = currentPhaseSummary(catalog, activityProgress, nextActivityResult);
 				// Sem state (projeto órfão, ver comentário acima), não há nenhum
 				// evento real para avaliar — sinal e última movimentação ficam
@@ -1999,6 +2003,19 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 				clock.now()
 			);
 			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Encerramento formal (ETAPA 16, D083) — idempotente; ver domínio.
+		async closeProject(input: CloseProjectInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = closeProjectInDomain(state, input.note ?? null, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+			if (result.value === state) return viewOf(state);
 
 			await repository.save(result.value);
 			return viewOf(result.value);

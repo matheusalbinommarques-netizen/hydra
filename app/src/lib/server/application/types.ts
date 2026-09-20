@@ -121,6 +121,11 @@ export interface ProjectListItem {
 				// nunca texto inventado para a tela.
 				why: string;
 			}
+		// catálogo esgotado, projeto ainda aberto — falta o encerramento formal
+		| {
+				kind: 'closure';
+			}
+		// Project.closedAt existe (ETAPA 16, D083)
 		| {
 				kind: 'completed';
 			};
@@ -696,6 +701,13 @@ export interface ProjectView {
 	// (bloqueia conclusão, ao contrário de causeHypothesisConfirmationIssues).
 	desiredOutcomes: DesiredOutcomeView[];
 	desiredOutcomeConfirmationIssues: DesiredOutcomeConfirmationIssue[];
+	// Encerramento formal (ETAPA 16, D083). closedAt é o único fato; a
+	// readiness vem do domínio (isReadyToClose) — a UI nunca a recalcula.
+	closure: {
+		closedAt: string | null;
+		note: string | null;
+		ready: boolean;
+	};
 }
 
 export type UseCaseError =
@@ -1384,6 +1396,11 @@ export interface SetDesiredOutcomeTargetInput {
 	target: string | null;
 }
 
+export interface CloseProjectInput {
+	projectId: string;
+	note?: string | null;
+}
+
 export interface SetDesiredOutcomeAssessmentInput {
 	projectId: string;
 	outcomeId: string;
@@ -1540,6 +1557,7 @@ export interface ProjectUseCases {
 	setDesiredOutcomeChange(input: SetDesiredOutcomeChangeInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDesiredOutcomeTarget(input: SetDesiredOutcomeTargetInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDesiredOutcomeAssessment(input: SetDesiredOutcomeAssessmentInput): Promise<UseCaseOutcome<ProjectView>>;
+	closeProject(input: CloseProjectInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDesiredOutcome(input: RemoveDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveDesiredOutcome(input: MoveDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmDesiredOutcomes(input: ConfirmDesiredOutcomesInput): Promise<UseCaseOutcome<ProjectView>>;

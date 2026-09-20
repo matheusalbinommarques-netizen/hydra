@@ -75,15 +75,14 @@ describe('catalog', () => {
 		]);
 	});
 
-	it('Validação e encerramento tem as 6 atividades na ordem esperada', () => {
+	it('Validação e encerramento tem as 5 atividades na ordem esperada', () => {
 		const validacao = catalog.phases.find((phase) => phase.id === 'validacao');
 		expect(validacao?.activities.map((activity) => activity.id)).toEqual([
 			'validar_entregas_criterios',
 			'coletar_feedback',
 			'resolver_pendencias_finais',
 			'licoes_aprendidas',
-			'transicao_proximos_passos',
-			'confirmar_encerramento'
+			'transicao_proximos_passos'
 		]);
 	});
 
@@ -95,20 +94,18 @@ describe('catalog', () => {
 		expect('fields' in (resumo ?? {})).toBe(false);
 	});
 
-	it('"Confirmar encerramento do projeto" é required_fields com allowsSkip false', () => {
-		const validacao = catalog.phases.find((phase) => phase.id === 'validacao');
-		const confirmar = validacao?.activities.find((activity) => activity.id === 'confirmar_encerramento');
-		expect(confirmar?.completionMode).toBe('required_fields');
-		expect(confirmar?.allowsSkip).toBe(false);
+	it('"Confirmar encerramento do projeto" saiu do catálogo (o encerramento é Project.closedAt, D083)', () => {
+		const ids = catalog.phases.flatMap((phase) => phase.activities.map((activity) => activity.id));
+		expect(ids).not.toContain('confirmar_encerramento');
 	});
 
-	it('só "Resumo da descoberta", "Escolha o próximo foco" e "Confirmar encerramento do projeto" têm allowsSkip false', () => {
+	it('só "Resumo da descoberta" e "Escolha o próximo foco" têm allowsSkip false', () => {
 		const nonSkippable = catalog.phases
 			.flatMap((phase) => phase.activities)
 			.filter((activity) => activity.allowsSkip === false)
 			.map((activity) => activity.id)
 			.sort();
-		expect(nonSkippable).toEqual(['confirmar_encerramento', 'montar_proxima_versao', 'resumo']);
+		expect(nonSkippable).toEqual(['montar_proxima_versao', 'resumo']);
 	});
 
 	it('"Escolha o próximo foco" é scope_confirmation, não pulável e sem fields', () => {

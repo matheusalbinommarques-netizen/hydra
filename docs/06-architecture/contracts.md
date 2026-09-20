@@ -358,7 +358,8 @@ export type ProjectStatus = 'rascunho' | 'em_andamento' | 'concluído';
 
 export type NextActivityResult =
   | { kind: 'recommendation'; activityDefinitionId: string }
-  | { kind: 'catalog_limit_reached' };
+  | { kind: 'catalog_limit_reached' } // catálogo esgotado, projeto ainda ABERTO (D083)
+  | { kind: 'project_closed' }; // Project.closedAt existe — só computeSnapshot produz (D083)
 
 export interface PendingItemView {
   id: string;
@@ -385,11 +386,8 @@ export declare function computePhaseStatus(
   pendingItems: PendingItem[]
 ): PhaseStatus;
 
-export declare function computeProjectStatus(
-  project: Project,
-  catalog: Catalog,
-  activityProgress: ActivityProgress[]
-): ProjectStatus;
+// `concluído` ⇔ Project.closedAt !== null (D083); nunca inferido do catálogo.
+export declare function computeProjectStatus(project: Project): ProjectStatus;
 
 export declare function computeNextActivity(
   catalog: Catalog,

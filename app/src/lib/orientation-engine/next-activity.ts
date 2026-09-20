@@ -5,7 +5,12 @@ import type { ActivityProgress, Catalog } from '$lib/domain';
 
 export type NextActivityResult =
 	| { kind: 'recommendation'; activityDefinitionId: string }
-	| { kind: 'catalog_limit_reached' };
+	// catálogo esgotado, projeto AINDA ABERTO — falta o encerramento formal
+	| { kind: 'catalog_limit_reached' }
+	// Project.closedAt existe (ETAPA 16, D083): nenhuma recomendação normal.
+	// Só computeSnapshot produz esta variante; computeNextActivity segue puro
+	// sobre o catálogo.
+	| { kind: 'project_closed' };
 
 export function computeNextActivity(catalog: Catalog, activityProgress: ActivityProgress[]): NextActivityResult {
 	for (const phase of catalog.phases) {

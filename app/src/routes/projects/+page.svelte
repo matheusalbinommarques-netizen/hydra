@@ -14,11 +14,17 @@
 
 	function ctaLabel(project: ProjectListItem): string {
 		if (project.nextAction.kind === 'completed') return 'Ver projeto';
+		if (project.nextAction.kind === 'closure') return 'Encerrar projeto';
 		return project.projectStatus === 'rascunho' ? 'Começar projeto' : 'Continuar projeto';
 	}
 
 	function nextActionText(project: ProjectListItem): string {
-		return project.nextAction.kind === 'activity' ? project.nextAction.label : 'Jornada concluída';
+		if (project.nextAction.kind === 'activity') return project.nextAction.label;
+		return project.nextAction.kind === 'closure' ? 'Encerrar formalmente o projeto' : 'Projeto encerrado';
+	}
+
+	function ctaHref(project: ProjectListItem): string {
+		return `/projects/${project.projectId}/${project.nextAction.kind === 'closure' ? 'closure' : 'now'}`;
 	}
 
 	function badgeClass(status: ProjectStatus): string {
@@ -158,7 +164,7 @@
 							<div class="col-cta">
 								<a
 									class={project.nextAction.kind === 'completed' ? 'button-secondary' : 'button'}
-									href="/projects/{project.projectId}/now"
+									href={ctaHref(project)}
 								>
 									{ctaLabel(project)}
 								</a>

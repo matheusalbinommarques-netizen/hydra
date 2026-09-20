@@ -161,39 +161,15 @@ const transicaoProximosPassos: ActivityDefinition = {
 	]
 };
 
-const confirmarEncerramento: ActivityDefinition = {
-	id: 'confirmar_encerramento',
-	phaseId: 'validacao',
-	order: 6,
-	title: 'Confirmar encerramento do projeto',
-	mainQuestion: 'Você confirma o encerramento deste projeto?',
-	why: 'Encerrar formalmente evita que o projeto fique em um estado ambíguo, e consolida o aprendizado antes de seguir para o próximo passo.',
-	example: 'Projeto encerrado após validar as entregas, coletar feedback positivo da equipe de atendimento e registrar as lições aprendidas.',
-	completionCriteria: 'Resumo do encerramento registrado — sua existência é a própria confirmação da decisão de encerrar o projeto.',
-	completionMode: 'required_fields',
-	allowsSkip: false,
-	pendingItemLabel: 'O encerramento do projeto não foi confirmado',
-	pendingItemDetail: 'Sem essa confirmação, o projeto permanece formalmente em andamento.',
-	fields: [
-		{
-			id: 'resumo_encerramento',
-			activityId: 'confirmar_encerramento',
-			label: 'Resumo do encerramento',
-			required: true,
-			help: 'Escreva um resumo final: o que foi entregue, o resultado alcançado e por que o projeto está sendo encerrado agora. Registrar esse resumo é a confirmação do encerramento — esta atividade não pode ser pulada.',
-			placeholder:
-				'Ex.: projeto encerrado após validar as entregas e coletar feedback positivo; lições registradas para o próximo projeto.',
-			dataTarget: 'answer',
-			type: 'texto_longo'
-		}
-	]
-};
+// `confirmar_encerramento` (e o campo `resumo_encerramento`) saiu do catálogo
+// na ETAPA 16 (D083): o encerramento é o fato explícito `Project.closedAt`,
+// confirmado em /closure. O id legado segue reconhecido só para preservar
+// dados persistidos (ver domain/legacy-answers.ts).
 
 export const closureActivities: ActivityDefinition[] = [
 	validarEntregasCriterios,
 	coletarFeedback,
 	resolverPendenciasFinais,
 	licoesAprendidas,
-	transicaoProximosPassos,
-	confirmarEncerramento
+	transicaoProximosPassos
 ];

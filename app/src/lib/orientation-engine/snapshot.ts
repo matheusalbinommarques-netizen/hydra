@@ -29,9 +29,12 @@ export function computeSnapshot(catalog: Catalog, state: ProjectState): Orientat
 	const routeCatalog = computeRecommendedRoute(catalog, state.project.routeStartPhaseId);
 
 	return {
-		projectStatus: computeProjectStatus(state.project, catalog, state.activityProgress),
+		projectStatus: computeProjectStatus(state.project),
 		phaseStatuses,
-		nextActivity: computeNextActivity(routeCatalog, state.activityProgress),
+		nextActivity:
+			(state.project.closedAt ?? null) !== null
+				? { kind: 'project_closed' }
+				: computeNextActivity(routeCatalog, state.activityProgress),
 		openPendingItems: computeOpenPendingItems(catalog, state.pendingItems),
 		hypotheses: computeHypotheses(catalog, state.answers, state.scopeVersion)
 	};

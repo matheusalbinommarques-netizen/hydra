@@ -5,7 +5,7 @@ import { buildClosureOutcomes, buildClosureView } from './closure-view';
 const PROJECT_ID = 'proj-1';
 
 describe('buildClosureView', () => {
-	it('agrupa as seis atividades reais de validacao nas três seções, na ordem definida', () => {
+	it('agrupa as cinco atividades reais de validacao nas três seções, na ordem definida', () => {
 		const result = buildClosureView(catalog, {
 			projectId: PROJECT_ID,
 			activityStatuses: {},
@@ -22,8 +22,7 @@ describe('buildClosureView', () => {
 		expect(result.sections[1].activities.map((a) => a.id)).toEqual(['transicao_proximos_passos']);
 		expect(result.sections[2].activities.map((a) => a.id)).toEqual([
 			'resolver_pendencias_finais',
-			'licoes_aprendidas',
-			'confirmar_encerramento'
+			'licoes_aprendidas'
 		]);
 	});
 
@@ -38,8 +37,9 @@ describe('buildClosureView', () => {
 		const validar = result.sections[0].activities[0];
 		expect(validar.title).toBe('Validar entregas e critérios de aceitação');
 
-		const confirmar = result.sections[2].activities[2];
-		expect(confirmar.title).toBe('Confirmar encerramento do projeto');
+		// atividade aposentada (D083): não aparece mais em nenhuma seção
+		const ids = result.sections.flatMap((section) => section.activities.map((activity) => activity.id));
+		expect(ids).not.toContain('confirmar_encerramento');
 	});
 
 	it('mapeia os quatro estados para os rótulos aprovados', () => {
@@ -120,7 +120,7 @@ describe('buildClosureView', () => {
 		expect(validar.fields).toBeNull();
 	});
 
-	it('hasPendingClosureWork é true quando pelo menos uma das seis atividades não é terminal', () => {
+	it('hasPendingClosureWork é true quando pelo menos uma das cinco atividades não é terminal', () => {
 		const result = buildClosureView(catalog, {
 			projectId: PROJECT_ID,
 			activityStatuses: {
@@ -128,8 +128,7 @@ describe('buildClosureView', () => {
 				coletar_feedback: 'concluída',
 				transicao_proximos_passos: 'pulada',
 				resolver_pendencias_finais: 'concluída',
-				licoes_aprendidas: 'concluída',
-				confirmar_encerramento: 'não_iniciada'
+				licoes_aprendidas: 'não_iniciada'
 			},
 			answers: {},
 			nextActivityPhaseId: 'validacao'
@@ -138,7 +137,7 @@ describe('buildClosureView', () => {
 		expect(result.hasPendingClosureWork).toBe(true);
 	});
 
-	it('hasPendingClosureWork é false quando as seis atividades estão concluídas ou puladas', () => {
+	it('hasPendingClosureWork é false quando as cinco atividades estão concluídas ou puladas', () => {
 		const result = buildClosureView(catalog, {
 			projectId: PROJECT_ID,
 			activityStatuses: {
@@ -146,8 +145,7 @@ describe('buildClosureView', () => {
 				coletar_feedback: 'concluída',
 				transicao_proximos_passos: 'concluída',
 				resolver_pendencias_finais: 'pulada',
-				licoes_aprendidas: 'pulada',
-				confirmar_encerramento: 'concluída'
+				licoes_aprendidas: 'pulada'
 			},
 			answers: {},
 			nextActivityPhaseId: null
@@ -188,7 +186,7 @@ describe('buildClosureView', () => {
 		});
 	});
 
-	it('continuidade: todas as seis atividades terminais — sem CTA', () => {
+	it('continuidade: todas as cinco atividades terminais — sem CTA', () => {
 		const result = buildClosureView(catalog, {
 			projectId: PROJECT_ID,
 			activityStatuses: {
@@ -196,14 +194,13 @@ describe('buildClosureView', () => {
 				coletar_feedback: 'concluída',
 				transicao_proximos_passos: 'concluída',
 				resolver_pendencias_finais: 'pulada',
-				licoes_aprendidas: 'pulada',
-				confirmar_encerramento: 'concluída'
+				licoes_aprendidas: 'pulada'
 			},
 			answers: {},
 			nextActivityPhaseId: null
 		});
 
-		expect(result.continuity).toEqual({ kind: 'completed', message: 'Etapa de encerramento concluída.' });
+		expect(result.continuity).toEqual({ kind: 'completed', message: 'Atividades da etapa de validação concluídas.' });
 	});
 
 	it('recordsHref usa o projectId recebido — nenhuma montagem de rota é feita fora da projeção', () => {

@@ -6,11 +6,17 @@
 
 	function ctaLabel(project: ProjectListItem): string {
 		if (project.nextAction.kind === 'completed') return 'Ver projeto';
+		if (project.nextAction.kind === 'closure') return 'Encerrar projeto';
 		return project.projectStatus === 'rascunho' ? 'Começar projeto' : 'Continuar projeto';
 	}
 
 	function nextActionText(project: ProjectListItem): string {
-		return project.nextAction.kind === 'activity' ? project.nextAction.label : 'Jornada concluída';
+		if (project.nextAction.kind === 'activity') return project.nextAction.label;
+		return project.nextAction.kind === 'closure' ? 'Encerrar formalmente o projeto' : 'Projeto encerrado';
+	}
+
+	function ctaHref(project: ProjectListItem): string {
+		return `/projects/${project.projectId}/${project.nextAction.kind === 'closure' ? 'closure' : 'now'}`;
 	}
 
 	// Texto de apoio da próxima ação — sempre ActivityDefinition.why (dado
@@ -272,7 +278,7 @@
 								{#if nextActionWhy(featuredProject)}
 									<p class="hp-next-detail">{nextActionWhy(featuredProject)}</p>
 								{/if}
-								<a class="hp-btn-primary" href="/projects/{featuredProject.projectId}/now">
+								<a class="hp-btn-primary" href={ctaHref(featuredProject)}>
 									{ctaLabel(featuredProject)} <span aria-hidden="true">→</span>
 								</a>
 							</div>
@@ -296,7 +302,7 @@
 							{#each otherProjects as project (project.projectId)}
 								<a
 									class="hp-row"
-									href="/projects/{project.projectId}/now"
+									href={ctaHref(project)}
 									aria-label="{ctaLabel(project)} — {project.projectName ?? 'Projeto sem nome'}"
 								>
 									<span

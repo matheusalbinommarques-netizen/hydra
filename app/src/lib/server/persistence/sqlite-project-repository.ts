@@ -95,6 +95,23 @@ function ensureRouteStartPhaseColumn(db: Database.Database): void {
 	}
 }
 
+// Encerramento formal do projeto (ETAPA 16, D083) — bancos pré-S16 não têm
+// closed_at/closure_note; ficam NULL (aberto), sem backfill. Idempotente.
+function ensureProjectClosureColumns(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(project)').all() as TableInfoRow[];
+	const names = new Set(columns.map((column) => column.name));
+	if (!names.has('closed_at')) {
+		db.exec('ALTER TABLE project ADD COLUMN closed_at TEXT');
+	}
+	if (!names.has('closure_note')) {
+		db.exec(
+			`ALTER TABLE project ADD COLUMN closure_note TEXT
+			 CONSTRAINT project_closure_note_requires_closed_at
+			 CHECK (closure_note IS NULL OR closed_at IS NOT NULL)`
+		);
+	}
+}
+
 // Segunda evolução do schema desde 0001_init.sql (D025, decision-log.md) —
 // bancos criados antes dessa decisão não têm execution_status ainda. Mesmo
 // mecanismo idempotente de ensureRouteStartPhaseColumn/D023: PRAGMA +
@@ -519,6 +536,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	db.pragma('foreign_keys = ON');
 	db.exec(initSql);
 	ensureRouteStartPhaseColumn(db);
+	ensureProjectClosureColumns(db);
 	ensureScopeItemExecutionStatusColumn(db);
 	ensureCurrentTreatmentRows(db);
 	ensureCauseExplorationRows(db);
@@ -861,12 +879,14 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 	const insertTransaction = db.transaction((state: ProjectState, events: ProjectEvent[]) => {
 		db.prepare(
-			'INSERT INTO project (id, name, created_at, route_start_phase_id) VALUES (@id, @name, @createdAt, @routeStartPhaseId)'
+			'INSERT INTO project (id, name, created_at, route_start_phase_id, closed_at, closure_note) VALUES (@id, @name, @createdAt, @routeStartPhaseId, @closedAt, @closureNote)'
 		).run({
 			id: state.project.id,
 			name: state.project.name,
 			createdAt: state.project.createdAt,
-			routeStartPhaseId: state.project.routeStartPhaseId ?? null
+			routeStartPhaseId: state.project.routeStartPhaseId ?? null,
+			closedAt: state.project.closedAt ?? null,
+			closureNote: state.project.closureNote ?? null
 		});
 		insertChildren(state);
 		insertEvents(events);
@@ -903,13 +923,15 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	const saveTransaction = db.transaction((state: ProjectState, events: ProjectEvent[]) => {
 		const result = db
 			.prepare(
-				'UPDATE project SET name = @name, created_at = @createdAt, route_start_phase_id = @routeStartPhaseId WHERE id = @id'
+				'UPDATE project SET name = @name, created_at = @createdAt, route_start_phase_id = @routeStartPhaseId, closed_at = @closedAt, closure_note = @closureNote WHERE id = @id'
 			)
 			.run({
 				id: state.project.id,
 				name: state.project.name,
 				createdAt: state.project.createdAt,
-				routeStartPhaseId: state.project.routeStartPhaseId ?? null
+				routeStartPhaseId: state.project.routeStartPhaseId ?? null,
+				closedAt: state.project.closedAt ?? null,
+				closureNote: state.project.closureNote ?? null
 			});
 		if (result.changes === 0) {
 			throw new Error(`Project "${state.project.id}" não existe — save() exige um projeto já inserido`);
@@ -968,7 +990,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 		async findById(projectId: string): Promise<ProjectState | null> {
 			const projectRow = db
-				.prepare('SELECT id, name, created_at, route_start_phase_id FROM project WHERE id = ?')
+				.prepare('SELECT id, name, created_at, route_start_phase_id, closed_at, closure_note FROM project WHERE id = ?')
 				.get(projectId) as ProjectRow | undefined;
 			if (!projectRow) return null;
 
@@ -1223,7 +1245,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		async listRecent(): Promise<Project[]> {
 			const rows = db
 				.prepare(
-					'SELECT id, name, created_at, route_start_phase_id FROM project ORDER BY created_at DESC, id DESC'
+					'SELECT id, name, created_at, route_start_phase_id, closed_at, closure_note FROM project ORDER BY created_at DESC, id DESC'
 				)
 				.all() as ProjectRow[];
 			return rows.map(mapProjectRow);
