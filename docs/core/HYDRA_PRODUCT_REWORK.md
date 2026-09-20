@@ -2329,6 +2329,21 @@ retenção, IA e S17. O Gate não autoriza implementar tudo que mostra;
 demo data não vira regra de domínio. Não avança `CURRENT_WORK` nem
 escolhe o microcorte.
 
+D082 e D083 implementam os dois microcortes verticais (assessment explícito
+de DesiredOutcome; fato explícito de encerramento). D084
+(`docs/07-management/decision-log.md`) **fecha a ETAPA 16**: o resultado
+macro foi provado no repo — DesiredOutcome com assessment persistido em
+quatro estados e racional obrigatório, encerramento como fato explícito
+(`closedAt` ≠ sucesso), só a ausência de assessment bloqueia, projeto
+sem outcomes fecha, nota opcional, legado não promovido, projeto
+encerrado sai da orientação normal, `ainda_nao_verificavel` reavaliável
+sem alterar `closedAt`. Lifecycle/aceite de Deliverable, pendências
+bloqueando closure, Evidence obrigatória, `Project.status`,
+`ProjectClosure`, reabertura, read-only global, histórico de
+assessments, snapshot final automático, contexto adicional em `/closure`
+(WorkItems, Deliverables, pendências), handoff formal e IA ficam fora da
+etapa, sem promoção automática.
+
 ---
 
 # 47. ETAPA 17 — IA avançada

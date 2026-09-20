@@ -374,33 +374,25 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 15 do rework ("Artefatos e snapshots",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §45) está concluída — fechamento
-registrado em D079 (`docs/07-management/decision-log.md`), mesmo padrão
-de boundary de D075. D076 congelou a semântica de artefato vivo versus
-snapshot formal, D077 o Design Gate do corredor e D078 implementou
-`DocumentSnapshot` do Documento (`/document`): captura explícita,
-snapshot persistido e imutável, versão monotônica por projeto, leitura
-histórica e retorno ao Atual — caso real ponta a ponta que basta para
-fechar a etapa. Ficam fora, sem promoção para backlog: outros artifact
-kinds, entidade genérica Artifact/Snapshot, generalização de schema,
-Tailoring, approval, restore, diff, export/PDF, attachments, sharing,
-snapshots automáticos, retenção/exclusão.
+A ETAPA 16 do rework ("Validação, transição e encerramento",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §46) está concluída — fechamento
+registrado em D084 (`docs/07-management/decision-log.md`), mesmo padrão
+de boundary de D079. D080/D081 congelaram semântica e Design Gate; D082
+entregou o assessment explícito de DesiredOutcome e D083 o fato explícito
+de encerramento (`Project.closedAt`/`closureNote`, `closeProject`,
+`project_closed`) em `/closure`. Ficam fora, sem promoção para backlog:
+lifecycle/aceite de Deliverable, pendências bloqueando closure, Evidence
+obrigatória, `Project.status`, `ProjectClosure`, reabertura, read-only
+global, histórico de assessments, snapshot final, contexto adicional em
+`/closure`, handoff formal, polish do link do `/now` e defeitos mobile
+pré-existentes.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S16` (ETAPA 16, "Validação, transição e encerramento", §46) com status
-`in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou
-corte de S16. D080 congela a semântica inicial: DesiredOutcome tem
-avaliação explícita (alcançado/parcial/não alcançado/ainda não
-verificável, com racional), encerramento é fato explícito e não significa
-sucesso. D081 congela o Design Gate do corredor `/closure` (avaliação
-explícita dos DesiredOutcomes, confirmação consciente, encerrado ≠
-sucesso, nota opcional; shape técnico, reabertura e read-only fora). O
-primeiro microcorte de S16 (D082) entregou a avaliação explícita de DesiredOutcome em `/closure`; o
-segundo (D083) entregou o fato explícito de encerramento (`Project.closedAt`/`closureNote`, `closeProject`,
-`project_closed`); a próxima decisão relevante é escolher o próximo microcorte de S16 ou fechar a etapa. S16 segue não-IA; a primeira etapa materialmente IA é S17,
-que exige o boundary de dogfood humano completo do produto integrado
-antes de começar (D067).
+`S17` (ETAPA 17, "IA avançada", §47) com status `in_progress`. Abrir o
+ponteiro não decide nenhum modelo, escopo ou corte de S17 e não libera a
+implementação de IA: S17 é a primeira etapa materialmente IA e exige o
+boundary de dogfood humano completo do produto integrado antes de
+começar (D067). A próxima decisão relevante é esse boundary de dogfood.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

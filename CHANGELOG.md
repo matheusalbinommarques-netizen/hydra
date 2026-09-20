@@ -4,6 +4,14 @@
 
 ### Adicionado
 
+- Rework, ETAPA 16 ("Validação, transição e encerramento") — cada
+  resultado desejado passa a ter avaliação explícita (alcançado, parcial,
+  não alcançado, ainda não verificável, com racional) e o projeto pode ser
+  encerrado formalmente em `/closure`; encerrado não significa sucesso. Ver
+  D080–D084 (`docs/07-management/decision-log.md`); D084 fecha a etapa e
+  registra o que fica fora (reabertura, read-only, `Project.status`,
+  histórico de avaliações, snapshot final, IA).
+
 - Rework, ETAPA 15 ("Artefatos e snapshots") — o Documento do projeto
   (`/document`) passa a poder ter versões: captura explícita de um
   snapshot formal imutável e versionado, leitura histórica read-only e
