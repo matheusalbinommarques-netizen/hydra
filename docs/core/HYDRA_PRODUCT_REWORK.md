@@ -2284,6 +2284,31 @@ de
 
 > resultado alcançado.
 
+## Contrato semântico congelado (D080)
+
+D080 (`docs/07-management/decision-log.md`) congela a semântica inicial
+de S16; não escolhe shape técnico, não faz Design Gate nem microcorte.
+
+- **Verificação de DesiredOutcome**: cada DesiredOutcome pode ter uma
+  avaliação explícita e persistida — `alcançado`, `parcialmente
+  alcançado`, `não alcançado` ou `ainda não verificável` — sempre com
+  base/racional explícito; silêncio nunca vira sucesso. `EvidenceOutcome`
+  não é reutilizado para isso; `Evidence` segue com a semântica de
+  descoberta/ExternalAction.
+- **Encerramento não é sucesso**: o projeto pode ser encerrado com
+  qualquer dos quatro estados, mas, havendo DesiredOutcomes, cada um
+  precisa ter estado explicitamente registrado. `project closed` ≠
+  `outcome achieved`.
+- **Encerramento é fato explícito**, não apenas texto livre.
+- **`ainda não verificável` não é terminal**: o DesiredOutcome pode ser
+  reavaliado depois do encerramento sem que isso, por si só, desfaça o
+  encerramento formal.
+- Seguem abertos: shape técnico da avaliação e do encerramento
+  (`Project.status`, `closedAt`, `ProjectClosure`, schema, histórico),
+  read-only/edição após fechamento, reabertura, mecanismo de reavaliação,
+  lifecycle/aceite de Deliverable, transição/handoff, pendências
+  bloqueando fechamento, vínculo avaliação↔Evidence e snapshot final.
+
 ---
 
 # 47. ETAPA 17 — IA avançada

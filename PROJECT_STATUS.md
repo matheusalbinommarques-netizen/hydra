@@ -390,9 +390,11 @@ snapshots automáticos, retenção/exclusão.
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 `S16` (ETAPA 16, "Validação, transição e encerramento", §46) com status
 `in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou
-corte de S16. A próxima decisão relevante é a reavaliação/semântica
-inicial de S16 conforme §46 (entrega concluída versus resultado
-alcançado). S16 segue não-IA; a primeira etapa materialmente IA é S17,
+corte de S16. D080 congela a semântica inicial: DesiredOutcome tem
+avaliação explícita (alcançado/parcial/não alcançado/ainda não
+verificável, com racional), encerramento é fato explícito e não significa
+sucesso. A próxima decisão relevante é o Design Gate/primeiro corte de
+S16. S16 segue não-IA; a primeira etapa materialmente IA é S17,
 que exige o boundary de dogfood humano completo do produto integrado
 antes de começar (D067).
 
