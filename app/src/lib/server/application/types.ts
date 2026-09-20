@@ -1,6 +1,7 @@
 // DTO, erros e casos de uso — ver docs/06-architecture/contracts.md §10.
 
 import type {
+	DocumentSnapshotContentV1,
 	ActivityStatus,
 	AffectedGroupConfirmationIssue,
 	AffectedGroupFrequency,
@@ -695,6 +696,7 @@ export interface ProjectView {
 
 export type UseCaseError =
 	| { kind: 'project_not_found' }
+	| { kind: 'document_snapshot_not_found' }
 	| { kind: 'invalid_import'; reason: ProjectStateParseError }
 	| { kind: 'import_id_collision'; projectId: string }
 	| DomainTransitionError;
@@ -1393,6 +1395,23 @@ export interface ConfirmDesiredOutcomesInput {
 	projectId: string;
 }
 
+// Snapshot formal do Documento (ETAPA 15, D076/D077) — DTOs fora de
+// ProjectView (não carregam payload em toda página). `content` é o corpo
+// semântico tipado (DocumentSnapshotContentV1), nunca markup.
+export interface DocumentSnapshotSummaryView {
+	id: string;
+	version: number;
+	capturedAt: string;
+}
+
+export interface DocumentSnapshotView extends DocumentSnapshotSummaryView {
+	content: DocumentSnapshotContentV1;
+}
+
+export interface CaptureDocumentSnapshotInput {
+	projectId: string;
+}
+
 export interface ProjectUseCases {
 	createProject(): Promise<UseCaseOutcome<ProjectView>>;
 	createConfiguredProject(input: CreateConfiguredProjectInput): Promise<UseCaseOutcome<ProjectView>>;
@@ -1436,6 +1455,13 @@ export interface ProjectUseCases {
 		input: PreviewScheduleBaselineCaptureInput
 	): Promise<UseCaseOutcome<ScheduleBaselineCapturePreviewView>>;
 	captureScheduleBaseline(input: CaptureScheduleBaselineInput): Promise<UseCaseOutcome<ProjectView>>;
+
+	// Snapshot do Documento — captureDocumentSnapshot não aceita conteúdo do
+	// chamador: relê o estado no servidor e deriva o conteúdo pelo projetor
+	// canônico (projections/document-content.ts). Ler nunca altera estado.
+	captureDocumentSnapshot(input: CaptureDocumentSnapshotInput): Promise<UseCaseOutcome<DocumentSnapshotView>>;
+	listDocumentSnapshots(projectId: string): Promise<UseCaseOutcome<DocumentSnapshotSummaryView[]>>;
+	getDocumentSnapshot(projectId: string, version: number): Promise<UseCaseOutcome<DocumentSnapshotView>>;
 	addDeliverable(input: AddDeliverableInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDeliverableTitle(input: SetDeliverableTitleInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDeliverableEffort(input: SetDeliverableEffortInput): Promise<UseCaseOutcome<ProjectView>>;

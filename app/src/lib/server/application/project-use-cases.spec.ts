@@ -39,7 +39,10 @@ function countingRepository(inner: ProjectRepository): { repository: ProjectRepo
 				return inner.save(state, events);
 			},
 			listRecent: () => inner.listRecent(),
-			listEvents: (projectId, filter) => inner.listEvents(projectId, filter)
+			listEvents: (projectId, filter) => inner.listEvents(projectId, filter),
+			insertDocumentSnapshot: (input) => inner.insertDocumentSnapshot(input),
+			listDocumentSnapshots: (projectId) => inner.listDocumentSnapshots(projectId),
+			findDocumentSnapshot: (projectId, version) => inner.findDocumentSnapshot(projectId, version)
 		},
 		counts
 	};
@@ -796,7 +799,10 @@ describe('createProjectUseCases — propagação de erros e falhas', () => {
 				throw new Error('falha simulada de persistência');
 			},
 			listRecent: async () => [],
-			listEvents: async () => []
+			listEvents: async () => [],
+			insertDocumentSnapshot: async () => null,
+			listDocumentSnapshots: async () => [],
+			findDocumentSnapshot: async () => null
 		};
 		const useCases = createProjectUseCases({
 			repository: brokenRepository,
@@ -3027,5 +3033,79 @@ describe('createProjectUseCases — DecisionAffectedWorkItem (ETAPA 11 do rework
 
 		const second = await useCases.linkWorkItemToDecision({ projectId, decisionId, workItemId: ids[0] });
 		expect(second).toEqual({ ok: false, error: { kind: 'decision_work_item_already_linked' } });
+	});
+
+	describe('Snapshot do Documento (ETAPA 15)', () => {
+		async function projectWithOrigem(value: string) {
+			const { useCases, repo } = setup();
+			const created = await useCases.createProject();
+			if (!created.ok) throw new Error('createProject');
+			const projectId = created.value.projectId;
+			const answered = await useCases.answerActivity({
+				projectId,
+				activityDefinitionId: 'origem',
+				values: { origem: value }
+			});
+			if (!answered.ok) throw new Error('answerActivity');
+			return { useCases, repo, projectId };
+		}
+
+		function originValue(content: { sections: { blocks: { activityId: string; value: string }[] }[] }) {
+			return content.sections.flatMap((section) => section.blocks).find((block) => block.activityId === 'origem')
+				?.value;
+		}
+
+		it('captura deriva o conteúdo no servidor e cria v1, depois v2', async () => {
+			const { useCases, projectId } = await projectWithOrigem('Primeira origem');
+			const first = await useCases.captureDocumentSnapshot({ projectId });
+			const second = await useCases.captureDocumentSnapshot({ projectId });
+			expect(first.ok && first.value.version).toBe(1);
+			expect(second.ok && second.value.version).toBe(2);
+			if (first.ok) expect(originValue(first.value.content)).toBe('Primeira origem');
+		});
+
+		it('o snapshot permanece idêntico depois de o projeto vivo mudar', async () => {
+			const { useCases, projectId } = await projectWithOrigem('Primeira origem');
+			const captured = await useCases.captureDocumentSnapshot({ projectId });
+			if (!captured.ok) throw new Error('capture');
+
+			const changed = await useCases.answerActivity({
+				projectId,
+				activityDefinitionId: 'origem',
+				values: { origem: 'Origem mudou' }
+			});
+			expect(changed.ok).toBe(true);
+
+			const opened = await useCases.getDocumentSnapshot(projectId, 1);
+			expect(opened.ok && originValue(opened.value.content)).toBe('Primeira origem');
+			expect(opened.ok && JSON.stringify(opened.value.content)).toBe(JSON.stringify(captured.value.content));
+			const secondCapture = await useCases.captureDocumentSnapshot({ projectId });
+			expect(secondCapture.ok && originValue(secondCapture.value.content)).toBe('Origem mudou');
+		});
+
+		it('listar e abrir snapshot nunca alteram o ProjectState', async () => {
+			const { useCases, repo, projectId } = await projectWithOrigem('Origem');
+			await useCases.captureDocumentSnapshot({ projectId });
+			const before = await repo.findById(projectId);
+			await useCases.listDocumentSnapshots(projectId);
+			await useCases.getDocumentSnapshot(projectId, 1);
+			await expect(repo.findById(projectId)).resolves.toEqual(before);
+		});
+
+		it('projeto ou versão inexistente devolve erro tipado', async () => {
+			const { useCases, projectId } = await projectWithOrigem('Origem');
+			await expect(useCases.captureDocumentSnapshot({ projectId: 'nao-existe' })).resolves.toEqual({
+				ok: false,
+				error: { kind: 'project_not_found' }
+			});
+			await expect(useCases.getDocumentSnapshot(projectId, 9)).resolves.toEqual({
+				ok: false,
+				error: { kind: 'document_snapshot_not_found' }
+			});
+			await expect(useCases.listDocumentSnapshots('nao-existe')).resolves.toEqual({
+				ok: false,
+				error: { kind: 'project_not_found' }
+			});
+		});
 	});
 });

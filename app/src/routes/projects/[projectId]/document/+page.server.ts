@@ -1,34 +1,65 @@
+import { fail, redirect } from '@sveltejs/kit';
+import type { DocumentSnapshotContentV1 } from '$lib/domain';
 import { catalog } from '$lib/catalog';
-import { evidenceOutcomeLabel } from '$lib/catalog/external-action';
-import { buildBancadaOverviewView } from '../now/bancada-overview-view';
-import { buildDocumentView, type DocumentEvidenceItem } from './document-view';
-import type { PageServerLoad } from './$types';
+import { projectDocumentContent } from '$lib/projections/document-content';
+import { getProjectUseCases } from '$lib/server/composition';
+import { mapUseCaseError } from '$lib/server/error-messages';
+import { withEditAffordance } from './document-live-view';
+import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ parent }) => {
+// Igualdade estrutural do conteúdo congelado × conteúdo vivo — ambos vêm do
+// mesmo projetor canônico e da mesma forma canônica, então a serialização é
+// estável. Só alimenta o aviso textual "Atual já avançou" (sem diff).
+function sameContent(a: DocumentSnapshotContentV1, b: DocumentSnapshotContentV1): boolean {
+	return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export const load: PageServerLoad = async ({ parent, params, url }) => {
 	const { view } = await parent();
-	const { blocks } = buildBancadaOverviewView(
-		catalog,
-		view.answers,
-		view.affectedGroups,
-		view.evidences,
-		view.currentTreatment,
-		view.treatmentSteps,
-		view.causeExploration,
-		view.causeHypotheses
-	);
+	const useCases = getProjectUseCases();
 
-	// Evidence no Documento (ETAPA 3 do rework) — projeção determinística
-	// direta de Evidence: outcome em linguagem de UI + learning, na ordem em
-	// que foram registradas (mesma ordem de view.evidences, que reflete a
-	// ordem de inserção real). Nenhuma fonte de verdade nova.
-	const evidenceItems: DocumentEvidenceItem[] = view.evidences.map((evidence) => {
-		const group = view.affectedGroups.find((candidate) => candidate.id === evidence.affectedGroupId);
+	const listed = await useCases.listDocumentSnapshots(params.projectId);
+	if (!listed.ok) throw redirect(303, '/projects');
+	const snapshots = listed.value;
+
+	const liveContent = projectDocumentContent(catalog, view);
+
+	const requested = url.searchParams.get('v');
+	if (requested !== null) {
+		const version = Number(requested);
+		const opened = Number.isInteger(version) && version >= 1
+			? await useCases.getDocumentSnapshot(params.projectId, version)
+			: null;
+		// Versão inválida ou inexistente volta ao Atual, nunca a uma página quebrada.
+		if (!opened || !opened.ok) throw redirect(303, `/projects/${params.projectId}/document`);
+
 		return {
-			groupLabel: group?.label ?? 'Grupo removido',
-			outcomeLabel: evidenceOutcomeLabel(evidence.outcome),
-			learning: evidence.learning
+			mode: 'snapshot' as const,
+			snapshots,
+			sections: opened.value.content.sections.map((section) => ({
+				...section,
+				blocks: section.blocks.map((block) => ({ ...block, editable: false }))
+			})),
+			snapshot: { version: opened.value.version, capturedAt: opened.value.capturedAt },
+			currentAdvanced: !sameContent(opened.value.content, liveContent)
 		};
-	});
+	}
 
-	return buildDocumentView(catalog, blocks, evidenceItems);
+	return {
+		mode: 'current' as const,
+		snapshots,
+		sections: withEditAffordance(liveContent).sections,
+		snapshot: null,
+		currentAdvanced: false
+	};
+};
+
+export const actions: Actions = {
+	// A rota só solicita a captura: o conteúdo nunca vem do formulário — o
+	// caso de uso relê o estado no servidor e deriva o conteúdo canônico.
+	captureSnapshot: async ({ params }) => {
+		const result = await getProjectUseCases().captureDocumentSnapshot({ projectId: params.projectId });
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error) });
+		return { success: true, capturedVersion: result.value.version };
+	}
 };

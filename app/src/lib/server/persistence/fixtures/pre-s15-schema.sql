@@ -1,3 +1,8 @@
+-- Fixture de teste: schema de 0001_init.sql EXATAMENTE como em 9bae129 (último commit
+-- antes da S15), derivado uma vez via `git show` e versionado aqui para que o teste
+-- de upgrade não dependa de histórico Git. NÃO editar nem atualizar: representa um
+-- banco pré-S15 (anterior à tabela de snapshot do Documento). Só o teste de upgrade o usa.
+
 -- Schema inicial (versão 1) — deriva diretamente dos tipos de ProjectState
 -- (app/src/lib/domain/state-types.ts). Nenhuma estratégia de migração além
 -- desta aplicação determinística está decidida nesta versão.
@@ -670,32 +675,3 @@ CREATE INDEX IF NOT EXISTS idx_evidence_project_id ON evidence (project_id);
 CREATE INDEX IF NOT EXISTS idx_treatment_step_project_id ON treatment_step (project_id);
 CREATE INDEX IF NOT EXISTS idx_cause_hypothesis_project_id ON cause_hypothesis (project_id);
 CREATE INDEX IF NOT EXISTS idx_desired_outcome_project_id ON desired_outcome (project_id);
-
--- DocumentSnapshot (ETAPA 15 do rework, D076/D077) — snapshot formal do
--- Documento do projeto (/document). Histórico congelado, FORA de
--- ProjectState: save() nunca toca esta tabela (não entra no
--- DELETE/reinsert), e a imutabilidade é do próprio banco (trigger abaixo).
--- Tabela nova (mesmo caso de schedule_baseline): `CREATE TABLE IF NOT EXISTS`
--- sozinho basta para um banco anterior a este corte, sem `ensureX`/backfill.
---
--- version é alocada pelo repositório dentro de uma transação IMMEDIATE
--- (MAX(version)+1); UNIQUE(project_id, version) é a segunda barreira.
--- schema_version mora só aqui, nunca dentro de content_json (que guarda só o
--- corpo tipado do schema v1: representação semântica, nunca HTML/Markdown).
-CREATE TABLE IF NOT EXISTS document_snapshot (
-	id TEXT PRIMARY KEY,
-	project_id TEXT NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-	version INTEGER NOT NULL CHECK (version >= 1),
-	captured_at TEXT NOT NULL,
-	schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-	content_json TEXT NOT NULL CHECK (json_valid(content_json)),
-	CONSTRAINT document_snapshot_unique_version UNIQUE (project_id, version)
-);
-
--- Imutável depois de criado. Sem trigger de DELETE de propósito: o
--- ON DELETE CASCADE do projeto precisa poder remover as linhas.
-CREATE TRIGGER IF NOT EXISTS document_snapshot_immutable
-BEFORE UPDATE ON document_snapshot
-BEGIN
-	SELECT RAISE(ABORT, 'document_snapshot é imutável depois de criado');
-END;

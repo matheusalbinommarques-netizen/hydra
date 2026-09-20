@@ -3,6 +3,8 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DocumentSnapshotParseError } from '../../domain';
+import type { DocumentSnapshotContentV1 } from '../../domain';
 import { catalog } from '../../catalog';
 import {
 	addAffectedGroup,
@@ -2148,5 +2150,205 @@ describe('createSqliteProjectRepository — DecisionAffectedWorkItem (ETAPA 11 d
 		const next = unwrap(linkWorkItemToDecision(catalog, restored, 'dwi-1', 'dec-1', 'wi-1', T2));
 		await repo.save(next);
 		await expect(repo.findById('proj-1')).resolves.toEqual(next);
+	});
+
+	describe('DocumentSnapshot (ETAPA 15, D076/D077)', () => {
+		const content: DocumentSnapshotContentV1 = {
+			sections: [
+				{
+					phaseId: 'descoberta',
+					phaseLabel: 'Descoberta',
+					blocks: [
+						{ activityId: 'origem', heading: 'Origem do projeto', value: 'Um problema', chips: ['a'] },
+						{
+							activityId: 'publico',
+							heading: 'Público',
+							value: 'Analistas',
+							evidenceItems: [{ groupLabel: 'Analistas', outcomeLabel: 'Confirmado', learning: 'Sim' }]
+						}
+					]
+				}
+			]
+		};
+
+		async function seed(repo: SqliteProjectRepository) {
+			const state = createInitialProjectState(catalog, 'proj-1', T1);
+			await repo.insert(state);
+			return state;
+		}
+
+		it('primeira captura cria v1 e a segunda cria v2; lista mais recente primeiro; find devolve o conteúdo', async () => {
+			const repo = createSqliteProjectRepository(':memory:');
+			openRepos.push(repo);
+			await seed(repo);
+
+			const first = await repo.insertDocumentSnapshot({ id: 's-1', projectId: 'proj-1', capturedAt: T1, content });
+			const second = await repo.insertDocumentSnapshot({ id: 's-2', projectId: 'proj-1', capturedAt: T2, content });
+			expect(first?.version).toBe(1);
+			expect(second?.version).toBe(2);
+
+			await expect(repo.listDocumentSnapshots('proj-1')).resolves.toEqual([
+				{ id: 's-2', projectId: 'proj-1', version: 2, capturedAt: T2 },
+				{ id: 's-1', projectId: 'proj-1', version: 1, capturedAt: T1 }
+			]);
+			await expect(repo.findDocumentSnapshot('proj-1', 1)).resolves.toEqual({
+				id: 's-1',
+				projectId: 'proj-1',
+				version: 1,
+				capturedAt: T1,
+				content
+			});
+			await expect(repo.findDocumentSnapshot('proj-1', 3)).resolves.toBeNull();
+		});
+
+		it('projeto inexistente devolve null e não grava nada', async () => {
+			const repo = createSqliteProjectRepository(':memory:');
+			openRepos.push(repo);
+			await expect(
+				repo.insertDocumentSnapshot({ id: 's-1', projectId: 'nao-existe', capturedAt: T1, content })
+			).resolves.toBeNull();
+			await expect(repo.listDocumentSnapshots('nao-existe')).resolves.toEqual([]);
+		});
+
+		it('save() de mutações do projeto nunca altera o snapshot (linha byte-idêntica)', async () => {
+			const filePath = tempFilePath();
+			const repo = createSqliteProjectRepository(filePath);
+			openRepos.push(repo);
+			const state = await seed(repo);
+			await repo.insertDocumentSnapshot({ id: 's-1', projectId: 'proj-1', capturedAt: T1, content });
+
+			const raw = new Database(filePath);
+			const before = raw.prepare('SELECT * FROM document_snapshot').all();
+
+			await repo.save(unwrap(renameProject(catalog, state, 'Outro nome')));
+
+			expect(raw.prepare('SELECT * FROM document_snapshot').all()).toEqual(before);
+			raw.close();
+		});
+
+		it('UPDATE cru é rejeitado pelo trigger de imutabilidade; a linha continua intacta', async () => {
+			const filePath = tempFilePath();
+			const repo = createSqliteProjectRepository(filePath);
+			openRepos.push(repo);
+			await seed(repo);
+			await repo.insertDocumentSnapshot({ id: 's-1', projectId: 'proj-1', capturedAt: T1, content });
+
+			const raw = new Database(filePath);
+			expect(() => raw.prepare("UPDATE document_snapshot SET content_json = '{}'").run()).toThrow(/imutável/);
+			raw.close();
+			await expect(repo.findDocumentSnapshot('proj-1', 1)).resolves.toMatchObject({ content });
+		});
+
+		it('UNIQUE(project_id, version) é a segunda barreira: INSERT cru com versão repetida falha', async () => {
+			const filePath = tempFilePath();
+			const repo = createSqliteProjectRepository(filePath);
+			openRepos.push(repo);
+			await seed(repo);
+			await repo.insertDocumentSnapshot({ id: 's-1', projectId: 'proj-1', capturedAt: T1, content });
+
+			const raw = new Database(filePath);
+			expect(() =>
+				raw
+					.prepare(
+						`INSERT INTO document_snapshot (id, project_id, version, captured_at, schema_version, content_json)
+						 VALUES ('dup', 'proj-1', 1, ?, 1, '{"sections":[]}')`
+					)
+					.run(T2)
+			).toThrow(/UNIQUE/);
+			raw.close();
+		});
+
+		it('reabrir o banco preserva versões e conteúdo', async () => {
+			const filePath = tempFilePath();
+			const first = createSqliteProjectRepository(filePath);
+			await seed(first);
+			await first.insertDocumentSnapshot({ id: 's-1', projectId: 'proj-1', capturedAt: T1, content });
+			first.close();
+
+			const reopened = createSqliteProjectRepository(filePath);
+			openRepos.push(reopened);
+			await expect(reopened.findDocumentSnapshot('proj-1', 1)).resolves.toMatchObject({ version: 1, content });
+			const next = await reopened.insertDocumentSnapshot({ id: 's-2', projectId: 'proj-1', capturedAt: T2, content });
+			expect(next?.version).toBe(2);
+		});
+
+		it('schema_version desconhecida é rejeitada explicitamente na leitura', async () => {
+			const filePath = tempFilePath();
+			const repo = createSqliteProjectRepository(filePath);
+			openRepos.push(repo);
+			await seed(repo);
+			const raw = new Database(filePath);
+			raw
+				.prepare(
+					`INSERT INTO document_snapshot (id, project_id, version, captured_at, schema_version, content_json)
+					 VALUES ('s-x', 'proj-1', 1, ?, 2, '{"sections":[]}')`
+				)
+				.run(T1);
+			raw.close();
+			await expect(repo.findDocumentSnapshot('proj-1', 1)).rejects.toThrow(DocumentSnapshotParseError);
+		});
+
+		it('banco REALMENTE pré-S15 (schema pré-S15 versionado + projeto existente) abre, recebe tabela/trigger, preserva o projeto e aceita v1', async () => {
+			// 1) Projeto real gravado pelo repositório atual num banco descartável —
+			// só fonte de linhas realistas.
+			const seedPath = tempFilePath();
+			const seedRepo = createSqliteProjectRepository(seedPath);
+			const initial = createInitialProjectState(catalog, 'proj-1', T1);
+			const state = unwrap(renameProject(catalog, initial, 'Projeto antigo'));
+			await seedRepo.insert(initial);
+			await seedRepo.save(state);
+			seedRepo.close();
+
+			// 2) Banco pré-S15: schema de 0001_init.sql exatamente como em 9bae129
+			// (último commit antes da S15), versionado em fixtures/pre-s15-schema.sql
+			// — sem depender de histórico Git, e não uma cópia editada do schema atual.
+			const oldSql = fs.readFileSync(path.join(__dirname, 'fixtures', 'pre-s15-schema.sql'), 'utf8');
+			expect(oldSql).not.toContain('document_snapshot');
+
+			const legacyPath = tempFilePath();
+			const legacy = new Database(legacyPath);
+			legacy.exec(oldSql);
+			legacy.exec(`ATTACH DATABASE '${seedPath.replace(/'/g, "''")}' AS seed`);
+			const tableNames = (
+				legacy
+					.prepare("SELECT name FROM main.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+					.all() as { name: string }[]
+			).map((row) => row.name);
+			for (const name of tableNames) {
+				const mainCols = (legacy.prepare(`PRAGMA main.table_info("${name}")`).all() as { name: string }[]).map(
+					(c) => c.name
+				);
+				const seedCols = (legacy.prepare(`PRAGMA seed.table_info("${name}")`).all() as { name: string }[]).map(
+					(c) => c.name
+				);
+				const shared = mainCols
+					.filter((c) => seedCols.includes(c))
+					.map((c) => `"${c}"`)
+					.join(', ');
+				legacy.exec(`INSERT INTO main."${name}" (${shared}) SELECT ${shared} FROM seed."${name}"`);
+			}
+			legacy.exec('DETACH DATABASE seed');
+			expect(legacy.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'document_snapshot%'").all()).toEqual([]);
+			legacy.close();
+
+			// 3) Upgrade: abrir com o repositório atual.
+			const repo = createSqliteProjectRepository(legacyPath);
+			openRepos.push(repo);
+
+			await expect(repo.findById('proj-1')).resolves.toEqual(state);
+			const check = new Database(legacyPath);
+			const objects = (
+				check.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'document_snapshot%'").all() as {
+					name: string;
+				}[]
+			).map((row) => row.name);
+			check.close();
+			expect(objects).toContain('document_snapshot');
+			expect(objects).toContain('document_snapshot_immutable');
+
+			const captured = await repo.insertDocumentSnapshot({ id: 's-1', projectId: 'proj-1', capturedAt: T2, content });
+			expect(captured?.version).toBe(1);
+			await expect(repo.findById('proj-1')).resolves.toEqual(state);
+		});
 	});
 });

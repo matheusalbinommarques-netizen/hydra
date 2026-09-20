@@ -114,6 +114,7 @@ import { buildExternalActionPreparation } from '$lib/catalog/external-action';
 import type { ProjectEventFilter, ProjectRepository } from '../persistence';
 import type { Clock, IdGenerator } from './ports';
 import { buildProjectView } from './project-view';
+import { projectDocumentContent } from '$lib/projections/document-content';
 import type {
 	AddAffectedGroupInput,
 	AddCauseHypothesisInput,
@@ -129,7 +130,10 @@ import type {
 	ApplySchedulePropagationInput,
 	PreviewSchedulePropagationInput,
 	PreviewScheduleBaselineCaptureInput,
+	CaptureDocumentSnapshotInput,
 	CaptureScheduleBaselineInput,
+	DocumentSnapshotSummaryView,
+	DocumentSnapshotView,
 	MoveDeliverableInput,
 	PromoteScopeItemToDeliverableInput,
 	RemoveDeliverableInput,
@@ -1213,6 +1217,53 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 
 			await repository.save(result.value);
 			return viewOf(result.value);
+		},
+
+		// Snapshot do Documento (ETAPA 15, D076/D077) — captura explícita. O
+		// conteúdo NUNCA vem do chamador: o estado é relido aqui e o conteúdo
+		// derivado pelo projetor canônico (projections/document-content.ts),
+		// o mesmo que alimenta a leitura viva de /document. Não passa por
+		// repository.save(): snapshot é histórico, não estado do projeto.
+		async captureDocumentSnapshot(input: CaptureDocumentSnapshotInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const content = projectDocumentContent(catalog, buildProjectView(catalog, state));
+			const snapshot = await repository.insertDocumentSnapshot({
+				id: idGenerator.generate(),
+				projectId: input.projectId,
+				capturedAt: clock.now(),
+				content
+			});
+			if (!snapshot) return { ok: false, error: { kind: 'project_not_found' } };
+			return {
+				ok: true,
+				value: { id: snapshot.id, version: snapshot.version, capturedAt: snapshot.capturedAt, content: snapshot.content }
+			};
+		},
+
+		async listDocumentSnapshots(projectId: string) {
+			if (!(await repository.findById(projectId))) return { ok: false, error: { kind: 'project_not_found' } };
+			const summaries = await repository.listDocumentSnapshots(projectId);
+			const views: DocumentSnapshotSummaryView[] = summaries.map((summary) => ({
+				id: summary.id,
+				version: summary.version,
+				capturedAt: summary.capturedAt
+			}));
+			return { ok: true, value: views };
+		},
+
+		async getDocumentSnapshot(projectId: string, version: number) {
+			if (!(await repository.findById(projectId))) return { ok: false, error: { kind: 'project_not_found' } };
+			const snapshot = await repository.findDocumentSnapshot(projectId, version);
+			if (!snapshot) return { ok: false, error: { kind: 'document_snapshot_not_found' } };
+			const view: DocumentSnapshotView = {
+				id: snapshot.id,
+				version: snapshot.version,
+				capturedAt: snapshot.capturedAt,
+				content: snapshot.content
+			};
+			return { ok: true, value: view };
 		},
 
 		// Milestone (ETAPA 8 do rework, segundo microcorte) — sem evento de

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
-import type { BancadaOverviewBlock } from '../now/bancada-overview-view';
-import { buildDocumentView } from './document-view';
+import type { BancadaOverviewBlock } from './bancada-overview-view';
+import { buildDocumentContent } from './document-content';
 
-describe('buildDocumentView', () => {
+describe('buildDocumentContent', () => {
 	it('zero blocos: nenhuma seção', () => {
-		const view = buildDocumentView(catalog, []);
+		const view = buildDocumentContent(catalog, []);
 		expect(view.sections).toEqual([]);
 	});
 
@@ -14,7 +14,7 @@ describe('buildDocumentView', () => {
 			{ activityId: 'origem', heading: 'Origem do projeto', value: 'Um problema' },
 			{ activityId: 'objetivo_entregaveis', heading: 'Objetivo do projeto', value: 'Lançar o portal.' }
 		];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		expect(view.sections.map((s) => s.phaseId)).toEqual(['descoberta', 'estruturacao']);
 		expect(view.sections[0].phaseLabel).toBe('Descoberta');
 		expect(view.sections[1].phaseLabel).toBe('Estruturação do projeto');
@@ -24,7 +24,7 @@ describe('buildDocumentView', () => {
 		const blocks: BancadaOverviewBlock[] = [
 			{ activityId: 'origem', heading: 'Origem do projeto', value: 'Um problema' }
 		];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		expect(view.sections).toHaveLength(1);
 		expect(view.sections.find((s) => s.phaseId === 'definicao')).toBeUndefined();
 		expect(view.sections.find((s) => s.phaseId === 'estruturacao')).toBeUndefined();
@@ -36,7 +36,7 @@ describe('buildDocumentView', () => {
 			{ activityId: 'usuario_principal', heading: 'Usuário principal', value: 'Analista.' },
 			{ activityId: 'origem', heading: 'Origem do projeto', value: 'Um problema' }
 		];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		expect(view.sections.map((s) => s.phaseId)).toEqual(['descoberta', 'definicao', 'estruturacao']);
 	});
 
@@ -46,7 +46,7 @@ describe('buildDocumentView', () => {
 			{ activityId: 'problema', heading: 'Situação', value: 'Situação' },
 			{ activityId: 'publico', heading: 'Público afetado', value: 'Público' }
 		];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		expect(view.sections[0].blocks.map((b) => b.activityId)).toEqual(['origem', 'problema', 'publico']);
 	});
 
@@ -59,7 +59,7 @@ describe('buildDocumentView', () => {
 				chips: ['Excesso de etapas', 'Retrabalho']
 			}
 		];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		const problema = view.sections[0].blocks[0];
 		expect(problema.heading).toBe('Problema');
 		expect(problema.value).toBe('As solicitações chegam sem padrão.');
@@ -68,7 +68,7 @@ describe('buildDocumentView', () => {
 
 	it('bloco sem chips não ganha chips por conta própria', () => {
 		const blocks: BancadaOverviewBlock[] = [{ activityId: 'publico', heading: 'Público afetado', value: 'X' }];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		expect(view.sections[0].blocks[0].chips).toBeUndefined();
 	});
 
@@ -77,44 +77,38 @@ describe('buildDocumentView', () => {
 			{ activityId: 'origem', heading: 'Origem do projeto', value: 'Origem' },
 			{ activityId: 'decompor_trabalho', heading: 'Fora de escopo', value: 'Não deveria aparecer' }
 		];
-		const view = buildDocumentView(catalog, blocks);
+		const view = buildDocumentContent(catalog, blocks);
 		expect(view.sections).toHaveLength(1);
 		expect(view.sections[0].blocks.map((b) => b.activityId)).toEqual(['origem']);
 	});
 
-	it('blocos de Descoberta são marcados como editáveis (editable: true)', () => {
+	it('blocos nunca carregam affordance de UI (editable)', () => {
 		const blocks: BancadaOverviewBlock[] = [
 			{ activityId: 'origem', heading: 'Origem do projeto', value: 'Origem' }
 		];
-		const view = buildDocumentView(catalog, blocks);
-		expect(view.sections[0].blocks[0].editable).toBe(true);
-	});
-
-	it('blocos de Definição e Estruturação nunca são marcados como editáveis', () => {
-		const blocks: BancadaOverviewBlock[] = [
-			{ activityId: 'usuario_principal', heading: 'Usuário principal', value: 'Analista.' },
-			{ activityId: 'objetivo_entregaveis', heading: 'Objetivo do projeto', value: 'Objetivo.' }
-		];
-		const view = buildDocumentView(catalog, blocks);
-		const allBlocks = view.sections.flatMap((s) => s.blocks);
-		expect(allBlocks.every((b) => b.editable === false)).toBe(true);
+		const view = buildDocumentContent(catalog, blocks);
+		expect(view.sections[0].blocks[0]).toEqual({
+			activityId: 'origem',
+			heading: 'Origem do projeto',
+			value: 'Origem'
+		});
 	});
 });
 
-describe('buildDocumentView — Evidence (ETAPA 3 do rework, "Validação Externa")', () => {
+describe('buildDocumentContent — Evidence (ETAPA 3 do rework, "Validação Externa")', () => {
 	const blocks: BancadaOverviewBlock[] = [
 		{ activityId: 'origem', heading: 'Origem do projeto', value: 'Origem' },
 		{ activityId: 'publico', heading: 'Quem é afetado', value: 'Grupo afetado: Operação (Alto).', chips: ['Operação'] }
 	];
 
 	it('sem evidenceItems, o bloco "publico" não ganha a propriedade', () => {
-		const view = buildDocumentView(catalog, blocks, []);
+		const view = buildDocumentContent(catalog, blocks, []);
 		const publico = view.sections[0].blocks.find((b) => b.activityId === 'publico')!;
 		expect(publico.evidenceItems).toBeUndefined();
 	});
 
 	it('evidenceItems é anexado só ao bloco "publico" — outros blocos da mesma seção não são afetados', () => {
-		const view = buildDocumentView(catalog, blocks, [
+		const view = buildDocumentContent(catalog, blocks, [
 			{ groupLabel: 'Operação', outcomeLabel: 'Confirmou parcialmente', learning: 'O retrabalho ocorre em picos.' }
 		]);
 		const origem = view.sections[0].blocks.find((b) => b.activityId === 'origem')!;
@@ -126,7 +120,7 @@ describe('buildDocumentView — Evidence (ETAPA 3 do rework, "Validação Extern
 	});
 
 	it('preserva múltiplas Evidence do mesmo ou de grupos diferentes, na ordem recebida — sem roteiro/perguntas/preparation', () => {
-		const view = buildDocumentView(catalog, blocks, [
+		const view = buildDocumentContent(catalog, blocks, [
 			{ groupLabel: 'Operação', outcomeLabel: 'Confirmou parcialmente', learning: 'Aprendizado 1.' },
 			{ groupLabel: 'Clientes finais', outcomeLabel: 'Contradisse', learning: 'Aprendizado 2.' }
 		]);

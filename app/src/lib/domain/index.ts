@@ -10,3 +10,4 @@ export * from './serialization';
 export * from './civil-date';
 export * from './multi-select';
 export * from './planning-items';
+export * from './document-snapshot';

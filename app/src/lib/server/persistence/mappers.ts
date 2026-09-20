@@ -2,7 +2,10 @@
 // Nenhum detalhe SQL (nomes de coluna, tipos SQL) atravessa a interface
 // ProjectRepository.
 
+import { parseDocumentSnapshotContent } from '$lib/domain';
 import type {
+	DocumentSnapshot,
+	DocumentSnapshotSummary,
 	ActivityProgress,
 	ActivityStatus,
 	AffectedGroup,
@@ -661,5 +664,30 @@ export function mapPendingItemRow(row: PendingItemRow): PendingItem {
 		createdAt: row.created_at,
 		status: 'resolvida',
 		resolvedAt: row.resolved_at
+	};
+}
+
+// DocumentSnapshot (ETAPA 15) — content_json guarda só o corpo do schema v1;
+// schema_version vem da linha e é quem o parser consulta (rejeita versão
+// desconhecida explicitamente).
+export interface DocumentSnapshotRow {
+	id: string;
+	project_id: string;
+	version: number;
+	captured_at: string;
+	schema_version: number;
+	content_json: string;
+}
+
+export type DocumentSnapshotSummaryRow = Omit<DocumentSnapshotRow, 'schema_version' | 'content_json'>;
+
+export function mapDocumentSnapshotSummaryRow(row: DocumentSnapshotSummaryRow): DocumentSnapshotSummary {
+	return { id: row.id, projectId: row.project_id, version: row.version, capturedAt: row.captured_at };
+}
+
+export function mapDocumentSnapshotRow(row: DocumentSnapshotRow): DocumentSnapshot {
+	return {
+		...mapDocumentSnapshotSummaryRow(row),
+		content: parseDocumentSnapshotContent(row.schema_version, JSON.parse(row.content_json))
 	};
 }

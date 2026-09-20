@@ -7,6 +7,8 @@ export function mapUseCaseError(error: UseCaseError): string {
 	switch (error.kind) {
 		case 'project_not_found':
 			return 'Projeto não encontrado.';
+		case 'document_snapshot_not_found':
+			return 'Versão do Documento não encontrada.';
 		case 'invalid_import':
 			return 'O arquivo selecionado não é um JSON de projeto válido.';
 		case 'import_id_collision':

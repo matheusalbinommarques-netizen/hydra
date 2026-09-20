@@ -3,7 +3,14 @@
 // original (pré-implementação, presume que app/ ainda não existe) — não
 // é fonte normativa atual; ver docs/core/README.md.
 
-import type { Project, ProjectEvent, ProjectState } from '$lib/domain';
+import type {
+	DocumentSnapshot,
+	DocumentSnapshotContentV1,
+	DocumentSnapshotSummary,
+	Project,
+	ProjectEvent,
+	ProjectState
+} from '$lib/domain';
 
 // Filtro de leitura do event log (ETAPA 7 do rework) — entityIds (quando
 // presente e não vazio) restringe a projetos eventos cujo entityId esteja
@@ -36,4 +43,19 @@ export interface ProjectRepository {
 	// usado para reconstruir ProjectState; ordenação mais recente primeiro,
 	// com desempate determinístico (mesmo espírito de listRecent).
 	listEvents(projectId: string, filter?: ProjectEventFilter): Promise<ProjectEvent[]>;
+
+	// Snapshot formal do Documento (ETAPA 15, D076) — histórico imutável FORA
+	// de ProjectState: save() nunca o toca. Sem update/delete de propósito.
+	// insertDocumentSnapshot aloca a próxima versão do projeto e grava numa
+	// única transação (nunca duas capturas com a mesma versão); devolve null
+	// se o projeto não existe. `content` é validado antes de gravar.
+	insertDocumentSnapshot(input: {
+		id: string;
+		projectId: string;
+		capturedAt: string;
+		content: DocumentSnapshotContentV1;
+	}): Promise<DocumentSnapshot | null>;
+	// Mais recente primeiro (versão decrescente); sem o conteúdo.
+	listDocumentSnapshots(projectId: string): Promise<DocumentSnapshotSummary[]>;
+	findDocumentSnapshot(projectId: string, version: number): Promise<DocumentSnapshot | null>;
 }

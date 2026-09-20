@@ -399,8 +399,9 @@ versus snapshot formal (snapshot faz parte de S15; versão por
 projeto + kind; snapshot não é aprovação; `/document` é o primeiro
 corredor candidato). D077 congela o Design Gate desse corredor
 (`/document` vivo, captura explícita, `Snapshot vN` read-only, retorno ao
-Atual; approval, restore, diff e export fora). A próxima decisão relevante
-é escolher o menor microcorte de implementação de S15.
+Atual; approval, restore, diff e export fora). D078 registra o primeiro
+microcorte vertical implementado (`DocumentSnapshot` do Documento). A próxima
+decisão relevante é decidir se S15 fecha aí ou se falta outro caso real.
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

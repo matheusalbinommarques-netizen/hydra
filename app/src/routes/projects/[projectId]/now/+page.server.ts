@@ -6,7 +6,7 @@ import { buildPhaseProgress } from '$lib/phase-progress';
 import { getProjectUseCases } from '$lib/server/composition';
 import { mapUseCaseError } from '$lib/server/error-messages';
 import type { ProjectView } from '$lib/server/application/types';
-import { buildBancadaOverviewView } from './bancada-overview-view';
+import { buildBancadaOverviewView } from '$lib/projections/bancada-overview-view';
 import { buildJourneyContext } from './journey-context';
 import { buildNowOrientationView } from './now-orientation-view';
 import type { Actions, PageServerLoad } from './$types';

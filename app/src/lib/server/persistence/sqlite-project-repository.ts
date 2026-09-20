@@ -3,7 +3,15 @@
 // falar com o banco diretamente.
 
 import Database from 'better-sqlite3';
-import type { Project, ProjectEvent, ProjectState } from '$lib/domain';
+import { DOCUMENT_SNAPSHOT_SCHEMA_VERSION, parseDocumentSnapshotContent } from '$lib/domain';
+import type {
+	DocumentSnapshot,
+	DocumentSnapshotContentV1,
+	DocumentSnapshotSummary,
+	Project,
+	ProjectEvent,
+	ProjectState
+} from '$lib/domain';
 import type { ProjectEventFilter, ProjectRepository } from './project-repository';
 import {
 	mapActivityProgressRow,
@@ -30,6 +38,8 @@ import {
 	mapMilestoneRow,
 	mapMilestoneWorkItemRow,
 	mapRiskRow,
+	mapDocumentSnapshotRow,
+	mapDocumentSnapshotSummaryRow,
 	mapScheduleBaselineRow,
 	mapScheduleBaselineEntryRow,
 	mapWorkItemRow,
@@ -57,6 +67,8 @@ import {
 	type MilestoneRow,
 	type MilestoneWorkItemRow,
 	type RiskRow,
+	type DocumentSnapshotRow,
+	type DocumentSnapshotSummaryRow,
 	type ScheduleBaselineRow,
 	type ScheduleBaselineEntryRow,
 	type WorkItemRow
@@ -813,6 +825,34 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		insertEvents(events);
 	});
 
+	const captureDocumentSnapshotTransaction = db.transaction(
+		(input: {
+			id: string;
+			projectId: string;
+			capturedAt: string;
+			schemaVersion: number;
+			contentJson: string;
+			content: DocumentSnapshotContentV1;
+		}): DocumentSnapshot | null => {
+			const project = db.prepare('SELECT 1 FROM project WHERE id = ?').get(input.projectId);
+			if (!project) return null;
+			const { next } = db
+				.prepare('SELECT COALESCE(MAX(version), 0) + 1 AS next FROM document_snapshot WHERE project_id = ?')
+				.get(input.projectId) as { next: number };
+			db.prepare(
+				`INSERT INTO document_snapshot (id, project_id, version, captured_at, schema_version, content_json)
+				 VALUES (?, ?, ?, ?, ?, ?)`
+			).run(input.id, input.projectId, next, input.capturedAt, input.schemaVersion, input.contentJson);
+			return {
+				id: input.id,
+				projectId: input.projectId,
+				version: next,
+				capturedAt: input.capturedAt,
+				content: input.content
+			};
+		}
+	);
+
 	const saveTransaction = db.transaction((state: ProjectState, events: ProjectEvent[]) => {
 		const result = db
 			.prepare(
@@ -1097,6 +1137,39 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 		async save(state: ProjectState, events: ProjectEvent[] = []): Promise<void> {
 			saveTransaction(state, events);
+		},
+
+		// Snapshot do Documento (ETAPA 15) — a versão é alocada dentro de uma
+		// transação IMMEDIATE (o lock de escrita é tomado antes do SELECT
+		// MAX, então duas capturas concorrentes nunca leem o mesmo máximo);
+		// UNIQUE(project_id, version) é a segunda barreira. O conteúdo passa
+		// pelo parser antes de gravar (forma canônica, byte-estável) e é a
+		// única escrita nesta tabela — sem update/delete.
+		async insertDocumentSnapshot(input): Promise<DocumentSnapshot | null> {
+			const schemaVersion = DOCUMENT_SNAPSHOT_SCHEMA_VERSION;
+			const content = parseDocumentSnapshotContent(schemaVersion, input.content);
+			const contentJson = JSON.stringify(content);
+			return captureDocumentSnapshotTransaction.immediate({ ...input, schemaVersion, contentJson, content });
+		},
+
+		async listDocumentSnapshots(projectId: string): Promise<DocumentSnapshotSummary[]> {
+			const rows = db
+				.prepare(
+					`SELECT id, project_id, version, captured_at FROM document_snapshot
+					 WHERE project_id = ? ORDER BY version DESC`
+				)
+				.all(projectId) as DocumentSnapshotSummaryRow[];
+			return rows.map(mapDocumentSnapshotSummaryRow);
+		},
+
+		async findDocumentSnapshot(projectId: string, version: number): Promise<DocumentSnapshot | null> {
+			const row = db
+				.prepare(
+					`SELECT id, project_id, version, captured_at, schema_version, content_json FROM document_snapshot
+					 WHERE project_id = ? AND version = ?`
+				)
+				.get(projectId, version) as DocumentSnapshotRow | undefined;
+			return row ? mapDocumentSnapshotRow(row) : null;
 		},
 
 		async listRecent(): Promise<Project[]> {
