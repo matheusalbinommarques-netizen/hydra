@@ -22,6 +22,7 @@ import type {
 	ProjectScheduleBaseline,
 	ProjectScheduleBaselineEntry,
 	DesiredOutcome,
+	DesiredOutcomeAssessmentState,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -108,6 +109,8 @@ export type DomainTransitionError =
 	| { kind: 'cause_exploration_has_hypotheses' }
 	| { kind: 'evidence_not_found' }
 	| { kind: 'desired_outcome_not_found' }
+	| { kind: 'desired_outcome_assessment_state_invalid' }
+	| { kind: 'desired_outcome_assessment_rationale_required' }
 	| { kind: 'desired_outcome_confirmation_invalid'; issues: DesiredOutcomeConfirmationIssue[] }
 	| { kind: 'risk_not_found' }
 	| { kind: 'risk_statement_required' }
@@ -4119,6 +4122,7 @@ export function addDesiredOutcome(
 		change: trimmed,
 		target: null,
 		order: state.desiredOutcomes.length,
+		assessment: null,
 		createdAt: occurredAt,
 		updatedAt: occurredAt
 	};
@@ -4170,6 +4174,62 @@ export function setDesiredOutcomeTarget(
 		)
 	});
 	return { ok: true, value: next };
+}
+
+export const DESIRED_OUTCOME_ASSESSMENT_STATES: readonly DesiredOutcomeAssessmentState[] = [
+	'alcancado',
+	'parcialmente_alcancado',
+	'nao_alcancado',
+	'ainda_nao_verificavel'
+];
+
+export function isDesiredOutcomeAssessmentState(value: unknown): value is DesiredOutcomeAssessmentState {
+	return typeof value === 'string' && (DESIRED_OUTCOME_ASSESSMENT_STATES as readonly string[]).includes(value);
+}
+
+/**
+ * Avalia (ou reavalia) o resultado — ETAPA 16, D080. Uma única avaliação atual,
+ * sem histórico e sem ação de limpar. NÃO é mutação de descoberta: nunca chama
+ * afterDesiredOutcomeMutation (não reabre `resultado`, não invalida o Resumo) e
+ * não toca change/target/order. `updatedAt` acompanha `assessedAt` porque
+ * DesiredOutcome.updatedAt alimenta o movimento real do projeto
+ * (computeLastMovementAt). Repetir o mesmo estado+racional normalizado é no-op
+ * (referência preservada).
+ */
+export function setDesiredOutcomeAssessment(
+	_catalog: Catalog,
+	state: ProjectState,
+	outcomeId: string,
+	assessmentState: DesiredOutcomeAssessmentState,
+	rationale: string,
+	occurredAt: string
+): Result<ProjectState, DomainTransitionError> {
+	const outcome = findDesiredOutcome(state, outcomeId);
+	if (!outcome) return { ok: false, error: { kind: 'desired_outcome_not_found' } };
+	if (!isDesiredOutcomeAssessmentState(assessmentState)) {
+		return { ok: false, error: { kind: 'desired_outcome_assessment_state_invalid' } };
+	}
+	const trimmed = rationale.trim();
+	if (trimmed.length === 0) return { ok: false, error: { kind: 'desired_outcome_assessment_rationale_required' } };
+	if (outcome.assessment?.state === assessmentState && outcome.assessment.rationale === trimmed) {
+		return { ok: true, value: state };
+	}
+
+	return {
+		ok: true,
+		value: {
+			...state,
+			desiredOutcomes: state.desiredOutcomes.map((item) =>
+				item.id === outcomeId
+					? {
+							...item,
+							assessment: { state: assessmentState, rationale: trimmed, assessedAt: occurredAt },
+							updatedAt: occurredAt
+						}
+					: item
+			)
+		}
+	};
 }
 
 export function removeDesiredOutcome(

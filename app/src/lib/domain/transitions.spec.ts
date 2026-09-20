@@ -77,6 +77,7 @@ import {
 	setCauseHypothesisExpectedIfTrue,
 	setCauseHypothesisTitle,
 	setCauseHypothesisWhatWeakensIt,
+	setDesiredOutcomeAssessment,
 	setDesiredOutcomeChange,
 	setDesiredOutcomeTarget,
 	setHypothesis,
@@ -4044,6 +4045,7 @@ describe('DesiredOutcome (Stage 4C — "Resultado desejado")', () => {
 				change: 'Solicitações centralizadas',
 				target: null,
 				order: 0,
+				assessment: null,
 				createdAt: T1,
 				updatedAt: T1
 			}
@@ -4158,6 +4160,57 @@ describe('DesiredOutcome (Stage 4C — "Resultado desejado")', () => {
 		const added = unwrap(addDesiredOutcome(catalog, withSummary, 'do-1', 'Nova mudança', T2));
 		const resumo = added.activityProgress.find((p) => p.activityDefinitionId === 'resumo');
 		expect(resumo?.status).toBe('em_andamento');
+	});
+
+	describe('assessment (ETAPA 16 — avaliação explícita, D080)', () => {
+		const withOutcome = () => unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança', T1));
+
+		it('aceita os quatro estados; racional com trim; updatedAt = assessedAt = occurredAt', () => {
+			for (const st of ['alcancado', 'parcialmente_alcancado', 'nao_alcancado', 'ainda_nao_verificavel'] as const) {
+				const next = unwrap(setDesiredOutcomeAssessment(catalog, withOutcome(), 'do-1', st, '  porque sim  ', T2));
+				expect(next.desiredOutcomes[0].assessment).toEqual({ state: st, rationale: 'porque sim', assessedAt: T2 });
+				expect(next.desiredOutcomes[0].updatedAt).toBe(T2);
+			}
+		});
+
+		it('rejeita racional vazio/whitespace, estado inválido e outcome inexistente', () => {
+			expect(setDesiredOutcomeAssessment(catalog, withOutcome(), 'do-1', 'alcancado', '   ', T2)).toEqual({
+				ok: false,
+				error: { kind: 'desired_outcome_assessment_rationale_required' }
+			});
+			expect(
+				setDesiredOutcomeAssessment(catalog, withOutcome(), 'do-1', 'sucesso' as never, 'x', T2)
+			).toEqual({ ok: false, error: { kind: 'desired_outcome_assessment_state_invalid' } });
+			expect(setDesiredOutcomeAssessment(catalog, withOutcome(), 'nope', 'alcancado', 'x', T2)).toEqual({
+				ok: false,
+				error: { kind: 'desired_outcome_not_found' }
+			});
+		});
+
+		it('mesmo estado+racional normalizado é no-op (referência e assessedAt preservados); reavaliação real substitui', () => {
+			const first = unwrap(setDesiredOutcomeAssessment(catalog, withOutcome(), 'do-1', 'alcancado', 'ok', T2));
+			const T3 = '2026-01-03T00:00:00.000Z';
+			const same = unwrap(setDesiredOutcomeAssessment(catalog, first, 'do-1', 'alcancado', '  ok ', T3));
+			expect(same).toBe(first);
+			const changed = unwrap(setDesiredOutcomeAssessment(catalog, first, 'do-1', 'nao_alcancado', 'ok', T3));
+			expect(changed.desiredOutcomes[0].assessment).toEqual({ state: 'nao_alcancado', rationale: 'ok', assessedAt: T3 });
+			expect(changed.desiredOutcomes[0].updatedAt).toBe(T3);
+		});
+
+		it('não é mutação de descoberta: não reabre "resultado", não invalida o Resumo, não toca change/target/order', () => {
+			let state = unwrap(addDesiredOutcome(catalog, freshState(), 'do-1', 'Mudança', T1));
+			state = unwrap(setDesiredOutcomeTarget(catalog, state, 'do-1', 'alvo', T1));
+			state = unwrap(confirmDesiredOutcomes(catalog, state, T1));
+			state = unwrap(confirmSummary(catalog, state));
+			const before = state;
+			const next = unwrap(setDesiredOutcomeAssessment(catalog, state, 'do-1', 'ainda_nao_verificavel', 'cedo', T2));
+			expect(next.activityProgress).toEqual(before.activityProgress);
+			expect(next.activityProgress.find((p) => p.activityDefinitionId === 'resultado')?.status).toBe('concluída');
+			expect(next.activityProgress.find((p) => p.activityDefinitionId === 'resumo')?.status).toBe('concluída');
+			const { assessment: _a, updatedAt: _u, ...rest } = next.desiredOutcomes[0];
+			const { assessment: _a0, updatedAt: _u0, ...restBefore } = before.desiredOutcomes[0];
+			expect(rest).toEqual(restBefore);
+		});
 	});
 });
 

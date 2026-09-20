@@ -332,6 +332,40 @@ function ensureRiskAssessmentAndResponseColumns(db: Database.Database): void {
 	}
 }
 
+// Avaliação de DesiredOutcome (ETAPA 16 do rework, D080/D081, primeiro
+// microcorte) — três colunas novas na tabela existente `desired_outcome`,
+// então `CREATE TABLE IF NOT EXISTS` é no-op num banco anterior. Idempotente,
+// isolado da inicialização, mesmo padrão de ensureRiskAssessmentAndResponseColumns.
+// Outcomes já persistidos ficam com as três colunas NULL ("sem avaliação"):
+// nenhuma avaliação é sintetizada de Answers legadas. O CHECK cross-column é
+// aceito pelo SQLite embutido (3.53.x, verificado empiricamente) e vai na
+// última coluna adicionada, para as anteriores já existirem.
+function ensureDesiredOutcomeAssessmentColumns(db: Database.Database): void {
+	const columns = db.prepare('PRAGMA table_info(desired_outcome)').all() as TableInfoRow[];
+	const columnNames = new Set(columns.map((column) => column.name));
+	if (!columnNames.has('assessment_state')) {
+		db.exec(
+			`ALTER TABLE desired_outcome ADD COLUMN assessment_state TEXT
+			 CONSTRAINT desired_outcome_assessment_state_values
+			 CHECK (assessment_state IS NULL OR assessment_state IN ('alcancado', 'parcialmente_alcancado', 'nao_alcancado', 'ainda_nao_verificavel'))`
+		);
+	}
+	if (!columnNames.has('assessment_rationale')) {
+		db.exec('ALTER TABLE desired_outcome ADD COLUMN assessment_rationale TEXT');
+	}
+	if (!columnNames.has('assessed_at')) {
+		db.exec(
+			`ALTER TABLE desired_outcome ADD COLUMN assessed_at TEXT
+			 CONSTRAINT desired_outcome_assessment_block
+			 CHECK (
+			   (assessment_state IS NULL AND assessment_rationale IS NULL AND assessed_at IS NULL)
+			   OR (assessment_state IS NOT NULL AND assessment_rationale IS NOT NULL AND assessed_at IS NOT NULL
+			       AND length(trim(assessment_rationale)) > 0)
+			 )`
+		);
+	}
+}
+
 // Décima primeira evolução do schema desde 0001_init.sql (ETAPA 11 do
 // rework, segundo microcorte, §41/§13.4) — mesmo caso de
 // ensureImpedimentWorkItemIdColumn/ensureWorkItemDeliverableIdColumn:
@@ -493,6 +527,7 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 	ensureWorkItemDeliverableIdColumn(db);
 	ensureRiskReviewedAtColumn(db);
 	ensureRiskAssessmentAndResponseColumns(db);
+	ensureDesiredOutcomeAssessmentColumns(db);
 	ensureImpedimentDecisionIdColumn(db);
 	ensureDecisionResponsibleColumn(db);
 	ensureWorkItemScheduleColumns(db);
@@ -789,11 +824,23 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 		}
 
 		const insertDesiredOutcome = db.prepare(
-			`INSERT INTO desired_outcome (id, project_id, change, target, outcome_order, created_at, updated_at)
-			 VALUES (@id, @projectId, @change, @target, @order, @createdAt, @updatedAt)`
+			`INSERT INTO desired_outcome
+			   (id, project_id, change, target, outcome_order, assessment_state, assessment_rationale, assessed_at, created_at, updated_at)
+			 VALUES (@id, @projectId, @change, @target, @order, @assessmentState, @assessmentRationale, @assessedAt, @createdAt, @updatedAt)`
 		);
 		for (const outcome of state.desiredOutcomes) {
-			insertDesiredOutcome.run(outcome);
+			insertDesiredOutcome.run({
+				id: outcome.id,
+				projectId: outcome.projectId,
+				change: outcome.change,
+				target: outcome.target,
+				order: outcome.order,
+				assessmentState: outcome.assessment?.state ?? null,
+				assessmentRationale: outcome.assessment?.rationale ?? null,
+				assessedAt: outcome.assessment?.assessedAt ?? null,
+				createdAt: outcome.createdAt,
+				updatedAt: outcome.updatedAt
+			});
 		}
 	}
 
@@ -1100,7 +1147,8 @@ export function createSqliteProjectRepository(databasePath: string): SqliteProje
 
 			const desiredOutcomeRows = db
 				.prepare(
-					`SELECT id, project_id, change, target, outcome_order, created_at, updated_at
+					`SELECT id, project_id, change, target, outcome_order, assessment_state, assessment_rationale, assessed_at,
+					        created_at, updated_at
 					 FROM desired_outcome WHERE project_id = ? ORDER BY outcome_order`
 				)
 				.all(projectId) as DesiredOutcomeRow[];

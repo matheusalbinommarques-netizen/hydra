@@ -117,6 +117,10 @@ export function mapUseCaseError(error: UseCaseError): string {
 			return 'Evidência não encontrada.';
 		case 'desired_outcome_not_found':
 			return 'Resultado desejado não encontrado.';
+		case 'desired_outcome_assessment_state_invalid':
+			return 'Escolha um dos estados de avaliação disponíveis.';
+		case 'desired_outcome_assessment_rationale_required':
+			return 'Registre o racional da avaliação.';
 		case 'desired_outcome_confirmation_invalid':
 			return 'Adicione ao menos uma mudança esperada antes de confirmar o resultado.';
 		case 'risk_not_found':

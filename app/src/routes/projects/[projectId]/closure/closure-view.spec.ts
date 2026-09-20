@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { catalog } from '$lib/catalog';
-import { buildClosureView } from './closure-view';
+import { buildClosureOutcomes, buildClosureView } from './closure-view';
 
 const PROJECT_ID = 'proj-1';
 
@@ -215,5 +215,38 @@ describe('buildClosureView', () => {
 		});
 
 		expect(result.recordsHref).toBe('/projects/outro-projeto-xyz/records');
+	});
+});
+
+
+describe('buildClosureOutcomes (ETAPA 16)', () => {
+	const base = { id: 'a', change: 'Mudança', target: null, order: 0 };
+
+	it('null vira "Sem avaliação" (unassessed), distinto de "Ainda não verificável"', () => {
+		const [none, unverifiable] = buildClosureOutcomes([
+			{ ...base, assessment: null },
+			{
+				...base,
+				id: 'b',
+				order: 1,
+				assessment: { state: 'ainda_nao_verificavel', rationale: 'cedo', assessedAt: '2026-01-02T00:00:00.000Z' }
+			}
+		]);
+		expect(none).toMatchObject({ stateKey: 'unassessed', stateLabel: 'Sem avaliação', rationale: null });
+		expect(unverifiable).toMatchObject({ stateKey: 'ainda_nao_verificavel', stateLabel: 'Ainda não verificável', rationale: 'cedo' });
+	});
+
+	it('rotula os quatro estados e ordena por order', () => {
+		const states = ['alcancado', 'parcialmente_alcancado', 'nao_alcancado', 'ainda_nao_verificavel'] as const;
+		const views = buildClosureOutcomes(
+			states.map((state, i) => ({
+				...base,
+				id: state,
+				order: 3 - i,
+				assessment: { state, rationale: 'r', assessedAt: '2026-01-02T00:00:00.000Z' }
+			}))
+		);
+		expect(views.map((v) => v.id)).toEqual([...states].reverse());
+		expect(new Set(views.map((v) => v.stateLabel)).size).toBe(4);
 	});
 });

@@ -804,12 +804,33 @@ export interface CauseHypothesis {
 // antigo não têm equivalente aqui — AffectedGroup já representa quem é
 // afetado; duplicar esse conceito dentro de DesiredOutcome não foi
 // autorizado (ver domain/legacy-answers.ts, READ-LEGACY dos três campos).
+//
+// assessment (ETAPA 16 do rework, §46, D080/D081, primeiro microcorte) —
+// avaliação explícita e ATUAL do resultado (no máximo uma; sem histórico).
+// `null` significa "sem avaliação" — nunca sucesso, e distinto de
+// `ainda_nao_verificavel`, que é uma avaliação real. Bloco inteiro ou `null`:
+// nunca parcial. Nunca inferido de nenhuma Answer legada. Avaliar não é
+// mutação de descoberta (não reabre `resultado`, não invalida o Resumo).
+export type DesiredOutcomeAssessmentState =
+	| 'alcancado'
+	| 'parcialmente_alcancado'
+	| 'nao_alcancado'
+	| 'ainda_nao_verificavel';
+
+export interface DesiredOutcomeAssessment {
+	state: DesiredOutcomeAssessmentState;
+	// Racional obrigatório, não vazio após trim.
+	rationale: string;
+	assessedAt: string;
+}
+
 export interface DesiredOutcome {
 	id: string;
 	projectId: string;
 	change: string;
 	target: string | null;
 	order: number;
+	assessment: DesiredOutcomeAssessment | null;
 	createdAt: string;
 	updatedAt: string;
 }

@@ -8,7 +8,13 @@
 // nenhum dado que o catálogo não sustente — nenhuma métrica, percentual,
 // data, responsável ou contador.
 
-import type { ActivityDefinition, ActivityStatus, Catalog } from '$lib/domain';
+import type {
+	ActivityDefinition,
+	ActivityStatus,
+	Catalog,
+	DesiredOutcomeAssessment,
+	DesiredOutcomeAssessmentState
+} from '$lib/domain';
 
 export interface ClosureViewInput {
 	projectId: string;
@@ -156,4 +162,55 @@ export function buildClosureView(catalog: Catalog, input: ClosureViewInput): Clo
 		continuity: buildContinuity(input.projectId, hasPendingClosureWork, input.nextActivityPhaseId),
 		recordsHref: `/projects/${input.projectId}/records`
 	};
+}
+
+// Avaliação dos resultados desejados (ETAPA 16, D080/D081) — única fonte da
+// avaliação de cada DesiredOutcome. `assessment: null` é "Sem avaliação" e
+// nunca é lido como sucesso nem como `ainda_nao_verificavel` (que é uma
+// avaliação real). Texto legado das atividades nunca entra aqui.
+export interface ClosureOutcomeInput {
+	id: string;
+	change: string;
+	target: string | null;
+	order: number;
+	assessment: DesiredOutcomeAssessment | null;
+}
+
+export interface ClosureOutcomeView {
+	id: string;
+	change: string;
+	target: string | null;
+	// `unassessed` para `null`; senão o próprio estado — a UI usa esta chave
+	// para o tratamento visual distinto entre os cinco casos.
+	stateKey: 'unassessed' | DesiredOutcomeAssessmentState;
+	stateLabel: string;
+	rationale: string | null;
+	assessedAt: string | null;
+}
+
+export const CLOSURE_OUTCOME_STATE_OPTIONS: { value: DesiredOutcomeAssessmentState; label: string }[] = [
+	{ value: 'alcancado', label: 'Alcançado' },
+	{ value: 'parcialmente_alcancado', label: 'Parcialmente alcançado' },
+	{ value: 'nao_alcancado', label: 'Não alcançado' },
+	{ value: 'ainda_nao_verificavel', label: 'Ainda não verificável' }
+];
+
+export function buildClosureOutcomes(outcomes: readonly ClosureOutcomeInput[]): ClosureOutcomeView[] {
+	return [...outcomes]
+		.sort((a, b) => a.order - b.order)
+		.map((outcome) => {
+			const assessment = outcome.assessment;
+			const label = assessment
+				? (CLOSURE_OUTCOME_STATE_OPTIONS.find((option) => option.value === assessment.state)?.label ?? assessment.state)
+				: 'Sem avaliação';
+			return {
+				id: outcome.id,
+				change: outcome.change,
+				target: outcome.target,
+				stateKey: assessment ? assessment.state : 'unassessed',
+				stateLabel: label,
+				rationale: assessment?.rationale ?? null,
+				assessedAt: assessment?.assessedAt ?? null
+			};
+		});
 }

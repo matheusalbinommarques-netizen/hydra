@@ -90,6 +90,7 @@ import {
 	setCauseHypothesisTitle as setCauseHypothesisTitleInDomain,
 	setCauseHypothesisWhatWeakensIt as setCauseHypothesisWhatWeakensItInDomain,
 	setDesiredOutcomeChange as setDesiredOutcomeChangeInDomain,
+	setDesiredOutcomeAssessment as setDesiredOutcomeAssessmentInDomain,
 	setDesiredOutcomeTarget as setDesiredOutcomeTargetInDomain,
 	setHypothesis as setHypothesisInDomain,
 	setImpedimentDecision as setImpedimentDecisionInDomain,
@@ -205,6 +206,7 @@ import type {
 	SetCauseHypothesisTitleInput,
 	SetCauseHypothesisWhatWeakensItInput,
 	SetDesiredOutcomeChangeInput,
+	SetDesiredOutcomeAssessmentInput,
 	SetDesiredOutcomeTargetInput,
 	SetHypothesisInput,
 	SetChangeImpactInput,
@@ -1977,6 +1979,25 @@ export function createProjectUseCases(deps: ProjectUseCasesDependencies): Projec
 			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
 
 			const result = setDesiredOutcomeTargetInDomain(catalog, state, input.outcomeId, input.target, clock.now());
+			if (!result.ok) return { ok: false, error: result.error };
+
+			await repository.save(result.value);
+			return viewOf(result.value);
+		},
+
+		// Avaliação (ETAPA 16) — não é mutação de descoberta; ver domínio.
+		async setDesiredOutcomeAssessment(input: SetDesiredOutcomeAssessmentInput) {
+			const state = await repository.findById(input.projectId);
+			if (!state) return { ok: false, error: { kind: 'project_not_found' } };
+
+			const result = setDesiredOutcomeAssessmentInDomain(
+				catalog,
+				state,
+				input.outcomeId,
+				input.state,
+				input.rationale,
+				clock.now()
+			);
 			if (!result.ok) return { ok: false, error: result.error };
 
 			await repository.save(result.value);

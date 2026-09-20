@@ -132,3 +132,65 @@ test('Encerramento: estado terminal — sem CTA, mensagem de conclusão, link pa
 	);
 	expect(hasHorizontalOverflow).toBe(false);
 });
+
+test('Encerramento: avaliação explícita dos resultados desejados (S16) — avaliar, reavaliar, null ≠ ainda não verificável, sem CTA de encerramento', async ({
+	page
+}) => {
+	const projectId = await createProject(page, server.baseUrl);
+	const db = openDb(server.dbPath);
+	try {
+		setAllActivityStatuses(db, projectId, 'pulada');
+		setActivityStatus(db, projectId, 'validar_entregas_criterios', 'concluída');
+		insertAnswer(db, projectId, 'validar_entregas_criterios', 'resultado_validacao', 'Texto legado livre da atividade.');
+		const now = new Date().toISOString();
+		const insert = db.prepare(
+			`INSERT INTO desired_outcome (id, project_id, change, target, outcome_order, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`
+		);
+		insert.run('do-a', projectId, 'Solicitações centralizadas', '-30% de retrabalho', 0, now, now);
+		insert.run('do-b', projectId, 'Acompanhamento do início ao fim', null, 1, now, now);
+	} finally {
+		db.close();
+	}
+
+	await page.goto(`${server.baseUrl}/projects/${projectId}/closure`);
+	const outcomes = page.getByTestId('closure-outcome');
+	await expect(outcomes).toHaveCount(2);
+	await expect(outcomes.first()).toContainText('Solicitações centralizadas');
+	await expect(outcomes.first()).toContainText('Alvo: -30% de retrabalho');
+	await expect(outcomes.first().locator('[data-state="unassessed"]')).toHaveText('Sem avaliação');
+	// texto legado não vira avaliação
+	await expect(page.getByText('Texto legado livre da atividade.')).toBeVisible();
+	await expect(outcomes.first().locator('.state-badge')).not.toHaveText('Alcançado');
+
+	// racional obrigatório
+	await outcomes.first().getByLabel('Estado').selectOption('alcancado');
+	await outcomes.first().getByRole('button', { name: 'Registrar avaliação' }).click();
+	await expect(outcomes.first().locator('[data-state="unassessed"]')).toBeVisible();
+
+	// primeira avaliação: ainda não verificável
+	await outcomes.first().getByLabel('Estado').selectOption('ainda_nao_verificavel');
+	await outcomes.first().getByLabel('Racional').fill('Ainda é cedo para medir.');
+	await outcomes.first().getByRole('button', { name: 'Registrar avaliação' }).click();
+	await expect(outcomes.first().locator('[data-state="ainda_nao_verificavel"]')).toHaveText('Ainda não verificável');
+	await expect(outcomes.first()).toContainText('Ainda é cedo para medir.');
+	// o outro segue "Sem avaliação" — distinto de "Ainda não verificável"
+	await expect(outcomes.nth(1).locator('[data-state="unassessed"]')).toHaveText('Sem avaliação');
+
+	// reavaliação
+	await outcomes.first().getByLabel('Estado').selectOption('parcialmente_alcancado');
+	await outcomes.first().getByLabel('Racional').fill('Metade do fluxo já centralizado.');
+	await outcomes.first().getByRole('button', { name: 'Atualizar avaliação' }).click();
+	await expect(outcomes.first().locator('[data-state="parcialmente_alcancado"]')).toHaveText('Parcialmente alcançado');
+	await expect(outcomes.first()).toContainText('Metade do fluxo já centralizado.');
+
+	// nenhum CTA/readiness de encerramento neste corte
+	await expect(page.getByRole('button', { name: /Encerrar projeto/i })).toHaveCount(0);
+	await expect(page.getByText(/pronto para encerrar|readiness/i)).toHaveCount(0);
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	const hasHorizontalOverflow = await page.evaluate(
+		() => document.documentElement.scrollWidth > document.documentElement.clientWidth
+	);
+	expect(hasHorizontalOverflow).toBe(false);
+});

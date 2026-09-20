@@ -8,6 +8,8 @@ import type {
 	AffectedGroupImpact,
 	CauseHypothesisConfirmationIssue,
 	DecisionStatus,
+	DesiredOutcomeAssessment,
+	DesiredOutcomeAssessmentState,
 	DesiredOutcomeConfirmationIssue,
 	DomainTransitionError,
 	EvidenceOutcome,
@@ -569,6 +571,8 @@ export interface DesiredOutcomeView {
 	change: string;
 	target: string | null;
 	order: number;
+	// Avaliação atual (ETAPA 16); `null` = sem avaliação, nunca sucesso.
+	assessment: DesiredOutcomeAssessment | null;
 }
 
 export interface ProjectView {
@@ -1380,6 +1384,13 @@ export interface SetDesiredOutcomeTargetInput {
 	target: string | null;
 }
 
+export interface SetDesiredOutcomeAssessmentInput {
+	projectId: string;
+	outcomeId: string;
+	state: DesiredOutcomeAssessmentState;
+	rationale: string;
+}
+
 export interface RemoveDesiredOutcomeInput {
 	projectId: string;
 	outcomeId: string;
@@ -1528,6 +1539,7 @@ export interface ProjectUseCases {
 	addDesiredOutcome(input: AddDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDesiredOutcomeChange(input: SetDesiredOutcomeChangeInput): Promise<UseCaseOutcome<ProjectView>>;
 	setDesiredOutcomeTarget(input: SetDesiredOutcomeTargetInput): Promise<UseCaseOutcome<ProjectView>>;
+	setDesiredOutcomeAssessment(input: SetDesiredOutcomeAssessmentInput): Promise<UseCaseOutcome<ProjectView>>;
 	removeDesiredOutcome(input: RemoveDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
 	moveDesiredOutcome(input: MoveDesiredOutcomeInput): Promise<UseCaseOutcome<ProjectView>>;
 	confirmDesiredOutcomes(input: ConfirmDesiredOutcomesInput): Promise<UseCaseOutcome<ProjectView>>;

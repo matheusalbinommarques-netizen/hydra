@@ -1,5 +1,14 @@
 <script lang="ts">
-	let { data } = $props();
+	import { enhance } from '$app/forms';
+
+	let { data, form } = $props();
+
+	// dd/mm/aaaa a partir do ISO (data UTC) — sem depender de fuso/locale do
+	// ambiente, para SSR e hidratação coincidirem.
+	function formatDate(iso: string): string {
+		const [year, month, day] = iso.slice(0, 10).split('-');
+		return `${day}/${month}/${year}`;
+	}
 </script>
 
 <svelte:head>
@@ -30,6 +39,7 @@
 	<nav class="index" aria-label="Índice de seções">
 		<p class="eyebrow">Índice</p>
 		<div class="index-list">
+			<a class="index-item" href="#secao-resultados-desejados">Resultados desejados</a>
 			{#each data.sections as section (section.id)}
 				<a class="index-item" href="#secao-{section.id}">{section.title}</a>
 			{/each}
@@ -37,6 +47,68 @@
 	</nav>
 
 	<div class="content">
+		<section class="card section-card" id="secao-resultados-desejados" aria-labelledby="secao-resultados-desejados-heading">
+			<h2 id="secao-resultados-desejados-heading">Resultados desejados</h2>
+			<p class="outcomes-intro">
+				Avalie cada resultado desejado da descoberta. Esta é a avaliação registrada de cada resultado;
+				o texto das atividades abaixo é apenas o registro livre da etapa.
+			</p>
+			{#if data.outcomes.length === 0}
+				<p class="field-empty">Nenhum resultado desejado registrado na descoberta.</p>
+			{:else}
+				{#each data.outcomes as outcome, outcomeIndex (outcome.id)}
+					{#if outcomeIndex > 0}
+						<div class="activity-divider" aria-hidden="true"></div>
+					{/if}
+					<article class="outcome" data-testid="closure-outcome" aria-label={outcome.change}>
+						<p class="outcome-change">{outcome.change}</p>
+						{#if outcome.target}
+							<p class="outcome-target">Alvo: {outcome.target}</p>
+						{/if}
+						<p class="outcome-state">
+							<span class="state-badge state-{outcome.stateKey}" data-state={outcome.stateKey}
+								>{outcome.stateLabel}</span
+							>
+							{#if outcome.stateKey === 'unassessed'}
+								<span class="state-hint">Ainda não avaliado</span>
+							{:else if outcome.assessedAt}
+								<span class="state-hint">Avaliado em {formatDate(outcome.assessedAt)}</span>
+							{/if}
+						</p>
+						{#if outcome.rationale}
+							<p class="outcome-rationale">{outcome.rationale}</p>
+						{/if}
+						<form method="POST" action="?/assessDesiredOutcome" use:enhance class="assess-form">
+							<input type="hidden" name="outcomeId" value={outcome.id} />
+							<label>
+								<span class="field-label">Estado</span>
+								<select name="state" required>
+									{#if outcome.stateKey === 'unassessed'}
+										<option value="" selected disabled>Escolha um estado</option>
+									{/if}
+									{#each data.outcomeStateOptions as option (option.value)}
+										<option value={option.value} selected={outcome.stateKey === option.value}
+											>{option.label}</option
+										>
+									{/each}
+								</select>
+							</label>
+							<label>
+								<span class="field-label">Racional</span>
+								<textarea name="rationale" rows="3" required>{outcome.rationale ?? ''}</textarea>
+							</label>
+							{#if form?.message && form.outcomeId === outcome.id}
+								<p role="alert" class="assess-error">{form.message}</p>
+							{/if}
+							<button type="submit" class="assess-submit">
+								{outcome.stateKey === 'unassessed' ? 'Registrar avaliação' : 'Atualizar avaliação'}
+							</button>
+						</form>
+					</article>
+				{/each}
+			{/if}
+		</section>
+
 		{#each data.sections as section (section.id)}
 			<section class="card section-card" id="secao-{section.id}" aria-labelledby="secao-{section.id}-heading">
 				<h2 id="secao-{section.id}-heading">{section.title}</h2>
@@ -221,6 +293,112 @@
 	.field-empty {
 		font-style: italic;
 		color: var(--hydra-muted);
+	}
+
+	.outcomes-intro {
+		margin: 0 0 var(--space-4);
+		color: var(--hydra-muted);
+		line-height: 1.55;
+	}
+
+	.outcome-change {
+		margin: 0;
+		font-weight: 700;
+		overflow-wrap: break-word;
+	}
+
+	.outcome-target {
+		margin: var(--space-1) 0 0;
+		font-size: var(--font-size-meta);
+		color: var(--hydra-muted);
+	}
+
+	.outcome-state {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		margin: var(--space-3) 0 0;
+	}
+
+	/* Tratamento neutro (sem verde/vermelho, sem linguagem celebratória).
+	   `Sem avaliação` (tracejado, itálico) e `Ainda não verificável` (sólido,
+	   com preenchimento) precisam ser inequivocamente distintos. */
+	.state-badge {
+		display: inline-block;
+		padding: var(--space-1) var(--space-3);
+		border-radius: var(--hydra-radius-pill);
+		border: 1px solid var(--hydra-border);
+		font-size: var(--font-size-caption);
+		font-weight: 700;
+	}
+
+	.state-unassessed {
+		border-style: dashed;
+		font-style: italic;
+		font-weight: 600;
+		color: var(--hydra-muted);
+		background: transparent;
+	}
+
+	.state-ainda_nao_verificavel {
+		background: var(--hydra-surface);
+		color: var(--hydra-text);
+	}
+
+	.state-hint {
+		font-size: var(--font-size-caption);
+		color: var(--hydra-muted);
+	}
+
+	.outcome-rationale {
+		margin: var(--space-3) 0 0;
+		white-space: pre-wrap;
+		overflow-wrap: break-word;
+		line-height: 1.55;
+	}
+
+	.assess-form {
+		display: grid;
+		gap: var(--space-3);
+		margin-top: var(--space-4);
+		max-width: 36rem;
+	}
+
+	.assess-form label {
+		display: grid;
+		gap: var(--space-1);
+	}
+
+	.assess-form select,
+	.assess-form textarea {
+		font: inherit;
+		padding: var(--space-2) var(--space-3);
+		border: 1px solid var(--hydra-border);
+		border-radius: var(--hydra-radius);
+		background: var(--hydra-surface-raised);
+		color: var(--hydra-text);
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.assess-submit {
+		justify-self: start;
+		font: inherit;
+		font-weight: 700;
+		padding: var(--space-3) var(--space-5);
+		border-radius: var(--hydra-radius);
+		border: 1px solid var(--hydra-accent);
+		background: var(--hydra-surface-raised);
+		color: var(--hydra-text);
+		cursor: pointer;
+		min-height: 44px;
+	}
+
+	.assess-error {
+		margin: 0;
+		color: var(--hydra-warning);
+		font-size: var(--font-size-meta);
 	}
 
 	.records-link {

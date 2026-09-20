@@ -30,6 +30,7 @@ import {
 	setChangeImpact,
 	addCauseHypothesis,
 	addDesiredOutcome,
+	setDesiredOutcomeAssessment,
 	addImpediment,
 	addScopeItem,
 	addTreatmentStep,
@@ -1368,6 +1369,7 @@ describe('deserializeProjectState — READ-LEGACY de mudanca/beneficiario/percep
 				change: 'Resultado real, estruturado',
 				target: null,
 				order: 0,
+				assessment: null,
 				createdAt: T2,
 				updatedAt: T2
 			}
@@ -2927,5 +2929,41 @@ describe('Deliverable (ETAPA 9 do rework)', () => {
 			}
 		];
 		expectError(JSON.stringify(base), 'invariant_violation');
+	});
+});
+
+
+describe('DesiredOutcome.assessment (ETAPA 16)', () => {
+	function envelopeWithOutcome(extra: Record<string, unknown>) {
+		const state = unwrap(addDesiredOutcome(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'do-1', 'Mudança', T1));
+		const envelope = JSON.parse(serializeProjectState(state));
+		const outcome = envelope.state.desiredOutcomes[0];
+		delete outcome.assessment;
+		Object.assign(outcome, extra);
+		return envelope;
+	}
+
+	it('round-trip preserva assessment', () => {
+		let state = unwrap(addDesiredOutcome(catalog, createInitialProjectState(catalog, 'proj-1', T1), 'do-1', 'Mudança', T1));
+		state = unwrap(setDesiredOutcomeAssessment(catalog, state, 'do-1', 'ainda_nao_verificavel', 'cedo', T2));
+		expect(deserializeProjectState(serializeProjectState(state), catalog)).toEqual({ ok: true, value: state });
+	});
+
+	it('estado anterior sem assessment importa como null (nunca inferido)', () => {
+		const result = deserializeProjectState(JSON.stringify(envelopeWithOutcome({})), catalog);
+		expect(result.ok && result.value.desiredOutcomes[0].assessment).toBeNull();
+	});
+
+	it('rejeita bloco parcial, estado inválido e racional vazio', () => {
+		const bad = [
+			{ state: 'alcancado', assessedAt: T2 },
+			{ state: 'sucesso', rationale: 'x', assessedAt: T2 },
+			{ state: 'alcancado', rationale: '   ', assessedAt: T2 },
+			{ state: 'alcancado', rationale: 'x' }
+		];
+		for (const assessment of bad) {
+			const result = deserializeProjectState(JSON.stringify(envelopeWithOutcome({ assessment })), catalog);
+			expect(result.ok).toBe(false);
+		}
 	});
 });

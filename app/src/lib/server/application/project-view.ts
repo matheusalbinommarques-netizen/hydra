@@ -495,7 +495,13 @@ function buildCauseExplorationView(causeExploration: ProjectState['causeExplorat
 }
 
 function buildDesiredOutcomeView(outcome: ProjectState['desiredOutcomes'][number]): DesiredOutcomeView {
-	return { id: outcome.id, change: outcome.change, target: outcome.target, order: outcome.order };
+	return {
+		id: outcome.id,
+		change: outcome.change,
+		target: outcome.target,
+		order: outcome.order,
+		assessment: outcome.assessment
+	};
 }
 
 function buildEvidenceView(evidence: ProjectState['evidences'][number]): EvidenceView {

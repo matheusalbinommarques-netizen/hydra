@@ -581,21 +581,8 @@ CREATE TABLE IF NOT EXISTS desired_outcome (
 	change TEXT NOT NULL,
 	target TEXT,
 	outcome_order INTEGER NOT NULL,
-	-- Avaliação atual (ETAPA 16, D080/D081): bloco inteiro ou NULL.
-	assessment_state TEXT,
-	assessment_rationale TEXT,
-	assessed_at TEXT,
 	created_at TEXT NOT NULL,
-	updated_at TEXT NOT NULL,
-	CONSTRAINT desired_outcome_assessment_state_values CHECK (
-		assessment_state IS NULL
-		OR assessment_state IN ('alcancado', 'parcialmente_alcancado', 'nao_alcancado', 'ainda_nao_verificavel')
-	),
-	CONSTRAINT desired_outcome_assessment_block CHECK (
-		(assessment_state IS NULL AND assessment_rationale IS NULL AND assessed_at IS NULL)
-		OR (assessment_state IS NOT NULL AND assessment_rationale IS NOT NULL AND assessed_at IS NOT NULL
-			AND length(trim(assessment_rationale)) > 0)
-	)
+	updated_at TEXT NOT NULL
 );
 
 -- Event log incremental — ETAPA 7 do rework ("Event log incremental", ver

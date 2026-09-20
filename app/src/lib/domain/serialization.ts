@@ -20,6 +20,7 @@ import type {
 	DecisionAffectedWorkItem,
 	DecisionStatus,
 	DesiredOutcome,
+	DesiredOutcomeAssessment,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -59,7 +60,8 @@ import {
 	getAffectedGroupConfirmationIssues,
 	getDesiredOutcomeConfirmationIssues,
 	getScopeConfirmationIssues,
-	getTreatmentConfirmationIssues
+	getTreatmentConfirmationIssues,
+	isDesiredOutcomeAssessmentState
 } from './transitions';
 
 // events (ETAPA 7 do rework, "Event log incremental") — campo aditivo
@@ -1138,6 +1140,23 @@ function parseDesiredOutcomeList(value: unknown): Result<DesiredOutcome[], Proje
 		if (typeof item.order !== 'number' || !Number.isInteger(item.order) || item.order < 0) {
 			return shapeError('DesiredOutcome.order deve ser um inteiro não negativo');
 		}
+		// assessment (ETAPA 16) — `undefined` (snapshot anterior) importa como
+		// `null`; nunca inferido de Answer legada. Bloco inteiro ou null.
+		let assessment: DesiredOutcomeAssessment | null = null;
+		if (item.assessment !== undefined && item.assessment !== null) {
+			const raw = item.assessment;
+			if (!isRecord(raw)) return shapeError('DesiredOutcome.assessment deve ser um objeto ou null');
+			if (!isDesiredOutcomeAssessmentState(raw.state)) {
+				return shapeError('DesiredOutcome.assessment.state deve ser um dos literais aprovados');
+			}
+			if (!isString(raw.rationale) || raw.rationale.trim().length === 0) {
+				return shapeError('DesiredOutcome.assessment.rationale deve ser uma string não vazia');
+			}
+			if (!isIsoDateString(raw.assessedAt)) {
+				return shapeError('DesiredOutcome.assessment.assessedAt deve ser uma data ISO 8601 válida');
+			}
+			assessment = { state: raw.state, rationale: raw.rationale, assessedAt: raw.assessedAt };
+		}
 		if (!isIsoDateString(item.createdAt)) {
 			return shapeError('DesiredOutcome.createdAt deve ser uma data ISO 8601 válida');
 		}
@@ -1150,6 +1169,7 @@ function parseDesiredOutcomeList(value: unknown): Result<DesiredOutcome[], Proje
 			change: item.change,
 			target: item.target as string | null,
 			order: item.order,
+			assessment,
 			createdAt: item.createdAt,
 			updatedAt: item.updatedAt
 		});

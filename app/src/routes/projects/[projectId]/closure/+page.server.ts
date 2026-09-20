@@ -1,7 +1,11 @@
 import { catalog } from '$lib/catalog';
 import type { ActivityDefinition } from '$lib/domain';
-import { buildClosureView } from './closure-view';
-import type { PageServerLoad } from './$types';
+import { fail } from '@sveltejs/kit';
+import type { DesiredOutcomeAssessmentState } from '$lib/domain';
+import { getProjectUseCases } from '$lib/server/composition';
+import { mapUseCaseError } from '$lib/server/error-messages';
+import { buildClosureOutcomes, buildClosureView, CLOSURE_OUTCOME_STATE_OPTIONS } from './closure-view';
+import type { Actions, PageServerLoad } from './$types';
 
 function findActivityDefinition(activityId: string): ActivityDefinition | undefined {
 	for (const phase of catalog.phases) {
@@ -19,10 +23,37 @@ export const load: PageServerLoad = async ({ parent }) => {
 			? (findActivityDefinition(view.nextActivity.activityDefinitionId)?.phaseId ?? null)
 			: null;
 
-	return buildClosureView(catalog, {
-		projectId: view.projectId,
-		activityStatuses: view.activityStatuses,
-		answers: view.answers,
-		nextActivityPhaseId
-	});
+	return {
+		...buildClosureView(catalog, {
+			projectId: view.projectId,
+			activityStatuses: view.activityStatuses,
+			answers: view.answers,
+			nextActivityPhaseId
+		}),
+		outcomes: buildClosureOutcomes(view.desiredOutcomes),
+		outcomeStateOptions: CLOSURE_OUTCOME_STATE_OPTIONS
+	};
+};
+
+export const actions: Actions = {
+	assessDesiredOutcome: async ({ request, params }) => {
+		const formData = await request.formData();
+		const outcomeId = formData.get('outcomeId');
+		const state = formData.get('state');
+		const rationale = formData.get('rationale');
+		if (typeof outcomeId !== 'string' || outcomeId.length === 0) {
+			return fail(400, { message: 'Resultado desejado inválido.', outcomeId: null });
+		}
+		if (typeof state !== 'string' || !CLOSURE_OUTCOME_STATE_OPTIONS.some((option) => option.value === state)) {
+			return fail(400, { message: 'Escolha um dos estados de avaliação disponíveis.', outcomeId });
+		}
+		const result = await getProjectUseCases().setDesiredOutcomeAssessment({
+			projectId: params.projectId,
+			outcomeId,
+			state: state as DesiredOutcomeAssessmentState,
+			rationale: typeof rationale === 'string' ? rationale : ''
+		});
+		if (!result.ok) return fail(400, { message: mapUseCaseError(result.error), outcomeId });
+		return { success: true };
+	}
 };

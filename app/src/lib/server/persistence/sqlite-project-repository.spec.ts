@@ -13,6 +13,7 @@ import {
 	addDecision,
 	addDeliverable,
 	addDesiredOutcome,
+	setDesiredOutcomeAssessment,
 	addImpediment,
 	addMilestone,
 	addRisk,
@@ -2350,5 +2351,98 @@ describe('createSqliteProjectRepository — DecisionAffectedWorkItem (ETAPA 11 d
 			expect(captured?.version).toBe(1);
 			await expect(repo.findById('proj-1')).resolves.toEqual(state);
 		});
+	});
+});
+
+
+describe('createSqliteProjectRepository — DesiredOutcome.assessment (ETAPA 16, D080/D081)', () => {
+	const STATES = ['alcancado', 'parcialmente_alcancado', 'nao_alcancado', 'ainda_nao_verificavel'] as const;
+
+	it('round-trip preserva os quatro estados e null; reavaliar substitui a avaliação atual', async () => {
+		const repo = memoryRepo();
+		let state = nonTrivialState();
+		expect(state.desiredOutcomes.length).toBeGreaterThanOrEqual(2);
+		await repo.insert(state);
+		const [first, second] = state.desiredOutcomes;
+		expect((await repo.findById('proj-1'))?.desiredOutcomes.map((o) => o.assessment)).toEqual(
+			state.desiredOutcomes.map(() => null)
+		);
+
+		for (const st of STATES) {
+			state = unwrap(setDesiredOutcomeAssessment(catalog, state, first.id, st, `racional ${st}`, T2));
+			await repo.save(state);
+			await expect(repo.findById('proj-1')).resolves.toEqual(state);
+		}
+		const restored = await repo.findById('proj-1');
+		expect(restored?.desiredOutcomes.find((o) => o.id === first.id)?.assessment?.state).toBe('ainda_nao_verificavel');
+		expect(restored?.desiredOutcomes.find((o) => o.id === second.id)?.assessment).toBeNull();
+	});
+
+	it('fresh schema recusa bloco parcial, estado inválido e racional vazio (CHECK)', async () => {
+		const filePath = tempFilePath();
+		const repo = createSqliteProjectRepository(filePath);
+		await repo.insert(nonTrivialState());
+		repo.close();
+		const db = new Database(filePath);
+		const upd = (set: string) => () => db.exec(`UPDATE desired_outcome SET ${set} WHERE id = 'do-1'`);
+		expect(upd("assessment_state = 'alcancado'")).toThrow(/CHECK/);
+		expect(upd("assessment_state = 'sucesso', assessment_rationale = 'x', assessed_at = 'y'")).toThrow(/CHECK/);
+		expect(upd("assessment_state = 'alcancado', assessment_rationale = '   ', assessed_at = 'y'")).toThrow(/CHECK/);
+		db.close();
+	});
+
+	it('banco REALMENTE pré-S16 abre com assessment null, Answers intactas, upgrade idempotente, e o CHECK vale após o upgrade', async () => {
+		const seedPath = tempFilePath();
+		const seedRepo = createSqliteProjectRepository(seedPath);
+		const state = nonTrivialState();
+		await seedRepo.insert(state);
+		seedRepo.close();
+
+		const oldSql = fs.readFileSync(path.join(__dirname, 'fixtures', 'pre-s16-schema.sql'), 'utf8');
+		expect(oldSql).not.toContain('assessment_state');
+
+		const legacyPath = tempFilePath();
+		const legacy = new Database(legacyPath);
+		legacy.exec(oldSql);
+		legacy.exec(`ATTACH DATABASE '${seedPath.replace(/'/g, "''")}' AS seed`);
+		const tableNames = (
+			legacy
+				.prepare("SELECT name FROM main.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+				.all() as { name: string }[]
+		).map((row) => row.name);
+		for (const name of tableNames) {
+			const mainCols = (legacy.prepare(`PRAGMA main.table_info("${name}")`).all() as { name: string }[]).map((c) => c.name);
+			const seedCols = (legacy.prepare(`PRAGMA seed.table_info("${name}")`).all() as { name: string }[]).map((c) => c.name);
+			const shared = mainCols.filter((c) => seedCols.includes(c)).map((c) => `"${c}"`).join(', ');
+			legacy.exec(`INSERT INTO main."${name}" (${shared}) SELECT ${shared} FROM seed."${name}"`);
+		}
+		legacy.exec('DETACH DATABASE seed');
+		legacy.close();
+
+		const repo = createSqliteProjectRepository(legacyPath);
+		openRepos.push(repo);
+		const restored = await repo.findById('proj-1');
+		expect(restored).toEqual(state); // assessment null em todos; Answers e o resto intactos
+		expect(restored?.desiredOutcomes.every((o) => o.assessment === null)).toBe(true);
+		expect(restored?.answers).toEqual(state.answers);
+
+		// Reabrir não falha nem duplica colunas.
+		const repo2 = createSqliteProjectRepository(legacyPath);
+		openRepos.push(repo2);
+		await expect(repo2.findById('proj-1')).resolves.toEqual(state);
+		const db = new Database(legacyPath);
+		const cols = (db.prepare('PRAGMA table_info(desired_outcome)').all() as { name: string }[]).map((c) => c.name);
+		expect(cols.filter((c) => c.startsWith('assess')).sort()).toEqual([
+			'assessed_at',
+			'assessment_rationale',
+			'assessment_state'
+		]);
+		// CHECK cross-column aceito no ADD COLUMN e ativo no banco atualizado.
+		expect(() => db.exec("UPDATE desired_outcome SET assessment_state = 'alcancado' WHERE id = 'do-1'")).toThrow(/CHECK/);
+		db.close();
+
+		const next = unwrap(setDesiredOutcomeAssessment(catalog, state, 'do-1', 'nao_alcancado', 'r', T2));
+		await repo2.save(next);
+		await expect(repo2.findById('proj-1')).resolves.toEqual(next);
 	});
 });

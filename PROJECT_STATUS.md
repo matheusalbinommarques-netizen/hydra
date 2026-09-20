@@ -395,8 +395,9 @@ avaliação explícita (alcançado/parcial/não alcançado/ainda não
 verificável, com racional), encerramento é fato explícito e não significa
 sucesso. D081 congela o Design Gate do corredor `/closure` (avaliação
 explícita dos DesiredOutcomes, confirmação consciente, encerrado ≠
-sucesso, nota opcional; shape técnico, reabertura e read-only fora). A
-próxima decisão relevante é escolher o menor microcorte de S16. S16 segue não-IA; a primeira etapa materialmente IA é S17,
+sucesso, nota opcional; shape técnico, reabertura e read-only fora). O
+primeiro microcorte de S16 (D082) entregou a avaliação explícita de DesiredOutcome em `/closure`; a
+próxima decisão relevante é escolher o próximo microcorte de S16 (fato explícito de encerramento ainda não decidido). S16 segue não-IA; a primeira etapa materialmente IA é S17,
 que exige o boundary de dogfood humano completo do produto integrado
 antes de começar (D067).
 

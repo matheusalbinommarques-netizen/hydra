@@ -29,6 +29,7 @@ import type {
 	ProjectScheduleBaseline,
 	ProjectScheduleBaselineEntry,
 	DesiredOutcome,
+	DesiredOutcomeAssessmentState,
 	Evidence,
 	EvidenceOutcome,
 	ExternalAction,
@@ -601,6 +602,9 @@ export interface DesiredOutcomeRow {
 	change: string;
 	target: string | null;
 	outcome_order: number;
+	assessment_state: DesiredOutcomeAssessmentState | null;
+	assessment_rationale: string | null;
+	assessed_at: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -612,6 +616,12 @@ export function mapDesiredOutcomeRow(row: DesiredOutcomeRow): DesiredOutcome {
 		change: row.change,
 		target: row.target,
 		order: row.outcome_order,
+		// Bloco inteiro ou null — as três colunas juntas (CHECK no schema);
+		// parcial nunca vira assessment.
+		assessment:
+			row.assessment_state !== null && row.assessment_rationale !== null && row.assessed_at !== null
+				? { state: row.assessment_state, rationale: row.assessment_rationale, assessedAt: row.assessed_at }
+				: null,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};
