@@ -374,34 +374,27 @@ Histórico completo em `docs/07-management/decision-log.md`.
 
 ## Próxima decisão relevante
 
-A ETAPA 14 do rework ("Ações externas maduras",
-`docs/core/HYDRA_PRODUCT_REWORK.md` §44) está concluída — fechamento
-registrado em D075 (`docs/07-management/decision-log.md`), mesmo padrão
-de boundary de D069. `validate_affected_group` segue como primeiro kind
-operacional e `approval` foi materializado ponta a ponta (D074, sobre
-D070–D073): `ExternalAction` suporta dois contratos distintos sem virar
-outcome genérico, `approval` usa a `Decision` como única fonte canônica
-do resultado, e não existe surface top-level de ações externas — a
-faixa/drawer transversal continua sendo o mecanismo de retomada. Ficam
-fora da etapa: projeção em Agora e demais elasticidades B; entrevista,
-kickoff, revisão, aceite, fornecedor e sponsor (C); outcome/retorno
-genérico, assignee, prazo, prioridade, integrações, IA; Evidence/anexo
-opcional para `approval` (DEFER).
+A ETAPA 15 do rework ("Artefatos e snapshots",
+`docs/core/HYDRA_PRODUCT_REWORK.md` §45) está concluída — fechamento
+registrado em D079 (`docs/07-management/decision-log.md`), mesmo padrão
+de boundary de D075. D076 congelou a semântica de artefato vivo versus
+snapshot formal, D077 o Design Gate do corredor e D078 implementou
+`DocumentSnapshot` do Documento (`/document`): captura explícita,
+snapshot persistido e imutável, versão monotônica por projeto, leitura
+histórica e retorno ao Atual — caso real ponta a ponta que basta para
+fechar a etapa. Ficam fora, sem promoção para backlog: outros artifact
+kinds, entidade genérica Artifact/Snapshot, generalização de schema,
+Tailoring, approval, restore, diff, export/PDF, attachments, sharing,
+snapshots automáticos, retenção/exclusão.
 
 Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
-`S15` (ETAPA 15, "Artefatos e snapshots", §45) com status
+`S16` (ETAPA 16, "Validação, transição e encerramento", §46) com status
 `in_progress`. Abrir o ponteiro não decide nenhum modelo, escopo ou
-corte de S15 — isso é trabalho de uma passagem futura. S15 e S16
-continuam não-IA; a primeira etapa materialmente IA é S17, que segue
-exigindo o boundary de dogfood humano completo do produto integrado
-antes de começar (D067). D076 congela a semântica de artefato vivo
-versus snapshot formal (snapshot faz parte de S15; versão por
-projeto + kind; snapshot não é aprovação; `/document` é o primeiro
-corredor candidato). D077 congela o Design Gate desse corredor
-(`/document` vivo, captura explícita, `Snapshot vN` read-only, retorno ao
-Atual; approval, restore, diff e export fora). D078 registra o primeiro
-microcorte vertical implementado (`DocumentSnapshot` do Documento). A próxima
-decisão relevante é decidir se S15 fecha aí ou se falta outro caso real.
+corte de S16. A próxima decisão relevante é a reavaliação/semântica
+inicial de S16 conforme §46 (entrega concluída versus resultado
+alcançado). S16 segue não-IA; a primeira etapa materialmente IA é S17,
+que exige o boundary de dogfood humano completo do produto integrado
+antes de começar (D067).
 
 Este documento é snapshot pontual; o ponteiro operacional é
 `docs/core/CURRENT_WORK.json`. As seções anteriores preservam o histórico

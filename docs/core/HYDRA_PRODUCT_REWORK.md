@@ -2252,6 +2252,16 @@ sharing, snapshots automáticos, entidade universal, retenção e shape
 técnico ficam fora (C). Não avança `CURRENT_WORK` nem escolhe o
 microcorte.
 
+D078 implementa o primeiro corredor (`DocumentSnapshot` do Documento).
+D079 (`docs/07-management/decision-log.md`) **fecha a ETAPA 15**: o
+resultado macro foi provado por um caso real ponta a ponta — `/document`
+vivo → snapshot formal persistido e imutável → versionamento → projeto
+vivo continua mudando, snapshot permanece congelado → leitura histórica →
+retorno ao Atual. Não exige segundo artifact kind. Outros kinds, entidade
+genérica Artifact/Snapshot, generalização de schema, Tailoring, approval,
+restore, diff, export/PDF, attachments, sharing, snapshots automáticos e
+retenção ficam fora da etapa, sem promoção automática.
+
 ---
 
 # 46. ETAPA 16 — Validação, transição e encerramento

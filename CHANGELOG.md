@@ -4,6 +4,14 @@
 
 ### Adicionado
 
+- Rework, ETAPA 15 ("Artefatos e snapshots") — o Documento do projeto
+  (`/document`) passa a poder ter versões: captura explícita de um
+  snapshot formal imutável e versionado, leitura histórica read-only e
+  retorno ao Atual, sem alterar o Documento vivo. Ver D076–D079
+  (`docs/07-management/decision-log.md`); D079 fecha a etapa e registra o
+  que fica fora (outros kinds, restore, diff, export, approval,
+  Tailoring).
+
 - Rework, ETAPA 14 ("Ações externas maduras") — `ExternalAction` passa a
   suportar `approval` além de `validate_affected_group`: preparada a partir
   de uma Decision pendente, retorna pela faixa/drawer existentes e decide a
