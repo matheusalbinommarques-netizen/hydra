@@ -393,8 +393,10 @@ Próximo ponteiro operacional: `docs/core/CURRENT_WORK.json` aponta para
 corte de S16. D080 congela a semântica inicial: DesiredOutcome tem
 avaliação explícita (alcançado/parcial/não alcançado/ainda não
 verificável, com racional), encerramento é fato explícito e não significa
-sucesso. A próxima decisão relevante é o Design Gate/primeiro corte de
-S16. S16 segue não-IA; a primeira etapa materialmente IA é S17,
+sucesso. D081 congela o Design Gate do corredor `/closure` (avaliação
+explícita dos DesiredOutcomes, confirmação consciente, encerrado ≠
+sucesso, nota opcional; shape técnico, reabertura e read-only fora). A
+próxima decisão relevante é escolher o menor microcorte de S16. S16 segue não-IA; a primeira etapa materialmente IA é S17,
 que exige o boundary de dogfood humano completo do produto integrado
 antes de começar (D067).
 

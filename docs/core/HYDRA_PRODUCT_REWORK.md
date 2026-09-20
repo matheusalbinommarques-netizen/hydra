@@ -2309,6 +2309,26 @@ de S16; não escolhe shape técnico, não faz Design Gate nem microcorte.
   lifecycle/aceite de Deliverable, transição/handoff, pendências
   bloqueando fechamento, vínculo avaliação↔Evidence e snapshot final.
 
+D081 (`docs/07-management/decision-log.md`) congela o Design Gate do
+corredor: `/closure` como workspace maduro de encerramento →
+avaliação explícita de cada DesiredOutcome (quatro estados de D080, com
+racional obrigatório) → readiness → confirmação consciente (`Encerrar
+projeto`) → projeto encerrado → eventual reavaliação posterior de
+outcome `ainda não verificável`. Só a ausência de avaliação bloqueia;
+parcial, negativo e ainda não verificável não bloqueiam, e projeto sem
+DesiredOutcomes pode ser encerrado. Encerrado ≠ sucesso: marca neutra,
+sem linguagem celebratória. Nota de encerramento é opcional, sem seção
+vazia quando ausente. WorkItems/Deliverables, pendências, transição e
+lições aparecem só como contexto factual real, sem política de bloqueio.
+Elasticidade (B) sem comportamento: aceite formal de Deliverable,
+handoff formal, pendências×fechamento, avaliação×Evidence. Fora (C):
+`Project.status`/`ProjectClosure`/schema, reabertura, read-only global,
+lifecycle de Deliverable, sponsor approval, assinatura, Evidence
+obrigatória, histórico de avaliações, snapshot final, PDF/export,
+retenção, IA e S17. O Gate não autoriza implementar tudo que mostra;
+demo data não vira regra de domínio. Não avança `CURRENT_WORK` nem
+escolhe o microcorte.
+
 ---
 
 # 47. ETAPA 17 — IA avançada
